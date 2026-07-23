@@ -1,0 +1,24 @@
+# ADR-0010 — Explicit named barrel in `@crudo/core`
+
+**Status:** accepted (Phase 3)
+
+## Context
+
+`src/index.ts` could `export *` from every module — less maintenance, but
+the public surface would then change as a side effect of adding any
+internal export, and api-extractor diffs would be noisy.
+
+## Decision
+
+The core barrel is an explicit named list, grouped by area. Everything it
+names is public API; everything else is internal regardless of file-level
+`export` keywords. The `exports` map exposes only the barrel (deep imports
+are not API).
+
+## Consequences
+
+- The public surface changes only by editing one reviewed file — the
+  natural input for the Phase 19 api-extractor gate.
+- Module augmentation (`OperationMetadata`, ADR-0007) has a single stable
+  module id to target.
+- Adding an export is a two-step (file + barrel) — deliberate friction.

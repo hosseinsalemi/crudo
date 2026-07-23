@@ -1,0 +1,25 @@
+# ADR-0001 — Clean architecture: core owns all contracts
+
+**Status:** accepted (Phase 1)
+
+## Context
+
+Crudo must stay usable if the ORM or web framework changes, yet v6 builds
+exactly one of each (TypeORM, NestJS). The temptation is to let the edges
+define their own interfaces and have core adapt.
+
+## Decision
+
+Every contract (`CrudService`, `RepositoryAdapter`, `TransactionManager`,
+…) is declared in `@crudo/core`. Edge packages implement or consume core
+contracts; core never imports an edge. Dependency inversion is strict and
+mechanically enforced (dependency-cruiser + project references).
+
+## Consequences
+
+- The adapter seam is real: `@crudo/typeorm` is replaceable by
+  construction, even though no second adapter ships in v6.
+- Core contracts must be designed before edge implementations exist
+  (Milestone A precedes B) — accepted cost of a stable surface.
+- A contract change is a core change with lockstep releases (ADR-0004),
+  never a silent edge divergence.

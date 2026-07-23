@@ -1,0 +1,26 @@
+# ADR-0007 — Module-augmentable `OperationMetadata`
+
+**Status:** accepted (Phase 3; consumed in Phases 11/14)
+
+## Context
+
+Route options (method, path, Swagger overrides) are per-operation
+configuration, but core must stay route-ignorant. Alternatives: a typed
+`http` field in core (leaks HTTP into core), or `Record<string, unknown>`
+(no type safety for the Nest layer).
+
+## Decision
+
+Every registry entry carries `meta: OperationMetadata` — an empty
+interface in core, typed via TypeScript declaration merging by whoever
+consumes it. `@crudo/nest` augments it with a `routes` key. Core's whole
+contract: store it, merge it per Phase 8 precedence, hand it over.
+
+## Consequences
+
+- Framework concerns ride the registry with full typing, zero core
+  awareness; other consumers can add their own keys the same way.
+- Augmentation needs a stable module target — reinforces the single-barrel
+  export surface (ADR-0010).
+- Key collisions between augmenters are theoretically possible; namespaced
+  keys (`routes`) are the convention.
