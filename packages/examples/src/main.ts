@@ -9,10 +9,12 @@ async function bootstrap(): Promise<void> {
   const document = SwaggerModule.createDocument(
     app,
     new DocumentBuilder()
-      .setTitle("Crudo — Milestone B checkpoint")
+      .setTitle("Crudo — Pet example")
       .setDescription(
-        "One entity, full CRUD over HTTP with filtering, sorting, " +
-          "pagination, layered config, and RFC 9457 problem-details errors.",
+        "Cats, dogs, and owners: full CRUD over HTTP with filtering, " +
+          "sorting, pagination, layered config, and RFC 9457 problem-details " +
+          "errors. Single-table inheritance (Cat/Dog) and an Owner relation " +
+          "model the schema; relation includes remain a deferred feature.",
       )
       .setVersion("0.0.0")
       .build(),
@@ -20,7 +22,7 @@ async function bootstrap(): Promise<void> {
   SwaggerModule.setup("docs", app, document);
 
   await app.listen(3000);
-  console.log("Crudo checkpoint app: http://localhost:3000/users (docs at /docs)");
+  console.log("Crudo pet example: http://localhost:3000 — /cats /dogs /owners (docs at /docs)");
 }
 
 void bootstrap();

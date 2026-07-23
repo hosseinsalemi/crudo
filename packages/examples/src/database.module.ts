@@ -1,6 +1,9 @@
 import { Module } from "@nestjs/common";
 import { DataSource } from "typeorm";
-import { User } from "./user.entity.js";
+import { Owner } from "./owner.entity.js";
+import { Pet } from "./pet.entity.js";
+import { Cat } from "./cat.entity.js";
+import { Dog } from "./dog.entity.js";
 
 export const DATA_SOURCE = Symbol("DATA_SOURCE");
 
@@ -17,7 +20,7 @@ export const DATA_SOURCE = Symbol("DATA_SOURCE");
         const dataSource = new DataSource({
           type: "better-sqlite3",
           database: ":memory:",
-          entities: [User],
+          entities: [Owner, Pet, Cat, Dog],
           synchronize: true,
         });
         return dataSource.initialize();

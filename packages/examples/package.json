@@ -2,7 +2,7 @@
   "name": "@crudo/examples",
   "version": "0.0.0",
   "private": true,
-  "description": "Crudo reference application (Milestone B checkpoint: one entity, full CRUD over HTTP).",
+  "description": "Crudo reference application (Pet example: single-table inheritance, a relation, and full CRUD over HTTP).",
   "license": "MIT",
   "type": "module",
   "scripts": {

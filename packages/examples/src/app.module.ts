@@ -3,7 +3,9 @@ import { CrudoModule } from "@crudo/nest";
 import { createTypeOrmInfrastructure } from "@crudo/typeorm";
 import type { DataSource } from "typeorm";
 import { DATA_SOURCE, DatabaseModule } from "./database.module.js";
-import { UserController } from "./user.controller.js";
+import { OwnerController } from "./owner.controller.js";
+import { CatController } from "./cat.controller.js";
+import { DogController } from "./dog.controller.js";
 
 /**
  * Milestone B checkpoint wiring: the app hands `@crudo/nest` its
@@ -23,7 +25,7 @@ import { UserController } from "./user.controller.js";
         },
       }),
     }),
-    CrudoModule.forFeature([UserController]),
+    CrudoModule.forFeature([OwnerController, CatController, DogController]),
   ],
 })
 export class AppModule {}
