@@ -2,3 +2,4 @@ packages:
   - packages/core
   - packages/orms/*
   - packages/frameworks/*
+  - packages/examples

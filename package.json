@@ -10,10 +10,14 @@
     "build": "tsc -b",
     "clean": "tsc -b --clean",
     "depcruise": "depcruise packages --config .dependency-cruiser.cjs",
-    "check": "pnpm run build && pnpm run depcruise"
+    "test": "vitest run",
+    "check": "pnpm run build && pnpm run depcruise && pnpm run test"
   },
   "devDependencies": {
+    "@swc/core": "^1.7.26",
     "dependency-cruiser": "^16.10.0",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "unplugin-swc": "^1.5.1",
+    "vitest": "^3.0.5"
   }
 }
