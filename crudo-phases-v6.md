@@ -23,11 +23,6 @@ built is TypeORM, and the only framework binding built is NestJS.
 Every later phase uses these; deviations are review findings.
 
 - **Packages:** `@crudo/<thing>`, lowercase.
-- **Contracts:** `I` prefix (`ICrudService`) — kept so contract/implementation
-  pairs (`ICrudService`/`CrudService`) don't need awkward `Default*`/`*Impl`
-  names.
-- **Generic parameters:** `T` prefix — `TEntity`, `TCreateDto`, `TUpdateDto`,
-  `TPatchDto`, `TQueryDto`, `TItemDto`, `TListDto`, `TId`.
 - **DTO slots:** `create`, `update`, `patch`, `query`, `item`, `list` —
   bare verbs, because `createOne` and `createMany` share the `create` DTO.
 - **DTO classes:** request bodies are `<Verb><Entity>Dto` (`CreateUserDto`,
@@ -35,7 +30,7 @@ Every later phase uses these; deviations are review findings.
   `<Entity><Slot>Dto` (`UserQueryDto`, `UserItemDto`, `UserListDto`).
 - **`Dto` suffix rule:** every wire-crossing shape carries the `Dto`
   suffix — user DTO classes _and_ framework-owned envelopes and fragments
-  (`IListResultDto`, `IListMetaDto`, `IBulkResultDto`, `IProblemDetailsDto`).
+  (`ListResultDto`, `ListMetaDto`, `BulkResultDto`, `ProblemDetailsDto`).
   Behavioral contracts (services, adapters, registries) never do.
 - **Operations:** camelCase, and every operation names its cardinality
   explicitly — `<verb>One` for single-target (`createOne`, `findOne`,
@@ -43,7 +38,7 @@ Every later phase uses these; deviations are review findings.
   `<verb>Many` for batch (`findMany`, `createMany`, `updateMany`,
   `patchMany`, `deleteMany`, `restoreMany`). Operation ids in config
   (`operations.deleteOne`) use the same names. "Bulk" is the feature term,
-  never a method prefix: config key `bulk`, `/bulk` routes, `IBulkResultDto`.
+  never a method prefix: config key `bulk`, `/bulk` routes, `BulkResultDto`.
 - **Filter operators:** AST enum in SCREAMING_SNAKE (`EQ` … `IS_NOT_NULL`);
   wire tokens in camelCase (`eq` … `isNotNull`), exact-case matched. The
   mapping table in Phase 5 is the single source of truth.
@@ -55,8 +50,8 @@ Every later phase uses these; deviations are review findings.
 - **Factories:** `create*` (`createCrudo`, `createCrud`).
 - **Config keys:** camelCase; booleans phrased positively
   (`exposeInternals`, never `hideInternals`).
-- **Data access:** `IEntityReader` (reads) + `IEntityWriter` (writes);
-  `IRepositoryAdapter` = both. Adapters are named for what they adapt
+- **Data access:** `EntityReader` (reads) + `EntityWriter` (writes);
+  `RepositoryAdapter` = both. Adapters are named for what they adapt
   (`TypeOrmRepositoryAdapter`).
 
 ---
@@ -194,34 +189,34 @@ Milestone C — so the type system is complete before the first line of runtime
 code, and later phases never mutate `@crudo/core` types.
 
 **Required interfaces (v6 set):**
-`ICrudService<TEntity, ...>`, `IRepositoryAdapter<TEntity>`,
-`IEntityReader<TEntity>`, `IEntityWriter<TEntity>` (the read/write halves —
-`IRepositoryAdapter` extends both), `ITransactionManager`, `ISerializer`,
-`IDeserializer`, `IFilterBuilder`, `IFilterParser`, `ICrudContext`,
-`IQueryContext`, `ICrudRequest`, `ICrudResponse`, `IPagination`, `ISort`,
-`IFilter`, `IFieldSelection`, `ICrudException`, `IErrorHandler`.
+`CrudService<Entity, ...>`, `RepositoryAdapter<Entity>`,
+`EntityReader<Entity>`, `EntityWriter<Entity>` (the read/write halves —
+`RepositoryAdapter` extends both), `TransactionManager`, `Serializer`,
+`Deserializer`, `FilterBuilder`, `FilterParser`, `CrudContext`,
+`QueryContext`, `CrudRequest`, `CrudResponse`, `Pagination`, `Sort`,
+`Filter`, `FieldSelection`, `CrudException`, `ErrorHandler`.
 
 **Contracts for later phases (declared now, implemented then):**
 
-- `IRelationRegistry<TEntity>` / `IRelationDescriptor` / `IIncludeResolver` /
+- `RelationRegistry<Entity>` / `RelationDescriptor` / `IncludeResolver` /
   `IncludeTree` — nested includes (Phase 16).
-- `IGlobalConfig` + `IResolvedEntityConfig<TEntity>` — raw global config and
+- `GlobalConfig` + `ResolvedEntityConfig<Entity>` — raw global config and
   the frozen, fully-merged per-entity result (Phase 8).
-- `IOperationRegistry<TEntity>` / `IOperationHandler` / `IOperationMetadata` —
+- `OperationRegistry<Entity>` / `OperationHandler` / `OperationMetadata` —
   the operation table the engine dispatches through (mechanics in Phase 7,
-  control surface in Phase 14). `IOperationMetadata` is the opaque,
+  control surface in Phase 14). `OperationMetadata` is the opaque,
   module-augmentable `meta` slot the NestJS layer uses to attach route
   concerns without core knowing about them (Phase 11).
-- `IBulkResultDto<TItemDto>` — bulk envelope (Phase 15, if bulk is built;
+- `BulkResultDto<ItemDto>` — bulk envelope (Phase 15, if bulk is built;
   otherwise reserved).
-- `FieldPath<TEntity>` — template-literal type for dot-paths (`'profile.city'`)
+- `FieldPath<Entity>` — template-literal type for dot-paths (`'profile.city'`)
   with a hard recursion cap, used by filter/sort/include typings so relation
   paths are spell-checked at compile time.
 
-**DTO-aware generics:** `ICrudService`/`ICrudRequest`/`ICrudResponse` carry
-generic slots for all six DTO positions from Phase 4 — `TCreateDto`,
-`TUpdateDto`, `TPatchDto`, `TQueryDto`, `TItemDto`, `TListDto` — each
-defaulting to a type derived from `TEntity`.
+**DTO-aware generics:** `CrudService`/`CrudRequest`/`CrudResponse` carry
+generic slots for all six DTO positions from Phase 4 — `CreateDto`,
+`UpdateDto`, `PatchDto`, `QueryDto`, `ItemDto`, `ListDto` — each
+defaulting to a type derived from `Entity`.
 
 **Deliverables:**
 
@@ -230,7 +225,7 @@ defaulting to a type derived from `TEntity`.
    example.
 3. `FieldPath` implementation notes: recursion cap, behavior on `any`/index
    signatures, why the cap exists (compiler blowup).
-4. Module-augmentation pattern for `IOperationMetadata`, with a worked example
+4. Module-augmentation pattern for `OperationMetadata`, with a worked example
    showing `@crudo/nest` declaring a `routes` key.
 5. A short note on why `@crudo/core` has zero runtime dependencies.
 
@@ -259,9 +254,9 @@ and "a list of resources."
 | `create` | `POST`                                                                    | Request body for creation                                                              | Entity, minus generated/relation fields          |
 | `update` | `PUT`                                                                     | Request body for full replace                                                          | Same default as `create`                         |
 | `patch`  | `PATCH`                                                                   | Request body for partial update                                                        | `Partial<update>` if set, else `Partial<Entity>` |
-| `query`  | `GET` (list)                                                              | Filters, sort, pagination, field selection, includes, `withDeleted` (Phases 5, 15, 16) | Generic `IQueryContext<Entity>`                  |
+| `query`  | `GET` (list)                                                              | Filters, sort, pagination, field selection, includes, `withDeleted` (Phases 5, 15, 16) | Generic `QueryContext<Entity>`                  |
 | `item`   | Any single-resource response (`GET` one, `POST`, `PUT`, `PATCH`, restore) | Shape of one returned resource                                                         | `Entity`, subject to field selection             |
-| `list`   | `GET` (list) response                                                     | The **element type inside `IListResultDto.items`**                                     | Same as `item`'s resolved type                   |
+| `list`   | `GET` (list) response                                                     | The **element type inside `ListResultDto.items`**                                     | Same as `item`'s resolved type                   |
 
 **Config surface:**
 
@@ -286,12 +281,12 @@ resource).
 **The list envelope (normative):**
 
 ```ts
-interface IListResultDto<TListDto> {
-  items: TListDto[];
+interface ListResultDto<ListDto> {
+  items: ListDto[];
   limit: number; // effective page size the server applied
   offset: number; // zero-based index of items[0] within the full match set
   total: number | null; // total matching items; null when counting is disabled
-  meta: IListMetaDto; // open, extensible bag; core never writes to it
+  meta: ListMetaDto; // open, extensible bag; core never writes to it
 }
 ```
 
@@ -315,20 +310,20 @@ related resource owns its own contract.
 
 **Required interfaces:**
 
-- `IDto` — marker type for anything usable as a DTO.
-- `IOperationDtoMap<TEntity, TCreateDto, TUpdateDto, TPatchDto, TQueryDto, TItemDto, TListDto>`.
-- `IListResultDto<TListDto>` / `IListMetaDto` — as above.
-- `IDtoResolver<TEntity>` — resolves the effective DTO per operation at runtime.
+- `Dto` — marker type for anything usable as a DTO.
+- `OperationDtoMap<Entity, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto>`.
+- `ListResultDto<ListDto>` / `ListMetaDto` — as above.
+- `DtoResolver<Entity>` — resolves the effective DTO per operation at runtime.
 
 **Deliverables:**
 
-1. `IOperationDtoMap`, `IListResultDto`, `IDtoResolver` full definitions.
+1. `OperationDtoMap`, `ListResultDto`, `DtoResolver` full definitions.
 2. Default-derivation rules per slot, precisely specified — including edge
    cases: generated columns, relation properties, getters, embedded objects.
 3. Resolution algorithm: explicit-DTO vs. derived-default, per slot,
    independently; where the resolver result is cached (per entity, at
    bootstrap — not per request).
-4. Interaction with field selection and `ISerializer`; serialization order is
+4. Interaction with field selection and `Serializer`; serialization order is
    DTO mapping → field selection.
 5. The included-relation DTO resolution rule above, precisely specified.
 6. Note that restore (Phase 15) and custom operations (Phase 14) reuse
@@ -342,7 +337,7 @@ subsystem attached to them.
 
 ## PHASE 5 — QUERY MODEL, FILTER ENGINE & QUERY STRING GRAMMAR
 
-**Depends on:** Phase 3 (`IFilter`, `IFilterBuilder`, `IFilterParser`),
+**Depends on:** Phase 3 (`Filter`, `FilterBuilder`, `FilterParser`),
 Phase 4 (`query`).
 
 **Goal:** Design the provider-independent query system, including a fully
@@ -427,9 +422,9 @@ withDeleted: false
 - **Sort:** comma-separated field list; `-` prefix = descending; list order is
   priority order. Relation-path sort (`sort=-profile.rating`) allowed only for
   allowlisted paths.
-- **Pagination:** a pluggable `IPaginationStrategy`. Default: flat
+- **Pagination:** a pluggable `PaginationStrategy`. Default: flat
   `limit`/`offset` (offset 0-based) — the exact field names the
-  `IListResultDto` envelope reports back (Phase 4). A `page[number]`/`page[size]`
+  `ListResultDto` envelope reports back (Phase 4). A `page[number]`/`page[size]`
   strategy (1-indexed, normalized internally to `limit`/`offset`) ships as a
   built-in alternative.
 - **Field selection:** `fields=id,name,email` — sparse fieldset for the root
@@ -461,7 +456,7 @@ withDeleted: false
 1. Query model (normalized shape after `query` DTO parsing).
 2. Filter AST and `FilterExpression` hierarchy, including `NOT` nodes.
 3. Specification Pattern design for composable filters.
-4. Filter Builder and Filter Parser contracts, including `IPaginationStrategy`.
+4. Filter Builder and Filter Parser contracts, including `PaginationStrategy`.
 5. The full grammar specification above (operator table included), as a
    standalone reference document — this becomes end-user documentation
    verbatim.
@@ -486,7 +481,7 @@ a `BulkOperationException` capable of carrying per-item errors. The hierarchy
 is designed now so later phases only add leaves.
 
 **Wire shape:** the default serialized error is an **RFC 9457 problem-details**
-document, `IProblemDetailsDto` (`type`, `title`, `status`, `detail`, plus
+document, `ProblemDetailsDto` (`type`, `title`, `status`, `detail`, plus
 Crudo extensions: `code`, `errors[]` for field-level query issues, `items[]`
 for per-index bulk failures). The NestJS layer maps it 1:1; anyone who wants a
 different shape swaps the serializer, not the hierarchy.
@@ -526,13 +521,13 @@ details leak into responses — off by default.
 
 ```
 Request
- → Operation Resolution        (IOperationRegistry lookup — control surface in Phase 14)
- → Config Resolution           (frozen IResolvedEntityConfig — Phase 8)
+ → Operation Resolution        (OperationRegistry lookup — control surface in Phase 14)
+ → Config Resolution           (frozen ResolvedEntityConfig — Phase 8)
  → DTO Resolution              (explicit DTO, else Phase-4 default)
  → Deserialization
  → Query Resolution            (GET only: `query` → Filter AST; + IncludeTree from Phase 16 ⟨deferred⟩)
  → Repository Adapter call     (transactional once Phase 13 lands ⟨deferred⟩)
- → Response Mapping            (result → item or IListResultDto envelope)
+ → Response Mapping            (result → item or ListResultDto envelope)
  → Field Selection + Serialization
  → Response
 ```
@@ -547,7 +542,7 @@ Crudo — that is the v6 tradeoff, chosen for simplicity.
 default entries — the Phase 14 control surface configures this registry, it
 doesn't introduce it).
 
-**`ICrudContext` contents (specified here, used everywhere):** entity +
+**`CrudContext` contents (specified here, used everywhere):** entity +
 operation identity, resolved config, principal (opaque to core — set by the
 framework layer, available to custom operation handlers), transaction handle
 if any (Phase 13), the parsed query context for reads, correlation id, and a
@@ -623,7 +618,7 @@ phase owns the model, the merge algebra, and the lifecycle.
   global-routes → entity → operation.
 
 **Resolution timing:** all merging happens **once at bootstrap** into a frozen
-`IResolvedEntityConfig<TEntity>` per entity (plus per-operation views). Config
+`ResolvedEntityConfig<Entity>` per entity (plus per-operation views). Config
 is immutable after init — no runtime mutation API; per-call overrides are
 parameters, not config writes. Invalid config fails fast at bootstrap with an
 error naming the entity, the key path, and the offending value.
@@ -642,7 +637,7 @@ error naming the entity, the key path, and the offending value.
 
 **Constraints:** Complete implementation, not just types. Core owns the model
 and merging; `@crudo/nest` only contributes its `routes` keys via the
-`IOperationMetadata` augmentation (Phase 3).
+`OperationMetadata` augmentation (Phase 3).
 
 ---
 
@@ -659,14 +654,14 @@ where each future concern will attach so none of them forces a rewrite.
 **Deliverables:**
 
 1. Adapter architecture and its position relative to `@crudo/core`
-   (`TypeOrmRepositoryAdapter` implementing `IRepositoryAdapter` =
-   `IEntityReader` + `IEntityWriter`).
+   (`TypeOrmRepositoryAdapter` implementing `RepositoryAdapter` =
+   `EntityReader` + `EntityWriter`).
 2. Query translation strategy (Filter AST → TypeORM `QueryBuilder`), including
    `NOT` nodes and relation-path filters (joins added for filtering only,
    without selecting).
 3. Repository API vs. QueryBuilder API — when each is used and why.
 4. Pagination translation (`offset`/`limit` → `skip`/`take`), and the
-   count-query strategy for `IListResultDto.total` — including how `total: null`
+   count-query strategy for `ListResultDto.total` — including how `total: null`
    (counting disabled) skips the count query entirely, and avoiding
    `getManyAndCount` when count is not requested.
 5. **Error mapping table:** driver error → Crudo exception (unique violation →
@@ -688,7 +683,7 @@ where each future concern will attach so none of them forces a rewrite.
 CRUD (hard delete), filtering (incl. relation paths and `NOT`), sorting,
 pagination with optional counting. Translate the Filter AST into `QueryBuilder`
 calls. Consume resolved config (Phase 8) — the adapter reads limits and
-conventions from `IResolvedEntityConfig`, it never re-declares defaults.
+conventions from `ResolvedEntityConfig`, it never re-declares defaults.
 
 **Constraints:** Do not modify `@crudo/core` contracts — revisit Phase 9 if
 something doesn't fit. Write focused integration tests against a real database
@@ -720,7 +715,7 @@ prototype and skips auto-generating that route — no route conflicts, no config
 required for a genuine one-off).
 
 **DTO integration:** a registered DTO drives `@Body()`/`@Query()` types and
-the Swagger schema — list endpoints use the `IListResultDto` envelope
+the Swagger schema — list endpoints use the `ListResultDto` envelope
 (`items`/`limit`/`offset`/`total`/`meta` documented), error responses document
 the Phase 6 problem-details shape per status code. `filter[...]`, `sort`,
 `limit`/`offset`, and `fields` are documented as Swagger query params from the
@@ -762,7 +757,7 @@ exceptions never extend Nest's — the filter is the boundary.
 `CrudControllerFactory`, `@Crud` decorator, and the exception filter.
 
 **Features:** automatic CRUD endpoints for the skeleton scope; query-string
-parsing wired to the Phase 5 grammar; `IListResultDto` envelope on list
+parsing wired to the Phase 5 grammar; `ListResultDto` envelope on list
 routes; Swagger support incl. problem-details error schemas; DI.
 
 **Milestone B checkpoint:** at the end of this phase, a demo app with one
@@ -814,10 +809,10 @@ await transaction(async (ctx) => {
 
 **Deliverables:**
 
-1. `ITransactionManager` and `TransactionContext`; Unit of Work design.
+1. `TransactionManager` and `TransactionContext`; Unit of Work design.
 2. Propagation rules; nested-transaction ADR.
 3. Rollback strategy, including partial-failure semantics.
-4. **TypeORM integration** (`ITransactionManager` → `QueryRunner` /
+4. **TypeORM integration** (`TransactionManager` → `QueryRunner` /
    `EntityManager`), implemented in `@crudo/typeorm`.
 5. **NestJS integration:** how `transaction()` is exposed/injected in a Nest
    app; interaction with request scope.
@@ -836,14 +831,14 @@ all flowing through the same pipeline (DTOs, serialization) that standard CRUD
 operations use.
 
 **Design:** the engine already dispatches every operation through
-`IOperationRegistry<TEntity>` (Phase 7) — the built-in handlers are just
+`OperationRegistry<Entity>` (Phase 7) — the built-in handlers are just
 default registry entries, nothing about them is special-cased. This phase adds
 the developer-facing control surface over that registry. Each entry is an
-`IOperationHandler<TEntity, TInput, TOutput>`:
+`OperationHandler<Entity, Input, Output>`:
 
 ```ts
-interface IOperationHandler<TEntity, TInput, TOutput> {
-  execute(input: TInput, ctx: ICrudContext<TEntity>): Promise<TOutput>;
+interface OperationHandler<Entity, Input, Output> {
+  execute(input: Input, ctx: CrudContext<Entity>): Promise<Output>;
 }
 ```
 
@@ -853,7 +848,7 @@ interface IOperationHandler<TEntity, TInput, TOutput> {
 | **Override** | The registry entry's handler is swapped for a custom one. Same DTO/serialization scaffolding stays in place around it by default.      |
 | **Custom**   | A new entry is added with its own input/output DTOs. Runs through the same pipeline and gets its own generated route in `@crudo/nest`. |
 
-**The `meta` slot:** every registry entry carries an `IOperationMetadata` bag —
+**The `meta` slot:** every registry entry carries an `OperationMetadata` bag —
 opaque to core, typed via module augmentation by whoever consumes it (Phase 3).
 `@crudo/nest` augments it with route options and Swagger overrides. Core's only
 contract: store it, merge it per Phase 8 precedence, hand it to the framework
@@ -886,7 +881,7 @@ createCrud(UserEntity, {
 
 **Deliverables:**
 
-1. `IOperationHandler` control surface over the Phase 7 registry, including the
+1. `OperationHandler` control surface over the Phase 7 registry, including the
    `meta` merge behavior.
 2. Config surface for disable/override/custom, and precedence rules when
    layered with global/entity-level config (Phase 8).
@@ -903,7 +898,7 @@ createCrud(UserEntity, {
 6. Guidance on choosing override (same semantics, new implementation) vs.
    custom operation (a genuinely new endpoint).
 
-**Constraints:** Core-level concept — `IOperationRegistry` has no NestJS or
+**Constraints:** Core-level concept — `OperationRegistry` has no NestJS or
 TypeORM awareness; the framework/ORM layers just read it (including `meta`).
 
 ---
@@ -914,12 +909,12 @@ TypeORM awareness; the framework/ORM layers just read it (including `meta`).
 
 **Design:**
 
-- `ISoftDeletable<TEntity>` — declares the delete-marker field (default:
+- `SoftDeletable<Entity>` — declares the delete-marker field (default:
   `deletedAt: Date | null`, configurable globally in Phase 8, overridable per
   entity).
-- Delete strategy resolution: `hard` (default when not `ISoftDeletable`) vs.
+- Delete strategy resolution: `hard` (default when not `SoftDeletable`) vs.
   `soft` (default when it is) — explicit override always available.
-- `IEntityWriter` gains `restore(id, ctx): Promise<TEntity>`.
+- `EntityWriter` gains `restore(id, ctx): Promise<Entity>`.
 - `findOne`/`findMany` exclude soft-deleted rows by default; `query`'s
   `withDeleted` flag (Phase 5) opts in.
 - New exceptions extending Phase 6's hierarchy for already-deleted /
@@ -931,7 +926,7 @@ TypeORM awareness; the framework/ORM layers just read it (including `meta`).
 
 **Bulk (optional, same phase):** if the batch `*Many` variants are wanted,
 build them here as a thin loop over the single-item pipeline plus the
-`IBulkResultDto<TItemDto>` envelope (`succeeded`, `failed[]`, counts), with
+`BulkResultDto<ItemDto>` envelope (`succeeded`, `failed[]`, counts), with
 `atomic` (one Phase 13 transaction) vs. `bestEffort` (per item) modes and a
 batch-size limit from config. `createMany`/`updateMany`/`patchMany`/
 `deleteMany`/`restoreMany` are **list-based, never filter-based** (no unbounded
@@ -950,7 +945,7 @@ single-item CRUD surface is complete without it.
 
 **Deliverables:**
 
-1. `ISoftDeletable` contract and per-entity/operation delete-strategy config
+1. `SoftDeletable` contract and per-entity/operation delete-strategy config
    keys (added to the Phase 8 schema).
 2. `restoreOne`/`purgeOne` contracts; default-exclusion + `withDeleted`
    behavior, precisely specified.
@@ -959,7 +954,7 @@ single-item CRUD surface is complete without it.
    `withDeleted` translation; restore/purge implementation.
 5. **NestJS integration:** `PATCH /users/:id/restore` and
    `DELETE /users/:id/purge` routes via the registry.
-6. (If bulk built) `IBulkResultDto` design, atomic vs. best-effort semantics,
+6. (If bulk built) `BulkResultDto` design, atomic vs. best-effort semantics,
    and `POST /users/bulk` etc. routes.
 
 **Constraints:** Zero cost for entities that aren't soft-deletable.
@@ -977,8 +972,8 @@ everything between the parsed `include` string and the adapter call, plus the
 adapter translation itself.
 
 **Relation registry:** each entity declares its relations in an
-`IRelationRegistry<TEntity>` (populated from ORM metadata by the adapter,
-overridable in config). Each `IRelationDescriptor` carries:
+`RelationRegistry<Entity>` (populated from ORM metadata by the adapter,
+overridable in config). Each `RelationDescriptor` carries:
 
 - `name`, `target` entity, cardinality (`one` | `many`).
 - `includable: boolean` (default: **false** — inclusion is opt-in, an
@@ -991,7 +986,7 @@ Selectable/filterable/sortable fields of an included node come from the
 **target entity's own config** — a relation never widens what its target
 exposes.
 
-**Include resolution algorithm (`IIncludeResolver`):**
+**Include resolution algorithm (`IncludeResolver`):**
 
 1. Parse comma-separated dot-paths into a tree; overlapping paths merge
    (`posts` + `posts.comments` → one `posts` node with a `comments` child).
@@ -1040,7 +1035,7 @@ case. The decision, its rationale, and the extension point are documented.
 
 **Deliverables:**
 
-1. `IRelationRegistry`, `IRelationDescriptor`, `IIncludeResolver`,
+1. `RelationRegistry`, `RelationDescriptor`, `IncludeResolver`,
    `IncludeTree` implementations (contracts exist since Phase 3).
 2. The resolution algorithm above, precisely specified, with error cases
    mapped to Phase 6 exceptions.
@@ -1086,7 +1081,7 @@ const { items, total, limit, offset } = await userCrud.findMany({
   fields: { posts: ["id", "title"] },
 });
 
-await userCrud.deleteOne(id); // soft delete, if UserEntity is ISoftDeletable
+await userCrud.deleteOne(id); // soft delete, if UserEntity is SoftDeletable
 await userCrud.restoreOne(id);
 
 @Module({ imports: [CrudoModule.forFeature([UserEntity])] })
@@ -1172,7 +1167,7 @@ just publishable once.
 5. **Provenance & supply-chain:** npm provenance/attestation on publish,
    lockfile-based CI installs, dependency audit as a release gate.
 6. **Semver & deprecation policy:** what counts as breaking (adding a required
-   method to `IRepositoryAdapter`, renaming a Phase 6 error code, changing a
+   method to `RepositoryAdapter`, renaming a Phase 6 error code, changing a
    Phase 8 default); pre-1.0 vs. post-1.0 stability commitments, stated
    explicitly. Milestone B may ship as `0.x` so real feedback arrives before
    the C features harden.
