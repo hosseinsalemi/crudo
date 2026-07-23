@@ -13,5 +13,6 @@ export { CrudoModule, type CrudoModuleAsyncOptions } from "./crudo.module.js";
 export type { CrudoModuleOptions } from "./crudo-options.js";
 export { CrudoExceptionFilter } from "./crudo-exception.filter.js";
 export { flattenQuery } from "./flatten-query.js";
+export { enumProp, oneOfArray, type SchemaHint } from "./schema-hints.js";
 export { CRUDO_INSTANCE, CRUDO_MODULE_OPTIONS, getCrudServiceToken } from "./tokens.js";
 export type { CrudHttpMethod, CrudRouteOptions } from "./operation-metadata.js";

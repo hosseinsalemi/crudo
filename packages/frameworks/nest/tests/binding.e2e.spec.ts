@@ -5,7 +5,7 @@ import { Controller, Get, type INestApplication } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { Test } from "@nestjs/testing";
 import type { DefaultCrudService, OperationHandler } from "@crudo/core";
-import { Crud, CrudoModule, getCrudServiceToken } from "@crudo/nest";
+import { Crud, CrudoModule, enumProp, getCrudServiceToken, oneOfArray } from "@crudo/nest";
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
 
 let app: INestApplication;
@@ -279,5 +279,79 @@ describe("@Crud Swagger request-body schemas", () => {
     expect(Object.keys(schema?.properties ?? {})).toEqual(["items", "limit", "offset", "total", "meta"]);
     // Envelope items use the leaner `list` DTO projection.
     expect(Object.keys(schema?.properties?.items?.items?.properties ?? {})).toEqual(["id", "title"]);
+  });
+});
+
+describe("@Crud Swagger schema hints (enum, oneOf)", () => {
+  class VariantA {
+    id = 0;
+    a = "";
+  }
+  class VariantB {
+    id = 0;
+    b = 0;
+  }
+
+  class CreateHintedDto {
+    title = "";
+    size = enumProp(["small", "medium", "large"], { example: "medium" });
+  }
+  class HintedItemDto {
+    id = 0;
+    size = enumProp(["small", "medium", "large"]);
+    children = oneOfArray<VariantA | VariantB>([VariantA, VariantB]);
+  }
+
+  @Crud(Todo, { dto: { create: CreateHintedDto, item: HintedItemDto } })
+  @Controller("todos")
+  class HintedController {}
+
+  type HintSchema = {
+    type?: string;
+    properties?: Record<string, HintSchema>;
+    items?: HintSchema;
+    enum?: readonly (string | number)[];
+    example?: string | number;
+    oneOf?: readonly HintSchema[];
+    title?: string;
+  };
+
+  let document: ReturnType<typeof SwaggerModule.createDocument>;
+  beforeEach(async () => {
+    await bootstrap(HintedController);
+    document = SwaggerModule.createDocument(app, new DocumentBuilder().setTitle("t").setVersion("0").build());
+  });
+
+  const bodySchema = (): HintSchema | undefined =>
+    (document.paths["/todos"] as { post?: { requestBody?: { content?: Record<string, { schema?: HintSchema }> } } })
+      ?.post?.requestBody?.content?.["application/json"]?.schema;
+
+  const itemSchema = (): HintSchema | undefined =>
+    (
+      document.paths["/todos/{id}"] as Record<
+        string,
+        { responses?: Record<string, { content?: Record<string, { schema?: HintSchema }> }> }
+      >
+    )?.get?.responses?.["200"]?.content?.["application/json"]?.schema;
+
+  it("documents an enum field with its allowed values", () => {
+    expect(bodySchema()?.properties?.size).toEqual({
+      type: "string",
+      enum: ["small", "medium", "large"],
+      example: "medium",
+    });
+  });
+
+  it("documents an enum field without an example when none is given", () => {
+    expect(itemSchema()?.properties?.size).toEqual({ type: "string", enum: ["small", "medium", "large"] });
+  });
+
+  it("documents a oneOf array field with per-variant schemas", () => {
+    const children = itemSchema()?.properties?.children;
+    expect(children?.type).toBe("array");
+    expect(children?.items?.oneOf).toEqual([
+      { title: "VariantA", type: "object", properties: { id: { type: "integer" }, a: { type: "string" } } },
+      { title: "VariantB", type: "object", properties: { id: { type: "integer" }, b: { type: "integer" } } },
+    ]);
   });
 });

@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import type { ClassRef, EntityConfig, OperationDescriptor } from "@crudo/core";
 import type { CrudHttpMethod } from "./operation-metadata.js";
+import { isSchemaHint, readSchemaHint, type SchemaHint } from "./schema-hints.js";
 
 interface RouteShape {
   readonly method: CrudHttpMethod;
@@ -234,6 +235,7 @@ function schemaFromDto(bodyDto: ClassRef): { type: "object"; properties: Record<
 
 /** Infer a JSON-schema fragment from a DTO field's initializer value. */
 function jsonSchemaForValue(value: unknown): object {
+  if (isSchemaHint(value)) return schemaForHint(readSchemaHint(value));
   switch (typeof value) {
     case "string":
       return { type: "string" };
@@ -250,6 +252,28 @@ function jsonSchemaForValue(value: unknown): object {
       return {};
     default:
       return {};
+  }
+}
+
+/** Expand a schema hint (enum / oneOf array) into its OpenAPI fragment. */
+function schemaForHint(hint: SchemaHint): object {
+  switch (hint.kind) {
+    case "enum":
+      return {
+        type: hint.numeric ? "number" : "string",
+        enum: [...hint.values],
+        ...(hint.example !== undefined ? { example: hint.example } : {}),
+      };
+    case "oneOfArray":
+      return {
+        type: "array",
+        items: {
+          oneOf: hint.variants.map((variant) => {
+            const schema = schemaFromDto(variant);
+            return schema === null ? { type: "object" } : { title: variant.name, ...schema };
+          }),
+        },
+      };
   }
 }
 
