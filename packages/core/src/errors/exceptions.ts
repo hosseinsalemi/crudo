@@ -108,7 +108,7 @@ export class NotDeletedException extends CrudoException {
   }
 }
 
-/** Calling an operation whose registry entry is disabled (Phase 14). */
+/** Calling an operation whose registry entry is disabled (Phase 13). */
 export class OperationDisabledException extends CrudoException {
   constructor(options: CrudoExceptionOptions = {}) {
     super("CRUDO_OPERATION_DISABLED", options);

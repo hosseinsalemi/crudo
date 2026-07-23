@@ -13,7 +13,7 @@ import type { OperationId } from "../operations/operation.js";
  * - `list` falls back to the registered `item` class ("same as `item`'s
  *   resolved type"), else `null`.
  *
- * Restore (Phase 15) and custom operations (Phase 14) reuse `item`/`list`;
+ * Restore (Phase 14) and custom operations (Phase 13) reuse `item`/`list`;
  * the `operation` argument exists so a later phase *could* specialize per
  * operation, but v6 resolution is slot-driven only.
  */

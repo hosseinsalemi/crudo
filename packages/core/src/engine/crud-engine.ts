@@ -55,7 +55,7 @@ const INPUT_SLOTS: Readonly<Partial<Record<string, DtoSlot>>> = {
  * response mapping → serialization.
  *
  * Every stage boundary is a seam: handlers come from the registry
- * (Phase 14 swaps them), the serializer/deserializer and pagination
+ * (Phase 13 swaps them), the serializer/deserializer and pagination
  * strategies are constructor-injected strategies, and the transaction and
  * include stages hold plain defaults until Phases 13/16 land.
  */

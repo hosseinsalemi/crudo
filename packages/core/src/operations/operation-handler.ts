@@ -29,7 +29,7 @@ export interface OperationMetadata {}
 
 /**
  * The single execution contract every operation flows through — built-in
- * CRUD, overridden, and custom operations alike (Phase 14: one mechanism,
+ * CRUD, overridden, and custom operations alike (Phase 13: one mechanism,
  * three behaviors). Handlers run inside the Phase 7 pipeline and receive
  * the fully-resolved per-request context.
  */

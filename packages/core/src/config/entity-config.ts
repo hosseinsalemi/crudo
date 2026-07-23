@@ -21,7 +21,7 @@ export interface QueryAllowlists<Entity = unknown> {
 }
 
 /**
- * Per-operation configuration (control surface lands in Phase 14).
+ * Per-operation configuration (control surface lands in Phase 13).
  * Settings keys override entity scope for this operation only; `false` in
  * the parent `operations` record disables the operation outright.
  */
@@ -33,7 +33,7 @@ export interface OperationConfig<Entity = unknown> extends DeepPartial<CrudoSett
 }
 
 /**
- * A developer-defined operation (Phase 14). Unlike an override, a custom
+ * A developer-defined operation (Phase 13). Unlike an override, a custom
  * operation declares its own input/output DTOs — its shape isn't
  * guaranteed CRUD-like. Route generation (including the `http: false`
  * service-only mode) is expressed through `meta` by `@crudo/nest`'s
@@ -64,6 +64,6 @@ export interface EntityConfig<
   readonly allowlists?: QueryAllowlists<Entity>;
   /** Per-operation overrides; `false` disables the operation. */
   readonly operations?: Partial<Record<StandardOperationId, OperationConfig<Entity> | false>>;
-  /** New operations, dispatched through the same registry (Phase 14). */
+  /** New operations, dispatched through the same registry (Phase 13). */
   readonly customOperations?: Readonly<Record<string, CustomOperationConfig<Entity>>>;
 }

@@ -20,7 +20,7 @@ export type StandardOperationId =
   | "purgeOne";
 
 /**
- * Any operation id — standard or custom (Phase 14). The `string & {}`
+ * Any operation id — standard or custom (Phase 13). The `string & {}`
  * branch keeps literal-union completions for the standard ids while
  * admitting arbitrary custom names.
  */

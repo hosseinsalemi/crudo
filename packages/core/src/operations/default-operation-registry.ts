@@ -96,7 +96,7 @@ const unboundHandler = (id: OperationId): OperationHandler<unknown> => ({
 
 /**
  * Build one entity's operation registry from its config (Phase 7; the
- * Phase 14 control surface configures exactly this):
+ * Phase 13 control surface configures exactly this):
  *
  * - standard entries first, honoring `operations.<id>: false` (disable)
  *   and `operations.<id>.handler` (override — default scaffolding stays);
