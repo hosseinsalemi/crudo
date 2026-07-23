@@ -1,0 +1,307 @@
+import "reflect-metadata";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { DataSource } from "typeorm";
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from "typeorm";
+import {
+  ConflictException,
+  NotFoundException,
+  QueryValidationException,
+  type CrudoInstance,
+  type DefaultCrudService,
+} from "@crudo/core";
+import { buildEntityMetadata, createTypeOrmCrudo } from "@crudo/typeorm";
+
+// Explicit column types throughout: the swc test transform emits decorator
+// metadata, but explicit types keep entities transform-agnostic.
+@Entity()
+class Author {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column("varchar", { unique: true })
+  email!: string;
+
+  @Column("varchar")
+  name!: string;
+
+  @Column("int")
+  age!: number;
+
+  @Column("varchar", { default: "active" })
+  status!: string;
+
+  @Column("varchar", { nullable: true })
+  bio!: string | null;
+
+  @CreateDateColumn()
+  createdAt!: Date;
+
+  @OneToMany(() => Book, (book) => book.author)
+  books!: Book[];
+}
+
+@Entity()
+class Book {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column("varchar")
+  title!: string;
+
+  @ManyToOne(() => Author, (author) => author.books)
+  author!: Author;
+}
+
+let dataSource: DataSource;
+let crudo: CrudoInstance;
+let authors: DefaultCrudService<Author>;
+
+beforeAll(async () => {
+  dataSource = new DataSource({
+    type: "better-sqlite3",
+    database: ":memory:",
+    entities: [Author, Book],
+    synchronize: true,
+  });
+  await dataSource.initialize();
+  crudo = createTypeOrmCrudo(dataSource);
+  authors = crudo.createCrud(Author) as DefaultCrudService<Author>;
+});
+
+afterAll(async () => {
+  await dataSource.destroy();
+});
+
+beforeEach(async () => {
+  await dataSource.getRepository(Book).clear();
+  await dataSource.getRepository(Author).clear();
+});
+
+async function seed(): Promise<void> {
+  const rows = [
+    { email: "ada@x.io", name: "Ada", age: 36, status: "active" },
+    { email: "grace@x.io", name: "Grace", age: 45, status: "active" },
+    { email: "alan@x.io", name: "Alan", age: 41, status: "banned" },
+    { email: "joan@x.io", name: "Joan", age: 28, status: "pending" },
+  ];
+  for (const row of rows) await authors.createOne(row as never);
+}
+
+describe("metadata derivation (Phase 9 seam)", () => {
+  it("derives fields, id, generated flags, and relations", () => {
+    const metadata = buildEntityMetadata(dataSource, Author);
+    expect(metadata.name).toBe("Author");
+    expect(metadata.idField).toBe("id");
+    const byName = Object.fromEntries(metadata.fields.map((f) => [f.name, f]));
+    expect(byName["id"]).toMatchObject({ kind: "number", generated: true });
+    expect(byName["email"]).toMatchObject({ kind: "string", generated: false });
+    expect(byName["createdAt"]).toMatchObject({ kind: "date", generated: true });
+    expect(byName["bio"]).toMatchObject({ nullable: true });
+    expect(byName["books"]).toBeUndefined(); // relations are not fields
+    expect(metadata.relations.map((r) => r.name)).toEqual(["books"]);
+    expect(metadata.relations[0]).toMatchObject({
+      cardinality: "many",
+      includable: false,
+    });
+  });
+});
+
+describe("TypeOrmRepositoryAdapter — CRUD (Phase 10)", () => {
+  it("creates, reads, updates, patches, deletes against the real database", async () => {
+    const created = await authors.createOne({
+      email: "ada@x.io",
+      name: "Ada",
+      age: 36,
+    } as never);
+    expect(created).toMatchObject({ name: "Ada", status: "active" });
+    const id = (created as Author).id;
+
+    const fetched = await authors.findOne(id);
+    expect(fetched).toMatchObject({ email: "ada@x.io" });
+
+    await authors.updateOne(id, { email: "ada@x.io", name: "Ada L", age: 37 } as never);
+    const patched = await authors.patchOne(id, { age: 38 } as never);
+    expect(patched).toMatchObject({ name: "Ada L", age: 38 });
+
+    await authors.deleteOne(id);
+    await expect(authors.findOne(id)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it("throws NotFound for updates/deletes on missing rows", async () => {
+    await expect(
+      authors.updateOne(4242, { name: "x" } as never),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(authors.deleteOne(4242)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it("maps unique violations to ConflictException (error-mapping table)", async () => {
+    await authors.createOne({ email: "dup@x.io", name: "A", age: 1 } as never);
+    await expect(
+      authors.createOne({ email: "dup@x.io", name: "B", age: 2 } as never),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+});
+
+describe("TypeOrmRepositoryAdapter — query translation", () => {
+  it("filters, sorts, and paginates in the database", async () => {
+    await seed();
+    const list = await authors.findMany({
+      filter: {
+        kind: "condition",
+        field: "status",
+        operator: "EQ",
+        value: "active",
+      },
+      sort: [{ field: "age", direction: "desc" }],
+      limit: 1,
+      offset: 1,
+    });
+    expect(list.items.map((a) => (a as Author).name)).toEqual(["Ada"]);
+    expect(list.total).toBe(2); // total counts all matches, not the page
+    expect(list.limit).toBe(1);
+    expect(list.offset).toBe(1);
+  });
+
+  it("translates OR groups and NOT nodes", async () => {
+    await seed();
+    const either = await authors.findMany({
+      filter: {
+        kind: "group",
+        operator: "OR",
+        children: [
+          { kind: "condition", field: "name", operator: "EQ", value: "Ada" },
+          { kind: "condition", field: "status", operator: "EQ", value: "banned" },
+        ],
+      },
+      sort: [{ field: "name", direction: "asc" }],
+    });
+    expect(either.items.map((a) => (a as Author).name)).toEqual(["Ada", "Alan"]);
+
+    const negated = await authors.findMany({
+      filter: {
+        kind: "group",
+        operator: "NOT",
+        children: [
+          { kind: "condition", field: "status", operator: "EQ", value: "active" },
+        ],
+      },
+      sort: [{ field: "age", direction: "asc" }],
+    });
+    expect(negated.items.map((a) => (a as Author).name)).toEqual(["Joan", "Alan"]);
+  });
+
+  it("translates IN, BETWEEN, LIKE, ILIKE and null checks", async () => {
+    await seed();
+    await authors.patchOne(
+      (await authors.findMany()).items.map((a) => a as Author).find((a) => a.name === "Joan")!.id,
+      { bio: "wrote code" } as never,
+    );
+
+    const inSet = await authors.findMany({
+      filter: {
+        kind: "condition",
+        field: "status",
+        operator: "IN",
+        value: ["banned", "pending"],
+      },
+    });
+    expect(inSet.items).toHaveLength(2);
+
+    const between = await authors.findMany({
+      filter: {
+        kind: "condition",
+        field: "age",
+        operator: "BETWEEN",
+        value: [40, 50],
+      },
+    });
+    expect(between.items.map((a) => (a as Author).name).sort()).toEqual([
+      "Alan",
+      "Grace",
+    ]);
+
+    const like = await authors.findMany({
+      filter: { kind: "condition", field: "name", operator: "LIKE", value: "A%" },
+    });
+    expect(like.items.map((a) => (a as Author).name).sort()).toEqual([
+      "Ada",
+      "Alan",
+    ]);
+
+    const ilike = await authors.findMany({
+      filter: { kind: "condition", field: "name", operator: "ILIKE", value: "a%" },
+    });
+    expect(ilike.items.map((a) => (a as Author).name).sort()).toEqual([
+      "Ada",
+      "Alan",
+    ]);
+
+    const withBio = await authors.findMany({
+      filter: { kind: "condition", field: "bio", operator: "IS_NOT_NULL", value: true },
+    });
+    expect(withBio.items.map((a) => (a as Author).name)).toEqual(["Joan"]);
+  });
+
+  it("matches nothing on an empty IN set instead of erroring", async () => {
+    await seed();
+    const list = await authors.findMany({
+      filter: { kind: "condition", field: "status", operator: "IN", value: [] },
+    });
+    expect(list.items).toHaveLength(0);
+  });
+
+  it("skips the count query when counting is disabled", async () => {
+    await seed();
+    const list = await authors.findMany(undefined, {
+      settings: { pagination: { count: false } },
+    });
+    expect(list.total).toBeNull();
+    expect(list.items).toHaveLength(4);
+  });
+
+  it("still rejects non-allowlisted programmatic filters", async () => {
+    await expect(
+      authors.findMany({
+        filter: {
+          kind: "condition",
+          field: "books.title" as never,
+          operator: "EQ",
+          value: "x",
+        },
+      }),
+    ).rejects.toBeInstanceOf(QueryValidationException);
+  });
+
+  it("filters on relation paths when explicitly allowlisted", async () => {
+    const scoped = crudo.createCrud(Book, {
+      allowlists: { filterable: ["title", "author.name" as never] },
+    }) as DefaultCrudService<Book>;
+    await seed();
+    const ada = (await authors.findMany()).items
+      .map((a) => a as Author)
+      .find((a) => a.name === "Ada")!;
+    await dataSource.getRepository(Book).save([
+      { title: "Notes", author: { id: ada.id } },
+      { title: "Other", author: { id: (ada.id + 1) } },
+    ] as never);
+
+    const list = await scoped.findMany({
+      filter: {
+        kind: "condition",
+        field: "author.name" as never,
+        operator: "EQ",
+        value: "Ada",
+      },
+    });
+    expect(list.items.map((b) => (b as Book).title)).toEqual(["Notes"]);
+  });
+});
