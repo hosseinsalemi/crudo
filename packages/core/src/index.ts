@@ -151,3 +151,103 @@ export type {
   CrudService,
   IdentifiedInput,
 } from "./service/crud-service.js";
+
+// ════════════════════════════════════════════════════════════════════
+// Runtime (Milestone B) — implementations of the contracts above.
+// ════════════════════════════════════════════════════════════════════
+
+// ── Entity metadata seam ──────────────────────────────────────────────
+export type {
+  CrudInfrastructure,
+  EntityMetadata,
+  FieldKind,
+  FieldMetadata,
+} from "./metadata/entity-metadata.js";
+
+// ── Errors ────────────────────────────────────────────────────────────
+export {
+  ERROR_CATALOG,
+  renderMessage,
+  type CatalogedErrorCode,
+  type ErrorCatalogEntry,
+} from "./errors/error-catalog.js";
+export {
+  AlreadyDeletedException,
+  BulkOperationException,
+  ConfigurationException,
+  ConflictException,
+  CrudoException,
+  NotDeletedException,
+  NotFoundException,
+  OperationDisabledException,
+  PersistenceException,
+  QueryValidationException,
+  TransactionException,
+  type CrudoExceptionOptions,
+} from "./errors/exceptions.js";
+export {
+  toProblemDetails,
+  type ProblemDetailsOptions,
+} from "./errors/problem-details-serializer.js";
+export { DefaultErrorHandler } from "./errors/default-error-handler.js";
+
+// ── Configuration runtime ─────────────────────────────────────────────
+export { BUILT_IN_DEFAULTS } from "./config/defaults.js";
+export { deepFreeze, mergeSettings } from "./config/merge-settings.js";
+export { validateSettings } from "./config/validate-settings.js";
+export {
+  describeResolvedConfig,
+  resolveEntityConfig,
+} from "./config/resolve-entity-config.js";
+
+// ── DTO & serialization runtime ───────────────────────────────────────
+export { DefaultDtoResolver } from "./dto/default-dto-resolver.js";
+export { dtoShapeKeys } from "./dto/dto-shape.js";
+export {
+  DefaultDeserializer,
+  DefaultSerializer,
+} from "./serialization/default-serializer.js";
+
+// ── Query runtime ─────────────────────────────────────────────────────
+export { DefaultFilterParser } from "./query/default-filter-parser.js";
+export {
+  OffsetPaginationStrategy,
+  PagePaginationStrategy,
+  builtInPaginationStrategies,
+} from "./query/pagination-strategies.js";
+export { QueryNormalizer } from "./query/query-normalizer.js";
+export { parseBracketKey } from "./query/bracket-notation.js";
+
+// ── Operations & engine runtime ───────────────────────────────────────
+export {
+  DefaultOperationRegistry,
+  STANDARD_OPERATIONS,
+  createOperationRegistry,
+  type StandardHandlerFactory,
+} from "./operations/default-operation-registry.js";
+export {
+  builtInHandlers,
+  type FindManyResult,
+  type IdentifiedWrite,
+} from "./engine/built-in-handlers.js";
+export {
+  CrudEngine,
+  WireQuery,
+  type CrudEngineDependencies,
+} from "./engine/crud-engine.js";
+export {
+  DefaultCrudContextState,
+  createCrudContext,
+  type CrudContextInit,
+} from "./context/default-crud-context.js";
+export { DefaultRelationRegistry } from "./relations/default-relation-registry.js";
+
+// ── Service & root factory ────────────────────────────────────────────
+export { DefaultCrudService } from "./service/default-crud-service.js";
+export {
+  createCrud,
+  createCrudo,
+  type CrudRuntime,
+  type CrudoInstance,
+  type CrudoOptions,
+} from "./crudo.js";
