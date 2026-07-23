@@ -1,0 +1,23 @@
+{
+  "name": "@crudo/nest",
+  "version": "0.0.0",
+  "description": "Crudo NestJS binding — @Crud decorator, registry-driven route generation, problem-details exception filter, Swagger integration.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@crudo/core": "workspace:*"
+  }
+}

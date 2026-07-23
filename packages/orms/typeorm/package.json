@@ -1,0 +1,23 @@
+{
+  "name": "@crudo/typeorm",
+  "version": "0.0.0",
+  "description": "Crudo TypeORM adapter — implements @crudo/core's RepositoryAdapter and TransactionManager over TypeORM.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@crudo/core": "workspace:*"
+  }
+}
