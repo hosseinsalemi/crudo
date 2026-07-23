@@ -19,5 +19,13 @@
   },
   "dependencies": {
     "@crudo/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "typeorm": "^0.3.20"
+  },
+  "devDependencies": {
+    "better-sqlite3": "^12.0.0",
+    "reflect-metadata": "^0.2.2",
+    "typeorm": "^0.3.20"
   }
 }

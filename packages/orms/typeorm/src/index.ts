@@ -1,9 +1,15 @@
 /**
- * @crudo/typeorm — TypeORM adapter for Crudo.
+ * @crudo/typeorm — TypeORM adapter for Crudo (Phases 9–10).
  *
- * Milestone A scaffold: architecture in Phase 9, implementation in
- * Phase 10 (`TypeOrmRepositoryAdapter`, filter-AST → QueryBuilder
- * translation, error mapping). `typeorm` will be a peerDependency,
- * declared in Phase 19.
+ * Implements `@crudo/core`'s `RepositoryAdapter` over a TypeORM
+ * `DataSource` and feeds core's entity-metadata seam from TypeORM
+ * metadata. `typeorm` is a peerDependency; `@crudo/core` never imports it.
  */
-export {};
+export { TypeOrmRepositoryAdapter } from "./typeorm-repository-adapter.js";
+export { FilterTranslator } from "./filter-translator.js";
+export { buildEntityMetadata } from "./metadata.js";
+export { mapDriverError } from "./error-mapping.js";
+export {
+  createTypeOrmCrudo,
+  createTypeOrmInfrastructure,
+} from "./infrastructure.js";
