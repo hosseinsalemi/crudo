@@ -1,7 +1,7 @@
 import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn, TableInheritance } from "typeorm";
 // Type-only import + string relation target keep the Owner↔Pet cycle off the
 // runtime graph (TypeORM resolves "Owner" by entity name at metadata build).
-import type { Owner } from "./owner.entity.js";
+import type { Owner } from "../owner/owner.entity.js";
 
 /**
  * The single-table inheritance base. `Pet` is never served directly — you

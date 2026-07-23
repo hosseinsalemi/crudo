@@ -1,5 +1,5 @@
 import { ChildEntity, Column } from "typeorm";
-import { Pet } from "./pet.entity.js";
+import { Pet } from "../pet/pet.entity.js";
 
 /**
  * A concrete Pet subtype. Child columns must be nullable under single-table

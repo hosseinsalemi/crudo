@@ -1,7 +1,7 @@
 import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 // Type-only import + string relation target keep the Owner↔Pet cycle off the
 // runtime graph (TypeORM resolves "Pet" by entity name at metadata build).
-import type { Pet } from "./pet.entity.js";
+import type { Pet } from "../pet/pet.entity.js";
 
 /**
  * The relation side of the example: an Owner has many Pets. Explicit

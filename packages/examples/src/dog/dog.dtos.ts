@@ -1,5 +1,5 @@
 import { enumProp } from "@crudo/nest";
-import { PetSizeEnum } from "./pet.entity.js";
+import { PetSizeEnum } from "../pet/pet.entity.js";
 
 /**
  * DTO slots for the Dog route (Phase 4). See `cat.dtos.ts` for the rationale

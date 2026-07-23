@@ -1,9 +1,9 @@
 import { Module } from "@nestjs/common";
 import { DataSource } from "typeorm";
-import { Owner } from "./owner.entity.js";
-import { Pet } from "./pet.entity.js";
-import { Cat } from "./cat.entity.js";
-import { Dog } from "./dog.entity.js";
+import { Owner } from "./owner/owner.entity.js";
+import { Pet } from "./pet/pet.entity.js";
+import { Cat } from "./cat/cat.entity.js";
+import { Dog } from "./dog/dog.entity.js";
 
 export const DATA_SOURCE = Symbol("DATA_SOURCE");
 

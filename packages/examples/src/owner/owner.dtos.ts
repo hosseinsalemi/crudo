@@ -1,6 +1,6 @@
 import { oneOfArray } from "@crudo/nest";
-import { CatItemDto } from "./cat.dtos.js";
-import { DogItemDto } from "./dog.dtos.js";
+import { CatItemDto } from "../cat/cat.dtos.js";
+import { DogItemDto } from "../dog/dog.dtos.js";
 
 /**
  * DTO slots for the Owner route (Phase 4). See `cat.dtos.ts` for the
