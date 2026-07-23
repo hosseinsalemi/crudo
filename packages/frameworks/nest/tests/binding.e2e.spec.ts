@@ -2,6 +2,7 @@ import "reflect-metadata";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import { Controller, Get, type INestApplication } from "@nestjs/common";
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { Test } from "@nestjs/testing";
 import type { DefaultCrudService, OperationHandler } from "@crudo/core";
 import { Crud, CrudoModule, getCrudServiceToken } from "@crudo/nest";
@@ -209,5 +210,105 @@ describe("@Crud operation control surface", () => {
     expect(response.body).toMatchObject({ id: 1, done: true });
     // Service-only: no route.
     await request(server()).post("/todos/recalculate").expect(404);
+  });
+});
+
+describe("@Crud Swagger request-body schemas", () => {
+  class CreateTodoDto {
+    title = "";
+    priority = 0;
+    done = false;
+  }
+
+  class TodoItemDto {
+    id = 0;
+    title = "";
+    done = false;
+  }
+
+  class TodoListDto {
+    id = 0;
+    title = "";
+  }
+
+  @Crud(Todo, {
+    dto: { create: CreateTodoDto, item: TodoItemDto, list: TodoListDto },
+  })
+  @Controller("todos")
+  class DocumentedController {}
+
+  let document: ReturnType<typeof SwaggerModule.createDocument>;
+
+  beforeEach(async () => {
+    await bootstrap(DocumentedController);
+    document = SwaggerModule.createDocument(
+      app,
+      new DocumentBuilder().setTitle("t").setVersion("0").build(),
+    );
+  });
+
+  type Schema = {
+    properties?: Record<string, { type: string }>;
+    items?: Schema;
+  };
+
+  const responseSchema = (op: string, status: string): Schema | undefined =>
+    (document.paths["/todos"] as Record<string, { responses?: Record<string, { content?: Record<string, { schema?: Schema }> }> }>)?.[
+      op
+    ]?.responses?.[status]?.content?.["application/json"]?.schema;
+
+  const itemSchema = (op: string, path: string, status: string): Schema | undefined =>
+    (document.paths[path] as Record<string, { responses?: Record<string, { content?: Record<string, { schema?: Schema }> }> }>)?.[
+      op
+    ]?.responses?.[status]?.content?.["application/json"]?.schema;
+
+  it("documents the create body with the DTO's runtime shape", async () => {
+    const schema = document.paths["/todos"]?.post?.requestBody?.content?.[
+      "application/json"
+    ]?.schema as Schema | undefined;
+
+    // The body renders with real fields (not an empty {}): the bug was an
+    // empty schema because @nestjs/swagger can't read runtime initializers.
+    expect(schema?.properties).toBeDefined();
+    expect(Object.keys(schema?.properties ?? {})).toEqual([
+      "title",
+      "priority",
+      "done",
+    ]);
+    expect(schema?.properties?.title).toEqual({ type: "string" });
+    expect(schema?.properties?.priority).toEqual({ type: "integer" });
+    expect(schema?.properties?.done).toEqual({ type: "boolean" });
+  });
+
+  it("documents create/put/patch/get-item responses with the item DTO", () => {
+    for (const [op, path, status] of [
+      ["post", "/todos", "201"],
+      ["put", "/todos/{id}", "200"],
+      ["patch", "/todos/{id}", "200"],
+      ["get", "/todos/{id}", "200"],
+    ] as const) {
+      const schema = itemSchema(op, path, status);
+      expect(Object.keys(schema?.properties ?? {})).toEqual([
+        "id",
+        "title",
+        "done",
+      ]);
+    }
+  });
+
+  it("documents the collection response with the list envelope", () => {
+    const schema = responseSchema("get", "200");
+    expect(Object.keys(schema?.properties ?? {})).toEqual([
+      "items",
+      "limit",
+      "offset",
+      "total",
+      "meta",
+    ]);
+    // Envelope items use the leaner `list` DTO projection.
+    expect(Object.keys(schema?.properties?.items?.items?.properties ?? {})).toEqual([
+      "id",
+      "title",
+    ]);
   });
 });

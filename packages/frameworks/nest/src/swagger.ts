@@ -119,10 +119,16 @@ export function applySwaggerMetadata(
 
   const bodyDto = bodyDtoFor(descriptor, config);
   if (bodyDto !== null) {
-    apply(swagger.ApiBody({ type: bodyDto }));
+    apply(swagger.ApiBody(bodyOptionsFor(bodyDto)));
   }
 
-  apply(swagger.ApiResponse({ status: route.status, description: "Success" }));
+  apply(
+    swagger.ApiResponse({
+      status: route.status,
+      description: "Success",
+      ...successBodyFor(descriptor, route, entity, config),
+    }),
+  );
   apply(
     swagger.ApiResponse({
       status: 400,
@@ -138,6 +144,121 @@ export function applySwaggerMetadata(
         schema: PROBLEM_DETAILS_SCHEMA,
       }),
     );
+  }
+}
+
+/**
+ * Choose how `@ApiBody` documents a DTO. Crudo DTOs carry their shape in
+ * runtime field initializers (no `@ApiProperty` decorators, by design), and
+ * `@nestjs/swagger` cannot read those — passing `{ type }` alone yields an
+ * empty schema, so the request body renders with no fields. When a fresh
+ * instance exposes own enumerable properties we build an explicit JSON
+ * schema from them; when it does not (a `@ApiProperty`-decorated or purely
+ * declarative class) we defer to Swagger's own `{ type }` introspection.
+ */
+function bodyOptionsFor(bodyDto: ClassRef): object {
+  const schema = schemaFromDto(bodyDto);
+  if (schema === null) return { type: bodyDto };
+  return { schema: { title: bodyDto.name, ...schema } };
+}
+
+/**
+ * The success-response schema for a generated route, derived from the
+ * resolved response DTO the same way request bodies are (runtime shape →
+ * explicit JSON schema; decorated/declarative classes fall back to
+ * Swagger's own `{ type }` introspection). Single-item operations document
+ * the `item` DTO (or the entity when no `item` slot is registered);
+ * `findMany` wraps the `list` element in Crudo's list envelope. `deleteOne`
+ * (204) and everything else keep the description-only response.
+ */
+function successBodyFor(
+  descriptor: OperationDescriptor<object>,
+  route: RouteShape,
+  entity: ClassRef,
+  config: EntityConfig<object> | undefined,
+): object {
+  if (route.status === 204) return {};
+  const dto = config?.dto as
+    | { item?: ClassRef; list?: ClassRef }
+    | undefined;
+  switch (descriptor.id) {
+    case "createOne":
+    case "updateOne":
+    case "patchOne":
+    case "findOne": {
+      const itemDto = dto?.item ?? entity;
+      const schema = schemaFromDto(itemDto);
+      return schema === null
+        ? { type: itemDto }
+        : { schema: { title: itemDto.name, ...schema } };
+    }
+    case "findMany": {
+      const listDto = dto?.list ?? dto?.item ?? entity;
+      const element = schemaFromDto(listDto);
+      return { schema: listEnvelopeSchema(element, listDto.name) };
+    }
+    default:
+      return {};
+  }
+}
+
+/** The Phase 4 list envelope, wrapping the resolved list-element schema. */
+function listEnvelopeSchema(
+  element: { type: "object"; properties: Record<string, object> } | null,
+  title: string,
+): object {
+  return {
+    title: `${title}List`,
+    type: "object",
+    properties: {
+      items: {
+        type: "array",
+        items: element ?? { type: "object" },
+      },
+      limit: { type: "integer" },
+      offset: { type: "integer" },
+      total: { type: "integer", nullable: true },
+      meta: { type: "object" },
+    },
+  };
+}
+
+function schemaFromDto(
+  bodyDto: ClassRef,
+): { type: "object"; properties: Record<string, object> } | null {
+  let instance: Record<string, unknown>;
+  try {
+    instance = new (bodyDto as new () => Record<string, unknown>)();
+  } catch {
+    return null;
+  }
+  const keys = Object.keys(instance);
+  if (keys.length === 0) return null;
+  const properties: Record<string, object> = {};
+  for (const key of keys) {
+    properties[key] = jsonSchemaForValue(instance[key]);
+  }
+  return { type: "object", properties };
+}
+
+/** Infer a JSON-schema fragment from a DTO field's initializer value. */
+function jsonSchemaForValue(value: unknown): object {
+  switch (typeof value) {
+    case "string":
+      return { type: "string" };
+    case "number":
+      return Number.isInteger(value) ? { type: "integer" } : { type: "number" };
+    case "boolean":
+      return { type: "boolean" };
+    case "bigint":
+      return { type: "integer" };
+    case "object":
+      if (value instanceof Date) return { type: "string", format: "date-time" };
+      if (Array.isArray(value)) return { type: "array", items: {} };
+      if (value !== null) return { type: "object" };
+      return {};
+    default:
+      return {};
   }
 }
 
