@@ -7,7 +7,7 @@ import { CreateCatDto, UpdateCatDto, CatItemDto, CatListDto } from "./cat.dtos.j
  * CRUD over the concrete `Cat` subtype: one decorator, zero methods.
  * Binding `@Crud` to the child (never the abstract `Pet` base) lets the
  * child repository auto-write the `species` discriminator on create.
- * Routes: POST /cats, GET /cats, GET/PUT/PATCH/DELETE /cats/:id.
+ * Routes: POST /cats, GET /cats, GET/PUT/DELETE /cats/:id (PATCH disabled).
  */
 @Crud(Cat, {
   dto: {
@@ -17,6 +17,9 @@ import { CreateCatDto, UpdateCatDto, CatItemDto, CatListDto } from "./cat.dtos.j
     list: CatListDto,
   },
   pagination: { defaultLimit: 10, maxLimit: 50 },
+  operations: {
+    patchOne: false,
+  },
 })
 @Controller("cats")
 export class CatController {}

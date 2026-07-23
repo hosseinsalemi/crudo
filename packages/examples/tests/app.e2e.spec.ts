@@ -68,8 +68,8 @@ describe("Pet example app", () => {
       .send({ name: "Renamed", age: 4, size: "large", indoor: false, livesLeft: 8 })
       .expect(200);
 
-    const patched = await request(server()).patch(`/cats/${id}`).send({ age: 5 }).expect(200);
-    expect(patched.body).toMatchObject({ name: "Renamed", age: 5 });
+    // patchOne is disabled on CatController — no route generated.
+    await request(server()).patch(`/cats/${id}`).send({ age: 5 }).expect(404);
 
     await request(server()).delete(`/cats/${id}`).expect(204);
     await request(server()).get(`/cats/${id}`).expect(404);
