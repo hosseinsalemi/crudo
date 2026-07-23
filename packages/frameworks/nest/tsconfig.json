@@ -3,7 +3,10 @@
   "compilerOptions": {
     "composite": true,
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "useDefineForClassFields": false
   },
   "include": ["src"],
   "references": [{ "path": "../../core" }]
