@@ -62,13 +62,15 @@ Every later phase uses these; deviations are review findings.
 | ------------------------ | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **A — Blueprint**        | 1–3    | Architecture, monorepo, contracts. No runtime code.                                                                                                                                                                                     |
 | **B — Walking skeleton** | 4–12   | End-to-end basic CRUD (`createOne`/`findOne`/`findMany`/`updateOne`/`patchOne`/`deleteOne`, hard delete) through TypeORM behind generated NestJS routes, with filtering/sorting/pagination, layered config, and problem-details errors. |
-| **C — Core features**    | 13–16  | Transactions, operation control (disable/override/custom), soft delete/restore/purge, nested relation includes.                                                                                                                         |
-| **D — Ship**             | 17–19  | DX polish, reference application, npm release.                                                                                                                                                                                          |
+| **C — Core features**    | 13–15  | Operation control (disable/override/custom), soft delete/restore/purge, nested relation includes.                                                                                                                                       |
+| **D — Ship**             | 16–18  | DX polish, reference application, npm release.                                                                                                                                                                                          |
 
-Deferral mechanics: the skeleton never blocks on later features. Persistence
-is non-transactional until Phase 13, and every seam (soft-delete strategy,
-relation loading, operation registry) exists from Phase 7 with a plain
-default in it until its phase lands.
+Deferral mechanics: the skeleton never blocks on later features. Crudo has no
+standalone cross-cutting transaction system — the one place multi-write
+atomicity matters (bulk `atomic` mode) gets a narrow adapter-level hook
+specified in Phase 9/10, not a dedicated phase. Every other seam (soft-delete
+strategy, relation loading, operation registry) exists from Phase 7 with a
+plain default in it until its phase lands.
 
 ---
 
@@ -86,9 +88,8 @@ default in it until its phase lands.
 `createOne`, `findOne`, `findMany`, `updateOne`, `patchOne`, `deleteOne`,
 `restoreOne`, the `*Many` batch variants, and arbitrary custom operations —
 with filtering, sorting, pagination, nested relation inclusion, field
-selection, optional per-operation DTOs, serialization, transactions, and
-error handling, all configurable at **global, entity, operation, and
-per-call scope**.
+selection, optional per-operation DTOs, serialization, and error handling,
+all configurable at **global, entity, operation, and per-call scope**.
 
 **Requirements:**
 
@@ -102,8 +103,8 @@ per-call scope**.
   inference is a feature — a consumer rarely writes a generic argument by
   hand.
 - Bias toward **one mechanism, several behaviors** over parallel subsystems —
-  DRY is a design constraint (see Phase 14 for where this matters most).
-- Explicit performance posture: no N+1 by default (Phase 16), no unbounded
+  DRY is a design constraint (see Phase 13 for where this matters most).
+- Explicit performance posture: no N+1 by default (Phase 15), no unbounded
   queries (Phase 5 limits).
 - **The milestone plan above is an architectural input:** the design must make
   Milestone B shippable without stubbing out Milestones C–D as hacks — seams,
@@ -146,7 +147,7 @@ packages/
 │  └─ typeorm/      ← @crudo/typeorm
 ├─ frameworks/
 │  └─ nest/         ← @crudo/nest
-├─ examples/        ← the Phase 18 reference application
+├─ examples/        ← the Phase 17 reference application
 └─ docs/
 ```
 
@@ -169,9 +170,9 @@ door open for future adapters without implying any get built now.
    imports are not API).
 6. Build strategy (incremental builds, project references graph).
 7. Versioning strategy (independent vs. lockstep — pick one, justify it; full
-   release mechanics live in Phase 19).
+   release mechanics live in Phase 18).
 8. Note on which packages will have `peerDependencies` (`typeorm`,
-   `@nestjs/*`) vs. `dependencies` — decided here, executed in Phase 19.
+   `@nestjs/*`) vs. `dependencies` — decided here, executed in Phase 18.
 
 **Constraints:** No implementation code. Every package must earn its place.
 
@@ -191,7 +192,7 @@ code, and later phases never mutate `@crudo/core` types.
 **Required interfaces (v6 set):**
 `CrudService<Entity, ...>`, `RepositoryAdapter<Entity>`,
 `EntityReader<Entity>`, `EntityWriter<Entity>` (the read/write halves —
-`RepositoryAdapter` extends both), `TransactionManager`, `Serializer`,
+`RepositoryAdapter` extends both), `Serializer`,
 `Deserializer`, `FilterBuilder`, `FilterParser`, `CrudContext`,
 `QueryContext`, `CrudRequest`, `CrudResponse`, `Pagination`, `Sort`,
 `Filter`, `FieldSelection`, `CrudException`, `ErrorHandler`.
@@ -199,15 +200,15 @@ code, and later phases never mutate `@crudo/core` types.
 **Contracts for later phases (declared now, implemented then):**
 
 - `RelationRegistry<Entity>` / `RelationDescriptor` / `IncludeResolver` /
-  `IncludeTree` — nested includes (Phase 16).
+  `IncludeTree` — nested includes (Phase 15).
 - `GlobalConfig` + `ResolvedEntityConfig<Entity>` — raw global config and
   the frozen, fully-merged per-entity result (Phase 8).
 - `OperationRegistry<Entity>` / `OperationHandler` / `OperationMetadata` —
   the operation table the engine dispatches through (mechanics in Phase 7,
-  control surface in Phase 14). `OperationMetadata` is the opaque,
+  control surface in Phase 13). `OperationMetadata` is the opaque,
   module-augmentable `meta` slot the NestJS layer uses to attach route
   concerns without core knowing about them (Phase 11).
-- `BulkResultDto<ItemDto>` — bulk envelope (Phase 15, if bulk is built;
+- `BulkResultDto<ItemDto>` — bulk envelope (Phase 14, if bulk is built;
   otherwise reserved).
 - `FieldPath<Entity>` — template-literal type for dot-paths (`'profile.city'`)
   with a hard recursion cap, used by filter/sort/include typings so relation
@@ -254,7 +255,7 @@ and "a list of resources."
 | `create` | `POST`                                                                    | Request body for creation                                                              | Entity, minus generated/relation fields          |
 | `update` | `PUT`                                                                     | Request body for full replace                                                          | Same default as `create`                         |
 | `patch`  | `PATCH`                                                                   | Request body for partial update                                                        | `Partial<update>` if set, else `Partial<Entity>` |
-| `query`  | `GET` (list)                                                              | Filters, sort, pagination, field selection, includes, `withDeleted` (Phases 5, 15, 16) | Generic `QueryContext<Entity>`                   |
+| `query`  | `GET` (list)                                                              | Filters, sort, pagination, field selection, includes, `withDeleted` (Phases 5, 14, 15) | Generic `QueryContext<Entity>`                   |
 | `item`   | Any single-resource response (`GET` one, `POST`, `PUT`, `PATCH`, restore) | Shape of one returned resource                                                         | `Entity`, subject to field selection             |
 | `list`   | `GET` (list) response                                                     | The **element type inside `ListResultDto.items`**                                      | Same as `item`'s resolved type                   |
 
@@ -302,7 +303,7 @@ Design notes, stated once:
 - `meta` is the extension seam (e.g. a cursor strategy can add `meta.cursor`)
   without touching the envelope contract.
 
-**Included relations:** when a response embeds an included relation (Phase 16),
+**Included relations:** when a response embeds an included relation (Phase 15),
 the included node's shape is resolved from the **related entity's own
 registered `item`/`list` DTOs** when that entity has a Crudo config, falling
 back to its entity-derived default otherwise. No per-include DTO slot — the
@@ -326,7 +327,7 @@ related resource owns its own contract.
 4. Interaction with field selection and `Serializer`; serialization order is
    DTO mapping → field selection.
 5. The included-relation DTO resolution rule above, precisely specified.
-6. Note that restore (Phase 15) and custom operations (Phase 14) reuse
+6. Note that restore (Phase 14) and custom operations (Phase 13) reuse
    `item`/`list` rather than adding new slots.
 
 **Constraints:** Interfaces and resolution rules only. DTOs in v6 are shapes
@@ -413,7 +414,7 @@ withDeleted: false
 - **Relation-path filtering:** dot notation (`filter[profile.city][eq]=Helsinki`),
   only permitted for paths on the entity's filterable allowlist. Relation-path
   filters **restrict root rows**; they never filter the included collection
-  (that distinction is Phase 16's).
+  (that distinction is Phase 15's).
 - **Nested boolean trees:** `filter` also accepts a single JSON-encoded value
   (`?filter={"or":[...],"not":{...}}`) parsed into the same AST. Bracket
   notation is sugar for the common flat-AND case (with one-level `or`/`not`
@@ -429,12 +430,12 @@ withDeleted: false
   built-in alternative.
 - **Field selection:** `fields=id,name,email` — sparse fieldset for the root
   resource; `fields[<relation>]=...` — sparse fieldset for an included
-  relation (Phase 16). If omitted, everything the resolved DTO allows is
+  relation (Phase 15). If omitted, everything the resolved DTO allows is
   returned.
 - **Relation inclusion:** `include=profile,posts.comments` — surface syntax
-  defined here; loading semantics are Phase 16's. The skeleton parses and
+  defined here; loading semantics are Phase 15's. The skeleton parses and
   rejects `include` as unsupported until then, explicitly — not silently.
-- **Soft delete flag:** `withDeleted=true` (semantics in Phase 15; rejected as
+- **Soft delete flag:** `withDeleted=true` (semantics in Phase 14; rejected as
   unsupported until then).
 
 **Security & robustness:**
@@ -475,8 +476,8 @@ withDeleted: false
 **Exceptions:** `QueryValidationException` (bad filter/sort/include/fields
 input), `NotFoundException`, `ConflictException`, `PersistenceException`,
 `TransactionException`, plus base classes extended by later phases:
-`AlreadyDeletedException` / `NotDeletedException` (Phase 15),
-`OperationDisabledException` (Phase 14), and — reserved for bulk (Phase 15) —
+`AlreadyDeletedException` / `NotDeletedException` (Phase 14),
+`OperationDisabledException` (Phase 13), and — reserved for bulk (Phase 14) —
 a `BulkOperationException` capable of carrying per-item errors. The hierarchy
 is designed now so later phases only add leaves.
 
@@ -489,7 +490,7 @@ different shape swaps the serializer, not the hierarchy.
 **Error catalog:** every exception carries a stable, string-based `code`
 (`CRUDO_NOT_FOUND`, `CRUDO_QUERY_INVALID_FIELD`, …) documented in one catalog
 table: code → HTTP status → when it fires → payload extensions. Codes are API
-surface — renaming one is a breaking change (Phase 19 semver policy).
+surface — renaming one is a breaking change (Phase 18 semver policy).
 
 **Message strategy:** human-readable `detail` strings are built from message
 keys + params so a consumer can localize; core ships English defaults.
@@ -505,7 +506,7 @@ details leak into responses — off by default.
    errors become `PersistenceException` with the original as `cause` — never
    swallowed.
 5. Problem-details serialization strategy, including the per-item bulk shape
-   (reserved now, used in Phase 15).
+   (reserved now, used in Phase 14).
 
 **Constraints:** Must not depend on NestJS's built-in exceptions — mapped in
 `@crudo/nest` (Phases 11–12), not the reverse.
@@ -521,12 +522,14 @@ details leak into responses — off by default.
 
 ```
 Request
- → Operation Resolution        (OperationRegistry lookup — control surface in Phase 14)
+ → Operation Resolution        (OperationRegistry lookup — control surface in Phase 13)
  → Config Resolution           (frozen ResolvedEntityConfig — Phase 8)
  → DTO Resolution              (explicit DTO, else Phase-4 default)
  → Deserialization
- → Query Resolution            (GET only: `query` → Filter AST; + IncludeTree from Phase 16 ⟨deferred⟩)
- → Repository Adapter call     (transactional once Phase 13 lands ⟨deferred⟩)
+ → Query Resolution            (GET only: `query` → Filter AST; + IncludeTree from Phase 15 ⟨deferred⟩)
+ → Repository Adapter call     (single adapter-level unit of work; multi-write
+                                 atomicity, where it's needed, is scoped to
+                                 bulk `atomic` mode — see Phase 9/10, Phase 14)
  → Response Mapping            (result → item or ListResultDto envelope)
  → Field Selection + Serialization
  → Response
@@ -539,14 +542,17 @@ Crudo — that is the v6 tradeoff, chosen for simplicity.
 
 **Implement:** `CrudEngine`, `CrudService`, `CrudOperationExecutor`,
 `CrudContext`, `OperationRegistry` (with the standard operations as its
-default entries — the Phase 14 control surface configures this registry, it
+default entries — the Phase 13 control surface configures this registry, it
 doesn't introduce it).
 
 **`CrudContext` contents (specified here, used everywhere):** entity +
 operation identity, resolved config, principal (opaque to core — set by the
-framework layer, available to custom operation handlers), transaction handle
-if any (Phase 13), the parsed query context for reads, correlation id, and a
-typed per-request `state` bag for custom handlers to pass data.
+framework layer, available to custom operation handlers), the parsed query
+context for reads, correlation id, and a typed per-request `state` bag for
+custom handlers to pass data. There is no ambient transaction handle: Crudo
+has no cross-operation transaction API (see the Milestone Map's deferral
+mechanics note and Phase 9/10's `runInTransaction` hook for the one place
+multi-write atomicity is actually needed).
 
 **Patterns required:** Template Method (the lifecycle above), Strategy
 (adapters/serializers/pagination), Dependency Injection.
@@ -579,9 +585,9 @@ const crudo = createCrudo({
     query: { maxFilterDepth: 3, maxInValues: 100 },
     errors: { exposeInternals: false },
     // keys added by later phases, reserved in the schema now:
-    relations: { maxIncludeDepth: 2, maxIncludedNodes: 10 }, // Phase 16
-    softDelete: { field: "deletedAt" }, // Phase 15
-    bulk: { mode: "atomic", maxBatchSize: 500 }, // Phase 15
+    relations: { maxIncludeDepth: 2, maxIncludedNodes: 10 }, // Phase 15
+    softDelete: { field: "deletedAt" }, // Phase 14
+    bulk: { mode: "atomic", maxBatchSize: 500 }, // Phase 14
   },
 });
 const userCrud = crudo.createCrud(UserEntity, {/* entity config */});
@@ -598,9 +604,9 @@ CrudoModule.forRoot({
 
 The bare `createCrud(Entity)` zero-config path still works — it's an implicit
 root instance with built-in defaults. Nothing about global config may tax the
-zero-config case (Phase 17's constraint).
+zero-config case (Phase 16's constraint).
 
-**Schema extensibility rule:** later feature phases (15, 16, 14) **add keys to
+**Schema extensibility rule:** later feature phases (14, 15, 13) **add keys to
 this schema**; they never add a second config mechanism. Each feature phase's
 deliverables include its config keys, their scopes, and their defaults — this
 phase owns the model, the merge algebra, and the lifecycle.
@@ -643,9 +649,23 @@ and merging; `@crudo/nest` only contributes its `routes` keys via the
 
 **Feature scope (this milestone):** createOne, findOne, findMany, updateOne,
 patchOne, deleteOne (hard); filtering, sorting, pagination. Later features
-extend this adapter in their own phases: transactions (13), soft
-delete/restore/purge (15), relation loading (16). The architecture must show
-where each future concern will attach so none of them forces a rewrite.
+extend this adapter in their own phases: soft delete/restore/purge (14),
+relation loading (15). The architecture must show where each future concern
+will attach so none of them forces a rewrite.
+
+**Transactions, scoped down:** Crudo has no standalone Transaction System
+phase — that surface (propagation modes, ambient context, nested-transaction
+savepoints) was cut because nothing in v6 needs it except one thing: bulk
+`atomic` mode (Phase 14) needs a list of writes to commit or roll back
+together. This phase specifies that need directly as a narrow adapter-level
+hook — `runInTransaction<T>(fn: (adapter: RepositoryAdapter<Entity>) =>
+Promise<T>): Promise<T>` — backed by TypeORM's `QueryRunner`/`EntityManager`.
+It is not part of `CrudContext`, not exposed to application code as a public
+API, and carries no propagation semantics: it exists solely so Phase 14's
+`atomic` bulk mode has somewhere to call. If a consumer needs their own
+multi-entity atomicity across separate `userCrud`/`profileCrud` calls, that's
+out of scope for v6 — they reach for the underlying `DataSource`/`QueryRunner`
+directly, same as they would without Crudo.
 
 **Deliverables:**
 
@@ -664,7 +684,8 @@ where each future concern will attach so none of them forces a rewrite.
    `ConflictException`, FK violation → `ConflictException` with relation
    context, serialization/deadlock → `TransactionException` with a `retryable`
    flag, everything else → `PersistenceException` with `cause`).
-6. Attachment points for Phases 13, 15, 16 (named seams, one paragraph each).
+6. `runInTransaction<T>` hook design (as scoped above), plus attachment
+   points for Phases 14 and 15 (named seams, one paragraph each).
 7. Performance considerations (index-aware filtering/sorting).
 
 **Constraints:** Architecture and decisions only — implementation is Phase 10.
@@ -703,7 +724,7 @@ export class UserController {}
 **Route generation reads the operation registry:** generates a route for every
 enabled operation — in this milestone, the six standard CRUD routes. The
 generation rules are written against the registry, not a hardcoded verb list,
-so later phases (restore/purge in 15, custom operations in 14, bulk in 15) get
+so later phases (restore/purge in 14, custom operations in 13, bulk in 14) get
 routes by adding registry entries — zero changes to the generation mechanism.
 It also skips any operation where a hand-written controller method already
 exists (**manual-method-wins**: the factory detects the method on the class
@@ -758,9 +779,9 @@ routes; Swagger support incl. problem-details error schemas; DI.
 
 **Milestone B checkpoint:** at the end of this phase, a demo app with one
 entity serves working CRUD over HTTP with filtering, sorting, pagination,
-layered config, and problem-details errors — no transactions, no soft delete,
-no relations, no bulk. That app becomes the seed of the Phase 18 reference
-application.
+layered config, and problem-details errors — no operation control, no soft
+delete, no relations, no bulk. That app becomes the seed of the Phase 17
+reference application.
 
 **Constraints:** Production-grade implementation, e2e-tested against a real
 Nest app.
@@ -777,47 +798,7 @@ A feature isn't done until it works over HTTP.
 
 ---
 
-## PHASE 13 — TRANSACTION SYSTEM
-
-**Depends on:** Phases 6, 7, 10.
-
-**Goal:**
-
-```ts
-await transaction(async (ctx) => {
-  await userCrud.createOne(..., { ctx });
-  await profileCrud.createOne(..., { ctx });
-});
-```
-
-**Design decisions to make explicitly:**
-
-- **Propagation modes:** `required` (join ambient transaction, else start one —
-  default), `requiresNew` (always start; suspend semantics), `never` (fail if
-  one is active). Justify the set; keep it minimal.
-- **Context passing:** the explicit `{ ctx }` parameter is the primary API —
-  visible, typed, testable. An optional AsyncLocalStorage integration (ambient
-  transactions, no parameter threading) may ship as an opt-in convenience in
-  the framework layer, never as the core mechanism; document why (ALS is
-  Node-specific and makes data flow invisible).
-- **Nested transactions:** savepoints vs. rejecting nesting — pick one, justify
-  it against the propagation modes above.
-
-**Deliverables:**
-
-1. `TransactionManager` and `TransactionContext`; Unit of Work design.
-2. Propagation rules; nested-transaction ADR.
-3. Rollback strategy, including partial-failure semantics.
-4. **TypeORM integration** (`TransactionManager` → `QueryRunner` /
-   `EntityManager`), implemented in `@crudo/typeorm`.
-5. **NestJS integration:** how `transaction()` is exposed/injected in a Nest
-   app; interaction with request scope.
-
-**Constraints:** `@crudo/core` must not depend on TypeORM.
-
----
-
-## PHASE 14 — OPERATION CONTROL: DISABLE, OVERRIDE & CUSTOM METHODS
+## PHASE 13 — OPERATION CONTROL: DISABLE, OVERRIDE & CUSTOM METHODS
 
 **Depends on:** Phases 4, 7, 8, 11.
 
@@ -899,9 +880,9 @@ TypeORM awareness; the framework/ORM layers just read it (including `meta`).
 
 ---
 
-## PHASE 15 — SOFT DELETE, RESTORE & PURGE
+## PHASE 14 — SOFT DELETE, RESTORE & PURGE
 
-**Depends on:** Phases 3, 7, 10, 13, 14.
+**Depends on:** Phases 3, 7, 10, 13.
 
 **Design:**
 
@@ -916,14 +897,15 @@ TypeORM awareness; the framework/ORM layers just read it (including `meta`).
 - New exceptions extending Phase 6's hierarchy for already-deleted /
   not-deleted-cannot-restore cases, both mapping to `ConflictException`.
 - **Purge:** permanently deleting an already-soft-deleted row is an optional
-  operation (`purgeOne`) registered through the Phase 14 registry, disabled by
+  operation (`purgeOne`) registered through the Phase 13 registry, disabled by
   default.
 - No new DTO slot — restore reuses `item` (Phase 4).
 
 **Bulk (optional, same phase):** if the batch `*Many` variants are wanted,
 build them here as a thin loop over the single-item pipeline plus the
 `BulkResultDto<ItemDto>` envelope (`succeeded`, `failed[]`, counts), with
-`atomic` (one Phase 13 transaction) vs. `bestEffort` (per item) modes and a
+`atomic` (single adapter-level transaction via the Phase 9/10
+`runInTransaction` hook) vs. `bestEffort` (per item) modes and a
 batch-size limit from config. `createMany`/`updateMany`/`patchMany`/
 `deleteMany`/`restoreMany` are **list-based, never filter-based** (no unbounded
 mass writes). If bulk is out of scope for a given build, drop it — the
@@ -957,9 +939,9 @@ single-item CRUD surface is complete without it.
 
 ---
 
-## PHASE 16 — RELATION SYSTEM & NESTED INCLUDES
+## PHASE 15 — RELATION SYSTEM & NESTED INCLUDES
 
-**Depends on:** Phases 3, 4, 5, 8, 10, 15.
+**Depends on:** Phases 3, 4, 5, 8, 10, 14.
 
 **Goal:** First-class, safe, nested relation inclusion —
 `include=posts.comments,profile` — with per-relation control over what may be
@@ -1015,7 +997,7 @@ paginate root ids first.
 
 - **Sparse fieldsets:** primary/foreign keys needed for stitching are always
   fetched internally, then stripped at serialization if not selected.
-- **Soft delete (Phase 15):** soft-deleted related rows are excluded from
+- **Soft delete (Phase 14):** soft-deleted related rows are excluded from
   includes by default. Root-level `withDeleted` applies to the root only; a
   per-include `withDeleted` is deliberately **not** in v6.
 - **DTOs (Phase 4):** included node shape = target entity's registered
@@ -1058,7 +1040,7 @@ touches `@crudo/typeorm`.
 
 ---
 
-## PHASE 17 — DEVELOPER EXPERIENCE API
+## PHASE 16 — DEVELOPER EXPERIENCE API
 
 **Depends on:** Phases 8, 12, and the Milestone C feature set.
 
@@ -1105,9 +1087,9 @@ feature here must be additive, never a tax on the simple case.
 
 ---
 
-## PHASE 18 — REFERENCE APPLICATION
+## PHASE 17 — REFERENCE APPLICATION
 
-**Depends on:** Phases 12, 17 (and exercises everything before them).
+**Depends on:** Phases 12, 16 (and exercises everything before them).
 
 **Goal:** One realistic application that uses every shipped feature, living in
 `packages/examples/`, grown from the Milestone B checkpoint app, serving as
@@ -1117,8 +1099,8 @@ both living documentation and the `@crudo/nest` e2e bed.
 `Project`, `Task`, `Comment`, `Tag`. It must exercise: nested includes ≥ 2
 deep (`project.tasks.comments`), sparse fieldsets on includes, relation-path
 filtering, soft delete + restore on `Task`, a custom operation
-(`POST /tasks/:id/complete`), a cross-service transaction, and global config
-with per-entity overrides.
+(`POST /tasks/:id/complete`), a bulk atomic operation (Phase 14), and global
+config with per-entity overrides.
 
 **Deliverables:**
 
@@ -1133,9 +1115,9 @@ pseudo-code; it runs or it's not in the app.
 
 ---
 
-## PHASE 19 — NPM PUBLISHING & RELEASE ENGINEERING
+## PHASE 18 — NPM PUBLISHING & RELEASE ENGINEERING
 
-**Depends on:** Phase 2, Phase 18 — and effectively everything else; this is
+**Depends on:** Phase 2, Phase 17 — and effectively everything else; this is
 the shipping phase.
 
 **Goal:** Take the finished monorepo (`@crudo/core`, `@crudo/typeorm`,
