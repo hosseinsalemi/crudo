@@ -10,9 +10,5 @@ import type { CrudContext } from "../context/crud-context.js";
  * builder trusts its input — validation happened at parse time.
  */
 export interface FilterBuilder<Entity = unknown, Target = unknown> {
-  apply(
-    filter: Filter<Entity>,
-    target: Target,
-    context: CrudContext<Entity>,
-  ): Target;
+  apply(filter: Filter<Entity>, target: Target, context: CrudContext<Entity>): Target;
 }

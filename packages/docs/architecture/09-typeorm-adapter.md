@@ -41,7 +41,7 @@ explicitly allowlisted in Milestone B).
   translated AST, joins, ORDER BY on joined paths, and skip/take.
 - **Writes → Repository**: entity hydration, column defaults, and
   cascades matter; no dynamic SQL is needed. `update` and `patch` share
-  one load-merge-save primitive — the *shape* of the payload differs at
+  one load-merge-save primitive — the _shape_ of the payload differs at
   the DTO layer (full body vs. sparse), not the persistence mechanics.
   Missing rows raise `NotFoundException` (load returns `null`;
   `delete` checks `affected === 0`).
@@ -57,12 +57,12 @@ dedicated query built from the same filter (sorting stripped) — never
 
 `mapDriverError` — the original error always travels as `cause`:
 
-| Driver condition (PG SQLSTATE / MySQL errno / SQLite code) | Exception |
-| --- | --- |
-| unique violation (`23505` / 1062 / `SQLITE_CONSTRAINT_UNIQUE`·`_PRIMARYKEY`) | `ConflictException` |
-| FK violation (`23503` / 1451·1452 / `SQLITE_CONSTRAINT_FOREIGNKEY`) | `ConflictException` |
-| serialization/deadlock (`40001`·`40P01` / 1213 / `SQLITE_BUSY`) | `TransactionException` (`retryable: true`) |
-| anything else | `PersistenceException` with `cause` |
+| Driver condition (PG SQLSTATE / MySQL errno / SQLite code)                   | Exception                                  |
+| ---------------------------------------------------------------------------- | ------------------------------------------ |
+| unique violation (`23505` / 1062 / `SQLITE_CONSTRAINT_UNIQUE`·`_PRIMARYKEY`) | `ConflictException`                        |
+| FK violation (`23503` / 1451·1452 / `SQLITE_CONSTRAINT_FOREIGNKEY`)          | `ConflictException`                        |
+| serialization/deadlock (`40001`·`40P01` / 1213 / `SQLITE_BUSY`)              | `TransactionException` (`retryable: true`) |
+| anything else                                                                | `PersistenceException` with `cause`        |
 
 ## 6. Attachment points for later phases
 

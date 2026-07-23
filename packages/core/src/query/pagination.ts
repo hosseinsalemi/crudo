@@ -31,8 +31,5 @@ export interface PaginationStrategy {
    * Normalize raw wire params. Missing params fall back to `defaultLimit`;
    * out-of-range values are clamped or rejected per the Phase 5 grammar.
    */
-  normalize(
-    rawParams: Readonly<Record<string, unknown>>,
-    limits: PaginationLimits,
-  ): Pagination;
+  normalize(rawParams: Readonly<Record<string, unknown>>, limits: PaginationLimits): Pagination;
 }

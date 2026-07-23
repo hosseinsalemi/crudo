@@ -33,10 +33,6 @@ export interface OperationMetadata {}
  * three behaviors). Handlers run inside the Phase 7 pipeline and receive
  * the fully-resolved per-request context.
  */
-export interface OperationHandler<
-  Entity = unknown,
-  Input = unknown,
-  Output = unknown,
-> {
+export interface OperationHandler<Entity = unknown, Input = unknown, Output = unknown> {
   execute(input: Input, context: CrudContext<Entity>): Promise<Output>;
 }

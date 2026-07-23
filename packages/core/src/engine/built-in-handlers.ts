@@ -39,9 +39,7 @@ export function builtInHandlers<Entity extends object>(
     });
   };
 
-  const handlers: Partial<
-    Record<StandardOperationId, OperationHandler<Entity, never, unknown>>
-  > = {
+  const handlers: Partial<Record<StandardOperationId, OperationHandler<Entity, never, unknown>>> = {
     createOne: {
       async execute(input: Partial<Entity>, context: CrudContext<Entity>) {
         return adapter.create(input, context);
@@ -54,10 +52,7 @@ export function builtInHandlers<Entity extends object>(
       },
     },
     findMany: {
-      async execute(
-        _input: null,
-        context: CrudContext<Entity>,
-      ): Promise<FindManyResult<Entity>> {
+      async execute(_input: null, context: CrudContext<Entity>): Promise<FindManyResult<Entity>> {
         const query = context.query;
         if (query === null) {
           throw new Error("findMany requires a normalized query on the context");
@@ -68,18 +63,12 @@ export function builtInHandlers<Entity extends object>(
       },
     },
     updateOne: {
-      async execute(
-        input: IdentifiedWrite<Entity>,
-        context: CrudContext<Entity>,
-      ) {
+      async execute(input: IdentifiedWrite<Entity>, context: CrudContext<Entity>) {
         return adapter.update(input.id, input.data, context);
       },
     },
     patchOne: {
-      async execute(
-        input: IdentifiedWrite<Entity>,
-        context: CrudContext<Entity>,
-      ) {
+      async execute(input: IdentifiedWrite<Entity>, context: CrudContext<Entity>) {
         return adapter.patch(input.id, input.data, context);
       },
     },

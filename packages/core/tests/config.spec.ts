@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  BUILT_IN_DEFAULTS,
-  ConfigurationException,
-  mergeSettings,
-  resolveEntityConfig,
-} from "@crudo/core";
+import { BUILT_IN_DEFAULTS, ConfigurationException, mergeSettings, resolveEntityConfig } from "@crudo/core";
 import { User, userMetadata } from "./support/user-fixture.js";
 
 describe("mergeSettings (Phase 8 merge algebra)", () => {
@@ -43,14 +38,7 @@ describe("resolveEntityConfig (Phase 8 bootstrap)", () => {
     expect(config.entityName).toBe("User");
     expect(config.settings.pagination.defaultLimit).toBe(20);
     // Allowlists derive from own scalar columns.
-    expect(config.allowlists.filterable).toEqual([
-      "id",
-      "name",
-      "email",
-      "age",
-      "status",
-      "createdAt",
-    ]);
+    expect(config.allowlists.filterable).toEqual(["id", "name", "email", "age", "status", "createdAt"]);
   });
 
   it("applies the precedence chain global → entity → operation", () => {
@@ -75,9 +63,9 @@ describe("resolveEntityConfig (Phase 8 bootstrap)", () => {
   });
 
   it("fails fast naming entity, key path, and offending value", () => {
-    expect(() =>
-      resolveEntityConfig(userMetadata, { pagination: { maxLimit: -1 } }, undefined),
-    ).toThrowError(ConfigurationException);
+    expect(() => resolveEntityConfig(userMetadata, { pagination: { maxLimit: -1 } }, undefined)).toThrowError(
+      ConfigurationException,
+    );
     try {
       resolveEntityConfig(userMetadata, { pagination: { maxLimit: -1 } }, undefined);
     } catch (error) {
@@ -89,21 +77,13 @@ describe("resolveEntityConfig (Phase 8 bootstrap)", () => {
   });
 
   it("rejects defaultLimit above maxLimit", () => {
-    expect(() =>
-      resolveEntityConfig(
-        userMetadata,
-        { pagination: { defaultLimit: 200 } },
-        undefined,
-      ),
-    ).toThrowError(/exceeds maxLimit/);
+    expect(() => resolveEntityConfig(userMetadata, { pagination: { defaultLimit: 200 } }, undefined)).toThrowError(
+      /exceeds maxLimit/,
+    );
   });
 
   it("uses explicit allowlists verbatim when configured", () => {
-    const config = resolveEntityConfig(
-      userMetadata,
-      { allowlists: { filterable: ["name", "age"] } },
-      undefined,
-    );
+    const config = resolveEntityConfig(userMetadata, { allowlists: { filterable: ["name", "age"] } }, undefined);
     expect(config.allowlists.filterable).toEqual(["name", "age"]);
     // Unconfigured lists still derive.
     expect(config.allowlists.sortable).toContain("email");

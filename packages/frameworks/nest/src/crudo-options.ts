@@ -1,9 +1,4 @@
-import type {
-  CrudInfrastructure,
-  CrudoSettings,
-  DeepPartial,
-  PaginationStrategy,
-} from "@crudo/core";
+import type { CrudInfrastructure, CrudoSettings, DeepPartial, PaginationStrategy } from "@crudo/core";
 
 /**
  * `CrudoModule.forRoot` options — the NestJS skin over core's

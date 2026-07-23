@@ -37,13 +37,9 @@ type PathInto<T, Depth extends 0 | FieldPathDepth> =
                     : NonNullable<T[K]> extends Primitive
                       ? K
                       : NonNullable<T[K]> extends readonly (infer Element)[]
-                        ?
-                            | K
-                            | `${K}.${PathInto<NonNullable<Element>, Prev[Depth]>}`
+                        ? K | `${K}.${PathInto<NonNullable<Element>, Prev[Depth]>}`
                         : NonNullable<T[K]> extends object
-                          ?
-                              | K
-                              | `${K}.${PathInto<NonNullable<T[K]>, Prev[Depth]>}`
+                          ? K | `${K}.${PathInto<NonNullable<T[K]>, Prev[Depth]>}`
                           : K;
                 }[keyof T & string];
 
@@ -59,7 +55,4 @@ type PathInto<T, Depth extends 0 | FieldPathDepth> =
  * This is a *typing* aid, not a security boundary — the runtime allowlist
  * (Phase 5) decides what a request may actually filter, sort, or select on.
  */
-export type FieldPath<
-  Entity,
-  MaxDepth extends FieldPathDepth = 3,
-> = PathInto<Entity, MaxDepth>;
+export type FieldPath<Entity, MaxDepth extends FieldPathDepth = 3> = PathInto<Entity, MaxDepth>;

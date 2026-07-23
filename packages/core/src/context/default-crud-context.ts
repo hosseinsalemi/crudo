@@ -1,8 +1,4 @@
-import type {
-  CrudContext,
-  CrudContextState,
-  StateKey,
-} from "./crud-context.js";
+import type { CrudContext, CrudContextState, StateKey } from "./crud-context.js";
 import type { NormalizedQueryContext } from "../query/query-context.js";
 import type { OperationId } from "../operations/operation.js";
 import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
@@ -32,9 +28,7 @@ export class DefaultCrudContextState implements CrudContextState {
  * `node:crypto` import.
  */
 export function randomUuid(): string {
-  return (
-    globalThis as unknown as { crypto: { randomUUID(): string } }
-  ).crypto.randomUUID();
+  return (globalThis as unknown as { crypto: { randomUUID(): string } }).crypto.randomUUID();
 }
 
 export interface CrudContextInit<Entity> {
@@ -51,9 +45,7 @@ export interface CrudContextInit<Entity> {
  * here when the caller (e.g. a framework layer forwarding an upstream
  * request id) doesn't supply one.
  */
-export function createCrudContext<Entity>(
-  init: CrudContextInit<Entity>,
-): CrudContext<Entity> {
+export function createCrudContext<Entity>(init: CrudContextInit<Entity>): CrudContext<Entity> {
   return {
     entityName: init.config.entityName,
     operation: init.operation,

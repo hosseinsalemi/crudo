@@ -1,9 +1,4 @@
-import type {
-  DynamicModule,
-  ModuleMetadata,
-  Provider,
-  Type,
-} from "@nestjs/common";
+import type { DynamicModule, ModuleMetadata, Provider, Type } from "@nestjs/common";
 import { Module } from "@nestjs/common";
 import { APP_FILTER } from "@nestjs/core";
 import type { CrudoInstance } from "@crudo/core";
@@ -11,18 +6,10 @@ import { ConfigurationException, createCrudo } from "@crudo/core";
 import type { CrudoModuleOptions } from "./crudo-options.js";
 import type { CrudControllerMetadata } from "./crud.decorator.js";
 import { CrudoExceptionFilter } from "./crudo-exception.filter.js";
-import {
-  CRUDO_INSTANCE,
-  CRUDO_MODULE_OPTIONS,
-  CRUD_CONTROLLER_METADATA,
-  getCrudServiceToken,
-} from "./tokens.js";
+import { CRUDO_INSTANCE, CRUDO_MODULE_OPTIONS, CRUD_CONTROLLER_METADATA, getCrudServiceToken } from "./tokens.js";
 
-export interface CrudoModuleAsyncOptions
-  extends Pick<ModuleMetadata, "imports"> {
-  useFactory: (
-    ...args: never[]
-  ) => CrudoModuleOptions | Promise<CrudoModuleOptions>;
+export interface CrudoModuleAsyncOptions extends Pick<ModuleMetadata, "imports"> {
+  useFactory: (...args: never[]) => CrudoModuleOptions | Promise<CrudoModuleOptions>;
   inject?: readonly (string | symbol | Type)[];
 }
 
@@ -47,8 +34,7 @@ export class CrudoModule {
         { provide: CRUDO_MODULE_OPTIONS, useValue: options },
         {
           provide: CRUDO_INSTANCE,
-          useFactory: (resolved: CrudoModuleOptions): CrudoInstance =>
-            createInstance(resolved),
+          useFactory: (resolved: CrudoModuleOptions): CrudoInstance => createInstance(resolved),
           inject: [CRUDO_MODULE_OPTIONS],
         },
         { provide: APP_FILTER, useClass: CrudoExceptionFilter },
@@ -70,8 +56,7 @@ export class CrudoModule {
         },
         {
           provide: CRUDO_INSTANCE,
-          useFactory: (resolved: CrudoModuleOptions): CrudoInstance =>
-            createInstance(resolved),
+          useFactory: (resolved: CrudoModuleOptions): CrudoInstance => createInstance(resolved),
           inject: [CRUDO_MODULE_OPTIONS],
         },
         { provide: APP_FILTER, useClass: CrudoExceptionFilter },
@@ -82,10 +67,7 @@ export class CrudoModule {
 
   static forFeature(controllers: readonly Type[]): DynamicModule {
     const providers: Provider[] = controllers.map((controller) => {
-      const metadata = Reflect.getMetadata(
-        CRUD_CONTROLLER_METADATA,
-        controller,
-      ) as CrudControllerMetadata | undefined;
+      const metadata = Reflect.getMetadata(CRUD_CONTROLLER_METADATA, controller) as CrudControllerMetadata | undefined;
       if (metadata === undefined) {
         throw new ConfigurationException(
           controller.name,
@@ -96,8 +78,7 @@ export class CrudoModule {
       }
       return {
         provide: getCrudServiceToken(metadata.entity),
-        useFactory: (crudo: CrudoInstance) =>
-          crudo.createCrud(metadata.entity, metadata.config),
+        useFactory: (crudo: CrudoInstance) => crudo.createCrud(metadata.entity, metadata.config),
         inject: [CRUDO_INSTANCE],
       };
     });

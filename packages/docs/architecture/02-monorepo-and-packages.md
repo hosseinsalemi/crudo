@@ -108,11 +108,11 @@ publish order) are Phase 19.
 
 ## 8. Dependency classification (decided now, executed in Phase 19)
 
-| Package | `dependencies` | `peerDependencies` |
-| --- | --- | --- |
-| `@crudo/core` | — (none, ever) | — |
-| `@crudo/typeorm` | `@crudo/core` | `typeorm` |
-| `@crudo/nest` | `@crudo/core` | `@nestjs/common`, `@nestjs/core` (+ `@nestjs/swagger` optional) |
+| Package          | `dependencies` | `peerDependencies`                                              |
+| ---------------- | -------------- | --------------------------------------------------------------- |
+| `@crudo/core`    | — (none, ever) | —                                                               |
+| `@crudo/typeorm` | `@crudo/core`  | `typeorm`                                                       |
+| `@crudo/nest`    | `@crudo/core`  | `@nestjs/common`, `@nestjs/core` (+ `@nestjs/swagger` optional) |
 
 Peers, not dependencies, because the consumer's app owns the TypeORM/Nest
 instance — a second copy via a nested dependency would fracture

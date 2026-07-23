@@ -1,9 +1,4 @@
-import type {
-  Filter,
-  FilterCondition,
-  FilterExpression,
-  FilterScalar,
-} from "@crudo/core";
+import type { Filter, FilterCondition, FilterExpression, FilterScalar } from "@crudo/core";
 import { Brackets, NotBrackets, type WhereExpressionBuilder } from "typeorm";
 import type { SelectQueryBuilder, ObjectLiteral } from "typeorm";
 
@@ -72,10 +67,7 @@ export class FilterTranslator<Entity extends ObjectLiteral> {
     });
   }
 
-  private applyCondition(
-    where: WhereExpressionBuilder,
-    condition: FilterCondition<Entity>,
-  ): void {
+  private applyCondition(where: WhereExpressionBuilder, condition: FilterCondition<Entity>): void {
     const column = this.columnRef(condition.field as string);
     const parameter = `p${this.parameterIndex++}`;
     const value = condition.value;
@@ -132,10 +124,10 @@ export class FilterTranslator<Entity extends ObjectLiteral> {
         return;
       case "BETWEEN": {
         const [low, high] = value as readonly FilterScalar[];
-        where.where(
-          `${column} BETWEEN :${parameter}_lo AND :${parameter}_hi`,
-          { [`${parameter}_lo`]: low, [`${parameter}_hi`]: high },
-        );
+        where.where(`${column} BETWEEN :${parameter}_lo AND :${parameter}_hi`, {
+          [`${parameter}_lo`]: low,
+          [`${parameter}_hi`]: high,
+        });
         return;
       }
       case "IS_NULL":

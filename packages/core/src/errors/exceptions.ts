@@ -29,10 +29,7 @@ export abstract class CrudoException extends Error implements CrudException {
   readonly context: ErrorContext;
   override readonly cause?: unknown;
 
-  protected constructor(
-    code: CatalogedErrorCode,
-    options: CrudoExceptionOptions = {},
-  ) {
+  protected constructor(code: CatalogedErrorCode, options: CrudoExceptionOptions = {}) {
     const params = options.messageParams ?? {};
     const detail = renderMessage(code, params);
     super(detail);
@@ -58,19 +55,13 @@ export abstract class CrudoException extends Error implements CrudException {
 export class QueryValidationException extends CrudoException {
   readonly issues: readonly QueryIssueDto[];
 
-  constructor(
-    issues: readonly QueryIssueDto[],
-    options: CrudoExceptionOptions = {},
-  ) {
+  constructor(issues: readonly QueryIssueDto[], options: CrudoExceptionOptions = {}) {
     super("CRUDO_QUERY_INVALID", options);
     this.issues = issues;
   }
 
   /** Convenience for the common single-issue case. */
-  static single(
-    issue: QueryIssueDto,
-    options: CrudoExceptionOptions = {},
-  ): QueryValidationException {
+  static single(issue: QueryIssueDto, options: CrudoExceptionOptions = {}): QueryValidationException {
     return new QueryValidationException([issue], options);
   }
 }
@@ -97,9 +88,7 @@ export class TransactionException extends CrudoException {
   /** Whether retrying the whole transaction may succeed (deadlocks do). */
   readonly retryable: boolean;
 
-  constructor(
-    options: CrudoExceptionOptions & { readonly retryable?: boolean } = {},
-  ) {
+  constructor(options: CrudoExceptionOptions & { readonly retryable?: boolean } = {}) {
     super("CRUDO_TRANSACTION_FAILED", options);
     this.retryable = options.retryable ?? false;
   }
@@ -133,10 +122,7 @@ export class OperationDisabledException extends CrudoException {
 export class BulkOperationException extends CrudoException {
   readonly items: readonly BulkItemIssueDto[];
 
-  constructor(
-    items: readonly BulkItemIssueDto[],
-    options: CrudoExceptionOptions = {},
-  ) {
+  constructor(items: readonly BulkItemIssueDto[], options: CrudoExceptionOptions = {}) {
     super("CRUDO_BULK_FAILED", options);
     this.items = items;
   }

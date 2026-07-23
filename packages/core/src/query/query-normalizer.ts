@@ -7,10 +7,7 @@ import type { FieldPath } from "../types/field-path.js";
 import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
 import type { EntityMetadata } from "../metadata/entity-metadata.js";
 import type { QueryIssueDto } from "../errors/problem-details.js";
-import {
-  ConfigurationException,
-  QueryValidationException,
-} from "../errors/exceptions.js";
+import { ConfigurationException, QueryValidationException } from "../errors/exceptions.js";
 import { DefaultFilterParser } from "./default-filter-parser.js";
 import { builtInPaginationStrategies } from "./pagination-strategies.js";
 import { parseBracketKey } from "./bracket-notation.js";
@@ -31,10 +28,7 @@ export class QueryNormalizer<Entity = unknown> {
   private readonly filterParser: DefaultFilterParser<Entity>;
   private readonly strategies: ReadonlyMap<string, PaginationStrategy>;
 
-  constructor(
-    metadata: EntityMetadata<Entity>,
-    extraStrategies: readonly PaginationStrategy[] = [],
-  ) {
+  constructor(metadata: EntityMetadata<Entity>, extraStrategies: readonly PaginationStrategy[] = []) {
     this.filterParser = new DefaultFilterParser(metadata);
     const strategies = new Map(builtInPaginationStrategies());
     for (const strategy of extraStrategies) {
@@ -115,29 +109,16 @@ export class QueryNormalizer<Entity = unknown> {
 
     const sort = input.sort ?? [];
     for (const entry of sort) {
-      requireAllowlisted(
-        entry.field as string,
-        config.allowlists.sortable,
-        "sorting",
-        issues,
-      );
+      requireAllowlisted(entry.field as string, config.allowlists.sortable, "sorting", issues);
     }
 
     const rootFields = input.fields?.root ?? null;
     if (rootFields != null) {
       for (const field of rootFields) {
-        requireAllowlisted(
-          field as string,
-          config.allowlists.selectable,
-          "selection",
-          issues,
-        );
+        requireAllowlisted(field as string, config.allowlists.selectable, "selection", issues);
       }
     }
-    if (
-      input.fields?.relations !== undefined &&
-      Object.keys(input.fields.relations).length > 0
-    ) {
+    if (input.fields?.relations !== undefined && Object.keys(input.fields.relations).length > 0) {
       issues.push(unsupportedIssue("fields[relation]"));
     }
 
@@ -168,9 +149,7 @@ export class QueryNormalizer<Entity = unknown> {
     };
   }
 
-  private strategyFor(
-    config: ResolvedEntityConfig<Entity>,
-  ): PaginationStrategy {
+  private strategyFor(config: ResolvedEntityConfig<Entity>): PaginationStrategy {
     const name = config.settings.pagination.strategy;
     const strategy = this.strategies.get(name);
     if (strategy === undefined) {
@@ -189,10 +168,7 @@ export class QueryNormalizer<Entity = unknown> {
  * explicitly, never silently (Phase 5): `include` waits on Phase 16,
  * `withDeleted=true` on Phase 15.
  */
-function rejectUnsupported(
-  rawParams: Readonly<Record<string, unknown>>,
-  issues: QueryIssueDto[],
-): void {
+function rejectUnsupported(rawParams: Readonly<Record<string, unknown>>, issues: QueryIssueDto[]): void {
   if (rawParams["include"] !== undefined) {
     issues.push(unsupportedIssue("include"));
   }
@@ -233,9 +209,7 @@ function parseSort<Entity>(
     if (token === "") continue;
     const descending = token.startsWith("-");
     const field = descending ? token.slice(1) : token;
-    if (
-      requireAllowlisted(field, config.allowlists.sortable, "sorting", issues)
-    ) {
+    if (requireAllowlisted(field, config.allowlists.sortable, "sorting", issues)) {
       result.push({
         field: field as FieldPath<Entity>,
         direction: descending ? "desc" : "asc",
@@ -271,14 +245,7 @@ function parseFields<Entity>(
   const root: FieldPath<Entity, 1>[] = [];
   for (const field of raw.split(",")) {
     if (field === "") continue;
-    if (
-      requireAllowlisted(
-        field,
-        config.allowlists.selectable,
-        "selection",
-        issues,
-      )
-    ) {
+    if (requireAllowlisted(field, config.allowlists.selectable, "selection", issues)) {
       root.push(field as FieldPath<Entity, 1>);
     }
   }
@@ -300,12 +267,7 @@ function validateExpression<Entity>(
     return;
   }
   if (expression.kind === "condition") {
-    requireAllowlisted(
-      expression.field as string,
-      config.allowlists.filterable,
-      "filtering",
-      issues,
-    );
+    requireAllowlisted(expression.field as string, config.allowlists.filterable, "filtering", issues);
     const value = expression.value;
     if (Array.isArray(value) && value.length > config.settings.query.maxInValues) {
       issues.push({

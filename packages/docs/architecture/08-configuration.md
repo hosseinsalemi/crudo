@@ -11,16 +11,16 @@ built-in defaults → global (createCrudo) → entity (createCrud)
 
 `BUILT_IN_DEFAULTS` (`core/src/config/defaults.ts`):
 
-| Key | Default | Notes |
-| --- | --- | --- |
-| `pagination.defaultLimit` / `maxLimit` | 20 / 100 | `defaultLimit ≤ maxLimit` enforced |
-| `pagination.strategy` | `"offset"` | `"page"` built in; custom via `paginationStrategies` |
-| `pagination.count` | `true` | `false` skips the count query; envelope reports `total: null` |
-| `query.maxFilterDepth` / `maxInValues` | 3 / 100 | |
-| `errors.exposeInternals` | `false` | leak driver detail into responses |
-| `relations.maxIncludeDepth` / `maxIncludedNodes` | 2 / 10 | reserved for Phase 16 |
-| `softDelete` | `{ field: "deletedAt" }` | reserved for Phase 15; `false` disables |
-| `bulk.mode` / `maxBatchSize` | `"atomic"` / 500 | reserved for Phase 15 |
+| Key                                              | Default                  | Notes                                                         |
+| ------------------------------------------------ | ------------------------ | ------------------------------------------------------------- |
+| `pagination.defaultLimit` / `maxLimit`           | 20 / 100                 | `defaultLimit ≤ maxLimit` enforced                            |
+| `pagination.strategy`                            | `"offset"`               | `"page"` built in; custom via `paginationStrategies`          |
+| `pagination.count`                               | `true`                   | `false` skips the count query; envelope reports `total: null` |
+| `query.maxFilterDepth` / `maxInValues`           | 3 / 100                  |                                                               |
+| `errors.exposeInternals`                         | `false`                  | leak driver detail into responses                             |
+| `relations.maxIncludeDepth` / `maxIncludedNodes` | 2 / 10                   | reserved for Phase 16                                         |
+| `softDelete`                                     | `{ field: "deletedAt" }` | reserved for Phase 15; `false` disables                       |
+| `bulk.mode` / `maxBatchSize`                     | `"atomic"` / 500         | reserved for Phase 15                                         |
 
 **Schema extensibility rule:** feature phases add keys to this schema —
 they never add a second config mechanism. The reserved keys above are
@@ -48,7 +48,7 @@ deep-frozen `ResolvedEntityConfig`: entity-scope settings, precomputed
 per-operation views behind `settingsFor(operation)`, resolved allowlists
 (explicit or derived from own scalar columns), the cached `DtoResolver`,
 and the relation registry. There is no runtime mutation API — per-call
-overrides (`CrudCallOptions.settings`) are merged as *parameters* onto
+overrides (`CrudCallOptions.settings`) are merged as _parameters_ onto
 the operation view inside the engine, validated, and discarded with the
 request.
 

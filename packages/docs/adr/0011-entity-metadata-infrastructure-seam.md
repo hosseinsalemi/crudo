@@ -22,7 +22,7 @@ which is also the unit-test path (in-memory fakes, no ORM).
 
 ## Consequences
 
-- Core stays metadata-*driven* without being metadata-*aware* of any ORM;
+- Core stays metadata-_driven_ without being metadata-_aware_ of any ORM;
   the dependency direction of ADR-0001 holds with runtime code.
 - One extra concept for adapter authors, but it is the entire adapter
   bootstrap contract — everything else is `RepositoryAdapter`.

@@ -8,23 +8,10 @@
  * (ADR-0007). `@nestjs/*` are peerDependencies; `@nestjs/swagger` is
  * optional.
  */
-export {
-  Crud,
-  type CrudControllerMetadata,
-} from "./crud.decorator.js";
-export {
-  CrudoModule,
-  type CrudoModuleAsyncOptions,
-} from "./crudo.module.js";
+export { Crud, type CrudControllerMetadata } from "./crud.decorator.js";
+export { CrudoModule, type CrudoModuleAsyncOptions } from "./crudo.module.js";
 export type { CrudoModuleOptions } from "./crudo-options.js";
 export { CrudoExceptionFilter } from "./crudo-exception.filter.js";
 export { flattenQuery } from "./flatten-query.js";
-export {
-  CRUDO_INSTANCE,
-  CRUDO_MODULE_OPTIONS,
-  getCrudServiceToken,
-} from "./tokens.js";
-export type {
-  CrudHttpMethod,
-  CrudRouteOptions,
-} from "./operation-metadata.js";
+export { CRUDO_INSTANCE, CRUDO_MODULE_OPTIONS, getCrudServiceToken } from "./tokens.js";
+export type { CrudHttpMethod, CrudRouteOptions } from "./operation-metadata.js";

@@ -1,28 +1,8 @@
-import {
-  Body,
-  Delete,
-  Get,
-  HttpCode,
-  Inject,
-  Param,
-  Patch,
-  Post,
-  Put,
-  Query,
-} from "@nestjs/common";
-import type {
-  ClassRef,
-  DefaultCrudService,
-  EntityConfig,
-  OperationDescriptor,
-} from "@crudo/core";
+import { Body, Delete, Get, HttpCode, Inject, Param, Patch, Post, Put, Query } from "@nestjs/common";
+import type { ClassRef, DefaultCrudService, EntityConfig, OperationDescriptor } from "@crudo/core";
 import { WireQuery, createOperationRegistry } from "@crudo/core";
 import type { CrudHttpMethod, CrudRouteOptions } from "./operation-metadata.js";
-import {
-  CRUD_CONTROLLER_METADATA,
-  CRUD_SERVICE_PROPERTY,
-  getCrudServiceToken,
-} from "./tokens.js";
+import { CRUD_CONTROLLER_METADATA, CRUD_SERVICE_PROPERTY, getCrudServiceToken } from "./tokens.js";
 import { flattenQuery } from "./flatten-query.js";
 import { applySwaggerMetadata } from "./swagger.js";
 
@@ -33,9 +13,7 @@ export interface CrudControllerMetadata {
 }
 
 /** The default route shape of each standard operation (Phase 11). */
-const STANDARD_ROUTES: Readonly<
-  Record<string, { method: CrudHttpMethod; path: string; status: number }>
-> = {
+const STANDARD_ROUTES: Readonly<Record<string, { method: CrudHttpMethod; path: string; status: number }>> = {
   createOne: { method: "POST", path: "", status: 201 },
   findMany: { method: "GET", path: "", status: 200 },
   findOne: { method: "GET", path: ":id", status: 200 },
@@ -48,10 +26,7 @@ const STANDARD_ROUTES: Readonly<
   purgeOne: { method: "DELETE", path: ":id/purge", status: 204 },
 };
 
-const METHOD_DECORATORS: Record<
-  CrudHttpMethod,
-  (path: string) => MethodDecorator
-> = {
+const METHOD_DECORATORS: Record<CrudHttpMethod, (path: string) => MethodDecorator> = {
   GET: Get,
   POST: Post,
   PUT: Put,
@@ -87,25 +62,15 @@ interface ResolvedRoute {
  * is the only moment that works. The service instance arrives later, via
  * the `forFeature` provider, through property injection.
  */
-export function Crud(
-  entity: ClassRef,
-  config?: EntityConfig<object>,
-): ClassDecorator {
+export function Crud(entity: ClassRef, config?: EntityConfig<object>): ClassDecorator {
   return (target) => {
     const controller = target as unknown as {
       prototype: Record<string, unknown>;
     };
-    Reflect.defineMetadata(
-      CRUD_CONTROLLER_METADATA,
-      { entity, config } satisfies CrudControllerMetadata,
-      target,
-    );
+    Reflect.defineMetadata(CRUD_CONTROLLER_METADATA, { entity, config } satisfies CrudControllerMetadata, target);
     // Property injection: generated methods reach the bound service via
     // `this[CRUD_SERVICE_PROPERTY]` without touching the constructor.
-    Inject(getCrudServiceToken(entity))(
-      controller.prototype,
-      CRUD_SERVICE_PROPERTY,
-    );
+    Inject(getCrudServiceToken(entity))(controller.prototype, CRUD_SERVICE_PROPERTY);
 
     const registry = createOperationRegistry(config);
     for (const descriptor of registry.all()) {
@@ -113,36 +78,22 @@ export function Crud(
       const route = resolveRoute(descriptor);
       if (route === null) continue;
       const methodName = descriptor.id;
-      if (
-        Object.prototype.hasOwnProperty.call(controller.prototype, methodName)
-      ) {
+      if (Object.prototype.hasOwnProperty.call(controller.prototype, methodName)) {
         continue; // manual-method-wins
       }
       defineRoute(controller.prototype, methodName, descriptor, route);
-      applySwaggerMetadata(
-        controller.prototype,
-        methodName,
-        descriptor,
-        route,
-        entity,
-        config,
-      );
+      applySwaggerMetadata(controller.prototype, methodName, descriptor, route, entity, config);
     }
   };
 }
 
-function resolveRoute(
-  descriptor: OperationDescriptor<object>,
-): ResolvedRoute | null {
+function resolveRoute(descriptor: OperationDescriptor<object>): ResolvedRoute | null {
   const options: CrudRouteOptions = descriptor.meta.routes ?? {};
   if (options.enabled === false) return null; // service-only
   const standard = STANDARD_ROUTES[descriptor.id];
   const method = options.method ?? standard?.method ?? "POST";
   const path = options.path ?? standard?.path ?? descriptor.id;
-  const status =
-    options.successStatus ??
-    standard?.status ??
-    (method === "POST" ? 201 : 200);
+  const status = options.successStatus ?? standard?.status ?? (method === "POST" ? 201 : 200);
   return { method, path, status, hasIdParam: path.includes(":id") };
 }
 
@@ -159,18 +110,11 @@ function defineRoute(
     writable: true,
     configurable: true,
   });
-  const propertyDescriptor = Object.getOwnPropertyDescriptor(
-    prototype,
-    methodName,
-  ) as PropertyDescriptor;
+  const propertyDescriptor = Object.getOwnPropertyDescriptor(prototype, methodName) as PropertyDescriptor;
 
   applyParamDecorators(prototype, methodName, descriptor, route);
   HttpCode(route.status)(prototype, methodName, propertyDescriptor);
-  METHOD_DECORATORS[route.method](route.path)(
-    prototype,
-    methodName,
-    propertyDescriptor,
-  );
+  METHOD_DECORATORS[route.method](route.path)(prototype, methodName, propertyDescriptor);
 }
 
 /**
@@ -223,10 +167,7 @@ function makeHandler(
       };
     case "findOne":
       return async function (this: BoundController, id: unknown, query: unknown) {
-        return this[CRUD_SERVICE_PROPERTY].findOne(
-          id as never,
-          wire(query) as never,
-        );
+        return this[CRUD_SERVICE_PROPERTY].findOne(id as never, wire(query) as never);
       };
     case "updateOne":
       return async function (this: BoundController, id: unknown, body: unknown) {
@@ -258,7 +199,5 @@ function makeHandler(
 }
 
 function wire(query: unknown): WireQuery {
-  return new WireQuery(
-    flattenQuery((query ?? {}) as Readonly<Record<string, unknown>>),
-  );
+  return new WireQuery(flattenQuery((query ?? {}) as Readonly<Record<string, unknown>>));
 }

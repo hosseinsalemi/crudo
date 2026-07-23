@@ -17,9 +17,7 @@ import { TypeOrmRepositoryAdapter } from "./typeorm-repository-adapter.js";
  * derivation and adapter construction are bootstrap work, not
  * per-request work).
  */
-export function createTypeOrmInfrastructure(
-  dataSource: DataSource,
-): CrudInfrastructure {
+export function createTypeOrmInfrastructure(dataSource: DataSource): CrudInfrastructure {
   const metadataCache = new Map<ClassRef, EntityMetadata>();
   const adapterCache = new Map<ClassRef, RepositoryAdapter>();
 
@@ -35,10 +33,7 @@ export function createTypeOrmInfrastructure(
     adapterFor<Entity extends object>(entity: ClassRef<Entity>) {
       let adapter = adapterCache.get(entity);
       if (adapter === undefined) {
-        adapter = new TypeOrmRepositoryAdapter(
-          dataSource,
-          entity as ClassRef<ObjectLiteral>,
-        ) as RepositoryAdapter;
+        adapter = new TypeOrmRepositoryAdapter(dataSource, entity as ClassRef<ObjectLiteral>) as RepositoryAdapter;
         adapterCache.set(entity, adapter);
       }
       return adapter as RepositoryAdapter<Entity>;

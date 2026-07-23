@@ -1,18 +1,6 @@
-import type {
-  ClassRef,
-  CrudContext,
-  EntityId,
-  NormalizedQueryContext,
-  RepositoryAdapter,
-} from "@crudo/core";
+import type { ClassRef, CrudContext, EntityId, NormalizedQueryContext, RepositoryAdapter } from "@crudo/core";
 import { NotFoundException } from "@crudo/core";
-import type {
-  DataSource,
-  DeepPartial,
-  ObjectLiteral,
-  Repository,
-  SelectQueryBuilder,
-} from "typeorm";
+import type { DataSource, DeepPartial, ObjectLiteral, Repository, SelectQueryBuilder } from "typeorm";
 import { FilterTranslator } from "./filter-translator.js";
 import { mapDriverError } from "./error-mapping.js";
 
@@ -32,9 +20,7 @@ import { mapDriverError } from "./error-mapping.js";
  * `delete`/`restore`/`purge` and the query methods' `withDeleted`
  * (Phase 15), include loading extends `buildQuery` (Phase 16).
  */
-export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral>
-  implements RepositoryAdapter<Entity>
-{
+export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements RepositoryAdapter<Entity> {
   private readonly repository: Repository<Entity>;
   private readonly alias: string;
   private readonly idField: string;
@@ -54,19 +40,14 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral>
     context: CrudContext<Entity>,
   ): Promise<Entity | null> {
     try {
-      const qb = this.repository
-        .createQueryBuilder(this.alias)
-        .where(`${this.alias}.${this.idField} = :id`, { id });
+      const qb = this.repository.createQueryBuilder(this.alias).where(`${this.alias}.${this.idField} = :id`, { id });
       return await qb.getOne();
     } catch (error) {
       throw mapDriverError(error, errorContext(context));
     }
   }
 
-  async findOne(
-    query: NormalizedQueryContext<Entity>,
-    context: CrudContext<Entity>,
-  ): Promise<Entity | null> {
+  async findOne(query: NormalizedQueryContext<Entity>, context: CrudContext<Entity>): Promise<Entity | null> {
     try {
       return await this.buildQuery(query).take(1).getOne();
     } catch (error) {
@@ -74,24 +55,15 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral>
     }
   }
 
-  async findMany(
-    query: NormalizedQueryContext<Entity>,
-    context: CrudContext<Entity>,
-  ): Promise<readonly Entity[]> {
+  async findMany(query: NormalizedQueryContext<Entity>, context: CrudContext<Entity>): Promise<readonly Entity[]> {
     try {
-      return await this.buildQuery(query)
-        .skip(query.pagination.offset)
-        .take(query.pagination.limit)
-        .getMany();
+      return await this.buildQuery(query).skip(query.pagination.offset).take(query.pagination.limit).getMany();
     } catch (error) {
       throw mapDriverError(error, errorContext(context));
     }
   }
 
-  async count(
-    query: NormalizedQueryContext<Entity>,
-    context: CrudContext<Entity>,
-  ): Promise<number> {
+  async count(query: NormalizedQueryContext<Entity>, context: CrudContext<Entity>): Promise<number> {
     try {
       // A dedicated count query — never getManyAndCount: the engine only
       // calls this when `query.count` is true, so `total: null` costs
@@ -112,10 +84,7 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral>
     translator.apply(query.filter);
     if (options.sorted !== false) {
       for (const sort of query.sort) {
-        qb.addOrderBy(
-          translator.columnRef(sort.field as string),
-          sort.direction === "desc" ? "DESC" : "ASC",
-        );
+        qb.addOrderBy(translator.columnRef(sort.field as string), sort.direction === "desc" ? "DESC" : "ASC");
       }
     }
     return qb;
@@ -123,10 +92,7 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral>
 
   // ── Writes (Repository API) ─────────────────────────────────────────
 
-  async create(
-    data: Partial<Entity>,
-    context: CrudContext<Entity>,
-  ): Promise<Entity> {
+  async create(data: Partial<Entity>, context: CrudContext<Entity>): Promise<Entity> {
     try {
       const entity = this.repository.create(data as DeepPartial<Entity>);
       return await this.repository.save(entity);
@@ -135,19 +101,11 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral>
     }
   }
 
-  async update(
-    id: EntityId,
-    data: Partial<Entity>,
-    context: CrudContext<Entity>,
-  ): Promise<Entity> {
+  async update(id: EntityId, data: Partial<Entity>, context: CrudContext<Entity>): Promise<Entity> {
     return this.mergeAndSave(id, data, context);
   }
 
-  async patch(
-    id: EntityId,
-    data: Partial<Entity>,
-    context: CrudContext<Entity>,
-  ): Promise<Entity> {
+  async patch(id: EntityId, data: Partial<Entity>, context: CrudContext<Entity>): Promise<Entity> {
     return this.mergeAndSave(id, data, context);
   }
 
@@ -156,11 +114,7 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral>
    * `data` differs (full body vs. sparse) because the DTO layer differs,
    * not the persistence mechanics.
    */
-  private async mergeAndSave(
-    id: EntityId,
-    data: Partial<Entity>,
-    context: CrudContext<Entity>,
-  ): Promise<Entity> {
+  private async mergeAndSave(id: EntityId, data: Partial<Entity>, context: CrudContext<Entity>): Promise<Entity> {
     try {
       const existing = await this.repository.findOneBy({
         [this.idField]: id,
@@ -185,17 +139,11 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral>
   }
 
   async restore(id: EntityId, context: CrudContext<Entity>): Promise<Entity> {
-    throw mapDriverError(
-      new Error("restore requires soft delete (Phase 15)"),
-      errorContext(context),
-    );
+    throw mapDriverError(new Error("restore requires soft delete (Phase 15)"), errorContext(context));
   }
 
   async purge(id: EntityId, context: CrudContext<Entity>): Promise<void> {
-    throw mapDriverError(
-      new Error("purge requires soft delete (Phase 15)"),
-      errorContext(context),
-    );
+    throw mapDriverError(new Error("purge requires soft delete (Phase 15)"), errorContext(context));
   }
 
   private notFound(id: EntityId, context: CrudContext<Entity>): NotFoundException {

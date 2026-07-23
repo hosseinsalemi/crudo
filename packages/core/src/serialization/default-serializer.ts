@@ -30,11 +30,7 @@ export class DefaultSerializer<Entity = unknown> implements Serializer<Entity> {
     const projection = dtoShapeKeys(dto) ?? this.defaultProjection;
     const selection = context.query?.fields.root;
     const keys =
-      selection == null
-        ? projection
-        : projection.filter((key) =>
-            (selection as readonly string[]).includes(key),
-          );
+      selection == null ? projection : projection.filter((key) => (selection as readonly string[]).includes(key));
     const source = entity as Record<string, unknown>;
     const result: Record<string, unknown> = {};
     for (const key of keys) {
@@ -59,22 +55,14 @@ export class DefaultSerializer<Entity = unknown> implements Serializer<Entity> {
  * (generated columns, relation properties) is the safe default: a client
  * cannot write `id` or `createdAt` by including them in a body.
  */
-export class DefaultDeserializer<Entity = unknown>
-  implements Deserializer<Entity>
-{
+export class DefaultDeserializer<Entity = unknown> implements Deserializer<Entity> {
   private readonly writableProjection: readonly string[];
 
   constructor(metadata: EntityMetadata<Entity>) {
-    this.writableProjection = metadata.fields
-      .filter((field) => !field.generated)
-      .map((field) => field.name);
+    this.writableProjection = metadata.fields.filter((field) => !field.generated).map((field) => field.name);
   }
 
-  deserialize<Shape>(
-    raw: unknown,
-    dto: DtoClass<Shape & object> | null,
-    _context: CrudContext<Entity>,
-  ): Shape {
+  deserialize<Shape>(raw: unknown, dto: DtoClass<Shape & object> | null, _context: CrudContext<Entity>): Shape {
     if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
       return {} as Shape;
     }

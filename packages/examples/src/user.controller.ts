@@ -1,12 +1,7 @@
 import { Controller } from "@nestjs/common";
 import { Crud } from "@crudo/nest";
 import { User } from "./user.entity.js";
-import {
-  CreateUserDto,
-  UpdateUserDto,
-  UserItemDto,
-  UserListDto,
-} from "./user.dtos.js";
+import { CreateUserDto, UpdateUserDto, UserItemDto, UserListDto } from "./user.dtos.js";
 
 /**
  * The whole Milestone B developer surface: one decorator, zero methods.

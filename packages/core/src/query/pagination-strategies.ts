@@ -1,8 +1,4 @@
-import type {
-  Pagination,
-  PaginationLimits,
-  PaginationStrategy,
-} from "./pagination.js";
+import type { Pagination, PaginationLimits, PaginationStrategy } from "./pagination.js";
 import { QueryValidationException } from "../errors/exceptions.js";
 
 /**
@@ -18,10 +14,7 @@ import { QueryValidationException } from "../errors/exceptions.js";
 export class OffsetPaginationStrategy implements PaginationStrategy {
   readonly name = "offset";
 
-  normalize(
-    rawParams: Readonly<Record<string, unknown>>,
-    limits: PaginationLimits,
-  ): Pagination {
+  normalize(rawParams: Readonly<Record<string, unknown>>, limits: PaginationLimits): Pagination {
     const limit = readBoundedInt(rawParams["limit"], "limit", 1);
     const offset = readBoundedInt(rawParams["offset"], "offset", 0);
     return {
@@ -39,10 +32,7 @@ export class OffsetPaginationStrategy implements PaginationStrategy {
 export class PagePaginationStrategy implements PaginationStrategy {
   readonly name = "page";
 
-  normalize(
-    rawParams: Readonly<Record<string, unknown>>,
-    limits: PaginationLimits,
-  ): Pagination {
+  normalize(rawParams: Readonly<Record<string, unknown>>, limits: PaginationLimits): Pagination {
     const number = readBoundedInt(rawParams["page[number]"], "page[number]", 1);
     const size = readBoundedInt(rawParams["page[size]"], "page[size]", 1);
     const limit = Math.min(size ?? limits.defaultLimit, limits.maxLimit);
@@ -54,22 +44,12 @@ export class PagePaginationStrategy implements PaginationStrategy {
 }
 
 /** Built-in strategies, keyed by the `pagination.strategy` config value. */
-export function builtInPaginationStrategies(): ReadonlyMap<
-  string,
-  PaginationStrategy
-> {
-  const strategies = [
-    new OffsetPaginationStrategy(),
-    new PagePaginationStrategy(),
-  ];
+export function builtInPaginationStrategies(): ReadonlyMap<string, PaginationStrategy> {
+  const strategies = [new OffsetPaginationStrategy(), new PagePaginationStrategy()];
   return new Map(strategies.map((strategy) => [strategy.name, strategy]));
 }
 
-function readBoundedInt(
-  raw: unknown,
-  param: string,
-  minimum: number,
-): number | null {
+function readBoundedInt(raw: unknown, param: string, minimum: number): number | null {
   if (raw === undefined || raw === null || raw === "") return null;
   const value = Number(String(raw));
   if (!Number.isInteger(value) || value < minimum) {

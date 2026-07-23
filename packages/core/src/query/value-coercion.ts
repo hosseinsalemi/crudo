@@ -53,30 +53,18 @@ export function coerceScalar(
     }
     case "enum": {
       if (metadata.enumValues?.includes(text)) return text;
-      return issue(
-        field,
-        text,
-        `member of [${(metadata.enumValues ?? []).join(", ")}]`,
-      );
+      return issue(field, text, `member of [${(metadata.enumValues ?? []).join(", ")}]`);
     }
     case "json":
       return issue(field, text, "filterable column (json columns cannot be compared)");
   }
 }
 
-export function isIssue(
-  value: FilterScalar | QueryIssueDto,
-): value is QueryIssueDto {
-  return (
-    typeof value === "object" && value !== null && !(value instanceof Date)
-  );
+export function isIssue(value: FilterScalar | QueryIssueDto): value is QueryIssueDto {
+  return typeof value === "object" && value !== null && !(value instanceof Date);
 }
 
-function issue(
-  field: string,
-  value: string,
-  expected: FieldKind | string,
-): QueryIssueDto {
+function issue(field: string, value: string, expected: FieldKind | string): QueryIssueDto {
   return {
     field,
     code: "CRUDO_QUERY_INVALID_VALUE",

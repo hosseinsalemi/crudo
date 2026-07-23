@@ -1,10 +1,4 @@
-import type {
-  Filter,
-  FilterCondition,
-  FilterExpression,
-  FilterOperator,
-  FilterScalar,
-} from "./filter.js";
+import type { Filter, FilterCondition, FilterExpression, FilterOperator, FilterScalar } from "./filter.js";
 import type { FilterParser } from "./filter-parser.js";
 import type { FieldPath } from "../types/field-path.js";
 import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
@@ -48,19 +42,14 @@ const LOGICAL_TOKENS = new Set(["and", "or", "not"]);
  * `QueryValidationException` (a 400 listing *all* problems), never a
  * silent drop.
  */
-export class DefaultFilterParser<Entity = unknown>
-  implements FilterParser<Entity>
-{
+export class DefaultFilterParser<Entity = unknown> implements FilterParser<Entity> {
   private readonly fields: ReadonlyMap<string, FieldMetadata>;
 
   constructor(metadata: EntityMetadata<Entity>) {
     this.fields = new Map(metadata.fields.map((field) => [field.name, field]));
   }
 
-  parse(
-    rawParams: Readonly<Record<string, unknown>>,
-    config: ResolvedEntityConfig<Entity>,
-  ): Filter<Entity> {
+  parse(rawParams: Readonly<Record<string, unknown>>, config: ResolvedEntityConfig<Entity>): Filter<Entity> {
     const issues: QueryIssueDto[] = [];
     const roots: FilterExpression<Entity>[] = [];
 
@@ -107,9 +96,7 @@ export class DefaultFilterParser<Entity = unknown>
   }
 
   /** Fold every `filter[...]` param into one nested node tree. */
-  private collectBracketTree(
-    rawParams: Readonly<Record<string, unknown>>,
-  ): Record<string, unknown> | null {
+  private collectBracketTree(rawParams: Readonly<Record<string, unknown>>): Record<string, unknown> | null {
     const tree: Record<string, unknown> = {};
     let found = false;
     for (const [key, value] of Object.entries(rawParams)) {
@@ -121,10 +108,7 @@ export class DefaultFilterParser<Entity = unknown>
     return found ? tree : null;
   }
 
-  private parseJsonFilter(
-    json: string,
-    issues: QueryIssueDto[],
-  ): Record<string, unknown> | null {
+  private parseJsonFilter(json: string, issues: QueryIssueDto[]): Record<string, unknown> | null {
     try {
       const parsed: unknown = JSON.parse(json);
       if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
@@ -186,11 +170,7 @@ export class DefaultFilterParser<Entity = unknown>
       return;
     }
     if (token === "not") {
-      const child = this.convertNode(
-        value as Record<string, unknown>,
-        config,
-        issues,
-      );
+      const child = this.convertNode(value as Record<string, unknown>, config, issues);
       if (child !== null) {
         out.push({ kind: "group", operator: "NOT", children: [child] });
       }
@@ -208,11 +188,7 @@ export class DefaultFilterParser<Entity = unknown>
         });
         continue;
       }
-      const child = this.convertNode(
-        branch as Record<string, unknown>,
-        config,
-        issues,
-      );
+      const child = this.convertNode(branch as Record<string, unknown>, config, issues);
       if (child !== null) children.push(child);
     }
     if (children.length > 0) {
@@ -231,9 +207,7 @@ export class DefaultFilterParser<Entity = unknown>
     issues: QueryIssueDto[],
     out: FilterExpression<Entity>[],
   ): void {
-    if (
-      !(config.allowlists.filterable as readonly string[]).includes(field)
-    ) {
+    if (!(config.allowlists.filterable as readonly string[]).includes(field)) {
       issues.push({
         field,
         code: "CRUDO_QUERY_INVALID_FIELD",
@@ -289,8 +263,7 @@ export class DefaultFilterParser<Entity = unknown>
           return null;
         }
         const flip = flag === "false";
-        const effective =
-          (operator === "IS_NULL") !== flip ? "IS_NULL" : "IS_NOT_NULL";
+        const effective = (operator === "IS_NULL") !== flip ? "IS_NULL" : "IS_NOT_NULL";
         return { kind: "condition", field: path, operator: effective, value: true };
       }
       case "IN":
@@ -397,11 +370,7 @@ function expressionDepth(expression: FilterExpression<unknown>): number {
  * (the repeated-key form `filter[status][in][]=a&filter[status][in][]=b`)
  * appends into an array at the parent key instead.
  */
-function assignPath(
-  tree: Record<string, unknown>,
-  segments: readonly string[],
-  value: unknown,
-): void {
+function assignPath(tree: Record<string, unknown>, segments: readonly string[], value: unknown): void {
   const append = segments[segments.length - 1] === "";
   const path = append ? segments.slice(0, -1) : segments;
   if (path.length === 0) return;
@@ -410,11 +379,7 @@ function assignPath(
   for (let i = 0; i < path.length - 1; i++) {
     const segment = path[i] as string;
     const existing = node[segment];
-    if (
-      typeof existing === "object" &&
-      existing !== null &&
-      !Array.isArray(existing)
-    ) {
+    if (typeof existing === "object" && existing !== null && !Array.isArray(existing)) {
       node = existing as Record<string, unknown>;
     } else {
       const next: Record<string, unknown> = {};
@@ -427,7 +392,7 @@ function assignPath(
     const existing = node[last];
     const bucket = Array.isArray(existing)
       ? (existing as unknown[])
-      : (node[last] = existing === undefined ? [] : [existing]) as unknown[];
+      : ((node[last] = existing === undefined ? [] : [existing]) as unknown[]);
     if (Array.isArray(value)) bucket.push(...(value as unknown[]));
     else bucket.push(value);
     return;

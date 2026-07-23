@@ -27,9 +27,7 @@ module.exports = {
     {
       name: "typeorm-only-imports-core",
       severity: "error",
-      comment:
-        "@crudo/typeorm may depend on @crudo/core and the typeorm peer — " +
-        "never on @crudo/nest.",
+      comment: "@crudo/typeorm may depend on @crudo/core and the typeorm peer — " + "never on @crudo/nest.",
       from: { path: "^packages/orms/typeorm" },
       to: { path: "^packages/frameworks" },
     },

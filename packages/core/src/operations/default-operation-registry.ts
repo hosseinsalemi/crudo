@@ -1,21 +1,11 @@
-import type {
-  OperationDescriptor,
-  OperationRegistry,
-} from "./operation-registry.js";
-import type {
-  OperationCardinality,
-  OperationId,
-  OperationKind,
-  StandardOperationId,
-} from "./operation.js";
+import type { OperationDescriptor, OperationRegistry } from "./operation-registry.js";
+import type { OperationCardinality, OperationId, OperationKind, StandardOperationId } from "./operation.js";
 import type { OperationHandler } from "./operation-handler.js";
 import type { EntityConfig } from "../config/entity-config.js";
 import { ConfigurationException } from "../errors/exceptions.js";
 
 /** Map-backed operation registry (Phase 7), insertion-ordered. */
-export class DefaultOperationRegistry<Entity = unknown>
-  implements OperationRegistry<Entity>
-{
+export class DefaultOperationRegistry<Entity = unknown> implements OperationRegistry<Entity> {
   private readonly entries = new Map<OperationId, OperationDescriptor<Entity>>();
 
   get(id: OperationId): OperationDescriptor<Entity> | undefined {
@@ -75,9 +65,7 @@ interface StandardOperationShape {
  * `OperationDisabledException`, and no route is generated — a real seam,
  * not a TODO.
  */
-export const STANDARD_OPERATIONS: Readonly<
-  Record<StandardOperationId, StandardOperationShape>
-> = Object.freeze({
+export const STANDARD_OPERATIONS: Readonly<Record<StandardOperationId, StandardOperationShape>> = Object.freeze({
   createOne: { kind: "write", cardinality: "one", enabled: true },
   createMany: { kind: "write", cardinality: "many", enabled: false },
   findOne: { kind: "read", cardinality: "one", enabled: true },
@@ -94,17 +82,14 @@ export const STANDARD_OPERATIONS: Readonly<
 });
 
 /** Provides the handler for one standard operation id. */
-export type StandardHandlerFactory<Entity> = (
-  id: StandardOperationId,
-) => OperationHandler<Entity>;
+export type StandardHandlerFactory<Entity> = (id: StandardOperationId) => OperationHandler<Entity>;
 
 const unboundHandler = (id: OperationId): OperationHandler<unknown> => ({
   execute(): Promise<never> {
     throw new ConfigurationException(
       "unknown",
       `operations.${id}`,
-      `operation '${id}' has no bound handler — this registry was built ` +
-        `for inspection (route generation) only`,
+      `operation '${id}' has no bound handler — this registry was built ` + `for inspection (route generation) only`,
     );
   },
 });
@@ -128,27 +113,19 @@ export function createOperationRegistry<Entity extends object>(
   const registry = new DefaultOperationRegistry<Entity>();
   const operations = config?.operations ?? {};
 
-  for (const [id, shape] of Object.entries(STANDARD_OPERATIONS) as [
-    StandardOperationId,
-    StandardOperationShape,
-  ][]) {
+  for (const [id, shape] of Object.entries(STANDARD_OPERATIONS) as [StandardOperationId, StandardOperationShape][]) {
     const operationConfig = operations[id];
     const disabled = operationConfig === false;
-    const override =
-      operationConfig !== false ? operationConfig?.handler : undefined;
+    const override = operationConfig !== false ? operationConfig?.handler : undefined;
     registry.register({
       id,
       kind: shape.kind,
       cardinality: shape.cardinality,
       enabled: shape.enabled && !disabled,
-      handler:
-        override ??
-        handlers?.(id) ??
-        (unboundHandler(id) as unknown as OperationHandler<Entity>),
+      handler: override ?? handlers?.(id) ?? (unboundHandler(id) as unknown as OperationHandler<Entity>),
       input: null,
       output: null,
-      meta:
-        (operationConfig !== false ? operationConfig?.meta : undefined) ?? {},
+      meta: (operationConfig !== false ? operationConfig?.meta : undefined) ?? {},
     });
   }
 

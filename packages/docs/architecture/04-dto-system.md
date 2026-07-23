@@ -7,14 +7,14 @@ docs** — there is no validation subsystem attached to them.
 
 ## 1. The six slots and their defaults
 
-| Slot | Verb / context | Default when omitted |
-| --- | --- | --- |
-| `create` | `POST` body | Entity minus generated + relation fields |
-| `update` | `PUT` body | Same default as `create` |
-| `patch` | `PATCH` body | `Partial<update>` if `update` registered, else `Partial<Entity>` |
-| `query` | `GET` list input | Generic `QueryContext<Entity>` |
-| `item` | Any single-resource response | Entity, subject to field selection |
-| `list` | Element type in `ListResultDto.items` | Same as `item`'s resolved type |
+| Slot     | Verb / context                        | Default when omitted                                             |
+| -------- | ------------------------------------- | ---------------------------------------------------------------- |
+| `create` | `POST` body                           | Entity minus generated + relation fields                         |
+| `update` | `PUT` body                            | Same default as `create`                                         |
+| `patch`  | `PATCH` body                          | `Partial<update>` if `update` registered, else `Partial<Entity>` |
+| `query`  | `GET` list input                      | Generic `QueryContext<Entity>`                                   |
+| `item`   | Any single-resource response          | Entity, subject to field selection                               |
+| `list`   | Element type in `ListResultDto.items` | Same as `item`'s resolved type                                   |
 
 Restore (Phase 15) and custom operations (Phase 14) reuse `item`/`list`;
 no additional slots exist.
@@ -52,8 +52,13 @@ enumerable properties of `new Dto()` (`dto-shape.ts`, cached per class).
 TypeScript fields only exist at runtime when initialized, so:
 
 ```ts
-class UserListDto { id = 0; name = ""; }   // projects [id, name]
-class BadDto { id!: number; }              // no runtime keys → falls back
+class UserListDto {
+  id = 0;
+  name = "";
+} // projects [id, name]
+class BadDto {
+  id!: number;
+} // no runtime keys → falls back
 ```
 
 A class with no initialized fields degrades to the entity-derived

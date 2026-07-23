@@ -10,10 +10,7 @@ import type { NormalizedQueryContext } from "../query/query-context.js";
  * Soft-delete exclusion (Phase 15) and include loading (Phase 16) are the
  * reader's concern, driven by `query.withDeleted` / `query.include`.
  */
-export interface EntityReader<
-  Entity = unknown,
-  Id extends EntityId = EntityId,
-> {
+export interface EntityReader<Entity = unknown, Id extends EntityId = EntityId> {
   /** `null` when nothing matches — "missing vs. error" is the engine's call. */
   findOneById(
     id: Id,
@@ -21,20 +18,11 @@ export interface EntityReader<
     context: CrudContext<Entity>,
   ): Promise<Entity | null>;
   /** First match of the query, or `null`. */
-  findOne(
-    query: NormalizedQueryContext<Entity>,
-    context: CrudContext<Entity>,
-  ): Promise<Entity | null>;
-  findMany(
-    query: NormalizedQueryContext<Entity>,
-    context: CrudContext<Entity>,
-  ): Promise<readonly Entity[]>;
+  findOne(query: NormalizedQueryContext<Entity>, context: CrudContext<Entity>): Promise<Entity | null>;
+  findMany(query: NormalizedQueryContext<Entity>, context: CrudContext<Entity>): Promise<readonly Entity[]>;
   /**
    * Count of all rows matching the query's filter, ignoring pagination.
    * Only called when `query.count` is `true`.
    */
-  count(
-    query: NormalizedQueryContext<Entity>,
-    context: CrudContext<Entity>,
-  ): Promise<number>;
+  count(query: NormalizedQueryContext<Entity>, context: CrudContext<Entity>): Promise<number>;
 }

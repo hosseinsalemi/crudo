@@ -1,14 +1,7 @@
 import "reflect-metadata";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { DataSource } from "typeorm";
-import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  ManyToOne,
-  OneToMany,
-  PrimaryGeneratedColumn,
-} from "typeorm";
+import { Column, CreateDateColumn, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 import {
   ConflictException,
   NotFoundException,
@@ -135,19 +128,15 @@ describe("TypeOrmRepositoryAdapter — CRUD (Phase 10)", () => {
   });
 
   it("throws NotFound for updates/deletes on missing rows", async () => {
-    await expect(
-      authors.updateOne(4242, { name: "x" } as never),
-    ).rejects.toBeInstanceOf(NotFoundException);
-    await expect(authors.deleteOne(4242)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(authors.updateOne(4242, { name: "x" } as never)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(authors.deleteOne(4242)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it("maps unique violations to ConflictException (error-mapping table)", async () => {
     await authors.createOne({ email: "dup@x.io", name: "A", age: 1 } as never);
-    await expect(
-      authors.createOne({ email: "dup@x.io", name: "B", age: 2 } as never),
-    ).rejects.toBeInstanceOf(ConflictException);
+    await expect(authors.createOne({ email: "dup@x.io", name: "B", age: 2 } as never)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
   });
 });
 
@@ -190,9 +179,7 @@ describe("TypeOrmRepositoryAdapter — query translation", () => {
       filter: {
         kind: "group",
         operator: "NOT",
-        children: [
-          { kind: "condition", field: "status", operator: "EQ", value: "active" },
-        ],
+        children: [{ kind: "condition", field: "status", operator: "EQ", value: "active" }],
       },
       sort: [{ field: "age", direction: "asc" }],
     });
@@ -224,26 +211,17 @@ describe("TypeOrmRepositoryAdapter — query translation", () => {
         value: [40, 50],
       },
     });
-    expect(between.items.map((a) => (a as Author).name).sort()).toEqual([
-      "Alan",
-      "Grace",
-    ]);
+    expect(between.items.map((a) => (a as Author).name).sort()).toEqual(["Alan", "Grace"]);
 
     const like = await authors.findMany({
       filter: { kind: "condition", field: "name", operator: "LIKE", value: "A%" },
     });
-    expect(like.items.map((a) => (a as Author).name).sort()).toEqual([
-      "Ada",
-      "Alan",
-    ]);
+    expect(like.items.map((a) => (a as Author).name).sort()).toEqual(["Ada", "Alan"]);
 
     const ilike = await authors.findMany({
       filter: { kind: "condition", field: "name", operator: "ILIKE", value: "a%" },
     });
-    expect(ilike.items.map((a) => (a as Author).name).sort()).toEqual([
-      "Ada",
-      "Alan",
-    ]);
+    expect(ilike.items.map((a) => (a as Author).name).sort()).toEqual(["Ada", "Alan"]);
 
     const withBio = await authors.findMany({
       filter: { kind: "condition", field: "bio", operator: "IS_NOT_NULL", value: true },
@@ -286,12 +264,10 @@ describe("TypeOrmRepositoryAdapter — query translation", () => {
       allowlists: { filterable: ["title", "author.name" as never] },
     }) as DefaultCrudService<Book>;
     await seed();
-    const ada = (await authors.findMany()).items
-      .map((a) => a as Author)
-      .find((a) => a.name === "Ada")!;
+    const ada = (await authors.findMany()).items.map((a) => a as Author).find((a) => a.name === "Ada")!;
     await dataSource.getRepository(Book).save([
       { title: "Notes", author: { id: ada.id } },
-      { title: "Other", author: { id: (ada.id + 1) } },
+      { title: "Other", author: { id: ada.id + 1 } },
     ] as never);
 
     const list = await scoped.findMany({

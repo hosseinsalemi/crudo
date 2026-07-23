@@ -8,10 +8,7 @@
  * bare prefix itself, which callers treat separately (`filter` alone is
  * the JSON escape hatch; `fields` alone is the root fieldset).
  */
-export function parseBracketKey(
-  key: string,
-  prefix: string,
-): readonly string[] | null {
+export function parseBracketKey(key: string, prefix: string): readonly string[] | null {
   if (!key.startsWith(prefix + "[") || !key.endsWith("]")) return null;
   const segments: string[] = [];
   let position = prefix.length;

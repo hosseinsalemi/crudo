@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  NotFoundException,
-  OperationDisabledException,
-  createCrudo,
-  toProblemDetails,
-} from "@crudo/core";
+import { NotFoundException, OperationDisabledException, createCrudo, toProblemDetails } from "@crudo/core";
 import { InMemoryUserAdapter, User, userMetadata } from "./support/user-fixture.js";
 
 function makeCrud(config?: Parameters<ReturnType<typeof createCrudo>["createCrud"]>[1]) {
@@ -104,19 +99,13 @@ describe("CrudEngine pipeline (Phase 7)", () => {
 
   it("raises OperationDisabledException for Milestone C operations", async () => {
     const { crud } = makeCrud();
-    await expect(crud.createMany([])).rejects.toBeInstanceOf(
-      OperationDisabledException,
-    );
-    await expect(crud.restoreOne(1)).rejects.toBeInstanceOf(
-      OperationDisabledException,
-    );
+    await expect(crud.createMany([])).rejects.toBeInstanceOf(OperationDisabledException);
+    await expect(crud.restoreOne(1)).rejects.toBeInstanceOf(OperationDisabledException);
   });
 
   it("raises OperationDisabledException for config-disabled operations", async () => {
     const { crud } = makeCrud({ operations: { deleteOne: false } } as never);
-    await expect(crud.deleteOne(1)).rejects.toBeInstanceOf(
-      OperationDisabledException,
-    );
+    await expect(crud.deleteOne(1)).rejects.toBeInstanceOf(OperationDisabledException);
   });
 
   it("dispatches overridden handlers through the same pipeline", async () => {

@@ -8,16 +8,16 @@ declared now so later phases never mutate `@crudo/core` types.
 
 ## 1. Generic parameters
 
-| Parameter | Purpose | Default | Override example |
-| --- | --- | --- | --- |
-| `TEntity` | The ORM-mapped entity class everything is typed against | — (always inferred from `createCrud(Entity)`) | `CrudService<User>` |
-| `TId` | Primary-key type; appears in `findOne(id)`, `deleteOne(id)`, … | `EntityId` (`string \| number`) | `CrudService<User, string>` for UUID keys |
-| `TCreateDto` | `POST` request body | `EntityInput<TEntity>` (entity minus methods; runtime derivation also drops generated/relation fields — Phase 4) | `dto: { create: CreateUserDto }` |
-| `TUpdateDto` | `PUT` full-replace body | `EntityInput<TEntity>` | `dto: { update: UpdateUserDto }` |
-| `TPatchDto` | `PATCH` partial body | `Partial<TUpdateDto>` — follows `update` when that is overridden | `dto: { patch: PatchUserDto }` |
-| `TQueryDto` | `GET` list query shape | `QueryContext<TEntity>` | `dto: { query: UserQueryDto }` |
-| `TItemDto` | Any single-resource response | `TEntity` | `dto: { item: UserItemDto }` |
-| `TListDto` | Element type inside `ListResultDto.items` | `TItemDto` (follows `item`) | `dto: { list: UserListDto }` — leaner list projection |
+| Parameter    | Purpose                                                        | Default                                                                                                          | Override example                                      |
+| ------------ | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `TEntity`    | The ORM-mapped entity class everything is typed against        | — (always inferred from `createCrud(Entity)`)                                                                    | `CrudService<User>`                                   |
+| `TId`        | Primary-key type; appears in `findOne(id)`, `deleteOne(id)`, … | `EntityId` (`string \| number`)                                                                                  | `CrudService<User, string>` for UUID keys             |
+| `TCreateDto` | `POST` request body                                            | `EntityInput<TEntity>` (entity minus methods; runtime derivation also drops generated/relation fields — Phase 4) | `dto: { create: CreateUserDto }`                      |
+| `TUpdateDto` | `PUT` full-replace body                                        | `EntityInput<TEntity>`                                                                                           | `dto: { update: UpdateUserDto }`                      |
+| `TPatchDto`  | `PATCH` partial body                                           | `Partial<TUpdateDto>` — follows `update` when that is overridden                                                 | `dto: { patch: PatchUserDto }`                        |
+| `TQueryDto`  | `GET` list query shape                                         | `QueryContext<TEntity>`                                                                                          | `dto: { query: UserQueryDto }`                        |
+| `TItemDto`   | Any single-resource response                                   | `TEntity`                                                                                                        | `dto: { item: UserItemDto }`                          |
+| `TListDto`   | Element type inside `ListResultDto.items`                      | `TItemDto` (follows `item`)                                                                                      | `dto: { list: UserListDto }` — leaner list projection |
 
 Design rule: **every parameter defaults from the ones before it**, so type
 inference is a feature — a consumer rarely writes a generic argument by
@@ -27,7 +27,7 @@ everything downstream (envelope, service returns) follows.
 
 The chain `TEntity → TUpdateDto → TPatchDto` and `TItemDto → TListDto`
 mirrors the Phase 4 runtime resolution rules, so static defaults and
-runtime derivation never disagree about *which slot follows which*.
+runtime derivation never disagree about _which slot follows which_.
 
 ## 2. `FieldPath` implementation notes
 
@@ -42,7 +42,7 @@ relation paths are spell-checked at compile time.
   would otherwise produce unions large enough to slow or crash the
   compiler (ADR-0008).
 - **`any` / `unknown`:** degrade to `string` (detected via the `0 extends
-  1 & T` probe) — untyped entities get no spell-checking but stay usable;
+1 & T` probe) — untyped entities get no spell-checking but stay usable;
   the runtime allowlist remains the actual gate.
 - **Index signatures:** `string extends keyof T` → degrade to `string`;
   keys are unknowable.
@@ -51,7 +51,7 @@ relation paths are spell-checked at compile time.
   relation (`posts.comments`) reads identically to a to-one.
 - **`Date`, `bigint`, primitives** are leaves — no recursion into their
   methods.
-- `FieldPath` is a *typing aid*, not a security boundary: the Phase 5
+- `FieldPath` is a _typing aid_, not a security boundary: the Phase 5
   allowlists decide what a request may actually do.
 
 ## 3. Module augmentation of `OperationMetadata`
@@ -107,16 +107,16 @@ Enforced by dependency-cruiser (`core-imports-nothing`), not convention.
 
 ## 5. Contract inventory
 
-| Area | Contracts | Implemented in |
-| --- | --- | --- |
-| Service | `CrudService`, `CrudCallOptions`, `IdentifiedInput` | Phase 7 |
-| Persistence | `EntityReader`, `EntityWriter`, `RepositoryAdapter` | Phases 9–10 |
-| Transactions | `TransactionManager`, `TransactionContext`, `TransactionOptions` | Phase 13 |
-| Query | `Filter*`, `FilterExpression`, `Sort`, `Pagination`, `PaginationStrategy`, `FieldSelection`, `QueryContext`, `NormalizedQueryContext`, `FilterParser`, `FilterBuilder` | Phase 5 (parse), Phase 10 (build) |
-| DTO | `Dto`, `DtoClass`, `OperationDtoMap`, `DtoResolver`, `ListResultDto`, `ListMetaDto`, `BulkResultDto` | Phase 4 (Phase 15 bulk) |
-| Errors | `CrudException`, `CrudoErrorCode`, `ErrorHandler`, `ProblemDetailsDto` | Phase 6 |
-| Config | `CrudoSettings` (+ per-area settings), `GlobalConfig`, `EntityConfig`, `OperationConfig`, `CustomOperationConfig`, `ResolvedEntityConfig` | Phase 8 (Phase 14 operations) |
-| Operations | `OperationId`, `OperationHandler`, `OperationMetadata`, `OperationDescriptor`, `OperationRegistry` | Phase 7 (control surface Phase 14) |
-| Relations | `RelationDescriptor`, `RelationRegistry`, `IncludeTree`, `IncludeNode`, `IncludeResolver` | Phase 16 |
-| Context | `CrudContext`, `CrudContextState`, `StateKey`, `CrudRequest`, `CrudResponse` | Phase 7 |
-| Serialization | `Serializer`, `Deserializer` | Phase 7 |
+| Area          | Contracts                                                                                                                                                              | Implemented in                     |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| Service       | `CrudService`, `CrudCallOptions`, `IdentifiedInput`                                                                                                                    | Phase 7                            |
+| Persistence   | `EntityReader`, `EntityWriter`, `RepositoryAdapter`                                                                                                                    | Phases 9–10                        |
+| Transactions  | `TransactionManager`, `TransactionContext`, `TransactionOptions`                                                                                                       | Phase 13                           |
+| Query         | `Filter*`, `FilterExpression`, `Sort`, `Pagination`, `PaginationStrategy`, `FieldSelection`, `QueryContext`, `NormalizedQueryContext`, `FilterParser`, `FilterBuilder` | Phase 5 (parse), Phase 10 (build)  |
+| DTO           | `Dto`, `DtoClass`, `OperationDtoMap`, `DtoResolver`, `ListResultDto`, `ListMetaDto`, `BulkResultDto`                                                                   | Phase 4 (Phase 15 bulk)            |
+| Errors        | `CrudException`, `CrudoErrorCode`, `ErrorHandler`, `ProblemDetailsDto`                                                                                                 | Phase 6                            |
+| Config        | `CrudoSettings` (+ per-area settings), `GlobalConfig`, `EntityConfig`, `OperationConfig`, `CustomOperationConfig`, `ResolvedEntityConfig`                              | Phase 8 (Phase 14 operations)      |
+| Operations    | `OperationId`, `OperationHandler`, `OperationMetadata`, `OperationDescriptor`, `OperationRegistry`                                                                     | Phase 7 (control surface Phase 14) |
+| Relations     | `RelationDescriptor`, `RelationRegistry`, `IncludeTree`, `IncludeNode`, `IncludeResolver`                                                                              | Phase 16                           |
+| Context       | `CrudContext`, `CrudContextState`, `StateKey`, `CrudRequest`, `CrudResponse`                                                                                           | Phase 7                            |
+| Serialization | `Serializer`, `Deserializer`                                                                                                                                           | Phase 7                            |

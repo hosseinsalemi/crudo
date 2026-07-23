@@ -7,11 +7,7 @@ import type { CrudContext } from "../context/crud-context.js";
  * applies the selection carried on `context.query`.
  */
 export interface Serializer<Entity = unknown> {
-  serializeItem<ItemDto>(
-    entity: Entity,
-    dto: DtoClass<ItemDto & object> | null,
-    context: CrudContext<Entity>,
-  ): ItemDto;
+  serializeItem<ItemDto>(entity: Entity, dto: DtoClass<ItemDto & object> | null, context: CrudContext<Entity>): ItemDto;
   serializeList<ListDto>(
     entities: readonly Entity[],
     dto: DtoClass<ListDto & object> | null,
@@ -26,9 +22,5 @@ export interface Serializer<Entity = unknown> {
  * shapes, it doesn't judge.
  */
 export interface Deserializer<Entity = unknown> {
-  deserialize<Shape>(
-    raw: unknown,
-    dto: DtoClass<Shape & object> | null,
-    context: CrudContext<Entity>,
-  ): Shape;
+  deserialize<Shape>(raw: unknown, dto: DtoClass<Shape & object> | null, context: CrudContext<Entity>): Shape;
 }

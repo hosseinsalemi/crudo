@@ -10,10 +10,7 @@ import type { QueryContext } from "../query/query-context.js";
 import type { OperationDescriptor, OperationRegistry } from "../operations/operation-registry.js";
 import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
 import type { CrudoSettings } from "../config/settings.js";
-import {
-  OperationDisabledException,
-  QueryValidationException,
-} from "../errors/exceptions.js";
+import { OperationDisabledException, QueryValidationException } from "../errors/exceptions.js";
 import { QueryNormalizer } from "../query/query-normalizer.js";
 import { createCrudContext, randomUuid } from "../context/default-crud-context.js";
 import { mergeSettings } from "../config/merge-settings.js";
@@ -87,10 +84,7 @@ export class CrudEngine<Entity extends object> {
     }
   }
 
-  private async run(
-    request: CrudRequest<Entity>,
-    correlationId: string,
-  ): Promise<CrudResponse> {
+  private async run(request: CrudRequest<Entity>, correlationId: string): Promise<CrudResponse> {
     const { registry, config } = this.deps;
 
     // 1. Operation resolution — registry lookup, nothing special-cased.
@@ -110,10 +104,7 @@ export class CrudEngine<Entity extends object> {
     const configView = this.configViewFor(request);
 
     // 3–5. Query resolution (reads) and context assembly.
-    const query =
-      descriptor.kind === "read"
-        ? this.normalizeQuery(request, configView)
-        : null;
+    const query = descriptor.kind === "read" ? this.normalizeQuery(request, configView) : null;
     const context = createCrudContext<Entity>({
       operation: descriptor.id,
       config: configView,
@@ -133,9 +124,7 @@ export class CrudEngine<Entity extends object> {
     return this.mapResponse(descriptor, result, context);
   }
 
-  private configViewFor(
-    request: CrudRequest<Entity>,
-  ): ResolvedEntityConfig<Entity> {
+  private configViewFor(request: CrudRequest<Entity>): ResolvedEntityConfig<Entity> {
     const { config } = this.deps;
     const base = config.settingsFor(request.operation);
     const overrides = request.options?.settings;
@@ -164,10 +153,7 @@ export class CrudEngine<Entity extends object> {
     if (query instanceof WireQuery) {
       return normalizer.normalizeWire(query.params, config);
     }
-    return normalizer.normalizeInput(
-      (query as QueryContext<Entity> | null) ?? undefined,
-      config,
-    );
+    return normalizer.normalizeInput((query as QueryContext<Entity> | null) ?? undefined, config);
   }
 
   private resolveInput(
@@ -177,9 +163,7 @@ export class CrudEngine<Entity extends object> {
   ): unknown {
     const { deserializer, config } = this.deps;
     const slot = INPUT_SLOTS[descriptor.id];
-    const dto =
-      descriptor.input ??
-      (slot !== undefined ? config.dto.resolve(slot, descriptor.id) : null);
+    const dto = descriptor.input ?? (slot !== undefined ? config.dto.resolve(slot, descriptor.id) : null);
 
     switch (descriptor.id) {
       case "findOne":
@@ -206,9 +190,7 @@ export class CrudEngine<Entity extends object> {
    */
   private coerceId(id: unknown): unknown {
     const { metadata } = this.deps;
-    const idField = metadata.fields.find(
-      (field) => field.name === metadata.idField,
-    );
+    const idField = metadata.fields.find((field) => field.name === metadata.idField);
     if (idField?.kind !== "number" || typeof id !== "string") return id;
     const value = Number(id);
     if (Number.isNaN(value)) {
@@ -230,9 +212,7 @@ export class CrudEngine<Entity extends object> {
 
     if (descriptor.id === "findMany") {
       const { entities, total } = result as FindManyResult<Entity>;
-      const listDto =
-        (descriptor.output as DtoClass<object> | null) ??
-        config.dto.resolve("list", descriptor.id);
+      const listDto = (descriptor.output as DtoClass<object> | null) ?? config.dto.resolve("list", descriptor.id);
       const pagination = context.query?.pagination ?? { limit: 0, offset: 0 };
       return {
         operation: descriptor.id,
@@ -253,9 +233,7 @@ export class CrudEngine<Entity extends object> {
       return { operation: descriptor.id, item: null, list: null, bulk: null };
     }
 
-    const itemDto =
-      (descriptor.output as DtoClass<object> | null) ??
-      config.dto.resolve("item", descriptor.id);
+    const itemDto = (descriptor.output as DtoClass<object> | null) ?? config.dto.resolve("item", descriptor.id);
     return {
       operation: descriptor.id,
       item: serializer.serializeItem(result as Entity, itemDto, context),

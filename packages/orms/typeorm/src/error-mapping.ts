@@ -1,10 +1,5 @@
 import type { ErrorContext } from "@crudo/core";
-import {
-  ConflictException,
-  CrudoException,
-  PersistenceException,
-  TransactionException,
-} from "@crudo/core";
+import { ConflictException, CrudoException, PersistenceException, TransactionException } from "@crudo/core";
 import { QueryFailedError } from "typeorm";
 
 /**
@@ -21,17 +16,12 @@ import { QueryFailedError } from "typeorm";
  * Unknown drivers fall through to `PersistenceException` — the original
  * error always travels as `cause`, never swallowed.
  */
-export function mapDriverError(
-  error: unknown,
-  context: ErrorContext,
-): CrudoException {
+export function mapDriverError(error: unknown, context: ErrorContext): CrudoException {
   if (error instanceof CrudoException) return error;
 
   const entity = context.entityName ?? "entity";
   if (error instanceof QueryFailedError) {
-    const driver = error.driverError as
-      | { code?: string; errno?: number; message?: string }
-      | undefined;
+    const driver = error.driverError as { code?: string; errno?: number; message?: string } | undefined;
     const code = String(driver?.code ?? "");
     const errno = driver?.errno;
     const message = String(driver?.message ?? error.message);

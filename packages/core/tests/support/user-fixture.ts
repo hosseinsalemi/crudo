@@ -1,10 +1,4 @@
-import type {
-  CrudContext,
-  EntityId,
-  EntityMetadata,
-  NormalizedQueryContext,
-  RepositoryAdapter,
-} from "@crudo/core";
+import type { CrudContext, EntityId, EntityMetadata, NormalizedQueryContext, RepositoryAdapter } from "@crudo/core";
 import { NotFoundException } from "@crudo/core";
 
 /** Test entity: plain class, fields initialized so shapes exist at runtime. */

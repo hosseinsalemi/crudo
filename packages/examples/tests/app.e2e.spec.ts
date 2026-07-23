@@ -58,19 +58,14 @@ describe("Milestone B checkpoint app", () => {
     const id = created.body.id as number;
 
     const fetched = await request(server()).get(`/users/${id}`).expect(200);
-    expect(Object.keys(fetched.body).sort()).toEqual(
-      ["age", "createdAt", "email", "id", "name", "status"],
-    );
+    expect(Object.keys(fetched.body).sort()).toEqual(["age", "createdAt", "email", "id", "name", "status"]);
 
     await request(server())
       .put(`/users/${id}`)
       .send({ email: "first@x.io", name: "Renamed", age: 31, status: "active" })
       .expect(200);
 
-    const patched = await request(server())
-      .patch(`/users/${id}`)
-      .send({ age: 32 })
-      .expect(200);
+    const patched = await request(server()).patch(`/users/${id}`).send({ age: 32 }).expect(200);
     expect(patched.body).toMatchObject({ name: "Renamed", age: 32 });
 
     await request(server()).delete(`/users/${id}`).expect(204);
@@ -86,10 +81,7 @@ describe("Milestone B checkpoint app", () => {
 
     // List responses use the leaner UserListDto projection.
     // Matches (age ≥ 30): Grace 45, Alan 41, Ada 36 — page starts at Alan.
-    expect(response.body.items.map((u: { name: string }) => u.name)).toEqual([
-      "Alan",
-      "Ada",
-    ]);
+    expect(response.body.items.map((u: { name: string }) => u.name)).toEqual(["Alan", "Ada"]);
     expect(response.body.items[0]).not.toHaveProperty("age");
     expect(response.body).toMatchObject({ limit: 2, offset: 1, total: 3 });
   });
@@ -97,31 +89,20 @@ describe("Milestone B checkpoint app", () => {
   it("supports OR groups and IN sets from the wire", async () => {
     const response = await request(server())
       .get("/users")
-      .query(
-        "filter[or][0][name][eq]=Ada&filter[or][1][name][eq]=Joan&sort=name",
-      )
+      .query("filter[or][0][name][eq]=Ada&filter[or][1][name][eq]=Joan&sort=name")
       .expect(200);
-    expect(response.body.items.map((u: { name: string }) => u.name)).toEqual([
-      "Ada",
-      "Joan",
-    ]);
+    expect(response.body.items.map((u: { name: string }) => u.name)).toEqual(["Ada", "Joan"]);
   });
 
   it("applies sparse fieldsets after DTO mapping", async () => {
-    const response = await request(server())
-      .get("/users")
-      .query("fields=id,name&sort=name&limit=1")
-      .expect(200);
+    const response = await request(server()).get("/users").query("fields=id,name&sort=name&limit=1").expect(200);
     expect(Object.keys(response.body.items[0])).toEqual(["id", "name"]);
   });
 
   it("honors the entity-scope pagination override (defaultLimit 10, max 50)", async () => {
     const defaulted = await request(server()).get("/users").expect(200);
     expect(defaulted.body.limit).toBe(10);
-    const clamped = await request(server())
-      .get("/users")
-      .query("limit=500")
-      .expect(200);
+    const clamped = await request(server()).get("/users").query("limit=500").expect(200);
     expect(clamped.body.limit).toBe(50);
   });
 
@@ -143,13 +124,8 @@ describe("Milestone B checkpoint app", () => {
   });
 
   it("rejects deferred features explicitly, never silently", async () => {
-    const response = await request(server())
-      .get("/users")
-      .query("include=posts&withDeleted=true")
-      .expect(400);
-    expect(
-      response.body.errors.map((e: { code: string }) => e.code),
-    ).toEqual([
+    const response = await request(server()).get("/users").query("include=posts&withDeleted=true").expect(400);
+    expect(response.body.errors.map((e: { code: string }) => e.code)).toEqual([
       "CRUDO_QUERY_UNSUPPORTED_PARAM",
       "CRUDO_QUERY_UNSUPPORTED_PARAM",
     ]);

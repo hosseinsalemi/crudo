@@ -22,12 +22,7 @@ export interface CrudRequest<
   readonly operation: OperationId;
   readonly id: Id | null;
   readonly ids: readonly Id[] | null;
-  readonly body:
-    | CreateDto
-    | UpdateDto
-    | PatchDto
-    | readonly CreateDto[]
-    | null;
+  readonly body: CreateDto | UpdateDto | PatchDto | readonly CreateDto[] | null;
   readonly query: QueryDto | null;
   /** Per-call override scope — parameters, never config writes. */
   readonly options: CrudCallOptions | null;

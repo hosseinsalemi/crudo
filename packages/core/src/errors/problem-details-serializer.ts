@@ -1,10 +1,7 @@
 import type { CrudException } from "./crud-exception.js";
 import type { ProblemDetailsDto } from "./problem-details.js";
 import { ERROR_CATALOG } from "./error-catalog.js";
-import {
-  BulkOperationException,
-  QueryValidationException,
-} from "./exceptions.js";
+import { BulkOperationException, QueryValidationException } from "./exceptions.js";
 
 /** Base URI under which every problem `type` lives (ADR-0009). */
 const PROBLEM_TYPE_BASE = "https://crudo.dev/errors/";
@@ -27,10 +24,7 @@ export interface ProblemDetailsOptions {
  * (Phase 6). This is the default wire shape; a consumer wanting a
  * different one swaps this serializer, never the exception hierarchy.
  */
-export function toProblemDetails(
-  exception: CrudException,
-  options: ProblemDetailsOptions = {},
-): ProblemDetailsDto {
+export function toProblemDetails(exception: CrudException, options: ProblemDetailsOptions = {}): ProblemDetailsDto {
   const catalog = ERROR_CATALOG[exception.code as keyof typeof ERROR_CATALOG];
   const detail =
     options.exposeInternals && exception.cause !== undefined

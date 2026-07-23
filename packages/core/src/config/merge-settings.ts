@@ -24,10 +24,7 @@ export function mergeSettings(
   return result as unknown as CrudoSettings;
 }
 
-function mergeLevel(
-  base: Record<string, unknown>,
-  override: Record<string, unknown>,
-): Record<string, unknown> {
+function mergeLevel(base: Record<string, unknown>, override: Record<string, unknown>): Record<string, unknown> {
   const result = { ...base };
   for (const [key, value] of Object.entries(override)) {
     if (value === undefined) continue;
@@ -44,12 +41,7 @@ function mergeLevel(
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    !Array.isArray(value) &&
-    !(value instanceof Date)
-  );
+  return typeof value === "object" && value !== null && !Array.isArray(value) && !(value instanceof Date);
 }
 
 /** Recursively freeze a settings tree (resolved config is immutable). */

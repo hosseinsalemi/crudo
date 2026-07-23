@@ -1,10 +1,4 @@
-import type {
-  ClassRef,
-  EntityMetadata,
-  FieldKind,
-  FieldMetadata,
-  RelationDescriptor,
-} from "@crudo/core";
+import type { ClassRef, EntityMetadata, FieldKind, FieldMetadata, RelationDescriptor } from "@crudo/core";
 import { ConfigurationException } from "@crudo/core";
 import type { DataSource } from "typeorm";
 import type { ColumnMetadata } from "typeorm/metadata/ColumnMetadata.js";
@@ -62,11 +56,7 @@ export function buildEntityMetadata<Entity extends object>(
       kind: fieldKindOf(column),
       nullable: column.isNullable,
       generated:
-        column.isGenerated ||
-        column.isCreateDate ||
-        column.isUpdateDate ||
-        column.isDeleteDate ||
-        column.isVersion,
+        column.isGenerated || column.isCreateDate || column.isUpdateDate || column.isDeleteDate || column.isVersion,
       ...(column.enum !== undefined && {
         enumValues: column.enum.map((value) => String(value)),
       }),
@@ -75,8 +65,7 @@ export function buildEntityMetadata<Entity extends object>(
   const relations: RelationDescriptor[] = metadata.relations.map((relation) => ({
     name: relation.propertyName,
     target: () => relation.type as ClassRef,
-    cardinality:
-      relation.isOneToMany || relation.isManyToMany ? "many" : "one",
+    cardinality: relation.isOneToMany || relation.isManyToMany ? "many" : "one",
     // Inclusion is an opt-in allowlist (Phase 16); ORM metadata only
     // supplies shape, never permission.
     includable: false,

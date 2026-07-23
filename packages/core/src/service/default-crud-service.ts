@@ -29,14 +29,10 @@ export class DefaultCrudService<
   QueryDto = QueryContext<Entity>,
   ItemDto = Entity,
   ListDto = ItemDto,
-> implements
-    CrudService<Entity, Id, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto>
-{
+> implements CrudService<Entity, Id, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto> {
   constructor(readonly engine: CrudEngine<Entity>) {}
 
-  private request(
-    partial: Partial<CrudRequest<Entity>> & { operation: OperationId },
-  ): CrudRequest<Entity> {
+  private request(partial: Partial<CrudRequest<Entity>> & { operation: OperationId }): CrudRequest<Entity> {
     return {
       id: null,
       ids: null,
@@ -58,10 +54,7 @@ export class DefaultCrudService<
     return response.item as ItemDto;
   }
 
-  async createMany(
-    data: readonly CreateDto[],
-    options?: CrudCallOptions,
-  ): Promise<BulkResultDto<ItemDto>> {
+  async createMany(data: readonly CreateDto[], options?: CrudCallOptions): Promise<BulkResultDto<ItemDto>> {
     const response = await this.engine.execute(
       this.request({
         operation: "createMany",
@@ -72,11 +65,7 @@ export class DefaultCrudService<
     return response.bulk as BulkResultDto<ItemDto>;
   }
 
-  async findOne(
-    id: Id,
-    query?: QueryDto,
-    options?: CrudCallOptions,
-  ): Promise<ItemDto> {
+  async findOne(id: Id, query?: QueryDto, options?: CrudCallOptions): Promise<ItemDto> {
     const response = await this.engine.execute(
       this.request({
         operation: "findOne",
@@ -88,10 +77,7 @@ export class DefaultCrudService<
     return response.item as ItemDto;
   }
 
-  async findMany(
-    query?: QueryDto,
-    options?: CrudCallOptions,
-  ): Promise<ListResultDto<ListDto>> {
+  async findMany(query?: QueryDto, options?: CrudCallOptions): Promise<ListResultDto<ListDto>> {
     const response = await this.engine.execute(
       this.request({
         operation: "findMany",
@@ -102,11 +88,7 @@ export class DefaultCrudService<
     return response.list as ListResultDto<ListDto>;
   }
 
-  async updateOne(
-    id: Id,
-    data: UpdateDto,
-    options?: CrudCallOptions,
-  ): Promise<ItemDto> {
+  async updateOne(id: Id, data: UpdateDto, options?: CrudCallOptions): Promise<ItemDto> {
     const response = await this.engine.execute(
       this.request({
         operation: "updateOne",
@@ -132,11 +114,7 @@ export class DefaultCrudService<
     return response.bulk as BulkResultDto<ItemDto>;
   }
 
-  async patchOne(
-    id: Id,
-    data: PatchDto,
-    options?: CrudCallOptions,
-  ): Promise<ItemDto> {
+  async patchOne(id: Id, data: PatchDto, options?: CrudCallOptions): Promise<ItemDto> {
     const response = await this.engine.execute(
       this.request({
         operation: "patchOne",
@@ -163,15 +141,10 @@ export class DefaultCrudService<
   }
 
   async deleteOne(id: Id, options?: CrudCallOptions): Promise<void> {
-    await this.engine.execute(
-      this.request({ operation: "deleteOne", id, options: options ?? null }),
-    );
+    await this.engine.execute(this.request({ operation: "deleteOne", id, options: options ?? null }));
   }
 
-  async deleteMany(
-    ids: readonly Id[],
-    options?: CrudCallOptions,
-  ): Promise<BulkResultDto<Id>> {
+  async deleteMany(ids: readonly Id[], options?: CrudCallOptions): Promise<BulkResultDto<Id>> {
     const response = await this.engine.execute(
       this.request({ operation: "deleteMany", ids, options: options ?? null }),
     );
@@ -179,16 +152,11 @@ export class DefaultCrudService<
   }
 
   async restoreOne(id: Id, options?: CrudCallOptions): Promise<ItemDto> {
-    const response = await this.engine.execute(
-      this.request({ operation: "restoreOne", id, options: options ?? null }),
-    );
+    const response = await this.engine.execute(this.request({ operation: "restoreOne", id, options: options ?? null }));
     return response.item as ItemDto;
   }
 
-  async restoreMany(
-    ids: readonly Id[],
-    options?: CrudCallOptions,
-  ): Promise<BulkResultDto<ItemDto>> {
+  async restoreMany(ids: readonly Id[], options?: CrudCallOptions): Promise<BulkResultDto<ItemDto>> {
     const response = await this.engine.execute(
       this.request({ operation: "restoreMany", ids, options: options ?? null }),
     );
@@ -196,8 +164,6 @@ export class DefaultCrudService<
   }
 
   async purgeOne(id: Id, options?: CrudCallOptions): Promise<void> {
-    await this.engine.execute(
-      this.request({ operation: "purgeOne", id, options: options ?? null }),
-    );
+    await this.engine.execute(this.request({ operation: "purgeOne", id, options: options ?? null }));
   }
 }

@@ -8,9 +8,7 @@
  * (`{ filter: { age: { gte: "18" } } }`); flattening here makes the
  * binding parser-agnostic.
  */
-export function flattenQuery(
-  query: Readonly<Record<string, unknown>>,
-): Record<string, unknown> {
+export function flattenQuery(query: Readonly<Record<string, unknown>>): Record<string, unknown> {
   const flat: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(query)) {
     flattenInto(flat, key, value);
@@ -18,11 +16,7 @@ export function flattenQuery(
   return flat;
 }
 
-function flattenInto(
-  flat: Record<string, unknown>,
-  key: string,
-  value: unknown,
-): void {
+function flattenInto(flat: Record<string, unknown>, key: string, value: unknown): void {
   if (Array.isArray(value)) {
     // Repeated keys (`filter[status][in][]=a&…[]=b`) arrive as arrays in
     // both parsers; keep the array under the bracketed key. Top-level

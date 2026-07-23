@@ -23,10 +23,7 @@ export class DefaultErrorHandler implements ErrorHandler {
     });
   }
 
-  private enrich(
-    exception: CrudoException,
-    context: ErrorContext,
-  ): CrudException {
+  private enrich(exception: CrudoException, context: ErrorContext): CrudException {
     const merged: ErrorContext = {
       entityName: exception.context.entityName ?? context.entityName,
       operation: exception.context.operation ?? context.operation,

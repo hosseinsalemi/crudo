@@ -58,12 +58,12 @@ Every later phase uses these; deviations are review findings.
 
 ## Milestone Map
 
-| Milestone                | Phases | Checkpoint — what runs when it's done                                                                                                                      |
-| ------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A — Blueprint**        | 1–3    | Architecture, monorepo, contracts. No runtime code.                                                                                                        |
+| Milestone                | Phases | Checkpoint — what runs when it's done                                                                                                                                                                                                   |
+| ------------------------ | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A — Blueprint**        | 1–3    | Architecture, monorepo, contracts. No runtime code.                                                                                                                                                                                     |
 | **B — Walking skeleton** | 4–12   | End-to-end basic CRUD (`createOne`/`findOne`/`findMany`/`updateOne`/`patchOne`/`deleteOne`, hard delete) through TypeORM behind generated NestJS routes, with filtering/sorting/pagination, layered config, and problem-details errors. |
-| **C — Core features**    | 13–16  | Transactions, operation control (disable/override/custom), soft delete/restore/purge, nested relation includes.                                            |
-| **D — Ship**             | 17–19  | DX polish, reference application, npm release.                                                                                                              |
+| **C — Core features**    | 13–16  | Transactions, operation control (disable/override/custom), soft delete/restore/purge, nested relation includes.                                                                                                                         |
+| **D — Ship**             | 17–19  | DX polish, reference application, npm release.                                                                                                                                                                                          |
 
 Deferral mechanics: the skeleton never blocks on later features. Persistence
 is non-transactional until Phase 13, and every seam (soft-delete strategy,
@@ -254,9 +254,9 @@ and "a list of resources."
 | `create` | `POST`                                                                    | Request body for creation                                                              | Entity, minus generated/relation fields          |
 | `update` | `PUT`                                                                     | Request body for full replace                                                          | Same default as `create`                         |
 | `patch`  | `PATCH`                                                                   | Request body for partial update                                                        | `Partial<update>` if set, else `Partial<Entity>` |
-| `query`  | `GET` (list)                                                              | Filters, sort, pagination, field selection, includes, `withDeleted` (Phases 5, 15, 16) | Generic `QueryContext<Entity>`                  |
+| `query`  | `GET` (list)                                                              | Filters, sort, pagination, field selection, includes, `withDeleted` (Phases 5, 15, 16) | Generic `QueryContext<Entity>`                   |
 | `item`   | Any single-resource response (`GET` one, `POST`, `PUT`, `PATCH`, restore) | Shape of one returned resource                                                         | `Entity`, subject to field selection             |
-| `list`   | `GET` (list) response                                                     | The **element type inside `ListResultDto.items`**                                     | Same as `item`'s resolved type                   |
+| `list`   | `GET` (list) response                                                     | The **element type inside `ListResultDto.items`**                                      | Same as `item`'s resolved type                   |
 
 **Config surface:**
 
@@ -584,16 +584,12 @@ const crudo = createCrudo({
     bulk: { mode: "atomic", maxBatchSize: 500 }, // Phase 15
   },
 });
-const userCrud = crudo.createCrud(UserEntity, {
-  /* entity config */
-});
+const userCrud = crudo.createCrud(UserEntity, {/* entity config */});
 
 // NestJS skin (@crudo/nest, Phase 11)
 CrudoModule.forRoot({
   orm: "typeorm",
-  defaults: {
-    /* same shape as above */
-  },
+  defaults: {/* same shape as above */},
   routes: {
     prefix: "api",
   },
@@ -842,8 +838,8 @@ interface OperationHandler<Entity, Input, Output> {
 }
 ```
 
-| Need         | What happens                                                                                                                            |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Need         | What happens                                                                                                                           |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
 | **Disable**  | The registry entry is removed/deactivated. No service method (calling it throws `OperationDisabledException`), no route generated.     |
 | **Override** | The registry entry's handler is swapped for a custom one. Same DTO/serialization scaffolding stays in place around it by default.      |
 | **Custom**   | A new entry is added with its own input/output DTOs. Runs through the same pipeline and gets its own generated route in `@crudo/nest`. |

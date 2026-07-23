@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { FilterCondition, FilterGroup } from "@crudo/core";
-import {
-  DefaultFilterParser,
-  QueryValidationException,
-  resolveEntityConfig,
-} from "@crudo/core";
+import { DefaultFilterParser, QueryValidationException, resolveEntityConfig } from "@crudo/core";
 import { userMetadata } from "./support/user-fixture.js";
 
 const config = resolveEntityConfig(userMetadata, undefined, undefined);
@@ -55,14 +51,10 @@ describe("DefaultFilterParser — bracket grammar (Phase 5)", () => {
     });
     const root = filter.root as FilterGroup;
     expect(root.operator).toBe("AND");
-    const or = root.children.find(
-      (child): child is FilterGroup =>
-        child.kind === "group" && child.operator === "OR",
-    );
+    const or = root.children.find((child): child is FilterGroup => child.kind === "group" && child.operator === "OR");
     expect(or?.children).toHaveLength(2);
     const inCondition = root.children.find(
-      (child): child is FilterCondition =>
-        child.kind === "condition" && child.operator === "IN",
+      (child): child is FilterCondition => child.kind === "condition" && child.operator === "IN",
     );
     expect(inCondition?.value).toEqual(["active", "pending"]);
   });
@@ -83,18 +75,15 @@ describe("DefaultFilterParser — bracket grammar (Phase 5)", () => {
   });
 
   it("coerces dates and booleans; flips isNull=false", () => {
-    const date = parse({ "filter[createdAt][gte]": "2026-01-01" })
-      .root as FilterCondition;
+    const date = parse({ "filter[createdAt][gte]": "2026-01-01" }).root as FilterCondition;
     expect(date.value).toBeInstanceOf(Date);
 
-    const flipped = parse({ "filter[name][isNull]": "false" })
-      .root as FilterCondition;
+    const flipped = parse({ "filter[name][isNull]": "false" }).root as FilterCondition;
     expect(flipped.operator).toBe("IS_NOT_NULL");
   });
 
   it("parses BETWEEN with exactly two bounds", () => {
-    const filter = parse({ "filter[age][between]": "18,65" })
-      .root as FilterCondition;
+    const filter = parse({ "filter[age][between]": "18,65" }).root as FilterCondition;
     expect(filter.value).toEqual([18, 65]);
     const issues = issuesOf(() => parse({ "filter[age][between]": "1,2,3" }));
     expect(issues[0]?.code).toBe("CRUDO_QUERY_INVALID_VALUE");

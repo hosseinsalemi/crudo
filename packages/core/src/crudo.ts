@@ -10,17 +10,11 @@ import { CrudEngine } from "./engine/crud-engine.js";
 import { ConfigurationException } from "./errors/exceptions.js";
 import { DefaultCrudService } from "./service/default-crud-service.js";
 import { DefaultErrorHandler } from "./errors/default-error-handler.js";
-import {
-  DefaultDeserializer,
-  DefaultSerializer,
-} from "./serialization/default-serializer.js";
+import { DefaultDeserializer, DefaultSerializer } from "./serialization/default-serializer.js";
 import { QueryNormalizer } from "./query/query-normalizer.js";
 import { builtInHandlers } from "./engine/built-in-handlers.js";
 import { createOperationRegistry } from "./operations/default-operation-registry.js";
-import {
-  describeResolvedConfig,
-  resolveEntityConfig,
-} from "./config/resolve-entity-config.js";
+import { describeResolvedConfig, resolveEntityConfig } from "./config/resolve-entity-config.js";
 import { STANDARD_OPERATIONS } from "./operations/default-operation-registry.js";
 
 /**
@@ -77,8 +71,7 @@ export function createCrudo(options: CrudoOptions = {}): CrudoInstance {
   return {
     createCrud(entity, config, runtime) {
       type Entity = InstanceType<typeof entity> & object;
-      const metadata =
-        runtime?.metadata ?? options.infrastructure?.metadataFor(entity);
+      const metadata = runtime?.metadata ?? options.infrastructure?.metadataFor(entity);
       if (metadata === undefined) {
         throw new ConfigurationException(
           entity.name,
@@ -88,14 +81,12 @@ export function createCrudo(options: CrudoOptions = {}): CrudoInstance {
             "@crudo/typeorm) or `runtime.metadata` to createCrud",
         );
       }
-      const adapter =
-        runtime?.adapter ?? options.infrastructure?.adapterFor(entity);
+      const adapter = runtime?.adapter ?? options.infrastructure?.adapterFor(entity);
       if (adapter === undefined) {
         throw new ConfigurationException(
           metadata.name,
           "infrastructure",
-          "no repository adapter: pass `infrastructure` to createCrudo or " +
-            "`runtime.adapter` to createCrud",
+          "no repository adapter: pass `infrastructure` to createCrudo or " + "`runtime.adapter` to createCrud",
         );
       }
 
@@ -112,20 +103,12 @@ export function createCrudo(options: CrudoOptions = {}): CrudoInstance {
           builtInHandlers(adapter as unknown as RepositoryAdapter<Entity>),
         ),
         serializer: new DefaultSerializer(metadata as EntityMetadata<Entity>),
-        deserializer: new DefaultDeserializer(
-          metadata as EntityMetadata<Entity>,
-        ),
-        normalizer: new QueryNormalizer(
-          metadata as EntityMetadata<Entity>,
-          options.paginationStrategies ?? [],
-        ),
+        deserializer: new DefaultDeserializer(metadata as EntityMetadata<Entity>),
+        normalizer: new QueryNormalizer(metadata as EntityMetadata<Entity>, options.paginationStrategies ?? []),
         errorHandler: new DefaultErrorHandler(),
       });
 
-      registered.set(
-        resolved.entityName,
-        describeResolvedConfig(resolved, Object.keys(STANDARD_OPERATIONS)),
-      );
+      registered.set(resolved.entityName, describeResolvedConfig(resolved, Object.keys(STANDARD_OPERATIONS)));
       return new DefaultCrudService(engine) as never;
     },
 

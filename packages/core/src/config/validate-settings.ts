@@ -6,26 +6,15 @@ import { ConfigurationException } from "../errors/exceptions.js";
  * entity, the key path, and the offending value — config errors surface at
  * startup, never as mysterious runtime behavior.
  */
-export function validateSettings(
-  entityName: string,
-  settings: CrudoSettings,
-): void {
+export function validateSettings(entityName: string, settings: CrudoSettings): void {
   const positiveInt = (path: string, value: unknown): void => {
     if (!Number.isInteger(value) || (value as number) <= 0) {
-      throw new ConfigurationException(
-        entityName,
-        path,
-        `expected a positive integer, got ${JSON.stringify(value)}`,
-      );
+      throw new ConfigurationException(entityName, path, `expected a positive integer, got ${JSON.stringify(value)}`);
     }
   };
   const bool = (path: string, value: unknown): void => {
     if (typeof value !== "boolean") {
-      throw new ConfigurationException(
-        entityName,
-        path,
-        `expected a boolean, got ${JSON.stringify(value)}`,
-      );
+      throw new ConfigurationException(entityName, path, `expected a boolean, got ${JSON.stringify(value)}`);
     }
   };
 
@@ -53,10 +42,7 @@ export function validateSettings(
   bool("errors.exposeInternals", settings.errors.exposeInternals);
 
   positiveInt("relations.maxIncludeDepth", settings.relations.maxIncludeDepth);
-  positiveInt(
-    "relations.maxIncludedNodes",
-    settings.relations.maxIncludedNodes,
-  );
+  positiveInt("relations.maxIncludedNodes", settings.relations.maxIncludedNodes);
 
   if (settings.softDelete !== false) {
     if (

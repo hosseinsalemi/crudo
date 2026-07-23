@@ -1,20 +1,9 @@
-import type {
-  OperationCardinality,
-  OperationId,
-  OperationKind,
-} from "./operation.js";
-import type {
-  OperationHandler,
-  OperationMetadata,
-} from "./operation-handler.js";
+import type { OperationCardinality, OperationId, OperationKind } from "./operation.js";
+import type { OperationHandler, OperationMetadata } from "./operation-handler.js";
 import type { DtoClass } from "../dto/dto.js";
 
 /** One registered operation: the unit the engine dispatches through. */
-export interface OperationDescriptor<
-  Entity = unknown,
-  Input = unknown,
-  Output = unknown,
-> {
+export interface OperationDescriptor<Entity = unknown, Input = unknown, Output = unknown> {
   readonly id: OperationId;
   readonly kind: OperationKind;
   readonly cardinality: OperationCardinality;
@@ -47,10 +36,7 @@ export interface OperationRegistry<Entity = unknown> {
   all(): readonly OperationDescriptor<Entity>[];
   register(descriptor: OperationDescriptor<Entity>): void;
   /** Replace an entry's handler, keeping its scaffolding (override). */
-  replace(
-    id: OperationId,
-    handler: OperationHandler<Entity>,
-  ): void;
+  replace(id: OperationId, handler: OperationHandler<Entity>): void;
   /** Deactivate an entry (disable). */
   disable(id: OperationId): void;
 }

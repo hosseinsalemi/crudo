@@ -99,8 +99,7 @@ export const ERROR_CATALOG = {
   CRUDO_CONFIG_INVALID: {
     status: 500,
     title: "Invalid configuration",
-    message:
-      "Invalid configuration for entity '{entity}' at '{path}': {problem}",
+    message: "Invalid configuration for entity '{entity}' at '{path}': {problem}",
   },
 } as const satisfies Record<CrudoErrorCode, ErrorCatalogEntry>;
 
@@ -108,15 +107,9 @@ export const ERROR_CATALOG = {
 export type CatalogedErrorCode = keyof typeof ERROR_CATALOG;
 
 /** Render an English `detail` string from a catalog template and params. */
-export function renderMessage(
-  code: CatalogedErrorCode,
-  params: Readonly<Record<string, string | number>>,
-): string {
-  return ERROR_CATALOG[code].message.replace(
-    /\{(\w+)\}/g,
-    (match, key: string) => {
-      const value = params[key];
-      return value === undefined ? match : String(value);
-    },
-  );
+export function renderMessage(code: CatalogedErrorCode, params: Readonly<Record<string, string | number>>): string {
+  return ERROR_CATALOG[code].message.replace(/\{(\w+)\}/g, (match, key: string) => {
+    const value = params[key];
+    return value === undefined ? match : String(value);
+  });
 }

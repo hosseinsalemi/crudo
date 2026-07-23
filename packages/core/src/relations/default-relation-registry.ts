@@ -6,9 +6,7 @@ import type { RelationRegistry } from "./relation-registry.js";
  * bootstrap. Milestone B only carries it (includes land in Phase 16), but
  * the registry existing now is what makes Phase 16 additive.
  */
-export class DefaultRelationRegistry<Entity = unknown>
-  implements RelationRegistry<Entity>
-{
+export class DefaultRelationRegistry<Entity = unknown> implements RelationRegistry<Entity> {
   private readonly relations: ReadonlyMap<string, RelationDescriptor>;
 
   constructor(descriptors: readonly RelationDescriptor[]) {

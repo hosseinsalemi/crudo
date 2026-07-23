@@ -7,13 +7,7 @@ import type { RepositoryAdapter } from "../persistence/repository-adapter.js";
  * value coercion (Phase 5) and DTO default derivation (Phase 4). `json`
  * covers embedded/serialized objects; coercion leaves them untouched.
  */
-export type FieldKind =
-  | "string"
-  | "number"
-  | "boolean"
-  | "date"
-  | "enum"
-  | "json";
+export type FieldKind = "string" | "number" | "boolean" | "date" | "enum" | "json";
 
 /** One scalar column of an entity. Relations are *not* fields. */
 export interface FieldMetadata {
@@ -55,10 +49,6 @@ export interface EntityMetadata<Entity = unknown> {
  * calls may still override the adapter per entity.
  */
 export interface CrudInfrastructure {
-  metadataFor<Entity extends object>(
-    entity: ClassRef<Entity>,
-  ): EntityMetadata<Entity>;
-  adapterFor<Entity extends object>(
-    entity: ClassRef<Entity>,
-  ): RepositoryAdapter<Entity>;
+  metadataFor<Entity extends object>(entity: ClassRef<Entity>): EntityMetadata<Entity>;
+  adapterFor<Entity extends object>(entity: ClassRef<Entity>): RepositoryAdapter<Entity>;
 }

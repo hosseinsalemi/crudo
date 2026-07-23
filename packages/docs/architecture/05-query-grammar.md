@@ -8,19 +8,19 @@ result.
 
 ## 1. Operators — AST names and wire tokens (single source of truth)
 
-| AST operator | Wire token | Example |
-| --- | --- | --- |
-| `EQ` | `eq` | `filter[status][eq]=active` |
-| `NE` | `ne` | `filter[status][ne]=banned` |
-| `GT` / `GTE` | `gt` / `gte` | `filter[age][gte]=18` |
-| `LT` / `LTE` | `lt` / `lte` | `filter[age][lt]=65` |
-| `IN` | `in` | `filter[status][in]=active,pending` |
-| `NOT_IN` | `notIn` | `filter[role][notIn]=bot,test` |
-| `LIKE` | `like` | `filter[name][like]=%25john%25` |
-| `ILIKE` | `ilike` | `filter[name][ilike]=%25john%25` |
-| `BETWEEN` | `between` | `filter[createdAt][between]=2026-01-01,2026-06-01` |
-| `IS_NULL` | `isNull` | `filter[deletedAt][isNull]=true` |
-| `IS_NOT_NULL` | `isNotNull` | `filter[deletedAt][isNotNull]=true` |
+| AST operator  | Wire token   | Example                                            |
+| ------------- | ------------ | -------------------------------------------------- |
+| `EQ`          | `eq`         | `filter[status][eq]=active`                        |
+| `NE`          | `ne`         | `filter[status][ne]=banned`                        |
+| `GT` / `GTE`  | `gt` / `gte` | `filter[age][gte]=18`                              |
+| `LT` / `LTE`  | `lt` / `lte` | `filter[age][lt]=65`                               |
+| `IN`          | `in`         | `filter[status][in]=active,pending`                |
+| `NOT_IN`      | `notIn`      | `filter[role][notIn]=bot,test`                     |
+| `LIKE`        | `like`       | `filter[name][like]=%25john%25`                    |
+| `ILIKE`       | `ilike`      | `filter[name][ilike]=%25john%25`                   |
+| `BETWEEN`     | `between`    | `filter[createdAt][between]=2026-01-01,2026-06-01` |
+| `IS_NULL`     | `isNull`     | `filter[deletedAt][isNull]=true`                   |
+| `IS_NOT_NULL` | `isNotNull`  | `filter[deletedAt][isNotNull]=true`                |
 
 Wire tokens are camelCase and **exact-case matched** — one spelling, no
 aliases (`GTE`/`Gte` are 400s). Logical operators: `AND`, `OR`, `NOT`

@@ -6,11 +6,7 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { Test } from "@nestjs/testing";
 import type { DefaultCrudService, OperationHandler } from "@crudo/core";
 import { Crud, CrudoModule, getCrudServiceToken } from "@crudo/nest";
-import {
-  InMemoryTodoAdapter,
-  Todo,
-  fakeInfrastructure,
-} from "./support/fake-infrastructure.js";
+import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
 
 let app: INestApplication;
 let adapter: InMemoryTodoAdapter;
@@ -45,10 +41,7 @@ describe("@Crud route generation (Phases 11–12)", () => {
   });
 
   it("serves the six skeleton routes end to end", async () => {
-    const created = await request(server())
-      .post("/todos")
-      .send({ title: "write docs", priority: 2 })
-      .expect(201);
+    const created = await request(server()).post("/todos").send({ title: "write docs", priority: 2 }).expect(201);
     expect(created.body).toMatchObject({ id: 1, title: "write docs" });
 
     await request(server()).get("/todos/1").expect(200);
@@ -59,10 +52,7 @@ describe("@Crud route generation (Phases 11–12)", () => {
       .expect(200);
     expect(updated.body).toMatchObject({ title: "write more docs" });
 
-    const patched = await request(server())
-      .patch("/todos/1")
-      .send({ done: true })
-      .expect(200);
+    const patched = await request(server()).patch("/todos/1").send({ done: true }).expect(200);
     expect(patched.body).toMatchObject({ done: true });
 
     await request(server()).delete("/todos/1").expect(204);
@@ -71,11 +61,12 @@ describe("@Crud route generation (Phases 11–12)", () => {
 
   it("returns the ListResultDto envelope on the list route", async () => {
     for (let i = 1; i <= 5; i++) {
-      await request(server()).post("/todos").send({ title: `t${i}` }).expect(201);
+      await request(server())
+        .post("/todos")
+        .send({ title: `t${i}` })
+        .expect(201);
     }
-    const response = await request(server())
-      .get("/todos?limit=2&offset=1")
-      .expect(200);
+    const response = await request(server()).get("/todos?limit=2&offset=1").expect(200);
     expect(response.body).toMatchObject({
       limit: 2,
       offset: 1,
@@ -87,14 +78,10 @@ describe("@Crud route generation (Phases 11–12)", () => {
 
   it("parses the wire grammar into the filter AST (flat bracket keys)", async () => {
     await request(server()).post("/todos").send({ title: "x" }).expect(201);
-    await request(server())
-      .get("/todos?filter[done][eq]=true&filter[priority][gte]=2&sort=-priority")
-      .expect(200);
+    await request(server()).get("/todos?filter[done][eq]=true&filter[priority][gte]=2&sort=-priority").expect(200);
     const filter = adapter.lastQuery?.filter.root;
     expect(filter).toMatchObject({ kind: "group", operator: "AND" });
-    expect(adapter.lastQuery?.sort).toEqual([
-      { field: "priority", direction: "desc" },
-    ]);
+    expect(adapter.lastQuery?.sort).toEqual([{ field: "priority", direction: "desc" }]);
   });
 
   it("maps query validation to a 400 problem-details document", async () => {
@@ -126,18 +113,13 @@ describe("@Crud route generation (Phases 11–12)", () => {
   });
 
   it("strips generated/unknown keys from bodies", async () => {
-    const created = await request(server())
-      .post("/todos")
-      .send({ id: 999, title: "x", hacker: true })
-      .expect(201);
+    const created = await request(server()).post("/todos").send({ id: 999, title: "x", hacker: true }).expect(201);
     expect(created.body.id).toBe(1);
     expect(created.body).not.toHaveProperty("hacker");
   });
 
   it("exposes the typed service under getCrudServiceToken", async () => {
-    const service = app.get<DefaultCrudService<Todo>>(
-      getCrudServiceToken(Todo),
-    );
+    const service = app.get<DefaultCrudService<Todo>>(getCrudServiceToken(Todo));
     const item = await service.createOne({ title: "via service" } as never);
     expect(item).toMatchObject({ title: "via service" });
   });
@@ -194,7 +176,11 @@ describe("@Crud operation control surface", () => {
           meta: { routes: { method: "POST", path: ":id/activate" } },
         },
         recalculate: {
-          handler: { async execute() { return null; } },
+          handler: {
+            async execute() {
+              return null;
+            },
+          },
           meta: { routes: { enabled: false } }, // service-only
         },
       },
@@ -204,9 +190,7 @@ describe("@Crud operation control surface", () => {
 
     await bootstrap(CustomController);
     await request(server()).post("/todos").send({ title: "x" }).expect(201);
-    const response = await request(server())
-      .post("/todos/1/activate")
-      .expect(201);
+    const response = await request(server()).post("/todos/1/activate").expect(201);
     expect(response.body).toMatchObject({ id: 1, done: true });
     // Service-only: no route.
     await request(server()).post("/todos/recalculate").expect(404);
@@ -241,10 +225,7 @@ describe("@Crud Swagger request-body schemas", () => {
 
   beforeEach(async () => {
     await bootstrap(DocumentedController);
-    document = SwaggerModule.createDocument(
-      app,
-      new DocumentBuilder().setTitle("t").setVersion("0").build(),
-    );
+    document = SwaggerModule.createDocument(app, new DocumentBuilder().setTitle("t").setVersion("0").build());
   });
 
   type Schema = {
@@ -253,28 +234,29 @@ describe("@Crud Swagger request-body schemas", () => {
   };
 
   const responseSchema = (op: string, status: string): Schema | undefined =>
-    (document.paths["/todos"] as Record<string, { responses?: Record<string, { content?: Record<string, { schema?: Schema }> }> }>)?.[
-      op
-    ]?.responses?.[status]?.content?.["application/json"]?.schema;
+    (
+      document.paths["/todos"] as Record<
+        string,
+        { responses?: Record<string, { content?: Record<string, { schema?: Schema }> }> }
+      >
+    )?.[op]?.responses?.[status]?.content?.["application/json"]?.schema;
 
   const itemSchema = (op: string, path: string, status: string): Schema | undefined =>
-    (document.paths[path] as Record<string, { responses?: Record<string, { content?: Record<string, { schema?: Schema }> }> }>)?.[
-      op
-    ]?.responses?.[status]?.content?.["application/json"]?.schema;
+    (
+      document.paths[path] as Record<
+        string,
+        { responses?: Record<string, { content?: Record<string, { schema?: Schema }> }> }
+      >
+    )?.[op]?.responses?.[status]?.content?.["application/json"]?.schema;
 
   it("documents the create body with the DTO's runtime shape", async () => {
-    const schema = document.paths["/todos"]?.post?.requestBody?.content?.[
-      "application/json"
-    ]?.schema as Schema | undefined;
+    const schema = document.paths["/todos"]?.post?.requestBody?.content?.["application/json"]?.schema as
+      Schema | undefined;
 
     // The body renders with real fields (not an empty {}): the bug was an
     // empty schema because @nestjs/swagger can't read runtime initializers.
     expect(schema?.properties).toBeDefined();
-    expect(Object.keys(schema?.properties ?? {})).toEqual([
-      "title",
-      "priority",
-      "done",
-    ]);
+    expect(Object.keys(schema?.properties ?? {})).toEqual(["title", "priority", "done"]);
     expect(schema?.properties?.title).toEqual({ type: "string" });
     expect(schema?.properties?.priority).toEqual({ type: "integer" });
     expect(schema?.properties?.done).toEqual({ type: "boolean" });
@@ -288,27 +270,14 @@ describe("@Crud Swagger request-body schemas", () => {
       ["get", "/todos/{id}", "200"],
     ] as const) {
       const schema = itemSchema(op, path, status);
-      expect(Object.keys(schema?.properties ?? {})).toEqual([
-        "id",
-        "title",
-        "done",
-      ]);
+      expect(Object.keys(schema?.properties ?? {})).toEqual(["id", "title", "done"]);
     }
   });
 
   it("documents the collection response with the list envelope", () => {
     const schema = responseSchema("get", "200");
-    expect(Object.keys(schema?.properties ?? {})).toEqual([
-      "items",
-      "limit",
-      "offset",
-      "total",
-      "meta",
-    ]);
+    expect(Object.keys(schema?.properties ?? {})).toEqual(["items", "limit", "offset", "total", "meta"]);
     // Envelope items use the leaner `list` DTO projection.
-    expect(Object.keys(schema?.properties?.items?.items?.properties ?? {})).toEqual([
-      "id",
-      "title",
-    ]);
+    expect(Object.keys(schema?.properties?.items?.items?.properties ?? {})).toEqual(["id", "title"]);
   });
 });

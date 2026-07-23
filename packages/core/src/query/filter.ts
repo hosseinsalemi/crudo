@@ -55,9 +55,7 @@ export interface FilterGroup<Entity = unknown> {
 }
 
 /** Any node of the filter AST. */
-export type FilterExpression<Entity = unknown> =
-  | FilterCondition<Entity>
-  | FilterGroup<Entity>;
+export type FilterExpression<Entity = unknown> = FilterCondition<Entity> | FilterGroup<Entity>;
 
 /**
  * Root filter container. `root: null` means "match everything" — kept as an

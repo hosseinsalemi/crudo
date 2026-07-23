@@ -32,9 +32,6 @@ export class CrudoExceptionFilter implements ExceptionFilter {
     const body = toProblemDetails(exception, {
       exposeInternals: this.options?.defaults?.errors?.exposeInternals ?? false,
     });
-    response
-      .status(exception.status)
-      .type("application/problem+json")
-      .json(body);
+    response.status(exception.status).type("application/problem+json").json(body);
   }
 }

@@ -12,8 +12,5 @@ import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
  * drops.
  */
 export interface FilterParser<Entity = unknown> {
-  parse(
-    rawParams: Readonly<Record<string, unknown>>,
-    config: ResolvedEntityConfig<Entity>,
-  ): Filter<Entity>;
+  parse(rawParams: Readonly<Record<string, unknown>>, config: ResolvedEntityConfig<Entity>): Filter<Entity>;
 }

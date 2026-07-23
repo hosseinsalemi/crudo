@@ -11,11 +11,11 @@ authoritative spec; its Naming Conventions section is normative).
 
 ## Packages
 
-| Package | Role |
-| --- | --- |
-| [`@crudo/core`](packages/core) | Contracts, type system, engine — zero runtime dependencies |
-| [`@crudo/typeorm`](packages/orms/typeorm) | TypeORM adapter (`RepositoryAdapter` implementation) |
-| [`@crudo/nest`](packages/frameworks/nest) | NestJS binding (`@Crud` decorator, route generation) |
+| Package                                   | Role                                                       |
+| ----------------------------------------- | ---------------------------------------------------------- |
+| [`@crudo/core`](packages/core)            | Contracts, type system, engine — zero runtime dependencies |
+| [`@crudo/typeorm`](packages/orms/typeorm) | TypeORM adapter (`RepositoryAdapter` implementation)       |
+| [`@crudo/nest`](packages/frameworks/nest) | NestJS binding (`@Crud` decorator, route generation)       |
 
 Design docs, glossary, and ADRs live in [`packages/docs`](packages/docs).
 

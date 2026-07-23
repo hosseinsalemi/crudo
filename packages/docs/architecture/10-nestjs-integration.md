@@ -37,22 +37,22 @@ The decorator builds the entity's operation registry with the same
 `createOperationRegistry` the engine uses and generates a route per
 **enabled** entry (ADR-0006, ADR-0012):
 
-| Operation | Route | Status |
-| --- | --- | --- |
-| `createOne` | `POST /` | 201 |
-| `findMany` | `GET /` | 200 |
-| `findOne` | `GET /:id` | 200 |
-| `updateOne` | `PUT /:id` | 200 |
-| `patchOne` | `PATCH /:id` | 200 |
-| `deleteOne` | `DELETE /:id` | 204 |
-| `restoreOne` (Phase 15) | `PATCH /:id/restore` | 200 |
-| `purgeOne` (Phase 15) | `DELETE /:id/purge` | 204 |
+| Operation               | Route                | Status |
+| ----------------------- | -------------------- | ------ |
+| `createOne`             | `POST /`             | 201    |
+| `findMany`              | `GET /`              | 200    |
+| `findOne`               | `GET /:id`           | 200    |
+| `updateOne`             | `PUT /:id`           | 200    |
+| `patchOne`              | `PATCH /:id`         | 200    |
+| `deleteOne`             | `DELETE /:id`        | 204    |
+| `restoreOne` (Phase 15) | `PATCH /:id/restore` | 200    |
+| `purgeOne` (Phase 15)   | `DELETE /:id/purge`  | 204    |
 
 Disabled entries (config `operations.<id>: false`, or the Milestone C
 defaults) get **no route**. Custom operations read `meta.routes`
 (`method`, `path`, `successStatus`); `meta.routes.enabled: false` keeps
 one service-only. Because generation walks the registry, Phase 15's
-restore/purge appear by *enabling entries* — this generator does not
+restore/purge appear by _enabling entries_ — this generator does not
 change.
 
 **Manual-method-wins:** a hand-written controller method whose name
@@ -60,7 +60,7 @@ matches an operation id suppresses that generated route — detected via
 `hasOwnProperty` on the prototype, no config needed.
 
 Mechanically, generated methods are defined on the prototype and
-decorated by *calling* Nest's own decorators (`Post(path)(proto, name,
+decorated by _calling_ Nest's own decorators (`Post(path)(proto, name,
 descriptor)`, `Param("id")(…)`, …) — identical metadata to hand-written
 syntax, so guards, interceptors, versioning, and prefixes compose
 normally. The service arrives by property injection under a private key;

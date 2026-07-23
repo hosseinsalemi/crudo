@@ -9,8 +9,5 @@ import type { EntityWriter } from "./entity-writer.js";
  * surface. Adapters are named for what they adapt:
  * `TypeOrmRepositoryAdapter` (`@crudo/typeorm`, Phases 9–10).
  */
-export interface RepositoryAdapter<
-  Entity = unknown,
-  Id extends EntityId = EntityId,
-> extends EntityReader<Entity, Id>,
-    EntityWriter<Entity, Id> {}
+export interface RepositoryAdapter<Entity = unknown, Id extends EntityId = EntityId>
+  extends EntityReader<Entity, Id>, EntityWriter<Entity, Id> {}

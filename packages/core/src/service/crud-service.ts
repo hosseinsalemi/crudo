@@ -35,36 +35,18 @@ export interface CrudService<
   ListDto = ItemDto,
 > {
   createOne(data: CreateDto, options?: CrudCallOptions): Promise<ItemDto>;
-  createMany(
-    data: readonly CreateDto[],
-    options?: CrudCallOptions,
-  ): Promise<BulkResultDto<ItemDto>>;
+  createMany(data: readonly CreateDto[], options?: CrudCallOptions): Promise<BulkResultDto<ItemDto>>;
 
-  findOne(
-    id: Id,
-    query?: QueryDto,
-    options?: CrudCallOptions,
-  ): Promise<ItemDto>;
-  findMany(
-    query?: QueryDto,
-    options?: CrudCallOptions,
-  ): Promise<ListResultDto<ListDto>>;
+  findOne(id: Id, query?: QueryDto, options?: CrudCallOptions): Promise<ItemDto>;
+  findMany(query?: QueryDto, options?: CrudCallOptions): Promise<ListResultDto<ListDto>>;
 
-  updateOne(
-    id: Id,
-    data: UpdateDto,
-    options?: CrudCallOptions,
-  ): Promise<ItemDto>;
+  updateOne(id: Id, data: UpdateDto, options?: CrudCallOptions): Promise<ItemDto>;
   updateMany(
     items: readonly IdentifiedInput<Id, UpdateDto>[],
     options?: CrudCallOptions,
   ): Promise<BulkResultDto<ItemDto>>;
 
-  patchOne(
-    id: Id,
-    data: PatchDto,
-    options?: CrudCallOptions,
-  ): Promise<ItemDto>;
+  patchOne(id: Id, data: PatchDto, options?: CrudCallOptions): Promise<ItemDto>;
   patchMany(
     items: readonly IdentifiedInput<Id, PatchDto>[],
     options?: CrudCallOptions,
@@ -72,17 +54,11 @@ export interface CrudService<
 
   /** Hard or soft per the resolved delete strategy (Phase 15). */
   deleteOne(id: Id, options?: CrudCallOptions): Promise<void>;
-  deleteMany(
-    ids: readonly Id[],
-    options?: CrudCallOptions,
-  ): Promise<BulkResultDto<Id>>;
+  deleteMany(ids: readonly Id[], options?: CrudCallOptions): Promise<BulkResultDto<Id>>;
 
   /** Reuses the `item` DTO slot — no dedicated restore shape (Phase 4). */
   restoreOne(id: Id, options?: CrudCallOptions): Promise<ItemDto>;
-  restoreMany(
-    ids: readonly Id[],
-    options?: CrudCallOptions,
-  ): Promise<BulkResultDto<ItemDto>>;
+  restoreMany(ids: readonly Id[], options?: CrudCallOptions): Promise<BulkResultDto<ItemDto>>;
 
   /** Permanently removes a soft-deleted row; disabled by default. */
   purgeOne(id: Id, options?: CrudCallOptions): Promise<void>;

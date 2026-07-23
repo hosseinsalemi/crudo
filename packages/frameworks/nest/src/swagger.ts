@@ -85,10 +85,7 @@ export function applySwaggerMetadata(
   const swagger = loadSwagger();
   if (swagger === null) return;
 
-  const propertyDescriptor = Object.getOwnPropertyDescriptor(
-    prototype,
-    methodName,
-  ) as PropertyDescriptor;
+  const propertyDescriptor = Object.getOwnPropertyDescriptor(prototype, methodName) as PropertyDescriptor;
   const apply = (decorator: MethodDecorator): void => {
     decorator(prototype, methodName, propertyDescriptor);
   };
@@ -178,9 +175,7 @@ function successBodyFor(
   config: EntityConfig<object> | undefined,
 ): object {
   if (route.status === 204) return {};
-  const dto = config?.dto as
-    | { item?: ClassRef; list?: ClassRef }
-    | undefined;
+  const dto = config?.dto as { item?: ClassRef; list?: ClassRef } | undefined;
   switch (descriptor.id) {
     case "createOne":
     case "updateOne":
@@ -188,9 +183,7 @@ function successBodyFor(
     case "findOne": {
       const itemDto = dto?.item ?? entity;
       const schema = schemaFromDto(itemDto);
-      return schema === null
-        ? { type: itemDto }
-        : { schema: { title: itemDto.name, ...schema } };
+      return schema === null ? { type: itemDto } : { schema: { title: itemDto.name, ...schema } };
     }
     case "findMany": {
       const listDto = dto?.list ?? dto?.item ?? entity;
@@ -223,9 +216,7 @@ function listEnvelopeSchema(
   };
 }
 
-function schemaFromDto(
-  bodyDto: ClassRef,
-): { type: "object"; properties: Record<string, object> } | null {
+function schemaFromDto(bodyDto: ClassRef): { type: "object"; properties: Record<string, object> } | null {
   let instance: Record<string, unknown>;
   try {
     instance = new (bodyDto as new () => Record<string, unknown>)();
@@ -275,11 +266,7 @@ function bodyDtoFor(
     case "updateOne":
       return (dto.update as ClassRef | undefined) ?? null;
     case "patchOne":
-      return (
-        (dto.patch as ClassRef | undefined) ??
-        (dto.update as ClassRef | undefined) ??
-        null
-      );
+      return (dto.patch as ClassRef | undefined) ?? (dto.update as ClassRef | undefined) ?? null;
     default:
       return null;
   }
