@@ -1,0 +1,19 @@
+{
+  "name": "crudo",
+  "private": true,
+  "description": "Crudo — a production-grade CRUD framework for TypeScript (monorepo root).",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "depcruise": "depcruise packages --config .dependency-cruiser.cjs",
+    "check": "pnpm run build && pnpm run depcruise"
+  },
+  "devDependencies": {
+    "dependency-cruiser": "^16.10.0",
+    "typescript": "^5.5.4"
+  }
+}
