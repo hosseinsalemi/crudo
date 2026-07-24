@@ -354,7 +354,39 @@ _(Fill in as each phase completes — actual findings, not planned findings.)_
   normalizer is meant to be swappable at all.
   Also noted for Phase 7 (not fixed, out of scope): doc 01 §9's ADR index stops at
   0010 and is missing ADR-0011 through 0014, two of which §6 now cites.
-- Phase 4:
+- Phase 4: Mixed outcome, comments only — not one executable line moved.
+  Reading the two blocks side by side turned up something the plan didn't
+  predict: **the class doc's stage order was factually wrong.** It listed
+  `DTO resolution → deserialization → query resolution`, but `run()` executes
+  query resolution and context assembly *first*, because `createCrudContext`
+  carries the normalized query and `resolveInput` takes the context. The class
+  doc was reciting `crudo-phases-v6.md` Phase 7's stage list; the code and
+  `architecture/07-crud-engine.md` (the authoritative Phase 7 lifecycle) both use
+  the real order. So this was less a duplication finding than a stale-comment one.
+  - **Fixed the class doc** to the actual execution order and added one WHY
+    clause naming the constraint that forces it (context carries the query;
+    deserialization needs the context), citing doc 07. That constraint was
+    previously encoded nowhere — the inline `// 3–5.` then `// 3–4.` numbering,
+    running *backwards*, was the reader's only hint that the code departs from
+    the spec's stage order, and it never said why.
+  - **Trimmed 4 of 6 inline comments** that were pure stage labels the corrected
+    class doc now owns: `// 3–5. Query resolution and context assembly`,
+    `// 3–4. DTO resolution + deserialization (writes)`, `// 6. Handler
+    execution`, and `// 7–8. Response mapping + serialization (DTO mapping →
+    field selection)`. The first three restate the call directly beneath them;
+    the fourth's only real content — that DTO mapping precedes field selection —
+    is already normative at the `Serializer` contract (`serialization/serializer.ts`),
+    which is where a reader of `mapResponse` (it just delegates to the serializer)
+    would look.
+  - **Kept 2, rewritten to drop the stage-number prefix and keep the WHY**:
+    "nothing is special-cased per verb — built-ins are ordinary registry entries",
+    now citing ADR-0006 explicitly; and "per-call overrides are parameters, never
+    writes to the frozen resolved config". Both encode non-obvious constraints
+    that `registry.get(...)` and `this.configViewFor(request)` cannot state for
+    themselves.
+  Net: the pipeline shape is documented once (class doc), each surviving inline
+  comment carries only WHY, and the one genuine constraint the numbering hid is
+  now stated in prose.
 - Phase 5:
 - Phase 6:
 - Phase 7:
