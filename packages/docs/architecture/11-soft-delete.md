@@ -95,9 +95,10 @@ from the route alone. The documented pattern is an explicit cascade
 written by the caller (a custom operation, Phase 13), which also gets to
 decide ordering and what to do when one leg fails.
 
-**Related rows.** Once includes land (Phase 15), soft-deleted related
-rows are excluded from included relations by the same rule that governs
-root reads.
+**Related rows.** Soft-deleted related rows are excluded from included
+relations (Phase 15) by the same rule that governs root reads — the
+adapter spells the child predicate out per join rather than leaving it to
+the ORM's default. See doc 12 §4.
 
 ## 5. What is not here
 

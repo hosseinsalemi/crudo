@@ -31,23 +31,23 @@ Codes are API surface — renaming one is a breaking change (Phase 18
 semver policy). Source of truth: `ERROR_CATALOG` in
 `core/src/errors/error-catalog.ts`.
 
-| Code                            | HTTP | Fires when                                                                        | Payload extensions                |
-| ------------------------------- | ---- | --------------------------------------------------------------------------------- | --------------------------------- |
-| `CRUDO_QUERY_INVALID`           | 400  | Any query grammar/allowlist/limit violation (aggregate)                           | `errors[]` of the sub-codes below |
-| `CRUDO_QUERY_INVALID_FIELD`     | 400  | Field not on the filter/sort/select allowlist                                     | issue-level                       |
-| `CRUDO_QUERY_INVALID_OPERATOR`  | 400  | Unknown or misspelled wire operator                                               | issue-level                       |
-| `CRUDO_QUERY_INVALID_VALUE`     | 400  | Coercion failure, malformed bounds, bad pagination value                          | issue-level                       |
-| `CRUDO_QUERY_LIMIT_EXCEEDED`    | 400  | maxFilterDepth / maxInValues exceeded                                             | issue-level                       |
-| `CRUDO_QUERY_UNSUPPORTED_PARAM` | 400  | `include`/`fields[relation]` (Phase 15), or `withDeleted` on a hard-delete entity | issue-level                       |
-| `CRUDO_NOT_FOUND`               | 404  | Target row missing on findOne/update/patch/delete                                 | —                                 |
-| `CRUDO_CONFLICT`                | 409  | Unique/FK violation mapped by the adapter                                         | —                                 |
-| `CRUDO_ALREADY_DELETED`         | 409  | Soft-deleting an already-deleted row                                              | —                                 |
-| `CRUDO_NOT_DELETED`             | 409  | Restoring or purging a row that is not deleted                                    | —                                 |
-| `CRUDO_OPERATION_DISABLED`      | 405  | Programmatic call to a disabled registry entry (no route exists over HTTP)        | —                                 |
-| `CRUDO_BULK_FAILED`             | 422  | Atomic bulk failure (reserved — bulk is not built)                                | `items[]` per-index issues        |
-| `CRUDO_PERSISTENCE_FAILED`      | 500  | Unrecognized adapter/driver error                                                 | `cause` kept internally           |
-| `CRUDO_TRANSACTION_FAILED`      | 500  | Deadlock/serialization failure                                                    | `retryable` flag                  |
-| `CRUDO_CONFIG_INVALID`          | 500  | Bootstrap config error (fails startup, not a response)                            | —                                 |
+| Code                            | HTTP | Fires when                                                                         | Payload extensions                |
+| ------------------------------- | ---- | ---------------------------------------------------------------------------------- | --------------------------------- |
+| `CRUDO_QUERY_INVALID`           | 400  | Any query grammar/allowlist/limit violation (aggregate)                            | `errors[]` of the sub-codes below |
+| `CRUDO_QUERY_INVALID_FIELD`     | 400  | Field not on the filter/sort/select allowlist                                      | issue-level                       |
+| `CRUDO_QUERY_INVALID_OPERATOR`  | 400  | Unknown or misspelled wire operator                                                | issue-level                       |
+| `CRUDO_QUERY_INVALID_VALUE`     | 400  | Coercion failure, malformed bounds, bad pagination value                           | issue-level                       |
+| `CRUDO_QUERY_LIMIT_EXCEEDED`    | 400  | maxFilterDepth / maxInValues exceeded                                              | issue-level                       |
+| `CRUDO_QUERY_UNSUPPORTED_PARAM` | 400  | `withDeleted` on a hard-delete entity; `include` when no include resolver is wired | issue-level                       |
+| `CRUDO_NOT_FOUND`               | 404  | Target row missing on findOne/update/patch/delete                                  | —                                 |
+| `CRUDO_CONFLICT`                | 409  | Unique/FK violation mapped by the adapter                                          | —                                 |
+| `CRUDO_ALREADY_DELETED`         | 409  | Soft-deleting an already-deleted row                                               | —                                 |
+| `CRUDO_NOT_DELETED`             | 409  | Restoring or purging a row that is not deleted                                     | —                                 |
+| `CRUDO_OPERATION_DISABLED`      | 405  | Programmatic call to a disabled registry entry (no route exists over HTTP)         | —                                 |
+| `CRUDO_BULK_FAILED`             | 422  | Atomic bulk failure (reserved — bulk is not built)                                 | `items[]` per-index issues        |
+| `CRUDO_PERSISTENCE_FAILED`      | 500  | Unrecognized adapter/driver error                                                  | `cause` kept internally           |
+| `CRUDO_TRANSACTION_FAILED`      | 500  | Deadlock/serialization failure                                                     | `retryable` flag                  |
+| `CRUDO_CONFIG_INVALID`          | 500  | Bootstrap config error (fails startup, not a response)                             | —                                 |
 
 ## 3. Error context & message strategy
 

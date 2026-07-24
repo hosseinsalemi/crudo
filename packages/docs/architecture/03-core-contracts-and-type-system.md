@@ -63,9 +63,7 @@ consumer types its keys via declaration merging; `@crudo/nest` declares a
 `routes` key:
 
 ```ts
-// packages/frameworks/nest/src/augmentation.ts (Phase 11)
-import type { OperationMetadata } from "@crudo/core";
-
+// packages/frameworks/nest/src/operation-metadata.ts (Phase 11)
 declare module "@crudo/core" {
   interface OperationMetadata {
     routes?: {
@@ -73,7 +71,8 @@ declare module "@crudo/core" {
       path?: string;
       /** `false` = service-only operation: callable in code, no route. */
       enabled?: boolean;
-      swagger?: Record<string, unknown>;
+      /** Success status override (defaults: 201 create, 204 delete, 200 else). */
+      successStatus?: number;
     };
   }
 }
@@ -111,7 +110,7 @@ Enforced by dependency-cruiser (`core-imports-nothing`), not convention.
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
 | Service       | `CrudService`, `CrudCallOptions`, `IdentifiedInput`                                                                                                                    | Phase 7                            |
 | Persistence   | `EntityReader`, `EntityWriter`, `RepositoryAdapter`                                                                                                                    | Phases 9–10                        |
-| Transactions  | `TransactionManager`, `TransactionContext`, `TransactionOptions`                                                                                                       | Phases 9–10 (adapter-level hook)   |
+| Transactions  | `TransactionManager`, `TransactionContext`, `TransactionOptions`                                                                                                       | Not implemented — see below        |
 | Query         | `Filter*`, `FilterExpression`, `Sort`, `Pagination`, `PaginationStrategy`, `FieldSelection`, `QueryContext`, `NormalizedQueryContext`, `FilterParser`, `FilterBuilder` | Phase 5 (parse), Phase 10 (build)  |
 | DTO           | `Dto`, `DtoClass`, `OperationDtoMap`, `DtoResolver`, `ListResultDto`, `ListMetaDto`, `BulkResultDto`                                                                   | Phase 4 (bulk reserved)            |
 | Errors        | `CrudException`, `CrudoErrorCode`, `ErrorHandler`, `ProblemDetailsDto`                                                                                                 | Phase 6                            |
@@ -120,3 +119,13 @@ Enforced by dependency-cruiser (`core-imports-nothing`), not convention.
 | Relations     | `RelationDescriptor`, `RelationRegistry`, `IncludeTree`, `IncludeNode`, `IncludeResolver`, `EntityCatalog`                                                             | Phase 15                           |
 | Context       | `CrudContext`, `CrudContextState`, `StateKey`, `CrudRequest`, `CrudResponse`                                                                                           | Phase 7                            |
 | Serialization | `Serializer`, `Deserializer`                                                                                                                                           | Phase 7                            |
+
+`TransactionManager` / `TransactionOptions` / `TransactionPropagation` are
+declared but **intentionally unimplemented**, and no adapter provides them.
+v6 has no transaction phase: the only consumer of multi-write atomicity is
+bulk `atomic` mode, whose binder is the adapter-level `runInTransaction`
+hook, and bulk was dropped from this build. They stay because Phase 3 fixes
+core's type system once and later phases never mutate it — the `@remarks` at
+`core/src/persistence/transaction-manager.ts` is the definition-site record.
+`TransactionContext` is the exception: it is live, threaded through
+`CrudContext` and `CrudCallOptions` as an opaque adapter handle.

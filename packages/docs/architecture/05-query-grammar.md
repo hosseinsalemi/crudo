@@ -77,7 +77,7 @@ fields:     root: [id, name, email]
   — `?filter={"or":[{"name":{"eq":"admin"}},{"not":{"status":{"eq":"x"}}}]}` —
   parsed into the same AST. Bracket notation is sugar for the common flat
   cases; JSON is the full-power escape hatch. **Both produce the
-  identical AST** (property-tested in `filter-parser.spec.ts`); when both
+  identical AST** (asserted in `filter-parser.spec.ts`); when both
   appear, they AND together.
 - **Sort:** `sort=-createdAt,name` — comma-separated, `-` prefix =
   descending, list order is priority order. Sortable-allowlist enforced.
@@ -117,8 +117,11 @@ fields:     root: [id, name, email]
   before becoming AST values — number, boolean (`true`/`false`/`1`/`0`),
   date (ISO 8601), enum (member match), `null` for nullable columns.
   Failures are field-level 400 issues, never a silent `NaN` or
-  `Invalid Date`. Relation-path values pass through as strings in
-  Milestone B (target-entity metadata is wired in Phase 15).
+  `Invalid Date`. Coercion consults the **root** entity's column metadata
+  only: a relation-path value (`filter[profile.city][eq]=…`) has no entry
+  in that map and passes through as a string. Phase 15 wired the target
+  entity's config into include resolution and fieldset validation, but not
+  into filter-value coercion.
 - **One exception, all issues:** every violation across filter, sort,
   fields, and pagination is collected into a single
   `QueryValidationException`, so a client fixes its request in one round

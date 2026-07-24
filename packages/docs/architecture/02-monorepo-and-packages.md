@@ -59,6 +59,21 @@ Two independent enforcement layers:
    cycles (type-only cycles are exempt — core's contracts are mutually
    referential by design and erase at compile time).
 
+   Two properties of that rule set are load-bearing and easy to lose:
+
+   - **Both spellings are matched.** A workspace package specifier does not
+     resolve to a path for dependency-cruiser, so a path-only rule silently
+     misses `from "@crudo/nest"` — the spelling anyone would actually write.
+     The rules match the bare specifier as well as the relative path.
+     `packages/examples` is in scope too: it is the reference app.
+   - **`tests/` is cruised, not exempt.** Test files were once excluded
+     entirely, which left the boundary convention-only exactly where fixture
+     sharing tempts a shortcut. A test file may import its own package's
+     source and the `@crudo/*` barrels, never another package's `src` or
+     `tests`; core's tests additionally may not reach an adapter or framework
+     package, because core's ignorance of both is what its suite exists to
+     prove.
+
 ## 4. Workspace tooling: pnpm + plain scripts (ADR-0003)
 
 pnpm workspaces (assumed by the phase plan) with **plain root scripts**, no

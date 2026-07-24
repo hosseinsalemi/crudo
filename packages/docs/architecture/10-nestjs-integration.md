@@ -93,6 +93,7 @@ decoration time — revisited in Phase 16's DX pass.
 `tests/binding.e2e.spec.ts` runs a real Nest app over an in-memory fake
 infrastructure (no ORM in this package): all six routes, envelope shape,
 grammar wiring, problem-details mapping, disabled operations,
-manual-method-wins, custom + service-only operations, and the service
-token. The full-stack path (Nest → engine → TypeORM → SQLite) is the
+manual-method-wins, custom + service-only operations, the service token,
+the soft-delete routes (Phase 14), relation includes (Phase 15), and the
+Swagger body/hint schemas. The full-stack path (Nest → engine → TypeORM → SQLite) is the
 checkpoint app's suite in `packages/examples`.

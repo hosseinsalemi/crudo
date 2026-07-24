@@ -1,8 +1,10 @@
 # 01 — System Architecture (Phase 1)
 
 Crudo lets a developer define an entity once (via TypeORM) and get the full
-CRUD surface — `createOne` … `purgeOne`, the `*Many` batch variants, and
-arbitrary custom operations — with filtering, sorting, pagination, nested
+CRUD surface — `createOne` … `purgeOne`, the `*Many` batch variants
+(contracted and registered, but disabled: bulk is the optional half of
+Phase 14 and this build dropped it), and arbitrary custom operations —
+with filtering, sorting, pagination, nested
 includes, field selection, optional per-operation DTOs, serialization,
 transactions, and error handling, configurable at global, entity,
 operation, and per-call scope.
@@ -77,11 +79,11 @@ references — an illegal import fails CI, not code review.
 
 ## 3. Package overview
 
-| Package          | Owns                                                                                                   | Must never depend on         |
-| ---------------- | ------------------------------------------------------------------------------------------------------ | ---------------------------- |
-| `@crudo/core`    | Contracts, type system, engine, query model, DTO resolution, config merging, exceptions                | anything (zero runtime deps) |
-| `@crudo/typeorm` | `RepositoryAdapter`/`TransactionManager`/`FilterBuilder` over TypeORM; error mapping; relation loading | NestJS, `@crudo/nest`        |
-| `@crudo/nest`    | `@Crud` decorator, module wiring, route generation, exception filter, Swagger                          | TypeORM, `@crudo/typeorm`    |
+| Package          | Owns                                                                                    | Must never depend on         |
+| ---------------- | --------------------------------------------------------------------------------------- | ---------------------------- |
+| `@crudo/core`    | Contracts, type system, engine, query model, DTO resolution, config merging, exceptions | anything (zero runtime deps) |
+| `@crudo/typeorm` | `RepositoryAdapter`/`FilterBuilder` over TypeORM; error mapping; relation loading       | NestJS, `@crudo/nest`        |
+| `@crudo/nest`    | `@Crud` decorator, module wiring, route generation, exception filter, Swagger           | TypeORM, `@crudo/typeorm`    |
 
 ORM independence inside core is a structural discipline even though only
 TypeORM is built — it is what keeps the core clean.
@@ -94,7 +96,7 @@ Request
  → Config Resolution        frozen ResolvedEntityConfig (bootstrap-merged)
  → DTO Resolution           explicit DTO, else entity-derived default
  → Deserialization
- → Query Resolution         GET only: query → filter AST (+ IncludeTree, Phase 15 ⟨deferred⟩)
+ → Query Resolution         GET only: query → filter AST (+ IncludeTree, Phase 15)
  → Repository Adapter call  transactional via the adapter-level hook ⟨reserved⟩
  → Response Mapping         result → item or ListResultDto envelope
  → Field Selection + Serialization
@@ -250,6 +252,10 @@ Crudo is **not**:
 | [0008](../adr/0008-field-path-recursion-cap.md)               | `FieldPath` recursion cap (default 3, max 5)              |
 | [0009](../adr/0009-problem-details-error-shape.md)            | RFC 9457 problem details as the wire error shape          |
 | [0010](../adr/0010-explicit-named-barrel.md)                  | Explicit named barrel in core                             |
+| [0011](../adr/0011-entity-metadata-infrastructure-seam.md)    | Entity-metadata & infrastructure seam                     |
+| [0012](../adr/0012-decoration-time-route-generation.md)       | Decoration-time route generation in `@crudo/nest`         |
+| [0013](../adr/0013-config-declared-soft-delete-operations.md) | Soft-delete operations enabled from config, not metadata  |
+| [0014](../adr/0014-associate-by-id-not-deep-writes.md)        | Write-side relations: associate by id, no deep writes     |
 
 ## 10. Tradeoff analysis
 

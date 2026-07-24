@@ -3,7 +3,8 @@
 `@crudo/typeorm` implements `RepositoryAdapter` (= `EntityReader` +
 `EntityWriter`) over a TypeORM `DataSource` and feeds core's metadata
 seam. Skeleton scope: CRUD with hard delete, filtering (incl. `NOT` and
-relation paths), sorting, pagination, optional counting. `typeorm` is a
+relation paths), sorting, pagination, optional counting; Phases 14–15 added
+soft delete/restore/purge (§3) and relation loading (§6). `typeorm` is a
 peerDependency; `@crudo/core` never imports it.
 
 ## 1. The metadata seam
@@ -76,22 +77,29 @@ dedicated query built from the same filter (sorting stripped) — never
 
 ## 6. Attachment points for later phases
 
-- **Transactions (13):** every method already receives `CrudContext`;
-  the `QueryRunner` will ride on `context.transaction.handle`, and reads/
-  writes switch to the runner's manager when present.
-- **Soft delete (15):** the strategy branch lives in `delete` (currently
-  hard) and the `restore`/`purge` stubs; query methods add the
-  `deletedAt IS NULL` predicate driven by `query.withDeleted`.
-- **Includes (16):** `buildQuery` grows `leftJoinAndSelect`/batch loading
-  from the validated `IncludeTree`; alias management is already
-  deterministic.
+Two of the three have since landed and are documented above rather than
+here:
+
+- **Soft delete (Phase 14, doc 11):** built. The strategy branch lives in
+  `delete`/`restore`/`purge` reading `context.config.softDelete`, and query
+  methods add the `IS NULL` predicate driven by `query.withDeleted` (§3).
+- **Includes (Phase 15, doc 12):** built. `buildQuery` joins to-one nodes
+  from the validated `IncludeTree` and `loadBatches` issues one extra query
+  per to-many level, stitched by id; the deterministic alias scheme is what
+  lets an include join and a relation-path filter share one join (§2).
+- **Transactions:** still a seam, and the only one left. Every method
+  already receives `CrudContext`; a `QueryRunner` would ride on
+  `context.transaction.handle`, with reads/writes switching to the runner's
+  manager when present. Nothing binds it in v6 — the sole consumer would be
+  bulk `atomic` mode, which this build dropped (doc 03 §5).
 
 ## 7. Performance posture
 
 Filters and sorts translate to plain indexed-column predicates —
 index-aware by construction (no function-wrapping except the documented
-`ILIKE` lowering, which callers can avoid with `like`). No N+1 in
-skeleton scope (no relation loading); no unbounded queries (`maxLimit`
-clamps upstream). Integration tests run the real engine→adapter stack on
-in-memory SQLite (`tests/adapter.spec.ts`), per-package testing as
-specified.
+`ILIKE` lowering, which callers can avoid with `like`). No N+1: to-many
+relations load one batched query per level, not one per parent row; no
+unbounded queries (`maxLimit` clamps upstream). Integration tests run the
+real engine→adapter stack on in-memory SQLite (`tests/adapter.spec.ts`,
+`tests/soft-delete.spec.ts`, `tests/includes.spec.ts`), per-package testing
+as specified.

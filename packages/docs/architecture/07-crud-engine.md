@@ -30,7 +30,9 @@ around Crudo.
 
 Entity + operation identity, the resolved config view (with per-call
 settings already merged), `principal` (opaque to core, set by the
-framework layer), `transaction` (`null` — the adapter-level hook is reserved), the normalized
+framework layer), `transaction` (an opaque handle a programmatic caller may
+pass through `CrudCallOptions`; `null` otherwise, and nothing in v6 creates
+one — the adapter-level hook is reserved), the normalized
 query for reads (`null` for writes), a `correlationId` (generated if the
 caller didn't forward one), and the typed `state` bag
 (`StateKey<T>`-keyed) for custom handlers to pass data.
