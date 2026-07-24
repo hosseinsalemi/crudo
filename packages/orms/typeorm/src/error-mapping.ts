@@ -15,6 +15,15 @@ import { QueryFailedError } from "typeorm";
  * Codes covered: Postgres SQLSTATE, MySQL errno, SQLite extended codes.
  * Unknown drivers fall through to `PersistenceException` — the original
  * error always travels as `cause`, never swallowed.
+ *
+ * **Soft delete and unique indexes (Phase 14).** A soft-deleted row still
+ * occupies its unique indexes, so re-creating "the same" row after a soft
+ * delete raises a unique violation — mapped here to a 409 like any other
+ * conflict, which is the honest answer: the value *is* taken. Crudo never
+ * rewrites indexes; the standard fix is a partial/filtered unique index
+ * on the live rows only, e.g. in Postgres
+ * `CREATE UNIQUE INDEX … ON owner (email) WHERE deleted_at IS NULL`
+ * (SQLite supports the same form; MySQL needs a generated column).
  */
 export function mapDriverError(error: unknown, context: ErrorContext): CrudoException {
   if (error instanceof CrudoException) return error;

@@ -66,7 +66,7 @@ export function buildEntityMetadata<Entity extends object>(
     name: relation.propertyName,
     target: () => relation.type as ClassRef,
     cardinality: relation.isOneToMany || relation.isManyToMany ? "many" : "one",
-    // Inclusion is an opt-in allowlist (Phase 16); ORM metadata only
+    // Inclusion is an opt-in allowlist (Phase 15); ORM metadata only
     // supplies shape, never permission.
     includable: false,
     strategy: "auto",
@@ -78,5 +78,10 @@ export function buildEntityMetadata<Entity extends object>(
     idField: primary.propertyName,
     fields,
     relations,
+    // `@DeleteDateColumn` detection (Phase 14): the ORM's own declaration
+    // is what makes zero-config soft delete work. Explicit
+    // `softDelete.field` config still wins over it — core decides, this
+    // only reports.
+    softDeleteField: metadata.deleteDateColumn?.propertyName ?? null,
   };
 }
