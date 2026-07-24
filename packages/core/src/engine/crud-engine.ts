@@ -51,9 +51,14 @@ const INPUT_SLOTS: Readonly<Partial<Record<string, DtoSlot>>> = {
 /**
  * The request pipeline (Phase 7, Template Method over one lifecycle):
  *
- * operation resolution → config resolution → DTO resolution →
- * deserialization → query resolution (reads) → handler execution →
- * response mapping → serialization.
+ * operation resolution → config resolution → query resolution (reads) →
+ * context assembly → DTO resolution → deserialization → handler
+ * execution → response mapping → serialization.
+ *
+ * Query resolution runs ahead of the spec's stage order (which lists it
+ * after deserialization) because the context carries the normalized query
+ * and deserialization needs the context — architecture doc 07 documents
+ * this order as the authoritative one.
  *
  * Every stage boundary is a seam: handlers come from the registry
  * (Phase 13 swaps them), the serializer/deserializer and pagination
@@ -88,7 +93,8 @@ export class CrudEngine<Entity extends object> {
   private async run(request: CrudRequest<Entity>, correlationId: string): Promise<CrudResponse> {
     const { registry, config } = this.deps;
 
-    // 1. Operation resolution — registry lookup, nothing special-cased.
+    // Nothing is special-cased per verb — built-ins are ordinary registry
+    // entries (ADR-0006).
     const descriptor = registry.get(request.operation);
     if (descriptor === undefined || !descriptor.enabled) {
       throw new OperationDisabledException({
@@ -100,11 +106,10 @@ export class CrudEngine<Entity extends object> {
       });
     }
 
-    // 2. Config resolution — per-operation view + per-call overrides
-    //    (parameters, never config writes).
+    // Per-call overrides are parameters, never writes to the frozen
+    // resolved config.
     const configView = this.configViewFor(request);
 
-    // 3–5. Query resolution (reads) and context assembly.
     const query = descriptor.kind === "read" ? this.normalizeQuery(request, configView) : null;
     const context = createCrudContext<Entity>({
       operation: descriptor.id,
@@ -115,13 +120,10 @@ export class CrudEngine<Entity extends object> {
       correlationId,
     });
 
-    // 3–4. DTO resolution + deserialization (writes).
     const input = this.resolveInput(request, descriptor, context);
 
-    // 6. Handler execution.
     const result = await descriptor.handler.execute(input, context);
 
-    // 7–8. Response mapping + serialization (DTO mapping → field selection).
     return this.mapResponse(descriptor, result, context);
   }
 
