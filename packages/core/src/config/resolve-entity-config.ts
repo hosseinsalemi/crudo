@@ -10,6 +10,7 @@ import { deepFreeze, mergeSettings } from "./merge-settings.js";
 import { validateSettings } from "./validate-settings.js";
 import { DefaultDtoResolver } from "../dto/default-dto-resolver.js";
 import { DefaultRelationRegistry } from "../relations/default-relation-registry.js";
+import { resolveSoftDelete } from "../persistence/soft-delete.js";
 
 /** Top-level settings keys — the subset of an `EntityConfig` that merges. */
 const SETTINGS_KEYS = [
@@ -60,13 +61,20 @@ export function resolveEntityConfig<Entity extends object>(
   const perOperation = new Map<OperationId, CrudoSettings>();
   for (const [operation, config] of Object.entries(entityConfig?.operations ?? {}) as [
     StandardOperationId,
-    OperationConfig<Entity> | false,
+    OperationConfig<Entity> | boolean,
   ][]) {
-    if (config === false) continue;
+    // Boolean shorthands carry no settings — enablement is the registry's.
+    if (typeof config === "boolean") continue;
     const settings = pickSettings(config as Readonly<Record<string, unknown>>);
     if (settings === undefined || Object.keys(settings).length === 0) continue;
     const merged = mergeSettings(entitySettings, settings);
-    validateSettings(`${entityName}.operations.${operation}`, merged);
+    const scope = `${entityName}.operations.${operation}`;
+    validateSettings(scope, merged);
+    // Resolve for its validation side effect: a per-operation scope that
+    // demands soft delete on an entity without a marker field must fail at
+    // bootstrap, not on the first request (the engine recomputes the
+    // strategy for whichever settings view a call ends up with).
+    resolveSoftDelete(metadata, merged, scope);
     perOperation.set(operation, deepFreeze(merged));
   }
 
@@ -79,6 +87,7 @@ export function resolveEntityConfig<Entity extends object>(
       return perOperation.get(operation) ?? entitySettings;
     },
     allowlists,
+    softDelete: resolveSoftDelete(metadata, entitySettings),
     dto: new DefaultDtoResolver<Entity>(entityConfig?.dto),
     relations: new DefaultRelationRegistry<Entity>(metadata.relations),
   };
@@ -118,6 +127,7 @@ export function describeResolvedConfig<Entity>(
     entityName: config.entityName,
     settings: config.settings,
     allowlists: config.allowlists,
+    softDelete: config.softDelete,
     relations: config.relations.all().map((relation) => ({
       name: relation.name,
       cardinality: relation.cardinality,

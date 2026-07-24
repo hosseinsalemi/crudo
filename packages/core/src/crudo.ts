@@ -6,6 +6,8 @@ import type { GlobalConfig } from "./config/global-config.js";
 import type { PaginationStrategy } from "./query/pagination.js";
 import type { QueryContext } from "./query/query-context.js";
 import type { RepositoryAdapter } from "./persistence/repository-adapter.js";
+import type { OperationRegistry } from "./operations/operation-registry.js";
+import type { ResolvedEntityConfig } from "./config/resolved-entity-config.js";
 import { CrudEngine } from "./engine/crud-engine.js";
 import { ConfigurationException } from "./errors/exceptions.js";
 import { DefaultCrudService } from "./service/default-crud-service.js";
@@ -95,13 +97,16 @@ export function createCrudo(options: CrudoOptions = {}): CrudoInstance {
         config as EntityConfig<Entity> | undefined,
         options.defaults,
       );
+      const registry = createOperationRegistry<Entity>(
+        config as EntityConfig<Entity> | undefined,
+        builtInHandlers(adapter as unknown as RepositoryAdapter<Entity>),
+      );
+      requireSoftDeletable(resolved, registry);
+
       const engine = new CrudEngine<Entity>({
         metadata: metadata as EntityMetadata<Entity>,
         config: resolved,
-        registry: createOperationRegistry<Entity>(
-          config as EntityConfig<Entity> | undefined,
-          builtInHandlers(adapter as unknown as RepositoryAdapter<Entity>),
-        ),
+        registry,
         serializer: new DefaultSerializer(metadata as EntityMetadata<Entity>),
         deserializer: new DefaultDeserializer(metadata as EntityMetadata<Entity>),
         normalizer: new QueryNormalizer(metadata as EntityMetadata<Entity>, options.paginationStrategies ?? []),
@@ -116,6 +121,30 @@ export function createCrudo(options: CrudoOptions = {}): CrudoInstance {
       return registered.get(entityName);
     },
   };
+}
+
+/**
+ * `restoreOne`/`purgeOne` are enabled from config alone, because route
+ * generation runs before any ORM metadata exists (ADR-0013). Bootstrap is
+ * the first moment both halves are known, so it is where the mismatch —
+ * an entity that resolves to hard delete with a soft-delete operation
+ * switched on — becomes an error naming the fix.
+ */
+function requireSoftDeletable<Entity extends object>(
+  config: ResolvedEntityConfig<Entity>,
+  registry: OperationRegistry<Entity>,
+): void {
+  if (config.softDelete.strategy === "soft") return;
+  for (const id of ["restoreOne", "restoreMany", "purgeOne"] as const) {
+    if (registry.get(id)?.enabled !== true) continue;
+    throw new ConfigurationException(
+      config.entityName,
+      `operations.${id}`,
+      `'${id}' needs a soft-deletable entity, but '${config.entityName}' resolves to a ` +
+        `hard delete strategy — give it a delete-marker column (@DeleteDateColumn) or ` +
+        `set softDelete.field to an existing column`,
+    );
+  }
 }
 
 /**

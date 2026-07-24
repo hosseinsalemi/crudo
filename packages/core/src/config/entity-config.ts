@@ -26,6 +26,13 @@ export interface QueryAllowlists<Entity = unknown> {
  * the parent `operations` record disables the operation outright.
  */
 export interface OperationConfig<Entity = unknown> extends DeepPartial<CrudoSettings> {
+  /**
+   * Turn the operation on or off explicitly, overriding its default. The
+   * long form of the `false` / `true` shorthands in the parent
+   * `operations` record — spell it out when the entry also carries
+   * settings or `meta`.
+   */
+  readonly enabled?: boolean;
   /** Replacement handler — keeps the default DTO/serialization scaffolding. */
   readonly handler?: OperationHandler<Entity>;
   /** Opaque metadata consumed by the framework layer (route options). */
@@ -62,8 +69,11 @@ export interface EntityConfig<
 > extends DeepPartial<CrudoSettings> {
   readonly dto?: OperationDtoMap<Entity, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto>;
   readonly allowlists?: QueryAllowlists<Entity>;
-  /** Per-operation overrides; `false` disables the operation. */
-  readonly operations?: Partial<Record<StandardOperationId, OperationConfig<Entity> | false>>;
+  /**
+   * Per-operation overrides. `false` disables the operation; `true`
+   * enables one that is off by default (`purgeOne`, `restoreOne`).
+   */
+  readonly operations?: Partial<Record<StandardOperationId, OperationConfig<Entity> | boolean>>;
   /** New operations, dispatched through the same registry (Phase 13). */
   readonly customOperations?: Readonly<Record<string, CustomOperationConfig<Entity>>>;
 }

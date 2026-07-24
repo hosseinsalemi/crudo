@@ -15,6 +15,7 @@ import { QueryNormalizer } from "../query/query-normalizer.js";
 import { createCrudContext, randomUuid } from "../context/default-crud-context.js";
 import { mergeSettings } from "../config/merge-settings.js";
 import { validateSettings } from "../config/validate-settings.js";
+import { resolveSoftDelete } from "../persistence/soft-delete.js";
 import type { FindManyResult } from "./built-in-handlers.js";
 
 /**
@@ -56,8 +57,8 @@ const INPUT_SLOTS: Readonly<Partial<Record<string, DtoSlot>>> = {
  *
  * Every stage boundary is a seam: handlers come from the registry
  * (Phase 13 swaps them), the serializer/deserializer and pagination
- * strategies are constructor-injected strategies, and the transaction and
- * include stages hold plain defaults until Phases 13/16 land.
+ * strategies are constructor-injected strategies, and the include stage
+ * holds a plain default until Phase 15 lands.
  */
 export class CrudEngine<Entity extends object> {
   constructor(private readonly deps: CrudEngineDependencies<Entity>) {}
@@ -139,6 +140,10 @@ export class CrudEngine<Entity extends object> {
       settings,
       settingsFor: () => settings,
       allowlists: config.allowlists,
+      // A narrowed scope may change the delete strategy (an operation that
+      // forces `hard` on a soft-deletable entity, say), so it is resolved
+      // against the settings actually in force for this call.
+      softDelete: resolveSoftDelete(this.deps.metadata, settings, `${config.entityName} (${request.operation})`),
       dto: config.dto,
       relations: config.relations,
     };
@@ -168,6 +173,8 @@ export class CrudEngine<Entity extends object> {
     switch (descriptor.id) {
       case "findOne":
       case "deleteOne":
+      case "restoreOne":
+      case "purgeOne":
         return this.coerceId(request.id);
       case "findMany":
         return null;
@@ -229,7 +236,7 @@ export class CrudEngine<Entity extends object> {
     }
 
     if (result === null || result === undefined) {
-      // Void results: deleteOne (and purgeOne once Phase 15 enables it).
+      // Void results: deleteOne and purgeOne.
       return { operation: descriptor.id, item: null, list: null, bulk: null };
     }
 

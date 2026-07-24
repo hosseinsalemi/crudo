@@ -21,7 +21,7 @@ export interface IdentifiedInput<Id extends EntityId, Data> {
  * Registered DTO classes narrow the corresponding slot.
  *
  * Batch (`*Many`) operations are list-based, never filter-based — no
- * unbounded mass writes. Their availability is a Phase 15 feature; the
+ * unbounded mass writes. Their availability is a Phase 14 feature; the
  * contract is complete now so later phases never mutate core types.
  */
 export interface CrudService<
@@ -52,14 +52,21 @@ export interface CrudService<
     options?: CrudCallOptions,
   ): Promise<BulkResultDto<ItemDto>>;
 
-  /** Hard or soft per the resolved delete strategy (Phase 15). */
+  /** Hard or soft per the resolved delete strategy (Phase 14). */
   deleteOne(id: Id, options?: CrudCallOptions): Promise<void>;
   deleteMany(ids: readonly Id[], options?: CrudCallOptions): Promise<BulkResultDto<Id>>;
 
-  /** Reuses the `item` DTO slot — no dedicated restore shape (Phase 4). */
+  /**
+   * Un-deletes a soft-deleted row. Reuses the `item` DTO slot — no
+   * dedicated restore shape (Phase 4). Enabled when the entity config
+   * declares soft delete.
+   */
   restoreOne(id: Id, options?: CrudCallOptions): Promise<ItemDto>;
   restoreMany(ids: readonly Id[], options?: CrudCallOptions): Promise<BulkResultDto<ItemDto>>;
 
-  /** Permanently removes a soft-deleted row; disabled by default. */
+  /**
+   * Permanently removes a soft-deleted row; disabled by default, enabled
+   * with `operations: { purgeOne: true }`.
+   */
   purgeOne(id: Id, options?: CrudCallOptions): Promise<void>;
 }

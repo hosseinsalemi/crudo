@@ -54,16 +54,24 @@ interface StandardOperationShape {
   readonly cardinality: OperationCardinality;
   /** Enabled in the Milestone B skeleton; the rest activate in C. */
   readonly enabled: boolean;
+  /**
+   * Operates on soft-deleted rows (Phase 14), so it only makes sense on a
+   * soft-deletable entity. `restoreOne` switches on when the config
+   * declares soft delete; `purgeOne` stays off until asked for by name.
+   */
+  readonly requiresSoftDelete?: boolean;
 }
 
 /**
  * The standard operation table. The engine dispatches every operation
  * through the registry — these are just its default entries (ADR-0006),
- * and `@crudo/nest` route generation walks the same registry. Operations
- * whose behavior lands in Milestone C (`*Many`, restore, purge) are
- * registered **disabled**: calling one raises
+ * and `@crudo/nest` route generation walks the same registry.
+ *
+ * `enabled` here is the *unconditional* default. The batch (`*Many`)
+ * entries are registered disabled until bulk is built: calling one raises
  * `OperationDisabledException`, and no route is generated — a real seam,
- * not a TODO.
+ * not a TODO. `restoreOne`/`purgeOne` layer the Phase 14 rule on top
+ * (see {@link createOperationRegistry}).
  */
 export const STANDARD_OPERATIONS: Readonly<Record<StandardOperationId, StandardOperationShape>> = Object.freeze({
   createOne: { kind: "write", cardinality: "one", enabled: true },
@@ -76,9 +84,9 @@ export const STANDARD_OPERATIONS: Readonly<Record<StandardOperationId, StandardO
   patchMany: { kind: "write", cardinality: "many", enabled: false },
   deleteOne: { kind: "write", cardinality: "one", enabled: true },
   deleteMany: { kind: "write", cardinality: "many", enabled: false },
-  restoreOne: { kind: "write", cardinality: "one", enabled: false },
-  restoreMany: { kind: "write", cardinality: "many", enabled: false },
-  purgeOne: { kind: "write", cardinality: "one", enabled: false },
+  restoreOne: { kind: "write", cardinality: "one", enabled: false, requiresSoftDelete: true },
+  restoreMany: { kind: "write", cardinality: "many", enabled: false, requiresSoftDelete: true },
+  purgeOne: { kind: "write", cardinality: "one", enabled: false, requiresSoftDelete: true },
 });
 
 /** Provides the handler for one standard operation id. */
@@ -98,9 +106,20 @@ const unboundHandler = (id: OperationId): OperationHandler<unknown> => ({
  * Build one entity's operation registry from its config (Phase 7; the
  * Phase 13 control surface configures exactly this):
  *
- * - standard entries first, honoring `operations.<id>: false` (disable)
- *   and `operations.<id>.handler` (override — default scaffolding stays);
+ * - standard entries first, honoring `operations.<id>: false` (disable),
+ *   `operations.<id>: true` / `{ enabled: true }` (enable), and
+ *   `operations.<id>.handler` (override — default scaffolding stays);
  * - then `customOperations`, each with its own DTOs and `meta`.
+ *
+ * Phase 14's soft-delete operations default from the config alone, never
+ * from ORM metadata: `restoreOne` turns on when the entity config
+ * declares soft delete (`softDelete.strategy: "soft"` or an explicit
+ * `softDelete.field`), `purgeOne` only when named outright. Route
+ * generation runs at decoration time, where no ORM metadata exists
+ * (ADR-0012), so both registry builds — engine and `@crudo/nest` — must
+ * reach the same answer from the same input (ADR-0013). Enabling either
+ * on an entity that does not resolve to a soft delete strategy is a
+ * bootstrap error, raised in `createCrud` where metadata is known.
  *
  * `handlers` binds the built-in behaviors; when omitted the entries carry
  * throwing placeholders — that mode exists for consumers that only need
@@ -112,20 +131,21 @@ export function createOperationRegistry<Entity extends object>(
 ): OperationRegistry<Entity> {
   const registry = new DefaultOperationRegistry<Entity>();
   const operations = config?.operations ?? {};
+  const softDeleteDeclared = declaresSoftDelete(config);
 
   for (const [id, shape] of Object.entries(STANDARD_OPERATIONS) as [StandardOperationId, StandardOperationShape][]) {
     const operationConfig = operations[id];
-    const disabled = operationConfig === false;
-    const override = operationConfig !== false ? operationConfig?.handler : undefined;
+    const settings = typeof operationConfig === "object" ? operationConfig : undefined;
+    const byDefault = shape.enabled || (id === "restoreOne" && softDeleteDeclared);
     registry.register({
       id,
       kind: shape.kind,
       cardinality: shape.cardinality,
-      enabled: shape.enabled && !disabled,
-      handler: override ?? handlers?.(id) ?? (unboundHandler(id) as unknown as OperationHandler<Entity>),
+      enabled: typeof operationConfig === "boolean" ? operationConfig : (settings?.enabled ?? byDefault),
+      handler: settings?.handler ?? handlers?.(id) ?? (unboundHandler(id) as unknown as OperationHandler<Entity>),
       input: null,
       output: null,
-      meta: (operationConfig !== false ? operationConfig?.meta : undefined) ?? {},
+      meta: settings?.meta ?? {},
     });
   }
 
@@ -149,4 +169,18 @@ export function createOperationRegistry<Entity extends object>(
     });
   }
   return registry;
+}
+
+/**
+ * Whether an entity config *declares* soft delete — the config-only signal
+ * `restoreOne` defaults from. Declaring means saying so on this entity:
+ * `strategy: "soft"`, or naming the marker field explicitly. Merely
+ * inheriting the built-in `strategy: "auto"` is not a declaration: `auto`
+ * is answered by ORM metadata, which decoration time cannot see.
+ */
+function declaresSoftDelete(config: { readonly softDelete?: unknown } | undefined): boolean {
+  const softDelete = config?.softDelete;
+  if (typeof softDelete !== "object" || softDelete === null) return false;
+  const { strategy, field } = softDelete as { strategy?: string; field?: string };
+  return strategy === "soft" || typeof field === "string";
 }

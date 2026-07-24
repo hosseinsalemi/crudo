@@ -2,7 +2,7 @@ import type { CrudoErrorCode } from "./crud-exception.js";
 
 /**
  * One catalog entry: everything stable about an error code. Codes are API
- * surface — renaming one is a breaking change (Phase 19 semver policy).
+ * surface — renaming one is a breaking change (Phase 18 semver policy).
  * The full human-facing table lives in
  * packages/docs/architecture/06-error-handling.md and is generated from
  * this object, so code and docs cannot drift.
@@ -21,9 +21,9 @@ export interface ErrorCatalogEntry {
 }
 
 /**
- * The complete Milestone B error catalog. Later phases only add entries
- * (`CRUDO_ALREADY_DELETED`, … are reserved now so the Phase 15 leaves slot
- * into an existing hierarchy without renumbering anything).
+ * The complete error catalog. Later phases only add entries — the codes
+ * here are API surface, and the soft-delete leaves (Phase 14) slotted
+ * into the hierarchy reserved for them without renumbering anything.
  */
 export const ERROR_CATALOG = {
   CRUDO_QUERY_INVALID: {
@@ -74,7 +74,7 @@ export const ERROR_CATALOG = {
   CRUDO_NOT_DELETED: {
     status: 409,
     title: "Not deleted",
-    message: "{entity} with id '{id}' is not deleted and cannot be restored.",
+    message: "{entity} with id '{id}' is not deleted.",
   },
   CRUDO_OPERATION_DISABLED: {
     status: 405,

@@ -31,19 +31,29 @@ export interface ErrorSettings {
   readonly exposeInternals: boolean;
 }
 
-/** Reserved for Phase 16 (nested includes). */
+/** Reserved for Phase 15 (nested includes). */
 export interface RelationSettings {
   readonly maxIncludeDepth: number;
   readonly maxIncludedNodes: number;
 }
 
-/** Reserved for Phase 15 (soft delete). `false` at any scope disables. */
+/**
+ * How the delete strategy is chosen (Phase 14). `auto` — the default —
+ * resolves per entity: soft when it carries the delete-marker field, hard
+ * otherwise, so entities that aren't soft-deletable cost nothing. `soft`
+ * and `hard` state the strategy outright; `soft` on an entity without a
+ * marker field fails at bootstrap.
+ */
+export type SoftDeleteMode = "auto" | "soft" | "hard";
+
+/** Soft delete (Phase 14). `false` at any scope disables it entirely. */
 export interface SoftDeleteSettings {
   /** Delete-marker field name (`deletedAt: Date | null` convention). */
   readonly field: string;
+  readonly strategy: SoftDeleteMode;
 }
 
-/** Reserved for Phase 15 (bulk). */
+/** Reserved for Phase 14 (bulk). */
 export type BulkMode = "atomic" | "bestEffort";
 
 export interface BulkSettings {

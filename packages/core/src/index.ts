@@ -3,7 +3,7 @@
  *
  * This barrel is an **explicit named list**, kept deliberately (no
  * `export *`): the public surface should only ever change on purpose, the
- * future api-extractor gate (Phase 19) diffs against it, and module
+ * future api-extractor gate (Phase 18) diffs against it, and module
  * augmentation of `OperationMetadata` needs a stable module to target.
  */
 
@@ -56,6 +56,7 @@ export type {
   PaginationSettings,
   QuerySettings,
   RelationSettings,
+  SoftDeleteMode,
   SoftDeleteSettings,
   PaginationStrategyName,
 } from "./config/settings.js";
@@ -86,6 +87,7 @@ export type { Deserializer, Serializer } from "./serialization/serializer.js";
 export type { EntityReader } from "./persistence/entity-reader.js";
 export type { EntityWriter } from "./persistence/entity-writer.js";
 export type { RepositoryAdapter } from "./persistence/repository-adapter.js";
+export type { DeleteStrategy, ResolvedSoftDelete, SoftDeletable } from "./persistence/soft-delete.js";
 export type {
   TransactionContext,
   TransactionManager,
@@ -133,6 +135,7 @@ export { BUILT_IN_DEFAULTS } from "./config/defaults.js";
 export { deepFreeze, mergeSettings } from "./config/merge-settings.js";
 export { validateSettings } from "./config/validate-settings.js";
 export { describeResolvedConfig, resolveEntityConfig } from "./config/resolve-entity-config.js";
+export { HARD_DELETE, resolveSoftDelete } from "./persistence/soft-delete.js";
 
 // ── DTO & serialization runtime ───────────────────────────────────────
 export { DefaultDtoResolver } from "./dto/default-dto-resolver.js";

@@ -45,6 +45,7 @@ export class QueryNormalizer<Entity = unknown> {
     const issues: QueryIssueDto[] = [];
 
     rejectUnsupported(rawParams, issues);
+    const withDeleted = parseWithDeleted(rawParams["withDeleted"], config, issues);
 
     let filter: Filter<Entity> = { root: null };
     try {
@@ -77,7 +78,7 @@ export class QueryNormalizer<Entity = unknown> {
       pagination,
       fields,
       include: {},
-      withDeleted: false,
+      withDeleted,
       count: config.settings.pagination.count,
     };
   }
@@ -98,9 +99,7 @@ export class QueryNormalizer<Entity = unknown> {
     if (input.include !== undefined && input.include.length > 0) {
       issues.push(unsupportedIssue("include"));
     }
-    if (input.withDeleted === true) {
-      issues.push(unsupportedIssue("withDeleted"));
-    }
+    const withDeleted = parseWithDeleted(input.withDeleted, config, issues);
 
     const root = input.filter ?? null;
     if (root !== null) {
@@ -144,7 +143,7 @@ export class QueryNormalizer<Entity = unknown> {
       pagination: { limit, offset },
       fields: { root: rootFields, relations: {} },
       include: {},
-      withDeleted: false,
+      withDeleted,
       count: config.settings.pagination.count,
     };
   }
@@ -165,29 +164,56 @@ export class QueryNormalizer<Entity = unknown> {
 
 /**
  * The skeleton parses and rejects what it does not implement yet —
- * explicitly, never silently (Phase 5): `include` waits on Phase 16,
- * `withDeleted=true` on Phase 15.
+ * explicitly, never silently (Phase 5): `include` waits on Phase 15.
  */
 function rejectUnsupported(rawParams: Readonly<Record<string, unknown>>, issues: QueryIssueDto[]): void {
   if (rawParams["include"] !== undefined) {
     issues.push(unsupportedIssue("include"));
   }
-  const withDeleted = rawParams["withDeleted"];
-  if (withDeleted !== undefined && String(withDeleted) !== "false") {
-    issues.push(unsupportedIssue("withDeleted"));
-  }
 }
 
 function unsupportedIssue(param: string): QueryIssueDto {
-  const reason =
-    param === "withDeleted"
-      ? "soft delete ships in a later release (Phase 15)."
-      : "relation includes ship in a later release (Phase 16).";
   return {
     field: param,
     code: "CRUDO_QUERY_UNSUPPORTED_PARAM",
-    detail: `Query parameter '${param}' is not supported yet: ${reason}`,
+    detail:
+      `Query parameter '${param}' is not supported yet: ` + `relation includes ship in a later release (Phase 15).`,
   };
+}
+
+/**
+ * `withDeleted` (Phase 14): opt out of the default exclusion of
+ * soft-deleted rows. Asking for it on an entity that resolves to a hard
+ * delete strategy is rejected rather than silently ignored — a client
+ * that thinks it is seeing deleted rows should be told it is not.
+ */
+function parseWithDeleted<Entity>(
+  raw: unknown,
+  config: ResolvedEntityConfig<Entity>,
+  issues: QueryIssueDto[],
+): boolean {
+  if (raw === undefined || raw === null || raw === "" || raw === false || raw === "false" || raw === "0") {
+    return false;
+  }
+  if (raw !== true && raw !== "true" && raw !== "1") {
+    issues.push({
+      field: "withDeleted",
+      code: "CRUDO_QUERY_INVALID_VALUE",
+      detail: `Value '${String(raw)}' for field 'withDeleted' is not a valid boolean.`,
+    });
+    return false;
+  }
+  if (config.softDelete.strategy !== "soft") {
+    issues.push({
+      field: "withDeleted",
+      code: "CRUDO_QUERY_UNSUPPORTED_PARAM",
+      detail:
+        `Query parameter 'withDeleted' is not supported: ` +
+        `${config.entityName} is not soft-deletable, so no rows are excluded.`,
+    });
+    return false;
+  }
+  return true;
 }
 
 function parseSort<Entity>(
@@ -226,7 +252,7 @@ function parseFields<Entity>(
 ): FieldSelection<Entity> {
   for (const key of Object.keys(rawParams)) {
     if (parseBracketKey(key, "fields") !== null) {
-      // fields[<relation>] only makes sense with includes (Phase 16).
+      // fields[<relation>] only makes sense with includes (Phase 15).
       issues.push(unsupportedIssue("fields[relation]"));
     }
   }

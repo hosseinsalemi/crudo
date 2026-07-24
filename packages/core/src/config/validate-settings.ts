@@ -54,7 +54,15 @@ export function validateSettings(entityName: string, settings: CrudoSettings): v
       throw new ConfigurationException(
         entityName,
         "softDelete",
-        `expected false or { field: string }, got ${JSON.stringify(settings.softDelete)}`,
+        `expected false or { field: string, strategy: … }, got ${JSON.stringify(settings.softDelete)}`,
+      );
+    }
+    const strategy = settings.softDelete.strategy;
+    if (strategy !== "auto" && strategy !== "soft" && strategy !== "hard") {
+      throw new ConfigurationException(
+        entityName,
+        "softDelete.strategy",
+        `expected "auto", "soft", or "hard", got ${JSON.stringify(strategy)}`,
       );
     }
   }

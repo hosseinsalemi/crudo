@@ -94,14 +94,18 @@ export class TransactionException extends CrudoException {
   }
 }
 
-/** Phase 15 leaf, hierarchy reserved now: delete of a deleted row. */
+/** Soft-deleting a row that is already soft-deleted (Phase 14) → 409. */
 export class AlreadyDeletedException extends CrudoException {
   constructor(options: CrudoExceptionOptions = {}) {
     super("CRUDO_ALREADY_DELETED", options);
   }
 }
 
-/** Phase 15 leaf, hierarchy reserved now: restore of a live row. */
+/**
+ * Restoring — or purging — a row that is not deleted (Phase 14) → 409.
+ * Both operations act on soft-deleted rows only; a live row is a state
+ * conflict, not a missing one.
+ */
 export class NotDeletedException extends CrudoException {
   constructor(options: CrudoExceptionOptions = {}) {
     super("CRUDO_NOT_DELETED", options);
@@ -116,7 +120,7 @@ export class OperationDisabledException extends CrudoException {
 }
 
 /**
- * Reserved for bulk (Phase 15): an atomic batch that failed. Carries the
+ * Reserved for bulk (Phase 14): an atomic batch that failed. Carries the
  * per-index failures that serialize into the `items[]` extension.
  */
 export class BulkOperationException extends CrudoException {

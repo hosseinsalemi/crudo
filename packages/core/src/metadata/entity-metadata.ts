@@ -39,6 +39,13 @@ export interface EntityMetadata<Entity = unknown> {
   readonly idField: string;
   readonly fields: readonly FieldMetadata[];
   readonly relations: readonly RelationDescriptor[];
+  /**
+   * The delete-marker column the ORM itself declares (`@DeleteDateColumn`
+   * in `@crudo/typeorm`), or `null`/absent when it declares none. This is
+   * the detection half of Phase 14's strategy resolution; explicit
+   * `softDelete.field` configuration wins over it.
+   */
+  readonly softDeleteField?: string | null;
 }
 
 /**

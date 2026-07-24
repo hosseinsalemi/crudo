@@ -74,7 +74,23 @@ export function builtInHandlers<Entity extends object>(
     },
     deleteOne: {
       async execute(id: EntityId, context: CrudContext<Entity>) {
+        // Hard or soft per `context.config.softDelete` — the strategy is
+        // resolved at config time and applied by the adapter (Phase 14),
+        // so there is no branch here.
         await adapter.delete(id, context);
+        return null;
+      },
+    },
+    restoreOne: {
+      async execute(id: EntityId, context: CrudContext<Entity>) {
+        // Restore returns the revived row: it reuses the `item` DTO slot,
+        // so no new DTO shape enters the system (Phase 14).
+        return adapter.restore(id, context);
+      },
+    },
+    purgeOne: {
+      async execute(id: EntityId, context: CrudContext<Entity>) {
+        await adapter.purge(id, context);
         return null;
       },
     },
@@ -83,9 +99,8 @@ export function builtInHandlers<Entity extends object>(
   return (id) => {
     const handler = handlers[id];
     if (handler === undefined) {
-      // Milestone C operations (`*Many`, restore, purge) are registered
-      // disabled; their handlers are unreachable until those phases bind
-      // real ones.
+      // The batch (`*Many`) operations are registered disabled; their
+      // handlers are unreachable until bulk binds real ones.
       return {
         execute(): Promise<never> {
           throw new Error(`operation '${id}' has no built-in behavior yet`);

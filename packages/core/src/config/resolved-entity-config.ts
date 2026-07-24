@@ -3,6 +3,7 @@ import type { FieldPath } from "../types/field-path.js";
 import type { DtoResolver } from "../dto/dto.js";
 import type { OperationId } from "../operations/operation.js";
 import type { RelationRegistry } from "../relations/relation-registry.js";
+import type { ResolvedSoftDelete } from "../persistence/soft-delete.js";
 
 /** Allowlists after bootstrap resolution — complete, never optional. */
 export interface ResolvedQueryAllowlists<Entity = unknown> {
@@ -27,8 +28,14 @@ export interface ResolvedEntityConfig<Entity = unknown> {
   /** Per-operation settings view: entity settings + operation overrides. */
   settingsFor(operation: OperationId): CrudoSettings;
   readonly allowlists: ResolvedQueryAllowlists<Entity>;
+  /**
+   * The delete strategy resolved for this scope (Phase 14) — `hard` with
+   * a `null` field for everything that isn't soft-deletable, so adapters
+   * branch on one object instead of re-deriving the decision.
+   */
+  readonly softDelete: ResolvedSoftDelete;
   /** Bootstrap-cached DTO resolution (Phase 4). */
   readonly dto: DtoResolver<Entity>;
-  /** Relation edges of this entity (Phase 16). */
+  /** Relation edges of this entity (Phase 15). */
   readonly relations: RelationRegistry<Entity>;
 }

@@ -21,8 +21,17 @@ export type IsUnknown<T> = unknown extends T ? (IsAny<T> extends true ? false : 
  * `ResolvedEntityConfig`.
  */
 export type DeepPartial<T> = {
-  [K in keyof T]?: T[K] extends readonly unknown[] ? T[K] : T[K] extends object ? DeepPartial<T[K]> : T[K];
+  [K in keyof T]?: DeepPartialValue<T[K]>;
 };
+
+/**
+ * The per-property half of {@link DeepPartial}, split out so the naked
+ * type parameter makes the conditional *distributive*: a union-typed
+ * setting like `SoftDeleteSettings | false` partializes the object branch
+ * and keeps the literal one, instead of matching neither and staying
+ * required.
+ */
+type DeepPartialValue<V> = V extends readonly unknown[] ? V : V extends object ? DeepPartial<V> : V;
 
 /** Property keys of `T` that are not methods. */
 export type NonFunctionKeys<T> = {
