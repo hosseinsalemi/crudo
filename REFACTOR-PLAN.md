@@ -290,7 +290,7 @@ _(Fill in as each phase completes — actual findings, not planned findings.)_
   - **Factories** — `createCrudo`, `createCrud`, `createCrudContext`,
     `createOperationRegistry`, `createTypeOrmInfrastructure`, `createTypeOrmCrudo`.
     PASS. (Borderline, judged conforming, no change: `builtInHandlers` /
-    `builtInPaginationStrategies` construct values but name a *set of built-ins*
+    `builtInPaginationStrategies` construct values but name a _set of built-ins_
     contrasted with user-supplied ones, which is the more informative name; the
     rule targets composition-root factories and those all comply.)
   - **Config keys** — every key in `CrudoSettings`, `EntityConfig`,
@@ -301,14 +301,14 @@ _(Fill in as each phase completes — actual findings, not planned findings.)_
   - **No `I` prefix** — tree-wide grep for `interface I<Capital>` returns nothing. PASS.
   - **Data access** — `EntityReader` + `EntityWriter`, `RepositoryAdapter`
     extends both, adapter named `TypeOrmRepositoryAdapter`. PASS.
-  Two non-findings recorded so they aren't re-litigated: (a) Nest DI tokens
-  `CRUDO_INSTANCE`/`CRUDO_MODULE_OPTIONS` share the `CRUDO_` SCREAMING_SNAKE
-  prefix with error codes, but that rule is scoped to exception codes and
-  SCREAMING_SNAKE constants are conventional; (b) custom-operation route config
-  is `meta.routes` in code vs. a top-level `http` key in the spec's Phase 13
-  *example* — ADR-0007 explicitly rejected the top-level `http` field (it leaks
-  HTTP into core), so the code is correct and the example is the stale artifact.
-  Docs-only phase; `pnpm check` run to confirm the tree is green.
+    Two non-findings recorded so they aren't re-litigated: (a) Nest DI tokens
+    `CRUDO_INSTANCE`/`CRUDO_MODULE_OPTIONS` share the `CRUDO_` SCREAMING_SNAKE
+    prefix with error codes, but that rule is scoped to exception codes and
+    SCREAMING_SNAKE constants are conventional; (b) custom-operation route config
+    is `meta.routes` in code vs. a top-level `http` key in the spec's Phase 13
+    _example_ — ADR-0007 explicitly rejected the top-level `http` field (it leaks
+    HTTP into core), so the code is correct and the example is the stale artifact.
+    Docs-only phase; `pnpm check` run to confirm the tree is green.
 - Phase 3: Docs-only, no code changed. **Placement decision: extended the
   existing catalog at `architecture/01-system-architecture.md` §6 rather than
   adding a `13-design-patterns.md`.** The phase's premise ("patterns are
@@ -336,33 +336,33 @@ _(Fill in as each phase completes — actual findings, not planned findings.)_
     mechanism, already covered by ADR-0007).
   - Cross-linked doc 07 §4's shorter per-doc pattern list to doc 01 §6 so the
     two can't silently diverge. README already reaches §6, so no index change.
-  **Phase 3a proposed (found, flagged, NOT fixed): the Strategy pattern is
-  applied inconsistently in the query subsystem.** `CrudEngineDependencies`
-  (`packages/core/src/engine/crud-engine.ts:31-39`) types every collaborator as a
-  core-declared interface — `Serializer`, `Deserializer`, `ErrorHandler`,
-  `OperationRegistry` — except `normalizer`, which is typed as the **concrete**
-  `QueryNormalizer` class (line 37). There is no `QueryNormalizer` contract in
-  core. Relatedly, core declares and exports a `FilterParser` interface
-  (`query/filter-parser.ts`) that `DefaultFilterParser` correctly implements, but
-  `QueryNormalizer` hard-instantiates `new DefaultFilterParser(metadata)` in its
-  constructor (`query/query-normalizer.ts:31,38`), so that declared seam is not an
-  injection point either — the same "declared contract, never wired" shape Phase 1
-  found in `FilterBuilder`. Within the same subsystem, `PaginationStrategy` and
-  `IncludeResolver` *are* injected as interfaces, which is what makes this an
-  inconsistency rather than a uniform choice. Not fixed here: it changes a public
-  type (`CrudEngineDependencies`) and needs the coordinator's call on whether the
-  normalizer is meant to be swappable at all.
-  **Decision (user): deferred past Phase 8.** Phase 3a is not actioned by this
-  refactor. It is revisited alongside Phase 16's DX API work, when the public
-  surface is being revised anyway and a `CrudEngineDependencies` change costs
-  nothing extra. The finding stands as recorded above.
-  Also noted for Phase 7 (not fixed, out of scope): doc 01 §9's ADR index stops at
-  0010 and is missing ADR-0011 through 0014, two of which §6 now cites.
+    **Phase 3a proposed (found, flagged, NOT fixed): the Strategy pattern is
+    applied inconsistently in the query subsystem.** `CrudEngineDependencies`
+    (`packages/core/src/engine/crud-engine.ts:31-39`) types every collaborator as a
+    core-declared interface — `Serializer`, `Deserializer`, `ErrorHandler`,
+    `OperationRegistry` — except `normalizer`, which is typed as the **concrete**
+    `QueryNormalizer` class (line 37). There is no `QueryNormalizer` contract in
+    core. Relatedly, core declares and exports a `FilterParser` interface
+    (`query/filter-parser.ts`) that `DefaultFilterParser` correctly implements, but
+    `QueryNormalizer` hard-instantiates `new DefaultFilterParser(metadata)` in its
+    constructor (`query/query-normalizer.ts:31,38`), so that declared seam is not an
+    injection point either — the same "declared contract, never wired" shape Phase 1
+    found in `FilterBuilder`. Within the same subsystem, `PaginationStrategy` and
+    `IncludeResolver` _are_ injected as interfaces, which is what makes this an
+    inconsistency rather than a uniform choice. Not fixed here: it changes a public
+    type (`CrudEngineDependencies`) and needs the coordinator's call on whether the
+    normalizer is meant to be swappable at all.
+    **Decision (user): deferred past Phase 8.** Phase 3a is not actioned by this
+    refactor. It is revisited alongside Phase 16's DX API work, when the public
+    surface is being revised anyway and a `CrudEngineDependencies` change costs
+    nothing extra. The finding stands as recorded above.
+    Also noted for Phase 7 (not fixed, out of scope): doc 01 §9's ADR index stops at
+    0010 and is missing ADR-0011 through 0014, two of which §6 now cites.
 - Phase 4: Mixed outcome, comments only — not one executable line moved.
   Reading the two blocks side by side turned up something the plan didn't
   predict: **the class doc's stage order was factually wrong.** It listed
   `DTO resolution → deserialization → query resolution`, but `run()` executes
-  query resolution and context assembly *first*, because `createCrudContext`
+  query resolution and context assembly _first_, because `createCrudContext`
   carries the normalized query and `resolveInput` takes the context. The class
   doc was reciting `crudo-phases-v6.md` Phase 7's stage list; the code and
   `architecture/07-crud-engine.md` (the authoritative Phase 7 lifecycle) both use
@@ -371,13 +371,13 @@ _(Fill in as each phase completes — actual findings, not planned findings.)_
     clause naming the constraint that forces it (context carries the query;
     deserialization needs the context), citing doc 07. That constraint was
     previously encoded nowhere — the inline `// 3–5.` then `// 3–4.` numbering,
-    running *backwards*, was the reader's only hint that the code departs from
+    running _backwards_, was the reader's only hint that the code departs from
     the spec's stage order, and it never said why.
   - **Trimmed 4 of 6 inline comments** that were pure stage labels the corrected
     class doc now owns: `// 3–5. Query resolution and context assembly`,
     `// 3–4. DTO resolution + deserialization (writes)`, `// 6. Handler
-    execution`, and `// 7–8. Response mapping + serialization (DTO mapping →
-    field selection)`. The first three restate the call directly beneath them;
+execution`, and `// 7–8. Response mapping + serialization (DTO mapping →
+field selection)`. The first three restate the call directly beneath them;
     the fourth's only real content — that DTO mapping precedes field selection —
     is already normative at the `Serializer` contract (`serialization/serializer.ts`),
     which is where a reader of `mapResponse` (it just delegates to the serializer)
@@ -388,9 +388,9 @@ _(Fill in as each phase completes — actual findings, not planned findings.)_
     writes to the frozen resolved config". Both encode non-obvious constraints
     that `registry.get(...)` and `this.configViewFor(request)` cannot state for
     themselves.
-  Net: the pipeline shape is documented once (class doc), each surviving inline
-  comment carries only WHY, and the one genuine constraint the numbering hid is
-  now stated in prose.
+    Net: the pipeline shape is documented once (class doc), each surviving inline
+    comment carries only WHY, and the one genuine constraint the numbering hid is
+    now stated in prose.
 - Phase 5: Full pass over all 15 test files (3,112 lines, 4 locations — the
   three named plus `packages/examples/tests/`). **Verdict: conventions are
   consistent and every cross-package difference is layer-justified.** One real
@@ -409,11 +409,11 @@ _(Fill in as each phase completes — actual findings, not planned findings.)_
     because it has no external resource to reset — its factories are pure, so
     per-test isolation comes free; TypeORM needs `beforeEach` truncation because a
     shared in-memory SQLite connection carries rows between tests. Nest builds per
-    `describe` rather than once because `@Crud` generates routes at *decoration*
+    `describe` rather than once because `@Crud` generates routes at _decoration_
     time (ADR-0012), so each `describe`'s controller/config combination needs its
     own module; Examples can use `beforeAll` because it boots one fixed
     `AppModule`. TypeORM declares entities inline rather than in `support/`
-    because each spec needs a *different* schema shape (unique index, relations,
+    because each spec needs a _different_ schema shape (unique index, relations,
     `@DeleteDateColumn` vs. config-named marker) and `synchronize: true` builds it
     per file. None of these is arbitrary.
   - **Fixed (real, mechanical, same package):** `issuesOf` — 9 byte-identical
@@ -440,19 +440,19 @@ _(Fill in as each phase completes — actual findings, not planned findings.)_
     rather than deciding for itself, Seeded returns pre-stitched rows. Each carries
     a comment saying why. Collapsing them would erase the distinctions the tests
     exist to make. Likewise `server()` (2 lines) in the two e2e suites.
-  Test count unchanged at 166/166.
+    Test count unchanged at 166/166.
 - Phase 6: Rules verified **by construction**, not by assumption — 16 probes,
   each injecting one illegal import, running `depcruise`, and reverting. Found
   and closed a real gap: **the two most important rules were not firing on the
   spelling anyone would actually write.**
   - **Root cause.** Workspace package specifiers are `couldNotResolve: true` to
     dependency-cruiser (verified via `--output-type json`), so every
-    `to: { path: "^packages/..." }` rule could only ever match a *relative* deep
+    `to: { path: "^packages/..." }` rule could only ever match a _relative_ deep
     path. `import { x } from "@crudo/nest"` inside `@crudo/typeorm` — the natural
     spelling of the forbidden adapter→framework edge — passed `pnpm depcruise`
     clean. Same for `@crudo/nest` → `@crudo/typeorm`. Tried fixing resolution
     with `enhancedResolveOptions` (exportsFields/conditionNames/mainFields); it
-    resolved nothing extra and *dropped* 5 modules, so it was abandoned in favor
+    resolved nothing extra and _dropped_ 5 modules, so it was abandoned in favor
     of matching the raw specifier, which the JSON output confirms is what
     `to.path` holds for an unresolved dependency.
   - **Why the backstop wasn't one.** `tsc -b` does reject those imports (TS2307),
@@ -466,7 +466,7 @@ _(Fill in as each phase completes — actual findings, not planned findings.)_
     `^(packages/core/src/.+|@crudo/core/.+)` with `packages/examples` added to
     `from` (it was in no rule's scope at all, and it is the reference app).
     Comments now cite ADR-0002 and ADR-0010.
-  - **Verified CAUGHT after the change:** core → npm package (runtime *and*
+  - **Verified CAUGHT after the change:** core → npm package (runtime _and_
     type-only), core → `@crudo/nest` by name, core → any package's src, typeorm →
     `@crudo/nest` by name, nest → `@crudo/typeorm` by name, typeorm/nest → core
     src (relative), typeorm/nest → `@crudo/core/<subpath>`, examples → core src.
@@ -475,7 +475,7 @@ _(Fill in as each phase completes — actual findings, not planned findings.)_
     is swallowed by the `/dist/` exclusion. Tightening that pattern was tried and
     rejected (it pulled a dist module into the graph and still didn't catch it).
     It needs no rule: core's `package.json` `exports` map publishes only `"."`, so
-    under Node16 resolution *every* subpath is TS2307 — and unlike the cases
+    under Node16 resolution _every_ subpath is TS2307 — and unlike the cases
     above, that failure is structural and cannot be silenced by adding a
     dependency. ADR-0010's barrel is enforced by the exports map; depcruise is the
     second line.
@@ -500,7 +500,7 @@ _(Fill in as each phase completes — actual findings, not planned findings.)_
     `typeorm-only-imports-core`, `nest-only-imports-core`) so they stop firing on
     test files; `/tests/` dropped from `options.exclude` (`\\.d\\.ts$|/dist/`
     remains); two rules added. The deep-import rules kept their broad `from`
-    deliberately — deep-importing another package's `src` is illegal from *any*
+    deliberately — deep-importing another package's `src` is illegal from _any_
     file, test or not, and leaving them broad is what makes a test doing it fail
     under two rules at once.
   - **`tests-no-other-package-internals`** — a test file may import its own
@@ -510,13 +510,13 @@ _(Fill in as each phase completes — actual findings, not planned findings.)_
     same-package imports stay legal without enumerating them. Cites ADR-0002.
   - **`core-tests-know-no-adapter`** — added beyond the approved three-point
     shape, because scoping `core-imports-nothing` to `/src` would otherwise have
-    left core's *tests* free to import `@crudo/typeorm`. Core must not know an ORM
+    left core's _tests_ free to import `@crudo/typeorm`. Core must not know an ORM
     exists, and its suite proves that by running the engine against an in-memory
     fake; this keeps the part that still matters enforced (ADR-0005, ADR-0001)
     while allowing the barrel and vitest that the `/src` scoping was for.
   - **Verification: 22 probes, each injecting one import, cruising, reverting.**
     13 must-be-caught, all caught. Most important: `nest test →
-    packages/core/tests/support/account-fixture.js` — the exact fixture-sharing
+packages/core/tests/support/account-fixture.js` — the exact fixture-sharing
     import declined in Phase 5 — now errors under
     `tests-no-other-package-internals`. That call no longer rests on reviewer
     judgment. Also caught: nest/typeorm/examples tests → another package's `tests`
@@ -528,5 +528,76 @@ _(Fill in as each phase completes — actual findings, not planned findings.)_
     `@crudo/typeorm`, → vitest; examples test → own `src`. Clean tree is green with
     **no test file edited to accommodate a rule**: 120 modules / 452 dependencies
     cruised (up from 102 / 401 — that delta is the test suite, previously invisible).
-- Phase 7:
+- Phase 7: Architecture docs diffed against the code they describe. The four
+  carried-forward items were real and are fixed; the fresh pass found **six
+  more**, the largest being a doc section that contradicted its own earlier
+  sections. One systematic discrepancy is reported unfixed as ambiguous.
+  - **Carried forward, fixed.** (1) `TransactionManager` removed from the
+    `@crudo/typeorm` "Owns" cell in doc 01 §3, and doc 03 §5's Transactions row
+    changed from "Phases 9–10 (adapter-level hook)" to "Not implemented", with a
+    paragraph under the inventory recording why it stays and that
+    `TransactionContext` is the live exception. (2) Doc 01 §9's ADR index extended
+    with ADR-0011…0014. (3) Doc 02 §3 now states the two load-bearing properties
+    of the rule set from Phases 6/6a: both spellings matched, `packages/examples`
+    in scope, and `tests/` cruised with the per-package import rule spelled out.
+    (4) No architecture doc repeats the spec's stale top-level `http` key — they
+    all use `meta.routes` — so nothing to fix; see the spec note below.
+  - **Found in the fresh pass, fixed.** Doc 09 §6 ("Attachment points for later
+    phases") was the worst: it listed soft delete and includes as _unbuilt_ —
+    "the strategy branch lives in `delete` (currently hard)", "`buildQuery` grows
+    `leftJoinAndSelect`" — while §2 and §3 of the same doc already documented both
+    as working, and it numbered the phases wrong (transactions "13", soft delete
+    "15", includes "16"; actually 14 and 15). Rewritten to record both as landed
+    with transactions the only remaining seam. Same doc: the intro's "skeleton
+    scope" line and §7's "No N+1 in skeleton scope (no relation loading)" — false
+    since batch loading landed. Doc 11's "Once includes land (Phase 15)" — they
+    landed. Doc 03 §3's augmentation example cited
+    `nest/src/augmentation.ts`, a file that does not exist (it is
+    `operation-metadata.ts`), and showed a `swagger?` key the real
+    `CrudRouteOptions` has never had while omitting `successStatus`. Doc 06's
+    `CRUDO_QUERY_UNSUPPORTED_PARAM` row listed `include`/`fields[relation]` as
+    unsupported — includes are built; that code now fires only when no include
+    resolver is wired. Doc 07's `transaction` described as `null` when a
+    programmatic caller may pass one through `CrudCallOptions`. Doc 01's opening
+    promised "the `*Many` batch variants" as part of what you get (bulk is not
+    built — its entries are registered disabled) and its §4 lifecycle still
+    marked `IncludeTree` as `⟨deferred⟩`.
+  - **Doc 05, two fixes.** "property-tested in `filter-parser.spec.ts`" — there is
+    no property-based testing in the repo (no fast-check); the JSON/bracket
+    equivalence is an example-based assertion. And "Relation-path values pass
+    through as strings in Milestone B (target-entity metadata is wired in Phase
+    15)" — Phase 15 shipped without wiring it: `DefaultFilterParser` builds its
+    field map from the **root** entity's columns only, so `filter[profile.city]`
+    still coerces as a string. Doc now states current behavior instead of
+    promising a phase that has passed. **Whether the code should coerce
+    relation-path values against target metadata is a separate question, left
+    open — it is a behavior change, not doc sync.**
+  - **Verified clean, no change:** doc 08's defaults table (all 13 keys match
+    `BUILT_IN_DEFAULTS` exactly), doc 06's 15 error codes and statuses (match
+    `ERROR_CATALOG` exactly), doc 05's 13-operator table (matches
+    `WIRE_OPERATORS`), doc 10's route table (matches `STANDARD_ROUTES`), doc 12's
+    include limits/strategies/alias scheme/count behavior (verified against
+    `default-include-resolver.ts` and the adapter), doc 04's slot defaults and
+    `dtoShapeKeys` semantics. Every `path/to/file.ts` cited across the
+    architecture docs was resolved against the tree; all exist (after the
+    `augmentation.ts` fix).
+  - **Reported, NOT fixed — ambiguous.** Doc 03 §1's generic-parameter table and
+    §2 name the type parameters `TEntity`, `TCreateDto`, `TUpdateDto`,
+    `TPatchDto`, `TQueryDto`, `TItemDto`, `TListDto`, `FieldPath<TEntity,
+TMaxDepth>`; the code uses un-prefixed `Entity`, `CreateDto`, …,
+    `FieldPath<Entity, MaxDepth>`. ADR-0006 (`OperationRegistry<TEntity>`) and
+    ADR-0008 (`FieldPath<TEntity>`) carry the same prefix. Reading A: real drift
+    from a `T`-prefix removal the docs never followed. Reading B: `T*` is
+    expository placeholder notation, not a claim about identifiers. Not guessed
+    at, because the fix differs per reading and one candidate — renaming the
+    code's parameters — is out of Phase 7's scope entirely. The spec's Naming
+    Conventions section is silent on type-parameter naming, so nothing is in
+    violation either way. Also unfixed by design: ADR prose, which is a historical
+    record rather than a doc to sync.
+  - **Spec discrepancy for the user (no edit made).** `crudo-phases-v6.md:847-853`
+    shows custom operations taking a top-level `http: { method, path }` / `http:
+false`, but ADR-0007 explicitly rejected a top-level `http` field (it leaks
+    HTTP into core) in favor of `meta.routes`, and Phase 3's own text describes
+    the opaque `meta` slot. Code and all architecture docs follow the ADR; the
+    spec example is the outlier. Candidate for an erratum — the user's call.
 - Phase 8:
