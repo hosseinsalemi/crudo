@@ -1,0 +1,145 @@
+import type { CrudContext, EntityId, EntityMetadata, NormalizedQueryContext, RepositoryAdapter } from "@crudo/core";
+import { AlreadyDeletedException, NotDeletedException, NotFoundException } from "@crudo/core";
+
+/**
+ * Soft-deletable test entity (Phase 14): a `deletedAt` marker column, plus
+ * `softDeleteField` on the metadata — the seam a real ORM fills from its
+ * own declaration (`@DeleteDateColumn` in `@crudo/typeorm`).
+ */
+export class Account {
+  id = 0;
+  name = "";
+  deletedAt: Date | null = null;
+}
+
+export const accountMetadata: EntityMetadata<Account> = {
+  entity: Account,
+  name: "Account",
+  idField: "id",
+  fields: [
+    { name: "id", kind: "number", nullable: false, generated: true },
+    { name: "name", kind: "string", nullable: false, generated: false },
+    { name: "deletedAt", kind: "date", nullable: true, generated: true },
+  ],
+  relations: [],
+  softDeleteField: "deletedAt",
+};
+
+/** The same metadata with the ORM declaration removed. */
+export const accountMetadataWithoutMarker: EntityMetadata<Account> = {
+  ...accountMetadata,
+  fields: accountMetadata.fields.filter((field) => field.name !== "deletedAt"),
+  softDeleteField: null,
+};
+
+/**
+ * In-memory adapter that honors the resolved strategy the same way a real
+ * one does: it reads `context.config.softDelete` rather than deciding for
+ * itself, so these tests exercise the engine's resolution, not a mock's
+ * opinion.
+ */
+export class InMemoryAccountAdapter implements RepositoryAdapter<Account> {
+  rows: Account[] = [];
+  private nextId = 1;
+
+  async findOneById(
+    id: EntityId,
+    query: NormalizedQueryContext<Account> | null,
+    context: CrudContext<Account>,
+  ): Promise<Account | null> {
+    const row = this.rows.find((candidate) => candidate.id === Number(id)) ?? null;
+    if (row === null) return null;
+    return this.visible(row, context, query?.withDeleted ?? false) ? row : null;
+  }
+
+  async findOne(query: NormalizedQueryContext<Account>, context: CrudContext<Account>): Promise<Account | null> {
+    return (await this.findMany(query, context))[0] ?? null;
+  }
+
+  async findMany(query: NormalizedQueryContext<Account>, context: CrudContext<Account>): Promise<readonly Account[]> {
+    const visible = this.rows.filter((row) => this.visible(row, context, query.withDeleted));
+    const { offset, limit } = query.pagination;
+    return visible.slice(offset, offset + limit);
+  }
+
+  async count(query: NormalizedQueryContext<Account>, context: CrudContext<Account>): Promise<number> {
+    return this.rows.filter((row) => this.visible(row, context, query.withDeleted)).length;
+  }
+
+  async create(data: Partial<Account>): Promise<Account> {
+    const row = { ...new Account(), ...data, id: this.nextId++ };
+    this.rows.push(row);
+    return row;
+  }
+
+  async update(id: EntityId, data: Partial<Account>, context: CrudContext<Account>): Promise<Account> {
+    const row = await this.requireLive(id, context);
+    Object.assign(row, data);
+    return row;
+  }
+
+  async patch(id: EntityId, data: Partial<Account>, context: CrudContext<Account>): Promise<Account> {
+    return this.update(id, data, context);
+  }
+
+  async delete(id: EntityId, context: CrudContext<Account>): Promise<void> {
+    const softDelete = context.config.softDelete;
+    const row = this.require(id, context);
+    if (softDelete.strategy === "hard") {
+      this.rows = this.rows.filter((candidate) => candidate.id !== Number(id));
+      return;
+    }
+    if (row.deletedAt !== null) {
+      throw new AlreadyDeletedException({
+        messageParams: { entity: "Account", id: String(id) },
+      });
+    }
+    row.deletedAt = new Date();
+  }
+
+  async restore(id: EntityId, context: CrudContext<Account>): Promise<Account> {
+    const row = this.require(id, context);
+    if (row.deletedAt === null) {
+      throw new NotDeletedException({
+        messageParams: { entity: "Account", id: String(id) },
+      });
+    }
+    row.deletedAt = null;
+    return row;
+  }
+
+  async purge(id: EntityId, context: CrudContext<Account>): Promise<void> {
+    const row = this.require(id, context);
+    if (context.config.softDelete.strategy === "soft" && row.deletedAt === null) {
+      throw new NotDeletedException({
+        messageParams: { entity: "Account", id: String(id) },
+      });
+    }
+    this.rows = this.rows.filter((candidate) => candidate.id !== Number(id));
+  }
+
+  private visible(row: Account, context: CrudContext<Account>, withDeleted: boolean): boolean {
+    if (context.config.softDelete.strategy !== "soft") return true;
+    return withDeleted || row.deletedAt === null;
+  }
+
+  private require(id: EntityId, context: CrudContext<Account>): Account {
+    const row = this.rows.find((candidate) => candidate.id === Number(id));
+    if (row === undefined) {
+      throw new NotFoundException({
+        messageParams: { entity: context.entityName, id: String(id) },
+      });
+    }
+    return row;
+  }
+
+  private async requireLive(id: EntityId, context: CrudContext<Account>): Promise<Account> {
+    const row = this.require(id, context);
+    if (!this.visible(row, context, false)) {
+      throw new NotFoundException({
+        messageParams: { entity: context.entityName, id: String(id) },
+      });
+    }
+    return row;
+  }
+}

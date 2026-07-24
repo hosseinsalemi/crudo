@@ -89,11 +89,11 @@ export class InMemoryUserAdapter implements RepositoryAdapter<User> {
   }
 
   async restore(): Promise<User> {
-    throw new Error("restore lands in Phase 15");
+    throw new Error("User is not soft-deletable");
   }
 
-  async purge(): Promise<void> {
-    throw new Error("purge lands in Phase 15");
+  async purge(id: EntityId): Promise<void> {
+    await this.delete(id);
   }
 
   private async require(id: EntityId): Promise<User> {

@@ -197,6 +197,68 @@ describe("@Crud operation control surface", () => {
   });
 });
 
+describe("@Crud soft-delete routes (Phase 14)", () => {
+  @Crud(Todo, {
+    softDelete: { strategy: "soft" },
+    operations: { purgeOne: true },
+  })
+  @Controller("todos")
+  class SoftDeleteController {}
+
+  beforeEach(async () => {
+    await bootstrap(SoftDeleteController);
+    await request(server()).post("/todos").send({ title: "x" }).expect(201);
+  });
+
+  it("soft-deletes on DELETE and hides the row from reads", async () => {
+    await request(server()).delete("/todos/1").expect(204);
+    expect(adapter.rows[0]?.deletedAt).toBeInstanceOf(Date);
+    await request(server()).get("/todos/1").expect(404);
+    expect((await request(server()).get("/todos").expect(200)).body.total).toBe(0);
+  });
+
+  it("returns deleted rows for withDeleted=true", async () => {
+    await request(server()).delete("/todos/1").expect(204);
+    const response = await request(server()).get("/todos?withDeleted=true").expect(200);
+    expect(response.body.items).toHaveLength(1);
+  });
+
+  it("restores through PATCH /:id/restore, returning the item", async () => {
+    await request(server()).delete("/todos/1").expect(204);
+    const restored = await request(server()).patch("/todos/1/restore").expect(200);
+    expect(restored.body).toMatchObject({ id: 1, title: "x" });
+    await request(server()).get("/todos/1").expect(200);
+  });
+
+  it("maps a restore of a live row to a 409 problem details", async () => {
+    const response = await request(server()).patch("/todos/1/restore").expect(409);
+    expect(response.body).toMatchObject({
+      status: 409,
+      code: "CRUDO_NOT_DELETED",
+    });
+  });
+
+  it("purges through DELETE /:id/purge, but only what is already deleted", async () => {
+    await request(server()).delete("/todos/1/purge").expect(409);
+    await request(server()).delete("/todos/1").expect(204);
+    await request(server()).delete("/todos/1/purge").expect(204);
+    expect(adapter.rows).toHaveLength(0);
+  });
+
+  it("keeps purge unrouted unless it is asked for by name", async () => {
+    @Crud(Todo, { softDelete: { strategy: "soft" } })
+    @Controller("todos")
+    class RestoreOnlyController {}
+
+    await app.close();
+    await bootstrap(RestoreOnlyController);
+    await request(server()).post("/todos").send({ title: "x" }).expect(201);
+    await request(server()).delete("/todos/1").expect(204);
+    await request(server()).patch("/todos/1/restore").expect(200);
+    await request(server()).delete("/todos/1/purge").expect(404);
+  });
+});
+
 describe("@Crud Swagger request-body schemas", () => {
   class CreateTodoDto {
     title = "";

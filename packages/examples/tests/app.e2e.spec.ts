@@ -131,12 +131,52 @@ describe("Pet example app", () => {
     ]);
   });
 
-  it("rejects deferred features explicitly, never silently", async () => {
+  it("rejects unsupported params explicitly, never silently", async () => {
+    // `include` is deferred to Phase 15; `withDeleted` is real but
+    // meaningless here — cats are not soft-deletable, owners are.
     const response = await request(server()).get("/cats").query("include=owner&withDeleted=true").expect(400);
     expect(response.body.errors.map((e: { code: string }) => e.code)).toEqual([
       "CRUDO_QUERY_UNSUPPORTED_PARAM",
       "CRUDO_QUERY_UNSUPPORTED_PARAM",
     ]);
+  });
+
+  it("soft-deletes, restores, and purges owners (Phase 14)", async () => {
+    const created = await request(server()).post("/owners").send({ name: "Rose", email: "rose@x.io" }).expect(201);
+    const id = created.body.id as number;
+
+    await request(server()).delete(`/owners/${id}`).expect(204);
+    await request(server()).get(`/owners/${id}`).expect(404);
+    const withDeleted = await request(server())
+      .get("/owners")
+      .query(`withDeleted=true&filter[id][eq]=${id}`)
+      .expect(200);
+    expect(withDeleted.body.items).toHaveLength(1);
+
+    // A second delete is a state conflict, not a 404.
+    await request(server())
+      .delete(`/owners/${id}`)
+      .expect(409)
+      .expect("Content-Type", /application\/problem\+json/);
+
+    const restored = await request(server()).patch(`/owners/${id}/restore`).expect(200);
+    expect(restored.body).toMatchObject({ id, name: "Rose" });
+    await request(server()).get(`/owners/${id}`).expect(200);
+
+    // Purge takes a soft-deleted row only.
+    await request(server()).delete(`/owners/${id}/purge`).expect(409);
+    await request(server()).delete(`/owners/${id}`).expect(204);
+    await request(server()).delete(`/owners/${id}/purge`).expect(204);
+    await request(server()).patch(`/owners/${id}/restore`).expect(404);
+  });
+
+  it("leaves hard-delete entities without restore or purge routes", async () => {
+    const cat = await request(server())
+      .post("/cats")
+      .send({ name: "Ghost", age: 1, indoor: true, livesLeft: 9 })
+      .expect(201);
+    await request(server()).patch(`/cats/${cat.body.id}/restore`).expect(404);
+    await request(server()).delete(`/cats/${cat.body.id}/purge`).expect(404);
   });
 
   it("maps unique violations to 409 conflict problem details", async () => {

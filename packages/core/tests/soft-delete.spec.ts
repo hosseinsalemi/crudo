@@ -1,0 +1,192 @@
+import { describe, expect, it } from "vitest";
+import {
+  AlreadyDeletedException,
+  BUILT_IN_DEFAULTS,
+  ConfigurationException,
+  NotDeletedException,
+  NotFoundException,
+  QueryValidationException,
+  createCrudo,
+  createOperationRegistry,
+  mergeSettings,
+  resolveSoftDelete,
+} from "@crudo/core";
+import type { CrudoSettings, EntityConfig } from "@crudo/core";
+import {
+  Account,
+  InMemoryAccountAdapter,
+  accountMetadata,
+  accountMetadataWithoutMarker,
+} from "./support/account-fixture.js";
+import { InMemoryUserAdapter, User, userMetadata } from "./support/user-fixture.js";
+
+function settings(overrides: Parameters<typeof mergeSettings>[1] = {}): CrudoSettings {
+  return mergeSettings(BUILT_IN_DEFAULTS, overrides);
+}
+
+type AccountConfig = EntityConfig<Account>;
+
+function makeAccountCrud(config?: AccountConfig, metadata = accountMetadata) {
+  const adapter = new InMemoryAccountAdapter();
+  const crud = createCrudo().createCrud(Account, config as never, { adapter, metadata });
+  return { crud, adapter };
+}
+
+describe("delete strategy resolution (Phase 14)", () => {
+  it("defaults to soft for an entity carrying the marker field", () => {
+    expect(resolveSoftDelete(accountMetadata, settings())).toEqual({
+      strategy: "soft",
+      field: "deletedAt",
+    });
+  });
+
+  it("defaults to hard for an entity that carries none — zero cost", () => {
+    expect(resolveSoftDelete(userMetadata, settings())).toEqual({
+      strategy: "hard",
+      field: null,
+    });
+  });
+
+  it("honors an explicit marker field over the ORM's declaration", () => {
+    const metadata = {
+      ...accountMetadata,
+      fields: [...accountMetadata.fields, { name: "archivedAt", kind: "date", nullable: true, generated: false }],
+    } as typeof accountMetadata;
+    expect(resolveSoftDelete(metadata, settings({ softDelete: { field: "archivedAt" } }))).toEqual({
+      strategy: "soft",
+      field: "archivedAt",
+    });
+  });
+
+  it("resolves hard when soft delete is switched off entirely", () => {
+    expect(resolveSoftDelete(accountMetadata, settings({ softDelete: false })).strategy).toBe("hard");
+    expect(resolveSoftDelete(accountMetadata, settings({ softDelete: { strategy: "hard" } })).strategy).toBe("hard");
+  });
+
+  it("rejects strategy 'soft' on an entity with no marker field", () => {
+    expect(() =>
+      resolveSoftDelete(accountMetadataWithoutMarker, settings({ softDelete: { strategy: "soft" } })),
+    ).toThrow(ConfigurationException);
+  });
+});
+
+describe("soft delete lifecycle (Phase 14)", () => {
+  it("marks the row instead of removing it, and hides it from reads", async () => {
+    const { crud, adapter } = makeAccountCrud();
+    await crud.createOne({ name: "acme" } as never);
+
+    await crud.deleteOne(1);
+
+    expect(adapter.rows).toHaveLength(1);
+    expect(adapter.rows[0]!.deletedAt).toBeInstanceOf(Date);
+    await expect(crud.findOne(1)).rejects.toBeInstanceOf(NotFoundException);
+    expect((await crud.findMany()).items).toHaveLength(0);
+  });
+
+  it("shows deleted rows again under withDeleted", async () => {
+    const { crud } = makeAccountCrud();
+    await crud.createOne({ name: "acme" } as never);
+    await crud.deleteOne(1);
+
+    const list = await crud.findMany({ withDeleted: true });
+    expect(list.items).toHaveLength(1);
+    expect(await crud.findOne(1, { withDeleted: true } as never)).toMatchObject({ id: 1 });
+  });
+
+  it("rejects withDeleted on an entity that is not soft-deletable", async () => {
+    const crud = createCrudo().createCrud(User, undefined, {
+      adapter: new InMemoryUserAdapter(),
+      metadata: userMetadata,
+    });
+    await expect(crud.findMany({ withDeleted: true })).rejects.toMatchObject({
+      issues: [{ field: "withDeleted", code: "CRUDO_QUERY_UNSUPPORTED_PARAM" }],
+    });
+  });
+
+  it("refuses to delete an already-deleted row", async () => {
+    const { crud } = makeAccountCrud();
+    await crud.createOne({ name: "acme" } as never);
+    await crud.deleteOne(1);
+    await expect(crud.deleteOne(1)).rejects.toBeInstanceOf(AlreadyDeletedException);
+  });
+
+  it("restores a deleted row into the item slot, and refuses to restore a live one", async () => {
+    const { crud } = makeAccountCrud({ softDelete: { strategy: "soft" } });
+    await crud.createOne({ name: "acme" } as never);
+    await crud.deleteOne(1);
+
+    expect(await crud.restoreOne(1)).toMatchObject({ id: 1, name: "acme" });
+    expect((await crud.findMany()).items).toHaveLength(1);
+    await expect(crud.restoreOne(1)).rejects.toBeInstanceOf(NotDeletedException);
+  });
+
+  it("purges only an already-deleted row, and only when enabled", async () => {
+    const disabled = makeAccountCrud();
+    await disabled.crud.createOne({ name: "acme" } as never);
+    await expect(disabled.crud.purgeOne(1)).rejects.toMatchObject({ code: "CRUDO_OPERATION_DISABLED" });
+
+    const { crud, adapter } = makeAccountCrud({ operations: { purgeOne: true } });
+    await crud.createOne({ name: "acme" } as never);
+    await expect(crud.purgeOne(1)).rejects.toBeInstanceOf(NotDeletedException);
+
+    await crud.deleteOne(1);
+    await crud.purgeOne(1);
+    expect(adapter.rows).toHaveLength(0);
+  });
+
+  it("hard-deletes when the entity opts out, leaving restore unavailable", async () => {
+    const { crud, adapter } = makeAccountCrud({ softDelete: false });
+    await crud.createOne({ name: "acme" } as never);
+    await crud.deleteOne(1);
+    expect(adapter.rows).toHaveLength(0);
+    await expect(crud.restoreOne(1)).rejects.toMatchObject({ code: "CRUDO_OPERATION_DISABLED" });
+  });
+
+  it("applies a per-operation strategy override", async () => {
+    const { crud, adapter } = makeAccountCrud({
+      operations: { deleteOne: { softDelete: { strategy: "hard" } } },
+    });
+    await crud.createOne({ name: "acme" } as never);
+    await crud.deleteOne(1);
+    expect(adapter.rows).toHaveLength(0);
+  });
+});
+
+describe("soft-delete operation enablement (Phase 14, ADR-0013)", () => {
+  it("keeps restoreOne and purgeOne off by default", () => {
+    const registry = createOperationRegistry<Account>(undefined);
+    expect(registry.get("restoreOne")?.enabled).toBe(false);
+    expect(registry.get("purgeOne")?.enabled).toBe(false);
+  });
+
+  it("enables restoreOne when the config declares soft delete", () => {
+    for (const config of [{ softDelete: { strategy: "soft" } }, { softDelete: { field: "archivedAt" } }] as const) {
+      const registry = createOperationRegistry<Account>(config as AccountConfig);
+      expect(registry.get("restoreOne")?.enabled).toBe(true);
+      expect(registry.get("purgeOne")?.enabled).toBe(false);
+    }
+  });
+
+  it("treats an inherited 'auto' strategy as no declaration", () => {
+    const registry = createOperationRegistry<Account>({ softDelete: { strategy: "auto" } } as AccountConfig);
+    expect(registry.get("restoreOne")?.enabled).toBe(false);
+  });
+
+  it("still resolves soft delete for an undeclared entity — deletes and reads adapt", async () => {
+    const { crud, adapter } = makeAccountCrud();
+    await crud.createOne({ name: "acme" } as never);
+    await crud.deleteOne(1);
+    expect(adapter.rows[0]!.deletedAt).toBeInstanceOf(Date);
+  });
+
+  it("fails at bootstrap when a soft-delete operation is enabled on a hard-delete entity", () => {
+    expect(() => makeAccountCrud({ operations: { purgeOne: true } }, accountMetadataWithoutMarker)).toThrow(
+      ConfigurationException,
+    );
+  });
+
+  it("rejects a non-boolean withDeleted value", async () => {
+    const { crud } = makeAccountCrud();
+    await expect(crud.findMany({ withDeleted: "yes" } as never)).rejects.toBeInstanceOf(QueryValidationException);
+  });
+});
