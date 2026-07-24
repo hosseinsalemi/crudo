@@ -64,7 +64,11 @@ export function buildEntityMetadata<Entity extends object>(
 
   const relations: RelationDescriptor[] = metadata.relations.map((relation) => ({
     name: relation.propertyName,
-    target: () => relation.type as ClassRef,
+    // The *resolved* target class, not `relation.type`: a string-target
+    // relation (`@ManyToOne("Owner", …)`, the form that keeps import
+    // cycles off the runtime graph) leaves `type` as the entity name, and
+    // core matches registered entities by class identity (Phase 15).
+    target: () => relation.inverseEntityMetadata.target as ClassRef,
     cardinality: relation.isOneToMany || relation.isManyToMany ? "many" : "one",
     // Inclusion is an opt-in allowlist (Phase 15); ORM metadata only
     // supplies shape, never permission.
