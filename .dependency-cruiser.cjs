@@ -17,8 +17,10 @@ module.exports = {
       severity: "error",
       comment:
         "@crudo/core is the dependency-free hub: no other workspace package, " +
-        "no node_modules — zero runtime dependencies (ADR-0005).",
-      from: { path: "^packages/core" },
+        "no node_modules — zero runtime dependencies (ADR-0005). Scoped to " +
+        "`src`: core's own tests legitimately import the `@crudo/core` barrel " +
+        "and vitest, and are governed by the `tests-*` rules below instead.",
+      from: { path: "^packages/core/src" },
       to: {
         pathNot: "^packages/core",
         dependencyTypesNot: ["type-only"],
@@ -33,7 +35,7 @@ module.exports = {
         "workspace package specifier does not resolve to a path here, so a " +
         'path-only rule would miss `from "@crudo/nest"` — the spelling ' +
         "anyone would actually write.",
-      from: { path: "^packages/orms/typeorm" },
+      from: { path: "^packages/orms/typeorm/src" },
       to: { path: "^(packages/frameworks|@crudo/nest)" },
     },
     {
@@ -44,7 +46,7 @@ module.exports = {
         "never on an ORM adapter (ADR-0002). Adapters reach Nest's container " +
         "via DI, not via imports. Package-specifier form matched too, per the " +
         "note on typeorm-only-imports-core.",
-      from: { path: "^packages/frameworks/nest" },
+      from: { path: "^packages/frameworks/nest/src" },
       to: { path: "^(packages/orms|@crudo/typeorm)" },
     },
     {
@@ -67,6 +69,36 @@ module.exports = {
       to: { path: "^packages/(orms|frameworks)/[^/]+/src/.+" },
     },
     {
+      name: "tests-no-other-package-internals",
+      severity: "error",
+      comment:
+        "A test file may import its own package's source and the @crudo/* " +
+        "barrels — never another package's `src` or `tests`. Sharing a " +
+        "fixture by reaching into a sibling package's tests is the same " +
+        "boundary violation as doing it in production code (ADR-0002), and " +
+        "until this rule existed it was the one edge nothing enforced: " +
+        "`tests/` used to be excluded from cruising entirely. The `$1` " +
+        "back-reference is the package root captured from `from`, so " +
+        "same-package imports stay legal.",
+      from: { path: "^(packages/core|packages/examples|packages/orms/[^/]+|packages/frameworks/[^/]+)/tests/" },
+      to: {
+        path: "^(packages/core|packages/examples|packages/orms/[^/]+|packages/frameworks/[^/]+)/(src|tests)/",
+        pathNot: "^$1/",
+      },
+    },
+    {
+      name: "core-tests-know-no-adapter",
+      severity: "error",
+      comment:
+        "Core's tests are held to core's own ignorance: the engine must be " +
+        "testable with an in-memory fake and no ORM or framework anywhere " +
+        "(ADR-0005, ADR-0001). `core-imports-nothing` is scoped to `src` so " +
+        "core's tests may use the barrel and vitest; this keeps the part that " +
+        "still matters — no adapter, no framework — enforced for them too.",
+      from: { path: "^packages/core/tests" },
+      to: { path: "^(@crudo/(typeorm|nest)|packages/(orms|frameworks))" },
+    },
+    {
       name: "no-circular",
       severity: "error",
       comment:
@@ -82,6 +114,6 @@ module.exports = {
     doNotFollow: { path: "node_modules" },
     tsPreCompilationDeps: true,
     tsConfig: { fileName: "tsconfig.base.json" },
-    exclude: { path: "\\.d\\.ts$|/dist/|/tests/" },
+    exclude: { path: "\\.d\\.ts$|/dist/" },
   },
 };
