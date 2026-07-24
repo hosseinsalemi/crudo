@@ -20,11 +20,19 @@ const STANDARD_ROUTES: Readonly<Record<string, { method: CrudHttpMethod; path: s
   updateOne: { method: "PUT", path: ":id", status: 200 },
   patchOne: { method: "PATCH", path: ":id", status: 200 },
   deleteOne: { method: "DELETE", path: ":id", status: 204 },
-  // Phase 15 routes, generated the moment those registry entries enable —
-  // zero changes here (the registry is the source of truth).
+  // Soft delete (Phase 14). These entries enable from config alone
+  // (ADR-0013), and the generator needed no change to pick them up — the
+  // registry is the source of truth.
   restoreOne: { method: "PATCH", path: ":id/restore", status: 200 },
   purgeOne: { method: "DELETE", path: ":id/purge", status: 204 },
 };
+
+/**
+ * Write operations that target a row by id and take no request body
+ * (Phase 14). Without this, `PATCH /:id/restore` would be given a `@Body`
+ * parameter that is always empty.
+ */
+const BODYLESS_WRITES: ReadonlySet<string> = new Set(["restoreOne", "purgeOne"]);
 
 const METHOD_DECORATORS: Record<CrudHttpMethod, (path: string) => MethodDecorator> = {
   GET: Get,
@@ -135,7 +143,7 @@ function applyParamDecorators(
   }
   if (descriptor.kind === "read") {
     Query()(prototype, methodName, index++);
-  } else if (usesBody(route.method)) {
+  } else if (usesBody(route.method) && !BODYLESS_WRITES.has(descriptor.id)) {
     Body()(prototype, methodName, index++);
   }
 }
@@ -180,6 +188,14 @@ function makeHandler(
     case "deleteOne":
       return async function (this: BoundController, id: unknown) {
         await this[CRUD_SERVICE_PROPERTY].deleteOne(id as never);
+      };
+    case "restoreOne":
+      return async function (this: BoundController, id: unknown) {
+        return this[CRUD_SERVICE_PROPERTY].restoreOne(id as never);
+      };
+    case "purgeOne":
+      return async function (this: BoundController, id: unknown) {
+        await this[CRUD_SERVICE_PROPERTY].purgeOne(id as never);
       };
     default:
       return async function (this: BoundController, ...args: unknown[]) {

@@ -143,6 +143,15 @@ export function applySwaggerMetadata(
       }),
     );
   }
+  if (descriptor.id === "restoreOne" || descriptor.id === "purgeOne") {
+    apply(
+      swagger.ApiResponse({
+        status: 409,
+        description: "The row is not deleted (RFC 9457 problem details).",
+        schema: PROBLEM_DETAILS_SCHEMA,
+      }),
+    );
+  }
 }
 
 /**
@@ -181,7 +190,9 @@ function successBodyFor(
     case "createOne":
     case "updateOne":
     case "patchOne":
-    case "findOne": {
+    case "findOne":
+    // Restore reuses the `item` slot — no dedicated restore shape.
+    case "restoreOne": {
       const itemDto = dto?.item ?? entity;
       const schema = schemaFromDto(itemDto);
       return schema === null ? { type: itemDto } : { schema: { title: itemDto.name, ...schema } };
