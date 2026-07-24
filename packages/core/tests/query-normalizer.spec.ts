@@ -1,19 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { QueryNormalizer, QueryValidationException, resolveEntityConfig } from "@crudo/core";
+import { QueryNormalizer, resolveEntityConfig } from "@crudo/core";
 import { userMetadata } from "./support/user-fixture.js";
+import { issuesOf } from "./support/query-issues.js";
 
 const config = resolveEntityConfig(userMetadata, undefined, undefined);
 const normalizer = new QueryNormalizer(userMetadata);
-
-function issuesOf(fn: () => unknown) {
-  try {
-    fn();
-  } catch (error) {
-    if (error instanceof QueryValidationException) return error.issues;
-    throw error;
-  }
-  throw new Error("expected QueryValidationException");
-}
 
 describe("QueryNormalizer — wire params (Phase 5 pipeline)", () => {
   it("normalizes the full reference query", () => {

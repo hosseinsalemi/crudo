@@ -1,23 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { FilterCondition, FilterGroup } from "@crudo/core";
-import { DefaultFilterParser, QueryValidationException, resolveEntityConfig } from "@crudo/core";
+import { DefaultFilterParser, resolveEntityConfig } from "@crudo/core";
 import { userMetadata } from "./support/user-fixture.js";
+import { issuesOf } from "./support/query-issues.js";
 
 const config = resolveEntityConfig(userMetadata, undefined, undefined);
 const parser = new DefaultFilterParser(userMetadata);
 
 function parse(params: Record<string, unknown>) {
   return parser.parse(params, config);
-}
-
-function issuesOf(fn: () => unknown) {
-  try {
-    fn();
-  } catch (error) {
-    if (error instanceof QueryValidationException) return error.issues;
-    throw error;
-  }
-  throw new Error("expected QueryValidationException");
 }
 
 describe("DefaultFilterParser — bracket grammar (Phase 5)", () => {
