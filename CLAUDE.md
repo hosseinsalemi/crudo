@@ -84,4 +84,4 @@ See `packages/examples/src/app.module.ts`: `CrudoModule.forRootAsync({ useFactor
 
 ## Where to read more
 
-`packages/docs/` holds the design docs, `glossary.md`, and ADRs (`adr/0001`…`0013`) — one ADR per load-bearing decision. `packages/docs/architecture/` mirrors the packages (query grammar, error handling, engine, TypeORM adapter, Nest integration, soft delete). ADRs are referenced by name in code comments; read the referenced ADR before changing the behavior it governs.
+`packages/docs/` holds the design docs, `glossary.md`, and ADRs (`adr/0001`…`0014`) — one ADR per load-bearing decision. `packages/docs/architecture/` mirrors the packages (query grammar, error handling, engine, TypeORM adapter, Nest integration, soft delete, relations). ADRs are referenced by name in code comments; read the referenced ADR before changing the behavior it governs.

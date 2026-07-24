@@ -29,11 +29,12 @@ invalid; `LIKE` carries `ESCAPE '\'` (the grammar's literal-escape);
 spelling instead of a per-driver fork.
 
 **Relation-path conditions** (`author.name`) add one **non-selecting**
-left join per path segment with deterministic aliases
-(`Book__author`), reused across conditions. They restrict root rows only
-— loading relations is Phase 15, which will also own the distinct-root
-pagination rule for to-many joins (relation paths only exist when
-explicitly allowlisted in Milestone B).
+left join per path segment with deterministic aliases (`Book__author`),
+reused across conditions. They restrict root rows; _loading_ a relation is
+what `include=` does (doc 12), and because include joins use the same
+alias scheme and register themselves with the translator, a filter on an
+included path reuses that one selecting join. Relation paths are only
+filterable when explicitly allowlisted.
 
 ## 3. Repository API vs. QueryBuilder API
 

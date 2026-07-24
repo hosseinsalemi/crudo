@@ -22,6 +22,7 @@ of `crudo-phases-v6.md` and maintained alongside the code.
 ## Milestone C — Core features
 
 - [architecture/11-soft-delete.md](architecture/11-soft-delete.md) — strategy resolution, restore/purge, `withDeleted`, unique-index and cascade edges (Phase 14)
+- [architecture/12-relations-and-includes.md](architecture/12-relations-and-includes.md) — relation registry, include resolution, join/batch loading, pagination rule, write-side (Phase 15)
 
 ## Reference
 

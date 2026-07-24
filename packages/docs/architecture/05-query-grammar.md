@@ -89,16 +89,17 @@ fields:     root: [id, name, email]
   `limit` above `maxLimit` → clamped; malformed or negative → 400.
 - **Field selection:** `fields=id,name,email` — sparse fieldset for the
   root resource, validated against the selectable allowlist.
-  `fields[<relation>]=…` belongs to includes and is rejected until
-  Phase 15.
+  `fields[<relation path>]=id,title` narrows an included node, validated
+  against the _target_ entity's allowlist (doc 12).
 - **Soft delete:** `withDeleted=true` includes soft-deleted rows, which
   are otherwise excluded from every read (Phase 14, doc 11). On an entity
   that is not soft-deletable it is rejected with
   `CRUDO_QUERY_UNSUPPORTED_PARAM`, not ignored; a non-boolean value is a
   field-level 400.
-- **Deferred params, rejected explicitly:** `include=…` and
-  `fields[<relation>]` (Phase 15) are parsed and rejected with
-  `CRUDO_QUERY_UNSUPPORTED_PARAM` — never silently ignored.
+- **Includes:** `include=posts.comments,profile` — comma-separated
+  dot-paths, merged into one validated tree (Phase 15, doc 12). A
+  relation that is not on the entity's inclusion allowlist is a 400, never
+  a silent omission.
 
 ## 4. Security & robustness
 

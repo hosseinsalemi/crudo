@@ -18,13 +18,14 @@ built-in defaults → global (createCrudo) → entity (createCrud)
 | `pagination.count`                               | `true`                   | `false` skips the count query; envelope reports `total: null`                  |
 | `query.maxFilterDepth` / `maxInValues`           | 3 / 100                  |                                                                                |
 | `errors.exposeInternals`                         | `false`                  | leak driver detail into responses                                              |
-| `relations.maxIncludeDepth` / `maxIncludedNodes` | 2 / 10                   | reserved for Phase 15                                                          |
+| `relations.maxIncludeDepth` / `maxIncludedNodes` | 2 / 10                   | include depth budget and total node cap (Phase 15)                             |
+| `relations.edges.<name>`                         | `{}`                     | per-relation `includable` / `defaultInclude` / `maxDepth` / `strategy`         |
 | `softDelete.field` / `strategy`                  | `"deletedAt"` / `"auto"` | Phase 14; `auto` = soft when the entity has the marker field, `false` disables |
 | `bulk.mode` / `maxBatchSize`                     | `"atomic"` / 500         | reserved (bulk is not built)                                                   |
 
 **Schema extensibility rule:** feature phases add keys to this schema —
 they never add a second config mechanism. The reserved keys above are
-already merged and validated so Phase 15 adds behavior only.
+already merged and validated so a later feature adds behavior only.
 
 ## 2. Merge semantics (normative)
 

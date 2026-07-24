@@ -34,3 +34,4 @@ Conventions section of `crudo-phases-v6.md`.
 | **Problem details**    | The RFC 9457 error document (`ProblemDetailsDto`) all errors serialize to.                                                               | error response                  |
 | **Error code**         | The stable `CRUDO_*` string identifying an error kind; API surface.                                                                      | error type                      |
 | **Soft delete**        | Marking a row deleted via the marker field instead of removing it (Phase 14, doc 11). `restore` un-deletes; `purge` permanently removes. | archive, trash                  |
+| **Include**            | Embedding a relation in a response (`include=posts.comments`), opt-in per relation (Phase 15, doc 12).                                   | expand, join, populate          |

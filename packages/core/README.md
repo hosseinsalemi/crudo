@@ -17,7 +17,7 @@ src/
 ├─ errors/         CrudException, error codes, problem details
 ├─ config/         Settings schema, global/entity config, resolved config
 ├─ operations/     Operation ids, handler contract, registry
-├─ relations/      Relation registry, include tree/resolver (Phase 15 contracts)
+├─ relations/      Relation registry, include tree, include resolver
 ├─ context/        CrudContext, CrudRequest, CrudResponse
 ├─ serialization/  Serializer, Deserializer
 ├─ persistence/    EntityReader/Writer, RepositoryAdapter, soft delete, transactions
