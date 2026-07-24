@@ -94,8 +94,8 @@ Request
  → Config Resolution        frozen ResolvedEntityConfig (bootstrap-merged)
  → DTO Resolution           explicit DTO, else entity-derived default
  → Deserialization
- → Query Resolution         GET only: query → filter AST (+ IncludeTree, Phase 16 ⟨deferred⟩)
- → Repository Adapter call  transactional once Phase 13 lands ⟨deferred⟩
+ → Query Resolution         GET only: query → filter AST (+ IncludeTree, Phase 15 ⟨deferred⟩)
+ → Repository Adapter call  transactional via the adapter-level hook ⟨reserved⟩
  → Response Mapping         result → item or ListResultDto envelope
  → Field Selection + Serialization
  → Response
@@ -118,7 +118,7 @@ stubbing Milestones C–D as hacks.
 | `errors/`        | `CrudException`, stable error codes, problem-details shape                                                   |
 | `config/`        | Settings schema, scope inputs, frozen resolved config                                                        |
 | `operations/`    | Operation ids, handler contract, dispatch registry                                                           |
-| `relations/`     | Relation descriptors/registry, include tree/resolver (Phase 16 contracts)                                    |
+| `relations/`     | Relation descriptors/registry, include tree/resolver (Phase 15 contracts)                                    |
 | `context/`       | `CrudContext` + transport-agnostic request/response envelopes                                                |
 | `serialization/` | `Serializer` / `Deserializer`                                                                                |
 | `persistence/`   | Reader/writer/adapter contracts, transaction manager                                                         |
@@ -130,7 +130,7 @@ stubbing Milestones C–D as hacks.
 | ----------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Template Method**           | The Phase 7 lifecycle                              | One fixed stage order with swappable stage internals beats a free-form middleware chain: ordering bugs become impossible, and the pipeline stays inspectable.                          |
 | **Strategy**                  | Adapters, serializers, pagination, filter builders | Open/Closed: new behavior = new implementation of a core contract, never an engine edit.                                                                                               |
-| **Registry (dispatch table)** | `OperationRegistry`                                | One mechanism for built-in, overridden, and custom operations (Phase 14's "one mechanism, several behaviors"); route generation reads the same table, so features get routes for free. |
+| **Registry (dispatch table)** | `OperationRegistry`                                | One mechanism for built-in, overridden, and custom operations (Phase 13's "one mechanism, several behaviors"); route generation reads the same table, so features get routes for free. |
 | **Specification**             | Filter AST                                         | Composable, provider-independent query trees that each adapter translates once, instead of per-ORM query fragments leaking upward.                                                     |
 | **Interpreter**               | Adapter filter translation                         | The AST is walked into `QueryBuilder` calls; keeps translation local to the adapter.                                                                                                   |
 | **Dependency Injection**      | Everywhere                                         | Core receives its collaborators; only the framework binding knows the container.                                                                                                       |
@@ -211,7 +211,7 @@ sequenceDiagram
     participant A as Adapter
     C->>E: execute("deleteOne", id)
     E->>A: delete(id, ctx)
-    Note over A: hard delete in Milestone B;<br/>strategy-resolved (soft) after Phase 15
+    Note over A: strategy-resolved: hard, or soft<br/>when the entity has a marker field (Phase 14)
     A-->>E: void
     E-->>C: 204 No Content
 ```

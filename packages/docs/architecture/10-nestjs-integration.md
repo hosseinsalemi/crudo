@@ -37,23 +37,26 @@ The decorator builds the entity's operation registry with the same
 `createOperationRegistry` the engine uses and generates a route per
 **enabled** entry (ADR-0006, ADR-0012):
 
-| Operation               | Route                | Status |
-| ----------------------- | -------------------- | ------ |
-| `createOne`             | `POST /`             | 201    |
-| `findMany`              | `GET /`              | 200    |
-| `findOne`               | `GET /:id`           | 200    |
-| `updateOne`             | `PUT /:id`           | 200    |
-| `patchOne`              | `PATCH /:id`         | 200    |
-| `deleteOne`             | `DELETE /:id`        | 204    |
-| `restoreOne` (Phase 15) | `PATCH /:id/restore` | 200    |
-| `purgeOne` (Phase 15)   | `DELETE /:id/purge`  | 204    |
+| Operation    | Route                | Status |
+| ------------ | -------------------- | ------ |
+| `createOne`  | `POST /`             | 201    |
+| `findMany`   | `GET /`              | 200    |
+| `findOne`    | `GET /:id`           | 200    |
+| `updateOne`  | `PUT /:id`           | 200    |
+| `patchOne`   | `PATCH /:id`         | 200    |
+| `deleteOne`  | `DELETE /:id`        | 204    |
+| `restoreOne` | `PATCH /:id/restore` | 200    |
+| `purgeOne`   | `DELETE /:id/purge`  | 204    |
 
-Disabled entries (config `operations.<id>: false`, or the Milestone C
-defaults) get **no route**. Custom operations read `meta.routes`
+Disabled entries (config `operations.<id>: false`, or a default-off
+entry) get **no route**. Custom operations read `meta.routes`
 (`method`, `path`, `successStatus`); `meta.routes.enabled: false` keeps
-one service-only. Because generation walks the registry, Phase 15's
-restore/purge appear by _enabling entries_ — this generator does not
-change.
+one service-only. Because generation walks the registry, Phase 14's
+restore/purge appeared by _enabling entries_ — this generator did not
+change. Their enablement is config-declared rather than metadata-driven,
+precisely because decoration time has no ORM metadata (ADR-0013):
+`softDelete: { strategy: "soft" }` adds the restore route,
+`operations: { purgeOne: true }` the purge route.
 
 **Manual-method-wins:** a hand-written controller method whose name
 matches an operation id suppresses that generated route — detected via
@@ -83,7 +86,7 @@ When `@nestjs/swagger` is installed, generated routes get: operation ids
 on list routes, registered DTO classes as body schemas (`ApiBody`), and
 problem-details response schemas for 400/404. Allowlist-derived
 per-field query documentation needs ORM metadata, which doesn't exist at
-decoration time — revisited in Phase 17's DX pass.
+decoration time — revisited in Phase 16's DX pass.
 
 ## 5. Testing
 

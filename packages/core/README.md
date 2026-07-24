@@ -17,10 +17,10 @@ src/
 ├─ errors/         CrudException, error codes, problem details
 ├─ config/         Settings schema, global/entity config, resolved config
 ├─ operations/     Operation ids, handler contract, registry
-├─ relations/      Relation registry, include tree/resolver (Phase 16 contracts)
+├─ relations/      Relation registry, include tree/resolver (Phase 15 contracts)
 ├─ context/        CrudContext, CrudRequest, CrudResponse
 ├─ serialization/  Serializer, Deserializer
-├─ persistence/    EntityReader/Writer, RepositoryAdapter, transactions
+├─ persistence/    EntityReader/Writer, RepositoryAdapter, soft delete, transactions
 ├─ service/        CrudService, per-call options
 └─ index.ts        Explicit named barrel — the public API surface
 ```

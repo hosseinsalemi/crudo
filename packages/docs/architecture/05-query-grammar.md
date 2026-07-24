@@ -90,11 +90,15 @@ fields:     root: [id, name, email]
 - **Field selection:** `fields=id,name,email` — sparse fieldset for the
   root resource, validated against the selectable allowlist.
   `fields[<relation>]=…` belongs to includes and is rejected until
-  Phase 16.
-- **Deferred params, rejected explicitly:** `include=…` (Phase 16) and
-  `withDeleted=true` (Phase 15) are parsed and rejected with
+  Phase 15.
+- **Soft delete:** `withDeleted=true` includes soft-deleted rows, which
+  are otherwise excluded from every read (Phase 14, doc 11). On an entity
+  that is not soft-deletable it is rejected with
+  `CRUDO_QUERY_UNSUPPORTED_PARAM`, not ignored; a non-boolean value is a
+  field-level 400.
+- **Deferred params, rejected explicitly:** `include=…` and
+  `fields[<relation>]` (Phase 15) are parsed and rejected with
   `CRUDO_QUERY_UNSUPPORTED_PARAM` — never silently ignored.
-  `withDeleted=false` (the default state) is accepted.
 
 ## 4. Security & robustness
 
@@ -113,7 +117,7 @@ fields:     root: [id, name, email]
   date (ISO 8601), enum (member match), `null` for nullable columns.
   Failures are field-level 400 issues, never a silent `NaN` or
   `Invalid Date`. Relation-path values pass through as strings in
-  Milestone B (target-entity metadata is wired in Phase 16).
+  Milestone B (target-entity metadata is wired in Phase 15).
 - **One exception, all issues:** every violation across filter, sort,
   fields, and pagination is collected into a single
   `QueryValidationException`, so a client fixes its request in one round

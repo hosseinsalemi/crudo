@@ -12,7 +12,7 @@ CrudRequest
  → Operation Resolution   registry lookup; disabled/unknown → OperationDisabledException
  → Config Resolution      settingsFor(operation) + per-call overrides (parameters, never writes)
  → Query Resolution       reads only: WireQuery → normalizeWire, QueryContext → normalizeInput
- → Context Assembly       CrudContext: identity, config view, principal, transaction ⟨Phase 13⟩,
+ → Context Assembly       CrudContext: identity, config view, principal, transaction ⟨reserved⟩,
                           normalized query, correlationId, typed state bag
  → DTO Resolution         descriptor.input/output else Phase 4 slot default
  → Deserialization        writes only: body → allowed-key projection
@@ -30,7 +30,7 @@ around Crudo.
 
 Entity + operation identity, the resolved config view (with per-call
 settings already merged), `principal` (opaque to core, set by the
-framework layer), `transaction` (`null` until Phase 13), the normalized
+framework layer), `transaction` (`null` — the adapter-level hook is reserved), the normalized
 query for reads (`null` for writes), a `correlationId` (generated if the
 caller didn't forward one), and the typed `state` bag
 (`StateKey<T>`-keyed) for custom handlers to pass data.
@@ -41,10 +41,11 @@ Ordinary registry entries (ADR-0006), one adapter call each plus the
 "missing vs. error" decision — adapters return `null`, handlers raise
 `NotFoundException`. `findMany` returns `{ entities, total }` where
 `total` is only computed when `pagination.count` is true (a separate
-count query, never `getManyAndCount`). The Milestone C operations
-(`*Many`, `restoreOne`, `restoreMany`, `purgeOne`) are registered
-**disabled**: calling one raises `OperationDisabledException`, no route
-generates, and Phase 15 activates them by binding handlers — a real seam,
+count query, never `getManyAndCount`). `deleteOne`/`restoreOne`/
+`purgeOne` are equally ordinary entries — the delete strategy is resolved
+in config and applied by the adapter (doc 11), so no handler branches on
+it. The batch (`*Many`) entries are registered **disabled**: calling one
+raises `OperationDisabledException` and no route generates — a real seam,
 not a TODO.
 
 The engine also coerces URL path ids against the id column's kind, so

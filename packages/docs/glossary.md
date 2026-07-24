@@ -33,4 +33,4 @@ Conventions section of `crudo-phases-v6.md`.
 | **Principal**          | The authenticated caller carried opaquely on the context.                                                                                | user, actor                     |
 | **Problem details**    | The RFC 9457 error document (`ProblemDetailsDto`) all errors serialize to.                                                               | error response                  |
 | **Error code**         | The stable `CRUDO_*` string identifying an error kind; API surface.                                                                      | error type                      |
-| **Soft delete**        | Marking a row deleted via the marker field instead of removing it (Phase 15). `restore` un-deletes; `purge` permanently removes.         | archive, trash                  |
+| **Soft delete**        | Marking a row deleted via the marker field instead of removing it (Phase 14, doc 11). `restore` un-deletes; `purge` permanently removes. | archive, trash                  |

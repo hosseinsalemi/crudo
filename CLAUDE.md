@@ -60,6 +60,7 @@ Nothing is special-cased per verb. Operations come from an **operation registry*
 ### Route generation is registry-driven and happens at decoration time
 
 `@Crud(Entity, config?)` (`packages/frameworks/nest/src/crud.decorator.ts`) builds the same operation registry the engine uses and generates one route per **enabled** entry at class-definition time (the only moment Nest's router scan can see the methods). Notable rules:
+
 - Disabled operations get no route; custom operations get their route from `meta.routes`; `meta.routes.enabled: false` keeps an operation service-only.
 - **Manual-method-wins**: a hand-written controller method whose name matches an operation id suppresses that generated route.
 - The bound service arrives later via property injection (`forFeature` provider), not through the constructor.
@@ -83,4 +84,4 @@ See `packages/examples/src/app.module.ts`: `CrudoModule.forRootAsync({ useFactor
 
 ## Where to read more
 
-`packages/docs/` holds the design docs, `glossary.md`, and ADRs (`adr/0001`…`0012`) — one ADR per load-bearing decision. `packages/docs/architecture/` mirrors the packages (query grammar, error handling, engine, TypeORM adapter, Nest integration). ADRs are referenced by name in code comments; read the referenced ADR before changing the behavior it governs.
+`packages/docs/` holds the design docs, `glossary.md`, and ADRs (`adr/0001`…`0013`) — one ADR per load-bearing decision. `packages/docs/architecture/` mirrors the packages (query grammar, error handling, engine, TypeORM adapter, Nest integration, soft delete). ADRs are referenced by name in code comments; read the referenced ADR before changing the behavior it governs.

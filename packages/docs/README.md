@@ -1,7 +1,7 @@
 # Crudo documentation
 
-Design documentation for the Crudo framework, produced by Milestones A–B
-(Phases 1–12) of `crudo-phases-v6.md` and maintained alongside the code.
+Design documentation for the Crudo framework, produced by Milestones A–C
+of `crudo-phases-v6.md` and maintained alongside the code.
 
 ## Milestone A — Blueprint
 
@@ -18,6 +18,10 @@ Design documentation for the Crudo framework, produced by Milestones A–B
 - [architecture/08-configuration.md](architecture/08-configuration.md) — schema, precedence chain, merge semantics, bootstrap validation (Phase 8)
 - [architecture/09-typeorm-adapter.md](architecture/09-typeorm-adapter.md) — metadata seam, query translation, error mapping, seams (Phases 9–10)
 - [architecture/10-nestjs-integration.md](architecture/10-nestjs-integration.md) — module design, route generation, exception filter, Swagger (Phases 11–12)
+
+## Milestone C — Core features
+
+- [architecture/11-soft-delete.md](architecture/11-soft-delete.md) — strategy resolution, restore/purge, `withDeleted`, unique-index and cascade edges (Phase 14)
 
 ## Reference
 

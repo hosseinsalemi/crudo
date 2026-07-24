@@ -31,7 +31,7 @@ spelling instead of a per-driver fork.
 **Relation-path conditions** (`author.name`) add one **non-selecting**
 left join per path segment with deterministic aliases
 (`Book__author`), reused across conditions. They restrict root rows only
-— loading relations is Phase 16, which will also own the distinct-root
+— loading relations is Phase 15, which will also own the distinct-root
 pagination rule for to-many joins (relation paths only exist when
 explicitly allowlisted in Milestone B).
 
@@ -43,8 +43,17 @@ explicitly allowlisted in Milestone B).
   cascades matter; no dynamic SQL is needed. `update` and `patch` share
   one load-merge-save primitive — the _shape_ of the payload differs at
   the DTO layer (full body vs. sparse), not the persistence mechanics.
-  Missing rows raise `NotFoundException` (load returns `null`;
-  `delete` checks `affected === 0`).
+
+**Soft delete** (Phase 14, doc 11) rides on both halves.
+`buildEntityMetadata` reports `@DeleteDateColumn` as
+`EntityMetadata.softDeleteField`; reads scope themselves to live rows —
+`.withDeleted()` for a declared delete column, an explicit
+`<alias>.<field> IS NULL` for a marker column named through config — and
+`delete`/`restore`/`purge` branch on `context.config.softDelete`,
+reaching for TypeORM's own `softDelete`/`restore` only when the field is
+the declared one.
+Missing rows raise `NotFoundException` (load returns `null`;
+`delete` checks `affected === 0`).
 
 ## 4. Pagination & count strategy
 
