@@ -24,6 +24,11 @@ DELETE /owners/1                 # soft delete — the row is stamped, not remov
 GET    /owners?withDeleted=true  # …and still reachable when asked for
 PATCH  /owners/1/restore
 DELETE /owners/1/purge           # permanent, and only for an already-deleted row
+
+GET    /owners?include=pets              # to-many: batch-loaded, one query per page
+GET    /cats?include=owner               # to-one: joined into the same query
+GET    /cats?include=owner&fields[owner]=id,name
+POST   /cats                     {"name":"Kit","age":1,"owner":1}   # associate by id
 ```
 
 The e2e suite in `tests/` is the executable form of the milestone

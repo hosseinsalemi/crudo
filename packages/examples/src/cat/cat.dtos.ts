@@ -16,6 +16,9 @@ export class CreateCatDto {
   size = enumProp(Object.values(PetSizeEnum), { example: PetSizeEnum.Medium });
   indoor = false;
   livesLeft = 9;
+  // Association by id (Phase 15, ADR-0014): send the owner's id, or an
+  // `{ id }` reference. Deep nested writes are deliberately out of scope.
+  owner: number | null = null;
 }
 
 /** `update` slot — request body for PUT /cats/:id (patch derives from it). */
@@ -25,6 +28,7 @@ export class UpdateCatDto {
   size = enumProp(Object.values(PetSizeEnum), { example: PetSizeEnum.Medium });
   indoor = false;
   livesLeft = 0;
+  owner: number | null = null;
 }
 
 /** `item` slot — the detail projection. */

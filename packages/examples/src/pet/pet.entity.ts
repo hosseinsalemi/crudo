@@ -9,9 +9,9 @@ import type { Owner } from "../owner/owner.entity.js";
  * `abstract`. The discriminator column (`species`) has no entity property:
  * it is written automatically by the child repository on insert.
  *
- * The `owner` relation is modeling-only here. Crudo maps every relation to
- * `includable: false` (Phase 15 is unwired), so `include=owner` is still a
- * deferred feature and rejected with a problem-details 400.
+ * The `owner` relation is opened for inclusion on the Cat route
+ * (`include=owner`) — inclusion is opt-in per relation, so a relation the
+ * config never names stays invisible (Phase 15).
  */
 /** Enum column shared by every Pet subtype. */
 export enum PetSizeEnum {
