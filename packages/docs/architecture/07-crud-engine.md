@@ -54,6 +54,10 @@ error.
 
 ## 4. Patterns
 
+The engine's share of the catalog; the full list, with implementation
+files and the ADR behind each, is
+[doc 01 §6](01-system-architecture.md#6-design-patterns-and-why).
+
 - **Template Method** — the fixed lifecycle above.
 - **Strategy** — repository adapter, serializer/deserializer, pagination
   strategies, error handler: all constructor-injected interfaces.
