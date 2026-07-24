@@ -352,6 +352,10 @@ _(Fill in as each phase completes — actual findings, not planned findings.)_
   inconsistency rather than a uniform choice. Not fixed here: it changes a public
   type (`CrudEngineDependencies`) and needs the coordinator's call on whether the
   normalizer is meant to be swappable at all.
+  **Decision (user): deferred past Phase 8.** Phase 3a is not actioned by this
+  refactor. It is revisited alongside Phase 16's DX API work, when the public
+  surface is being revised anyway and a `CrudEngineDependencies` change costs
+  nothing extra. The finding stands as recorded above.
   Also noted for Phase 7 (not fixed, out of scope): doc 01 §9's ADR index stops at
   0010 and is missing ADR-0011 through 0014, two of which §6 now cites.
 - Phase 4: Mixed outcome, comments only — not one executable line moved.
@@ -489,5 +493,40 @@ _(Fill in as each phase completes — actual findings, not planned findings.)_
     cross-package fixture import declined in Phase 5. The cost is bounded and
     mechanical. Not done here because it touches every rule and would change what
     CI enforces.
+- Phase 6a: The `tests/` boundary is now mechanically enforced instead of
+  convention-only. Approved follow-on to Phase 6's measurement.
+  - **Config changes (all additive — no Phase 6 rule was relaxed).** `from`
+    scoped to `/src` on the three package-purity rules (`core-imports-nothing`,
+    `typeorm-only-imports-core`, `nest-only-imports-core`) so they stop firing on
+    test files; `/tests/` dropped from `options.exclude` (`\\.d\\.ts$|/dist/`
+    remains); two rules added. The deep-import rules kept their broad `from`
+    deliberately — deep-importing another package's `src` is illegal from *any*
+    file, test or not, and leaving them broad is what makes a test doing it fail
+    under two rules at once.
+  - **`tests-no-other-package-internals`** — a test file may import its own
+    package's source and the `@crudo/*` barrels, never another package's `src` or
+    `tests`. Uses dependency-cruiser's `$1` back-reference: the package root is
+    captured in `from.path` and excluded from `to` via `pathNot: "^$1/"`, so
+    same-package imports stay legal without enumerating them. Cites ADR-0002.
+  - **`core-tests-know-no-adapter`** — added beyond the approved three-point
+    shape, because scoping `core-imports-nothing` to `/src` would otherwise have
+    left core's *tests* free to import `@crudo/typeorm`. Core must not know an ORM
+    exists, and its suite proves that by running the engine against an in-memory
+    fake; this keeps the part that still matters enforced (ADR-0005, ADR-0001)
+    while allowing the barrel and vitest that the `/src` scoping was for.
+  - **Verification: 22 probes, each injecting one import, cruising, reverting.**
+    13 must-be-caught, all caught. Most important: `nest test →
+    packages/core/tests/support/account-fixture.js` — the exact fixture-sharing
+    import declined in Phase 5 — now errors under
+    `tests-no-other-package-internals`. That call no longer rests on reviewer
+    judgment. Also caught: nest/typeorm/examples tests → another package's `tests`
+    or `src` (relative), core tests → `@crudo/typeorm` and `@crudo/nest` (barrel
+    spelling) and → typeorm `src` (relative). All 6 Phase 6 production probes
+    still fail as they should — re-verified, not assumed.
+  - **9 negative controls, none tripped:** core test → `@crudo/core`, → own `src`,
+    → own `tests/support`; nest test → own `src`, → `@crudo/core`; typeorm test →
+    `@crudo/typeorm`, → vitest; examples test → own `src`. Clean tree is green with
+    **no test file edited to accommodate a rule**: 120 modules / 452 dependencies
+    cruised (up from 102 / 401 — that delta is the test suite, previously invisible).
 - Phase 7:
 - Phase 8:
