@@ -6,6 +6,7 @@ import type { GlobalConfig } from "./config/global-config.js";
 import type { PaginationStrategy } from "./query/pagination.js";
 import type { QueryContext } from "./query/query-context.js";
 import type { RepositoryAdapter } from "./persistence/repository-adapter.js";
+import type { IncludeResolver } from "./relations/include-resolver.js";
 import type { OperationRegistry } from "./operations/operation-registry.js";
 import type { ResolvedEntityConfig } from "./config/resolved-entity-config.js";
 import { CrudEngine } from "./engine/crud-engine.js";
@@ -16,6 +17,8 @@ import { DefaultDeserializer, DefaultSerializer } from "./serialization/default-
 import { QueryNormalizer } from "./query/query-normalizer.js";
 import { builtInHandlers } from "./engine/built-in-handlers.js";
 import { createOperationRegistry } from "./operations/default-operation-registry.js";
+import { DefaultEntityCatalog } from "./metadata/entity-catalog.js";
+import { DefaultIncludeResolver } from "./relations/default-include-resolver.js";
 import { describeResolvedConfig, resolveEntityConfig } from "./config/resolve-entity-config.js";
 import { STANDARD_OPERATIONS } from "./operations/default-operation-registry.js";
 
@@ -69,6 +72,13 @@ export interface CrudoInstance {
  */
 export function createCrudo(options: CrudoOptions = {}): CrudoInstance {
   const registered = new Map<string, Record<string, unknown>>();
+  // The cross-entity view nested includes resolve against (Phase 15).
+  // Entities that never go through `createCrud` are derived from
+  // infrastructure metadata on demand, so a relation can point at one.
+  const catalog = new DefaultEntityCatalog(
+    (entity) => options.infrastructure?.metadataFor(entity) as EntityMetadata<object> | undefined,
+    options.defaults,
+  );
 
   return {
     createCrud(entity, config, runtime) {
@@ -103,13 +113,22 @@ export function createCrudo(options: CrudoOptions = {}): CrudoInstance {
       );
       requireSoftDeletable(resolved, registry);
 
+      catalog.register(entity as ClassRef, {
+        metadata: metadata as EntityMetadata<object>,
+        config: resolved as unknown as ResolvedEntityConfig<object>,
+      });
+
       const engine = new CrudEngine<Entity>({
         metadata: metadata as EntityMetadata<Entity>,
         config: resolved,
         registry,
-        serializer: new DefaultSerializer(metadata as EntityMetadata<Entity>),
-        deserializer: new DefaultDeserializer(metadata as EntityMetadata<Entity>),
-        normalizer: new QueryNormalizer(metadata as EntityMetadata<Entity>, options.paginationStrategies ?? []),
+        serializer: new DefaultSerializer(metadata as EntityMetadata<Entity>, catalog),
+        deserializer: new DefaultDeserializer(metadata as EntityMetadata<Entity>, catalog),
+        normalizer: new QueryNormalizer(
+          metadata as EntityMetadata<Entity>,
+          options.paginationStrategies ?? [],
+          new DefaultIncludeResolver(catalog) as IncludeResolver<Entity>,
+        ),
         errorHandler: new DefaultErrorHandler(),
       });
 

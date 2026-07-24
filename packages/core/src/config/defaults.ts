@@ -19,11 +19,12 @@ export const BUILT_IN_DEFAULTS: CrudoSettings = Object.freeze({
   errors: Object.freeze({
     exposeInternals: false,
   }),
-  // `relations` and `bulk` are reserved keys — validated and merged now so
-  // feature phases add behavior, never a second config mechanism.
   relations: Object.freeze({
     maxIncludeDepth: 2,
     maxIncludedNodes: 10,
+    // Inclusion is opt-in: with no edges configured, `include=` has
+    // nothing to reach (Phase 15).
+    edges: Object.freeze({}),
   }),
   // `auto`: soft for entities carrying the marker field, hard for the rest
   // (Phase 14) — nothing to configure for entities that aren't
@@ -32,6 +33,8 @@ export const BUILT_IN_DEFAULTS: CrudoSettings = Object.freeze({
     field: "deletedAt",
     strategy: "auto" as const,
   }),
+  // `bulk` is a reserved key — validated and merged now so a later
+  // feature adds behavior, never a second config mechanism.
   bulk: Object.freeze({
     mode: "atomic" as const,
     maxBatchSize: 500,

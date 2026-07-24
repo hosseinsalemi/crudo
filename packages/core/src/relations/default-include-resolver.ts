@@ -1,0 +1,212 @@
+import type { EntityCatalog, EntityRuntimeInfo } from "../metadata/entity-catalog.js";
+import type { IncludeNode, IncludeTree } from "./include-tree.js";
+import type { IncludeRequest, IncludeResolver } from "./include-resolver.js";
+import type { QueryIssueDto } from "../errors/problem-details.js";
+import type { RelationDescriptor } from "./relation-descriptor.js";
+import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
+import { QueryValidationException } from "../errors/exceptions.js";
+
+/** A pending node, before validation turns it into an `IncludeNode`. */
+interface DraftNode {
+  readonly name: string;
+  readonly path: string;
+  readonly children: Map<string, DraftNode>;
+}
+
+/**
+ * The Phase 15 include-resolution algorithm:
+ *
+ * 1. parse dot-paths into a tree — overlapping paths merge, so `posts` and
+ *    `posts.comments` produce one `posts` node with a `comments` child;
+ * 2. validate every edge against the relation registry of the entity that
+ *    *owns* it (unknown or non-includable → 400, never a silent drop);
+ * 3. enforce `maxIncludeDepth`, per-relation `maxDepth` overrides below a
+ *    node, and `maxIncludedNodes` across the whole tree;
+ * 4. attach sparse fieldsets, validated against the target's selectable
+ *    allowlist;
+ * 5. resolve `auto` strategies and the target's delete strategy, so the
+ *    adapter receives decisions rather than questions.
+ *
+ * Depth is the only cycle guard: `manager.manager.manager` is legal until
+ * it runs out of depth budget. Visited-type tracking would forbid a
+ * legitimate self-relation, and depth is the contract clients can reason
+ * about.
+ *
+ * Every issue across the whole tree is collected before throwing, matching
+ * the rest of the query pipeline: one round trip, all problems.
+ */
+export class DefaultIncludeResolver<Entity extends object = object> implements IncludeResolver<Entity> {
+  constructor(private readonly catalog: EntityCatalog) {}
+
+  resolve(request: IncludeRequest, config: ResolvedEntityConfig<Entity>): IncludeTree {
+    const issues: QueryIssueDto[] = [];
+    const drafts = new Map<string, DraftNode>();
+    for (const path of request.paths) {
+      addPath(drafts, path, issues);
+    }
+
+    const budget = { remaining: config.settings.relations.maxIncludedNodes };
+    const tree = this.build(
+      drafts,
+      config as unknown as ResolvedEntityConfig<object>,
+      request,
+      config.settings.relations.maxIncludeDepth,
+      budget,
+      issues,
+    );
+
+    if (issues.length > 0) {
+      throw new QueryValidationException(issues, { context: { entityName: config.entityName } });
+    }
+    return tree;
+  }
+
+  /** One level of the tree, against the config of the entity owning it. */
+  private build(
+    drafts: Map<string, DraftNode>,
+    owner: ResolvedEntityConfig<object>,
+    request: IncludeRequest,
+    depthBudget: number,
+    nodeBudget: { remaining: number },
+    issues: QueryIssueDto[],
+    parentPath = "",
+  ): IncludeTree {
+    // Relations marked `defaultInclude` join the tree even when the client
+    // asked for nothing — but only where they are reachable, so they obey
+    // the same depth budget as anything else.
+    for (const relation of owner.relations.all()) {
+      if (relation.defaultInclude !== true || !relation.includable) continue;
+      if (drafts.has(relation.name)) continue;
+      const path = parentPath === "" ? relation.name : `${parentPath}.${relation.name}`;
+      drafts.set(relation.name, { name: relation.name, path, children: new Map() });
+    }
+    if (drafts.size === 0) return {};
+
+    const tree: Record<string, IncludeNode> = {};
+    for (const draft of drafts.values()) {
+      const relation = owner.relations.get(draft.name);
+      if (relation === undefined || !relation.includable) {
+        issues.push({
+          field: draft.path,
+          code: "CRUDO_QUERY_INVALID_FIELD",
+          detail: `Field '${draft.path}' cannot be used for inclusion.`,
+        });
+        continue;
+      }
+      if (depthBudget < 1) {
+        issues.push({
+          field: draft.path,
+          code: "CRUDO_QUERY_LIMIT_EXCEEDED",
+          detail:
+            `Include path '${draft.path}' is deeper than the configured maximum ` +
+            `of ${owner.settings.relations.maxIncludeDepth}.`,
+        });
+        continue;
+      }
+      if (nodeBudget.remaining < 1) {
+        issues.push({
+          field: draft.path,
+          code: "CRUDO_QUERY_LIMIT_EXCEEDED",
+          detail: `Include tree exceeds the configured maximum of ${owner.settings.relations.maxIncludedNodes} nodes.`,
+        });
+        continue;
+      }
+
+      const target = this.targetOf(relation, draft, issues);
+      if (target === undefined) continue;
+      nodeBudget.remaining -= 1;
+
+      tree[draft.name] = {
+        relation,
+        path: draft.path,
+        fields: this.fieldsFor(draft, request, target.config, issues),
+        strategy:
+          relation.strategy === "auto" ? (relation.cardinality === "many" ? "batch" : "join") : relation.strategy,
+        softDelete: target.config.softDelete,
+        children: this.build(
+          draft.children,
+          target.config,
+          request,
+          // A relation's own `maxDepth` replaces the inherited budget for
+          // everything below it — tightening or loosening one subtree.
+          (relation.maxDepth ?? depthBudget) - 1,
+          nodeBudget,
+          issues,
+          draft.path,
+        ),
+      };
+    }
+    return tree;
+  }
+
+  private targetOf(
+    relation: RelationDescriptor,
+    draft: DraftNode,
+    issues: QueryIssueDto[],
+  ): EntityRuntimeInfo | undefined {
+    const target = this.catalog.get(relation.target());
+    if (target === undefined) {
+      issues.push({
+        field: draft.path,
+        code: "CRUDO_QUERY_UNSUPPORTED_PARAM",
+        detail:
+          `Query parameter 'include' cannot resolve '${draft.path}': the target entity is ` +
+          `unknown to this Crudo instance.`,
+      });
+    }
+    return target;
+  }
+
+  /**
+   * A node's sparse fieldset, validated against the *target* entity's
+   * selectable allowlist — never the root's. Stitching keys are not
+   * added here: they are fetched regardless and stripped at serialization.
+   */
+  private fieldsFor(
+    draft: DraftNode,
+    request: IncludeRequest,
+    target: ResolvedEntityConfig<object>,
+    issues: QueryIssueDto[],
+  ): readonly string[] | null {
+    const requested = request.fields[draft.path];
+    if (requested === undefined) return null;
+    const allowed = target.allowlists.selectable as readonly string[];
+    const fields: string[] = [];
+    for (const field of requested) {
+      if (allowed.includes(field)) {
+        fields.push(field);
+        continue;
+      }
+      issues.push({
+        field: `${draft.path}.${field}`,
+        code: "CRUDO_QUERY_INVALID_FIELD",
+        detail: `Field '${field}' cannot be used for selection on '${draft.path}'.`,
+      });
+    }
+    return fields;
+  }
+}
+
+/** Merge one dot-path into the draft tree, sharing prefixes. */
+function addPath(drafts: Map<string, DraftNode>, path: string, issues: QueryIssueDto[]): void {
+  const segments = path.split(".");
+  if (segments.some((segment) => segment === "")) {
+    issues.push({
+      field: "include",
+      code: "CRUDO_QUERY_INVALID_VALUE",
+      detail: `Include path '${path}' is malformed: segments must be non-empty, dot-separated relation names.`,
+    });
+    return;
+  }
+  let level = drafts;
+  let prefix = "";
+  for (const segment of segments) {
+    prefix = prefix === "" ? segment : `${prefix}.${segment}`;
+    let node = level.get(segment);
+    if (node === undefined) {
+      node = { name: segment, path: prefix, children: new Map() };
+      level.set(segment, node);
+    }
+    level = node.children;
+  }
+}

@@ -89,7 +89,7 @@ export function resolveEntityConfig<Entity extends object>(
     allowlists,
     softDelete: resolveSoftDelete(metadata, entitySettings),
     dto: new DefaultDtoResolver<Entity>(entityConfig?.dto),
-    relations: new DefaultRelationRegistry<Entity>(metadata.relations),
+    relations: new DefaultRelationRegistry<Entity>(metadata.relations, entitySettings.relations.edges, entityName),
   };
   return Object.freeze(resolved);
 }

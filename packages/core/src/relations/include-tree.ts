@@ -1,8 +1,14 @@
 import type { RelationDescriptor } from "./relation-descriptor.js";
+import type { ResolvedSoftDelete } from "../persistence/soft-delete.js";
 
 /** One validated node of an include tree. */
 export interface IncludeNode {
   readonly relation: RelationDescriptor;
+  /**
+   * The wire path addressing this node (`posts.comments`) — the key
+   * `fields[…]` uses, and a stable handle for adapter join aliases.
+   */
+  readonly path: string;
   /**
    * Sparse fieldset for this node (`fields[posts]=id,title`), validated
    * against the target entity's selectable allowlist; `null` = all fields
@@ -10,6 +16,18 @@ export interface IncludeNode {
    * fetched internally and stripped at serialization if not selected.
    */
   readonly fields: readonly string[] | null;
+  /**
+   * The resolved load strategy — never `auto`. Core answers the heuristic
+   * (to-one → `join`, to-many → `batch`), so adapters translate a decision
+   * rather than re-make it.
+   */
+  readonly strategy: "join" | "batch";
+  /**
+   * The *target* entity's delete strategy: soft-deleted related rows are
+   * excluded from includes. Root-level `withDeleted` applies to the root
+   * only — a per-include `withDeleted` is deliberately out of scope in v6.
+   */
+  readonly softDelete: ResolvedSoftDelete;
   readonly children: IncludeTree;
 }
 

@@ -1,3 +1,5 @@
+import type { RelationLoadStrategy } from "../relations/relation-descriptor.js";
+
 /**
  * The complete, canonical settings schema — one schema for every scope.
  *
@@ -31,10 +33,30 @@ export interface ErrorSettings {
   readonly exposeInternals: boolean;
 }
 
-/** Reserved for Phase 15 (nested includes). */
+/**
+ * Per-relation configuration (Phase 15) — the config half of a
+ * `RelationDescriptor`. ORM metadata supplies shape (name, target,
+ * cardinality); this supplies *permission*, which metadata can never know.
+ */
+export interface RelationEdgeSettings {
+  /** Whether clients may `include=` this relation. Defaults to `false`. */
+  readonly includable?: boolean;
+  /** Included even when the client doesn't ask. */
+  readonly defaultInclude?: boolean;
+  /** Overrides `maxIncludeDepth` for the subtree below this node. */
+  readonly maxDepth?: number;
+  readonly strategy?: RelationLoadStrategy;
+}
+
+/** Relation inclusion limits and the per-relation allowlist (Phase 15). */
 export interface RelationSettings {
   readonly maxIncludeDepth: number;
   readonly maxIncludedNodes: number;
+  /**
+   * Per-relation overrides, keyed by relation property name. Inclusion is
+   * opt-in: a relation absent here is not includable.
+   */
+  readonly edges: Readonly<Record<string, RelationEdgeSettings>>;
 }
 
 /**

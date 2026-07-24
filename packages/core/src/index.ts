@@ -55,6 +55,7 @@ export type {
   ErrorSettings,
   PaginationSettings,
   QuerySettings,
+  RelationEdgeSettings,
   RelationSettings,
   SoftDeleteMode,
   SoftDeleteSettings,
@@ -73,7 +74,8 @@ export type { OperationDescriptor, OperationRegistry } from "./operations/operat
 export type { RelationDescriptor, RelationCardinality, RelationLoadStrategy } from "./relations/relation-descriptor.js";
 export type { RelationRegistry } from "./relations/relation-registry.js";
 export type { IncludeNode, IncludeTree } from "./relations/include-tree.js";
-export type { IncludeResolver } from "./relations/include-resolver.js";
+export type { IncludeRequest, IncludeResolver } from "./relations/include-resolver.js";
+export { DefaultIncludeResolver } from "./relations/default-include-resolver.js";
 
 // ── Request context & envelopes ───────────────────────────────────────
 export type { CrudContext, CrudContextState, StateKey } from "./context/crud-context.js";
@@ -105,6 +107,12 @@ export type { CrudService, IdentifiedInput } from "./service/crud-service.js";
 
 // ── Entity metadata seam ──────────────────────────────────────────────
 export type { CrudInfrastructure, EntityMetadata, FieldKind, FieldMetadata } from "./metadata/entity-metadata.js";
+export {
+  DefaultEntityCatalog,
+  type EntityCatalog,
+  type EntityRuntimeInfo,
+  type MetadataSource,
+} from "./metadata/entity-catalog.js";
 
 // ── Errors ────────────────────────────────────────────────────────────
 export {

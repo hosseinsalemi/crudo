@@ -7,6 +7,8 @@ import type { FieldPath } from "../types/field-path.js";
 import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
 import type { EntityMetadata } from "../metadata/entity-metadata.js";
 import type { QueryIssueDto } from "../errors/problem-details.js";
+import type { IncludeResolver } from "../relations/include-resolver.js";
+import type { IncludeTree } from "../relations/include-tree.js";
 import { ConfigurationException, QueryValidationException } from "../errors/exceptions.js";
 import { DefaultFilterParser } from "./default-filter-parser.js";
 import { builtInPaginationStrategies } from "./pagination-strategies.js";
@@ -27,9 +29,15 @@ import { parseBracketKey } from "./bracket-notation.js";
 export class QueryNormalizer<Entity = unknown> {
   private readonly filterParser: DefaultFilterParser<Entity>;
   private readonly strategies: ReadonlyMap<string, PaginationStrategy>;
+  private readonly includeResolver: IncludeResolver<Entity> | null;
 
-  constructor(metadata: EntityMetadata<Entity>, extraStrategies: readonly PaginationStrategy[] = []) {
+  constructor(
+    metadata: EntityMetadata<Entity>,
+    extraStrategies: readonly PaginationStrategy[] = [],
+    includeResolver: IncludeResolver<Entity> | null = null,
+  ) {
     this.filterParser = new DefaultFilterParser(metadata);
+    this.includeResolver = includeResolver;
     const strategies = new Map(builtInPaginationStrategies());
     for (const strategy of extraStrategies) {
       strategies.set(strategy.name, strategy);
@@ -44,7 +52,6 @@ export class QueryNormalizer<Entity = unknown> {
   ): NormalizedQueryContext<Entity> {
     const issues: QueryIssueDto[] = [];
 
-    rejectUnsupported(rawParams, issues);
     const withDeleted = parseWithDeleted(rawParams["withDeleted"], config, issues);
 
     let filter: Filter<Entity> = { root: null };
@@ -56,6 +63,7 @@ export class QueryNormalizer<Entity = unknown> {
 
     const sort = parseSort(rawParams["sort"], config, issues);
     const fields = parseFields(rawParams, config, issues);
+    const include = this.resolveIncludes(parseIncludePaths(rawParams["include"], issues), fields, config, issues);
 
     let pagination = { limit: 0, offset: 0 };
     try {
@@ -77,7 +85,7 @@ export class QueryNormalizer<Entity = unknown> {
       sort,
       pagination,
       fields,
-      include: {},
+      include,
       withDeleted,
       count: config.settings.pagination.count,
     };
@@ -95,10 +103,6 @@ export class QueryNormalizer<Entity = unknown> {
   ): NormalizedQueryContext<Entity> {
     const issues: QueryIssueDto[] = [];
     const input = query ?? {};
-
-    if (input.include !== undefined && input.include.length > 0) {
-      issues.push(unsupportedIssue("include"));
-    }
     const withDeleted = parseWithDeleted(input.withDeleted, config, issues);
 
     const root = input.filter ?? null;
@@ -117,9 +121,11 @@ export class QueryNormalizer<Entity = unknown> {
         requireAllowlisted(field as string, config.allowlists.selectable, "selection", issues);
       }
     }
-    if (input.fields?.relations !== undefined && Object.keys(input.fields.relations).length > 0) {
-      issues.push(unsupportedIssue("fields[relation]"));
-    }
+    const fields: FieldSelection<Entity> = {
+      root: rootFields,
+      relations: input.fields?.relations ?? {},
+    };
+    const include = this.resolveIncludes(input.include ?? [], fields, config, issues);
 
     const { defaultLimit, maxLimit } = config.settings.pagination;
     const limit = Math.min(input.limit ?? defaultLimit, maxLimit);
@@ -141,11 +147,39 @@ export class QueryNormalizer<Entity = unknown> {
       filter: { root },
       sort,
       pagination: { limit, offset },
-      fields: { root: rootFields, relations: {} },
-      include: {},
+      fields,
+      include,
       withDeleted,
       count: config.settings.pagination.count,
     };
+  }
+
+  /**
+   * Hand the parsed paths and per-relation fieldsets to the resolver,
+   * which owns every relation rule (Phase 15). Without a resolver there is
+   * no relation graph to validate against, so an `include` is rejected
+   * rather than quietly dropped.
+   */
+  private resolveIncludes(
+    paths: readonly string[],
+    fields: FieldSelection<Entity>,
+    config: ResolvedEntityConfig<Entity>,
+    issues: QueryIssueDto[],
+  ): IncludeTree {
+    const relationFields = fields.relations;
+    if (paths.length === 0 && Object.keys(relationFields).length === 0 && !hasDefaultIncludes(config)) {
+      return {};
+    }
+    if (this.includeResolver === null) {
+      issues.push(unsupportedIssue("include"));
+      return {};
+    }
+    try {
+      return this.includeResolver.resolve({ paths, fields: relationFields }, config);
+    } catch (error) {
+      collectIssues(error, issues);
+      return {};
+    }
   }
 
   private strategyFor(config: ResolvedEntityConfig<Entity>): PaginationStrategy {
@@ -162,23 +196,38 @@ export class QueryNormalizer<Entity = unknown> {
   }
 }
 
-/**
- * The skeleton parses and rejects what it does not implement yet —
- * explicitly, never silently (Phase 5): `include` waits on Phase 15.
- */
-function rejectUnsupported(rawParams: Readonly<Record<string, unknown>>, issues: QueryIssueDto[]): void {
-  if (rawParams["include"] !== undefined) {
-    issues.push(unsupportedIssue("include"));
-  }
-}
-
 function unsupportedIssue(param: string): QueryIssueDto {
   return {
     field: param,
     code: "CRUDO_QUERY_UNSUPPORTED_PARAM",
-    detail:
-      `Query parameter '${param}' is not supported yet: ` + `relation includes ship in a later release (Phase 15).`,
+    detail: `Query parameter '${param}' is not supported: this entity has no relation graph to resolve it against.`,
   };
+}
+
+/** Whether anything would be included even with an empty request. */
+function hasDefaultIncludes<Entity>(config: ResolvedEntityConfig<Entity>): boolean {
+  return config.relations.all().some((relation) => relation.defaultInclude === true && relation.includable);
+}
+
+/** `include=posts.comments,profile`, or the repeated-key array form. */
+function parseIncludePaths(raw: unknown, issues: QueryIssueDto[]): readonly string[] {
+  if (raw === undefined || raw === null || raw === "") return [];
+  const tokens = Array.isArray(raw) ? raw : [raw];
+  const paths: string[] = [];
+  for (const token of tokens) {
+    if (typeof token !== "string") {
+      issues.push({
+        field: "include",
+        code: "CRUDO_QUERY_INVALID_VALUE",
+        detail: "'include' must be a comma-separated list of relation paths.",
+      });
+      continue;
+    }
+    for (const path of token.split(",")) {
+      if (path !== "") paths.push(path);
+    }
+  }
+  return paths;
 }
 
 /**
@@ -250,15 +299,28 @@ function parseFields<Entity>(
   config: ResolvedEntityConfig<Entity>,
   issues: QueryIssueDto[],
 ): FieldSelection<Entity> {
+  // `fields[posts.comments]=id,body` — the key is the relation path. The
+  // include resolver validates it against the *target* entity's allowlist,
+  // so nothing beyond shape is checked here.
+  const relations: Record<string, readonly string[]> = {};
   for (const key of Object.keys(rawParams)) {
-    if (parseBracketKey(key, "fields") !== null) {
-      // fields[<relation>] only makes sense with includes (Phase 15).
-      issues.push(unsupportedIssue("fields[relation]"));
+    const segments = parseBracketKey(key, "fields");
+    if (segments === null || segments.length !== 1 || segments[0] === "") continue;
+    const value = rawParams[key];
+    if (typeof value !== "string") {
+      issues.push({
+        field: key,
+        code: "CRUDO_QUERY_INVALID_VALUE",
+        detail: `'${key}' must be a comma-separated field list.`,
+      });
+      continue;
     }
+    relations[segments[0]!] = value.split(",").filter((field) => field !== "");
   }
+
   const raw = rawParams["fields"];
   if (raw === undefined || raw === null || raw === "") {
-    return { root: null, relations: {} };
+    return { root: null, relations };
   }
   if (typeof raw !== "string") {
     issues.push({
@@ -266,7 +328,7 @@ function parseFields<Entity>(
       code: "CRUDO_QUERY_INVALID_VALUE",
       detail: "'fields' must be a comma-separated field list.",
     });
-    return { root: null, relations: {} };
+    return { root: null, relations };
   }
   const root: FieldPath<Entity, 1>[] = [];
   for (const field of raw.split(",")) {
@@ -275,7 +337,7 @@ function parseFields<Entity>(
       root.push(field as FieldPath<Entity, 1>);
     }
   }
-  return { root, relations: {} };
+  return { root, relations };
 }
 
 function validateExpression<Entity>(

@@ -43,6 +43,29 @@ export function validateSettings(entityName: string, settings: CrudoSettings): v
 
   positiveInt("relations.maxIncludeDepth", settings.relations.maxIncludeDepth);
   positiveInt("relations.maxIncludedNodes", settings.relations.maxIncludedNodes);
+  for (const [name, edge] of Object.entries(settings.relations.edges)) {
+    const path = `relations.edges.${name}`;
+    if (typeof edge !== "object" || edge === null) {
+      throw new ConfigurationException(entityName, path, `expected an object, got ${JSON.stringify(edge)}`);
+    }
+    if (edge.includable !== undefined) bool(`${path}.includable`, edge.includable);
+    if (edge.defaultInclude !== undefined) bool(`${path}.defaultInclude`, edge.defaultInclude);
+    if (edge.maxDepth !== undefined) positiveInt(`${path}.maxDepth`, edge.maxDepth);
+    if (edge.strategy !== undefined && !["join", "batch", "auto"].includes(edge.strategy)) {
+      throw new ConfigurationException(
+        entityName,
+        `${path}.strategy`,
+        `expected "join", "batch", or "auto", got ${JSON.stringify(edge.strategy)}`,
+      );
+    }
+    if (edge.defaultInclude === true && edge.includable === false) {
+      throw new ConfigurationException(
+        entityName,
+        path,
+        "defaultInclude requires an includable relation — it would load a relation clients cannot ask for",
+      );
+    }
+  }
 
   if (settings.softDelete !== false) {
     if (
