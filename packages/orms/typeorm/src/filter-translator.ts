@@ -1,4 +1,4 @@
-import type { Filter, FilterCondition, FilterExpression, FilterScalar } from "@crudo/core";
+import type { Filter, FilterBuilder, FilterCondition, FilterExpression, FilterScalar } from "@crudo/core";
 import { Brackets, NotBrackets, type WhereExpressionBuilder } from "typeorm";
 import type { SelectQueryBuilder, ObjectLiteral } from "typeorm";
 
@@ -17,7 +17,7 @@ import type { SelectQueryBuilder, ObjectLiteral } from "typeorm";
  * an include join registered under the same alias is reused rather than
  * duplicated.
  */
-export class FilterTranslator<Entity extends ObjectLiteral> {
+export class FilterTranslator<Entity extends ObjectLiteral> implements FilterBuilder<Entity> {
   private parameterIndex = 0;
   private readonly joins = new Set<string>();
 
