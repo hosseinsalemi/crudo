@@ -249,7 +249,66 @@ _(Fill in as each phase completes — actual findings, not planned findings.)_
   Stale-doc note deferred to Phase 7: `architecture/01-system-architecture.md:83`
   and `architecture/03-core-contracts-and-type-system.md:114` still list
   `TransactionManager` as owned/implemented by `@crudo/typeorm`.
-- Phase 2:
+- Phase 2: Full-surface naming audit against every bullet of
+  `crudo-phases-v6.md`'s "Naming Conventions (normative)" section (lines 21–56,
+  re-read rather than recalled). **Result: zero violations — no renames made.**
+  Surfaces walked: all three barrels (`packages/core/src/index.ts` — 60+ named
+  exports, `packages/orms/typeorm/src/index.ts`, `packages/frameworks/nest/src/index.ts`),
+  plus the non-barrel public surface (every config key, every operation id,
+  every error code, the filter wire-token table, DTO class names in
+  `packages/examples/src`). Per rule:
+  - **Packages** — `@crudo/{core,typeorm,nest,examples}`, all lowercase. PASS.
+  - **DTO slots** — `DtoSlot` (`dto/dto.ts:16`) is exactly
+    `create|update|patch|query|item|list`; `OperationDtoMap` keys match; no
+    seventh slot added by restore or custom operations. PASS.
+  - **DTO classes** — examples define `CreateCatDto`/`UpdateCatDto` (verb-first
+    request bodies) and `CatItemDto`/`CatListDto` (entity-first response
+    shapes); same in the dog/owner modules and the nest/core test fixtures. PASS.
+  - **`Dto` suffix rule** — every wire-crossing shape carries it
+    (`ListResultDto`, `ListMetaDto`, `BulkResultDto`, `BulkItemFailureDto`,
+    `ProblemDetailsDto`, `QueryIssueDto`, `BulkItemIssueDto`); no behavioral
+    contract does (`DtoResolver`, `OperationDtoMap`, `CrudService`,
+    `RepositoryAdapter`, `OperationRegistry` — `Dto` appears only as a prefix or
+    mid-name, never a suffix). `QueryContext`, `IncludeRequest` and `Pagination`
+    are query-model types, not wire shapes, and are named as the spec's Phase 3
+    contract list requires. PASS.
+  - **Operations** — `StandardOperationId` (`operations/operation.ts`) is 13 ids,
+    every one camelCase with explicit cardinality; `STANDARD_OPERATIONS`,
+    `CrudService`/`DefaultCrudService` methods, and `STANDARD_ROUTES` in the Nest
+    decorator all use the identical id set, so config keys and method names can't
+    drift apart. "Bulk" appears only as feature term (`bulk` settings key,
+    `BulkResultDto`, `BulkSettings`, `BulkMode`, `BulkOperationException`) —
+    grep confirms zero `bulk`-prefixed methods. PASS.
+  - **Filter operators** — `FilterOperator` is 13 SCREAMING_SNAKE members;
+    `WIRE_OPERATORS` (`query/default-filter-parser.ts:15`) maps 13 camelCase
+    tokens onto them, matching Phase 5's table exactly (`notIn`, `isNull`,
+    `isNotNull` included). PASS.
+  - **Envelope fields** — `ListResultDto` is `items`/`limit`/`offset`/`total`/`meta`,
+    mirroring the wire pagination params. PASS.
+  - **Exceptions** — 11 `*Exception` classes, each with a `CRUDO_SNAKE_CASE`
+    code; all 15 catalog codes match `` `CRUDO_${string}` ``. PASS.
+  - **Factories** — `createCrudo`, `createCrud`, `createCrudContext`,
+    `createOperationRegistry`, `createTypeOrmInfrastructure`, `createTypeOrmCrudo`.
+    PASS. (Borderline, judged conforming, no change: `builtInHandlers` /
+    `builtInPaginationStrategies` construct values but name a *set of built-ins*
+    contrasted with user-supplied ones, which is the more informative name; the
+    rule targets composition-root factories and those all comply.)
+  - **Config keys** — every key in `CrudoSettings`, `EntityConfig`,
+    `OperationConfig`, `GlobalConfig`, `CrudoModuleOptions`, `CrudRouteOptions`
+    is camelCase; all 9 boolean keys are positively phrased (`count`,
+    `exposeInternals`, `includable`, `defaultInclude`, `enabled`, `withDeleted`,
+    `retryable`) — no `hide*`/`no*`/`disable*` anywhere. PASS.
+  - **No `I` prefix** — tree-wide grep for `interface I<Capital>` returns nothing. PASS.
+  - **Data access** — `EntityReader` + `EntityWriter`, `RepositoryAdapter`
+    extends both, adapter named `TypeOrmRepositoryAdapter`. PASS.
+  Two non-findings recorded so they aren't re-litigated: (a) Nest DI tokens
+  `CRUDO_INSTANCE`/`CRUDO_MODULE_OPTIONS` share the `CRUDO_` SCREAMING_SNAKE
+  prefix with error codes, but that rule is scoped to exception codes and
+  SCREAMING_SNAKE constants are conventional; (b) custom-operation route config
+  is `meta.routes` in code vs. a top-level `http` key in the spec's Phase 13
+  *example* — ADR-0007 explicitly rejected the top-level `http` field (it leaks
+  HTTP into core), so the code is correct and the example is the stale artifact.
+  Docs-only phase; `pnpm check` run to confirm the tree is green.
 - Phase 3:
 - Phase 4:
 - Phase 5:
