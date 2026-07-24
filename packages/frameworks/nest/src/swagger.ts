@@ -115,6 +115,35 @@ export function applySwaggerMetadata(
     }
   }
 
+  // Includes are documented from the entity config's relation allowlist —
+  // the only relation knowledge decoration time has (ADR-0012). `findOne`
+  // supports `include` with identical semantics, so it is documented too.
+  if (descriptor.id === "findMany" || descriptor.id === "findOne") {
+    const includable = includableRelations(config);
+    apply(
+      swagger.ApiQuery({
+        name: "include",
+        required: false,
+        type: String,
+        description:
+          includable.length === 0
+            ? "Relation paths to embed. No relation is includable on this entity."
+            : `Comma-separated relation paths to embed, dot-separated for nesting. ` +
+              `Includable: ${includable.join(", ")}.`,
+      }),
+    );
+    for (const relation of includable) {
+      apply(
+        swagger.ApiQuery({
+          name: `fields[${relation}]`,
+          required: false,
+          type: String,
+          description: `Sparse fieldset for the included '${relation}' node.`,
+        }),
+      );
+    }
+  }
+
   const bodyDto = bodyDtoFor(descriptor, config);
   if (bodyDto !== null) {
     apply(swagger.ApiBody(bodyOptionsFor(bodyDto)));
@@ -286,6 +315,16 @@ function schemaForHint(hint: SchemaHint): object {
         },
       };
   }
+}
+
+/** Relation names this entity's config opens to `include=` (Phase 15). */
+function includableRelations(config: EntityConfig<object> | undefined): readonly string[] {
+  const edges = (config as { relations?: { edges?: Record<string, { includable?: boolean }> } } | undefined)?.relations
+    ?.edges;
+  if (edges === undefined) return [];
+  return Object.entries(edges)
+    .filter(([, edge]) => edge.includable !== false)
+    .map(([name]) => name);
 }
 
 function bodyDtoFor(
