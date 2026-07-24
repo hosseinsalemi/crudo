@@ -309,7 +309,51 @@ _(Fill in as each phase completes — actual findings, not planned findings.)_
   *example* — ADR-0007 explicitly rejected the top-level `http` field (it leaks
   HTTP into core), so the code is correct and the example is the stale artifact.
   Docs-only phase; `pnpm check` run to confirm the tree is green.
-- Phase 3:
+- Phase 3: Docs-only, no code changed. **Placement decision: extended the
+  existing catalog at `architecture/01-system-architecture.md` §6 rather than
+  adding a `13-design-patterns.md`.** The phase's premise ("patterns are
+  implicit, spread across ADRs") turned out to be only half true — doc 01 §6
+  ("Design patterns, and why") already named 7 patterns with rationale and a
+  rejected-alternatives list, and `packages/docs/README.md:8` already advertises
+  doc 01 as the patterns doc. A new numbered file would have created a second,
+  competing catalog for the two to drift apart. What §6 genuinely lacked is what
+  the phase asked for: the implementation file per pattern and the motivating ADR.
+  Added both, verified against the code rather than the plan's list:
+  - Kept and located: **Template Method** (`crud-engine.ts` — noted that
+    variability is by injected collaborator, not subclass override; `run` is
+    private and nothing extends `CrudEngine`), **Strategy** (all 5 real
+    interface-backed seams named individually), **Registry** (ADR-0006, ADR-0007),
+    **Specification** (Filter AST — qualified: composition only, the AST is pure
+    data with no evaluation method), **Interpreter** (`FilterTranslator.toBrackets`),
+    **Dependency Injection**, **Facade** (`DefaultCrudService`).
+  - Added, both genuinely in use and both missing from §6: **Composition Root**
+    (`crudo.ts` + the two framework-layer roots) and **Adapter**
+    (`TypeOrmRepositoryAdapter` + the `CrudInfrastructure` metadata/adapter
+    family; ADR-0001, ADR-0011).
+  - Deliberately not added (would have inflated the catalog): `HARD_DELETE` as
+    Null Object (one constant is not a pattern in use), `WireQuery` as Marker
+    (too small), TS module augmentation as Extension Object (a language
+    mechanism, already covered by ADR-0007).
+  - Cross-linked doc 07 §4's shorter per-doc pattern list to doc 01 §6 so the
+    two can't silently diverge. README already reaches §6, so no index change.
+  **Phase 3a proposed (found, flagged, NOT fixed): the Strategy pattern is
+  applied inconsistently in the query subsystem.** `CrudEngineDependencies`
+  (`packages/core/src/engine/crud-engine.ts:31-39`) types every collaborator as a
+  core-declared interface — `Serializer`, `Deserializer`, `ErrorHandler`,
+  `OperationRegistry` — except `normalizer`, which is typed as the **concrete**
+  `QueryNormalizer` class (line 37). There is no `QueryNormalizer` contract in
+  core. Relatedly, core declares and exports a `FilterParser` interface
+  (`query/filter-parser.ts`) that `DefaultFilterParser` correctly implements, but
+  `QueryNormalizer` hard-instantiates `new DefaultFilterParser(metadata)` in its
+  constructor (`query/query-normalizer.ts:31,38`), so that declared seam is not an
+  injection point either — the same "declared contract, never wired" shape Phase 1
+  found in `FilterBuilder`. Within the same subsystem, `PaginationStrategy` and
+  `IncludeResolver` *are* injected as interfaces, which is what makes this an
+  inconsistency rather than a uniform choice. Not fixed here: it changes a public
+  type (`CrudEngineDependencies`) and needs the coordinator's call on whether the
+  normalizer is meant to be swappable at all.
+  Also noted for Phase 7 (not fixed, out of scope): doc 01 §9's ADR index stops at
+  0010 and is missing ADR-0011 through 0014, two of which §6 now cites.
 - Phase 4:
 - Phase 5:
 - Phase 6:
