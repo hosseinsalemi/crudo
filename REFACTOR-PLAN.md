@@ -229,7 +229,26 @@ changed, only dead surface removed/documented and drift corrected.
 
 _(Fill in as each phase completes — actual findings, not planned findings.)_
 
-- Phase 1:
+- Phase 1: Both findings confirmed by audit and closed. (1) `FilterBuilder`
+  had no implementer or consumer anywhere in the tree, but it is a **required
+  Phase 3 contract** in `crudo-phases-v6.md` (lines 196, 341), so deleting it
+  would have been a spec deviation. Instead adjusted the interface to the real
+  shape — dropped the unused `Target`/`CrudContext` parameters, leaving
+  `apply(filter): void` — and made `FilterTranslator` (`@crudo/typeorm`)
+  declare `implements FilterBuilder<Entity>`. Type-only change; the doc comment
+  now records WHY the target is constructor-bound (stateful parameter naming
+  and join aliases). Corrected `packages/orms/typeorm/README.md`, which claimed
+  the adapter implements `TransactionManager`. (2) `TransactionManager` /
+  `TransactionOptions` / `TransactionPropagation` are unimplemented and
+  unreferenced; kept, with an `@remarks` at the definition site explaining the
+  status. Verified against the spec: v6 has **no** transaction phase — the only
+  binder is bulk `atomic` mode's adapter-level `runInTransaction` hook (Phase
+  9/10 "Transactions, scoped down"; Phase 14 makes bulk optional and this build
+  dropped it). `TransactionContext` is live and was left alone. No ADR discusses
+  transactions beyond ADR-0001's contract inventory, so no ADR was touched.
+  Stale-doc note deferred to Phase 7: `architecture/01-system-architecture.md:83`
+  and `architecture/03-core-contracts-and-type-system.md:114` still list
+  `TransactionManager` as owned/implemented by `@crudo/typeorm`.
 - Phase 2:
 - Phase 3:
 - Phase 4:
