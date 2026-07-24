@@ -36,7 +36,7 @@ export interface CrudContext<Entity = unknown> {
    * handlers; core never inspects it (v6 ships no policy layer).
    */
   readonly principal: unknown;
-  /** Active transaction, if any (Phase 13); `null` outside transactions. */
+  /** Active transaction, if any; `null` outside transactions. */
   readonly transaction: TransactionContext | null;
   /** Parsed, validated query — read operations only; `null` for writes. */
   readonly query: NormalizedQueryContext<Entity> | null;

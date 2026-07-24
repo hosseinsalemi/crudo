@@ -4,7 +4,7 @@ import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
 
 /**
  * Turns parsed `include=` dot-paths into a validated {@link IncludeTree}
- * (Phase 16): every edge is checked against the relation registry (unknown
+ * (Phase 15): every edge is checked against the relation registry (unknown
  * or non-includable → `QueryValidationException`, never silently dropped),
  * depth and node-count limits are enforced, and per-node sparse fieldsets
  * are attached. Depth is the cycle guard — the same entity type may repeat

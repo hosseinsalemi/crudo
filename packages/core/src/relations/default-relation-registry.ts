@@ -3,8 +3,8 @@ import type { RelationRegistry } from "./relation-registry.js";
 
 /**
  * Map-backed relation registry, populated from adapter metadata at
- * bootstrap. Milestone B only carries it (includes land in Phase 16), but
- * the registry existing now is what makes Phase 16 additive.
+ * bootstrap. Milestone B only carries it (includes land in Phase 15), but
+ * the registry existing now is what makes Phase 15 additive.
  */
 export class DefaultRelationRegistry<Entity = unknown> implements RelationRegistry<Entity> {
   private readonly relations: ReadonlyMap<string, RelationDescriptor>;

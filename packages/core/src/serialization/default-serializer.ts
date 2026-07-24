@@ -12,7 +12,7 @@ import { dtoShapeKeys } from "../dto/dto-shape.js";
  * Projection sources, in order:
  * 1. An explicit DTO class with initialized fields → its key set.
  * 2. Otherwise the entity-derived default: every scalar column from
- *    adapter metadata (relations are excluded until Phase 16 includes
+ *    adapter metadata (relations are excluded until Phase 15 includes
  *    them deliberately).
  */
 export class DefaultSerializer<Entity = unknown> implements Serializer<Entity> {

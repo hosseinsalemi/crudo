@@ -20,7 +20,7 @@ crudo/
    ├─ frameworks/
    │  └─ nest/                # @crudo/nest (scaffold until Phase 12)
    │     └─ src/index.ts
-   ├─ examples/               # Phase 18 reference application (empty)
+   ├─ examples/               # Phase 17 reference application (empty)
    └─ docs/                   # this documentation
 ```
 
@@ -68,7 +68,7 @@ incremental, dependency-ordered, cached builds natively. A task runner
 (turborepo/nx) would add a second place where the graph is declared, a
 cache layer duplicating `.tsbuildinfo`, and config to keep honest, while
 buying nothing at this scale. Revisit only if the workspace gains many
-packages or expensive non-tsc pipelines (Phase 18's e2e suite is the
+packages or expensive non-tsc pipelines (Phase 17's e2e suite is the
 natural checkpoint).
 
 Root scripts: `build` (`tsc -b`), `clean`, `depcruise`, and `check`
@@ -85,8 +85,8 @@ Each package's `exports` map exposes **only the barrel**:
 No subpath exports; deep imports are not API and Node will refuse them at
 runtime once published. Core's barrel is an explicit named list
 (ADR-0010) so the public surface only changes on purpose — it is the
-input to the Phase 19 api-extractor gate. Milestone A ships ESM only;
-dual ESM+CJS output is Phase 19's deliverable.
+input to the Phase 18 api-extractor gate. Milestone A ships ESM only;
+dual ESM+CJS output is Phase 18's deliverable.
 
 ## 6. Build strategy
 
@@ -104,9 +104,9 @@ change almost always touches an edge package, and a single version answers
 "which adapter works with which core" permanently. Cost: occasional no-op
 version bumps for an untouched package — accepted as trivially cheap next
 to cross-package version-matrix support. Release mechanics (changesets,
-publish order) are Phase 19.
+publish order) are Phase 18.
 
-## 8. Dependency classification (decided now, executed in Phase 19)
+## 8. Dependency classification (decided now, executed in Phase 18)
 
 | Package          | `dependencies` | `peerDependencies`                                              |
 | ---------------- | -------------- | --------------------------------------------------------------- |

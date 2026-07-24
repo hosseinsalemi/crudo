@@ -21,7 +21,7 @@ export function coerceScalar(
 ): FilterScalar | QueryIssueDto {
   // Relation paths and unknown-but-allowlisted fields have no local column
   // metadata in Milestone B; their values pass through as strings and the
-  // database compares them (Phase 16 wires target-entity metadata).
+  // database compares them (Phase 15 wires target-entity metadata).
   if (metadata === undefined) return String(raw);
 
   if (raw === null || raw === "null") {

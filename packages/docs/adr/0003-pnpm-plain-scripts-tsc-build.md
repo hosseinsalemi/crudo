@@ -23,5 +23,5 @@ cruiser — the CI gate.
 - No remote caching or parallel non-tsc pipelines — irrelevant at three
   type-only/type-heavy packages.
 - Revisit when the workspace gains many packages or expensive non-tsc
-  steps (Phase 18 e2e is the checkpoint); adopting a runner later is
+  steps (Phase 17 e2e is the checkpoint); adopting a runner later is
   additive since scripts stay per-package.

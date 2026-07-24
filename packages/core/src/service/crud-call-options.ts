@@ -8,7 +8,7 @@ import type { TransactionContext } from "../persistence/transaction-manager.js";
  * after bootstrap and there is no runtime mutation API.
  */
 export interface CrudCallOptions {
-  /** Join an existing transaction (Phase 13's `{ ctx }` parameter). */
+  /** Join an existing transaction (the explicit `{ ctx }` parameter). */
   readonly transaction?: TransactionContext;
   /** Caller identity to expose on `CrudContext.principal`. */
   readonly principal?: unknown;

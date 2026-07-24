@@ -34,6 +34,6 @@ export interface ProblemDetailsDto {
   readonly code: CrudoErrorCode;
   /** Crudo extension: field-level query issues (400s from Phase 5). */
   readonly errors?: readonly QueryIssueDto[];
-  /** Crudo extension: per-index bulk failures (Phase 15). */
+  /** Crudo extension: per-index bulk failures (Phase 14). */
   readonly items?: readonly BulkItemIssueDto[];
 }

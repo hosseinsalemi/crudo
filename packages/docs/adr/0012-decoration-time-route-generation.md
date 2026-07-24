@@ -35,4 +35,4 @@ property injection.
   time.
 - Limitation: decoration time has no ORM metadata, so Swagger docs can't
   enumerate allowlist-derived per-field query params yet (doc 10 §4);
-  acceptable for Milestone B, revisited in Phase 17.
+  acceptable for Milestone B, revisited in Phase 16.

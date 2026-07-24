@@ -3,7 +3,7 @@ import type { ClassRef } from "../types/utility.js";
 export type RelationCardinality = "one" | "many";
 
 /**
- * How an included relation is loaded (Phase 16):
+ * How an included relation is loaded (Phase 15):
  * - `join`  — single query with joins; correct default for to-one.
  * - `batch` — per-level `WHERE parentId IN (…)` queries stitched in
  *   memory; correct default for to-many (avoids row explosion and the

@@ -8,7 +8,7 @@ export interface BulkItemFailureDto {
 }
 
 /**
- * Envelope for `*Many` batch operations (Phase 15, if bulk is built;
+ * Envelope for `*Many` batch operations (Phase 14, if bulk is built;
  * reserved otherwise). Under `atomic` mode a batch either fully succeeds
  * or the whole request fails with a `BulkOperationException` — `failed` is
  * only ever populated under `bestEffort` mode.

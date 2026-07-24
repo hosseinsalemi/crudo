@@ -16,7 +16,7 @@ export interface FieldSelection<Entity = unknown> {
   /**
    * Per-included-relation fieldsets, keyed by relation path as it appeared
    * on the wire (`fields[posts]=…`). Validated against the *target*
-   * entity's selectable allowlist (Phase 16).
+   * entity's selectable allowlist (Phase 15).
    */
   readonly relations: Readonly<Record<string, readonly string[]>>;
 }

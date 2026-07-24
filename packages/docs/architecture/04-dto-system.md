@@ -16,7 +16,7 @@ docs** — there is no validation subsystem attached to them.
 | `item`   | Any single-resource response          | Entity, subject to field selection                               |
 | `list`   | Element type in `ListResultDto.items` | Same as `item`'s resolved type                                   |
 
-Restore (Phase 15) and custom operations (Phase 14) reuse `item`/`list`;
+Restore (Phase 14) and custom operations (Phase 13) reuse `item`/`list`;
 no additional slots exist.
 
 ## 2. Resolution algorithm
@@ -35,7 +35,7 @@ The metadata seam (`EntityMetadata`, doc 09 §1) supplies the field list
 the defaults derive from:
 
 - **Readable projection** (`item`/`list` default): every scalar column.
-  Relation properties are excluded until Phase 16 includes them
+  Relation properties are excluded until Phase 15 includes them
   deliberately; getters/methods never appear (they are not columns).
 - **Writable projection** (`create`/`update`/`patch` default): every
   scalar column with `generated: false`. Generated columns (auto ids,
@@ -73,7 +73,7 @@ narrow what the resolved DTO exposes — selection never widens a
 projection. Implemented in `DefaultSerializer.serializeItem`:
 projection ∩ selection, applied to every item and list element.
 
-## 6. Included relations (Phase 16 rule, fixed now)
+## 6. Included relations (Phase 15 rule, fixed now)
 
 When a response embeds an included relation, the node's shape resolves
 from the **target entity's own registered `item`/`list` DTOs** when that

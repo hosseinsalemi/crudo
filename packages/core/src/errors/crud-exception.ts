@@ -3,7 +3,7 @@ import type { OperationId } from "../operations/operation.js";
 /**
  * Stable, string-based error code. Codes are API surface: the full catalog
  * (code → HTTP status → when it fires → payload extensions) is defined in
- * Phase 6, and renaming a code is a breaking change (Phase 19 semver
+ * Phase 6, and renaming a code is a breaking change (Phase 18 semver
  * policy).
  */
 export type CrudoErrorCode = `CRUDO_${string}`;

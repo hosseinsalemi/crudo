@@ -21,9 +21,9 @@ export interface QueryContext<Entity = unknown> {
   readonly offset?: number;
   /** Sparse fieldsets; a bare array is sugar for root-only selection. */
   readonly fields?: Partial<FieldSelection<Entity>>;
-  /** Relation include paths (`['profile', 'posts.comments']`) — Phase 16. */
+  /** Relation include paths (`['profile', 'posts.comments']`) — Phase 15. */
   readonly include?: readonly string[];
-  /** Include soft-deleted rows — Phase 15. */
+  /** Include soft-deleted rows — Phase 14. */
   readonly withDeleted?: boolean;
 }
 

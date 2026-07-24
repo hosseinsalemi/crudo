@@ -12,7 +12,7 @@ import type { SelectQueryBuilder, ObjectLiteral } from "typeorm";
  *
  * Relation-path conditions (`profile.city`) add a **non-selecting** left
  * join per path segment: they restrict root rows, they never load the
- * relation (loading is Phase 16's). Join aliases are deterministic
+ * relation (loading is Phase 15's). Join aliases are deterministic
  * (`root__profile`), so repeated paths reuse one join.
  */
 export class FilterTranslator<Entity extends ObjectLiteral> {

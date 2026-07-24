@@ -1,7 +1,7 @@
 import type { RelationDescriptor } from "./relation-descriptor.js";
 
 /**
- * Per-entity registry of relation edges (Phase 16). Selectable/filterable/
+ * Per-entity registry of relation edges (Phase 15). Selectable/filterable/
  * sortable fields of an included node come from the *target* entity's own
  * config — a relation never widens what its target exposes.
  */

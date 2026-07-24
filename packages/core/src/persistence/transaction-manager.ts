@@ -1,5 +1,5 @@
 /**
- * Transaction propagation modes (Phase 13):
+ * Transaction propagation modes:
  * - `required`    — join the ambient transaction, else start one (default).
  * - `requiresNew` — always start a new transaction.
  * - `never`       — fail if a transaction is active.
@@ -27,7 +27,7 @@ export interface TransactionOptions {
 }
 
 /**
- * Runs work inside a transaction (implemented by adapters, Phase 13).
+ * Runs work inside a transaction (implemented by adapters).
  * Commit on resolve, rollback on reject — no partial outcomes.
  */
 export interface TransactionManager {
