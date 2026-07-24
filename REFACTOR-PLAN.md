@@ -437,6 +437,57 @@ _(Fill in as each phase completes — actual findings, not planned findings.)_
     a comment saying why. Collapsing them would erase the distinctions the tests
     exist to make. Likewise `server()` (2 lines) in the two e2e suites.
   Test count unchanged at 166/166.
-- Phase 6:
+- Phase 6: Rules verified **by construction**, not by assumption — 16 probes,
+  each injecting one illegal import, running `depcruise`, and reverting. Found
+  and closed a real gap: **the two most important rules were not firing on the
+  spelling anyone would actually write.**
+  - **Root cause.** Workspace package specifiers are `couldNotResolve: true` to
+    dependency-cruiser (verified via `--output-type json`), so every
+    `to: { path: "^packages/..." }` rule could only ever match a *relative* deep
+    path. `import { x } from "@crudo/nest"` inside `@crudo/typeorm` — the natural
+    spelling of the forbidden adapter→framework edge — passed `pnpm depcruise`
+    clean. Same for `@crudo/nest` → `@crudo/typeorm`. Tried fixing resolution
+    with `enhancedResolveOptions` (exportsFields/conditionNames/mainFields); it
+    resolved nothing extra and *dropped* 5 modules, so it was abandoned in favor
+    of matching the raw specifier, which the JSON output confirms is what
+    `to.path` holds for an unresolved dependency.
+  - **Why the backstop wasn't one.** `tsc -b` does reject those imports (TS2307),
+    but only because the package isn't in that package's `package.json` — i.e.
+    it fails for a reason the offender removes as their next step. Add
+    `@crudo/nest` to `@crudo/typeorm`'s dependencies and tsc goes quiet while
+    depcruise stays silent. That is the hole.
+  - **Fixed (3 rules, additive — nothing loosened):** `typeorm-only-imports-core`
+    → `^(packages/frameworks|@crudo/nest)`; `nest-only-imports-core` →
+    `^(packages/orms|@crudo/typeorm)`; `no-cross-package-deep-imports-core` →
+    `^(packages/core/src/.+|@crudo/core/.+)` with `packages/examples` added to
+    `from` (it was in no rule's scope at all, and it is the reference app).
+    Comments now cite ADR-0002 and ADR-0010.
+  - **Verified CAUGHT after the change:** core → npm package (runtime *and*
+    type-only), core → `@crudo/nest` by name, core → any package's src, typeorm →
+    `@crudo/nest` by name, nest → `@crudo/typeorm` by name, typeorm/nest → core
+    src (relative), typeorm/nest → `@crudo/core/<subpath>`, examples → core src.
+    Clean tree still 102 modules / 401 dependencies, zero false positives.
+  - **One spelling still uncatchable, and that is fine:** `@crudo/core/dist/...`
+    is swallowed by the `/dist/` exclusion. Tightening that pattern was tried and
+    rejected (it pulled a dist module into the graph and still didn't catch it).
+    It needs no rule: core's `package.json` `exports` map publishes only `"."`, so
+    under Node16 resolution *every* subpath is TS2307 — and unlike the cases
+    above, that failure is structural and cannot be silenced by adding a
+    dependency. ADR-0010's barrel is enforced by the exports map; depcruise is the
+    second line.
+  - **`/tests/` exclusion — recommendation, NOT actioned (coordinator's call).**
+    Measured it: removing `/tests/` from the exclusion fails immediately with
+    **10 errors**, all `core-imports-nothing` on core's own test files importing
+    `@crudo/core`. That is not drift — it is the rules' `from: "^packages/core"`
+    scope catching `packages/core/tests/`, which legitimately imports the barrel
+    (and vitest). So enabling test cruising is not a one-line flip: it requires
+    re-scoping every rule's `from` to `/src` first, then adding a tests-specific
+    rule (the `from`-group back-reference recipe: a test file may import its own
+    package and the `@crudo/*` barrels, never another package's `src`/`tests`).
+    **Recommendation: do it, as its own change.** The benefit is concrete — it is
+    the last unenforced boundary, and it would have mechanically caught the
+    cross-package fixture import declined in Phase 5. The cost is bounded and
+    mechanical. Not done here because it touches every rule and would change what
+    CI enforces.
 - Phase 7:
 - Phase 8:
