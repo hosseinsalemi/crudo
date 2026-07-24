@@ -13,6 +13,29 @@ against an authoritative spec with an ADR for every load-bearing decision,
 which is precisely the discipline that prevents the drift a refactor
 normally exists to undo.
 
+> **Corrected in Phase 8 — the premise above was half right.** The
+> _source code_ was clean, and stayed clean: after eight phases the entire
+> production-source diff is four hunks of comments plus one type-only
+> interface signature. But "clean code" was measured by reading code, and
+> two things that are not code turned out not to be clean at all:
+>
+> - **The enforcement was not enforcing.** Phase 6 found that
+>   `.dependency-cruiser.cjs` never matched a workspace package specifier,
+>   so the forbidden `@crudo/typeorm → @crudo/nest` edge passed CI when
+>   written the way anyone would actually write it. `pnpm depcruise` was
+>   green because it was not looking, and Phase 6a found `tests/` excluded
+>   from cruising entirely.
+> - **The docs had drifted.** Phase 7 found nine architecture docs stale,
+>   including a section listing soft delete and includes as unbuilt while
+>   two earlier sections of the same file documented them working, and a
+>   code example citing a file that does not exist.
+>
+> The lesson worth keeping: a spec-and-ADR-driven codebase does prevent
+> source drift, but it does not protect the artifacts _around_ the source —
+> CI rules and prose — and those were exactly where a green build hid the
+> problem. An audit that only reads code would have closed this plan at
+> Phase 5 with nothing found.
+
 So this plan is **not** a rewrite. It is a short list of genuine, narrow
 findings, plus a few phases that pull forward and formalize work the spec
 already schedules (Phase 16's naming audit) rather than inventing busywork
@@ -248,7 +271,8 @@ _(Fill in as each phase completes — actual findings, not planned findings.)_
   transactions beyond ADR-0001's contract inventory, so no ADR was touched.
   Stale-doc note deferred to Phase 7: `architecture/01-system-architecture.md:83`
   and `architecture/03-core-contracts-and-type-system.md:114` still list
-  `TransactionManager` as owned/implemented by `@crudo/typeorm`.
+  `TransactionManager` as owned/implemented by `@crudo/typeorm`. **(Both fixed in
+  Phase 7.)**
 - Phase 2: Full-surface naming audit against every bullet of
   `crudo-phases-v6.md`'s "Naming Conventions (normative)" section (lines 21–56,
   re-read rather than recalled). **Result: zero violations — no renames made.**
@@ -357,7 +381,8 @@ _(Fill in as each phase completes — actual findings, not planned findings.)_
     surface is being revised anyway and a `CrudEngineDependencies` change costs
     nothing extra. The finding stands as recorded above.
     Also noted for Phase 7 (not fixed, out of scope): doc 01 §9's ADR index stops at
-    0010 and is missing ADR-0011 through 0014, two of which §6 now cites.
+    0010 and is missing ADR-0011 through 0014, two of which §6 now cites. **(Fixed
+    in Phase 7.)**
 - Phase 4: Mixed outcome, comments only — not one executable line moved.
   Reading the two blocks side by side turned up something the plan didn't
   predict: **the class doc's stage order was factually wrong.** It listed
@@ -432,7 +457,10 @@ field selection)`. The first three restate the call directly beneath them;
     package is disproportionate. Worth flagging separately: `.dependency-cruiser.cjs`
     excludes `/tests/` from cruising entirely, so such an import would **not** fail
     `pnpm depcruise` — the boundary is convention-only inside `tests/`. Reported to
-    the coordinator rather than actioned.
+    the coordinator rather than actioned. **(Phase 6a closed the enforcement gap:
+    that import now errors under `tests-no-other-package-internals`. The
+    duplication itself remains, still by choice — the rule is what makes the choice
+    stick.)**
   - **Judged not-duplication:** the three core in-memory adapters
     (`InMemoryUserAdapter`, `InMemoryAccountAdapter`, `SeededAdapter`) share
     row-array mechanics but diverge exactly where each test needs it — User
@@ -479,7 +507,8 @@ field selection)`. The first three restate the call directly beneath them;
     above, that failure is structural and cannot be silenced by adding a
     dependency. ADR-0010's barrel is enforced by the exports map; depcruise is the
     second line.
-  - **`/tests/` exclusion — recommendation, NOT actioned (coordinator's call).**
+  - **`/tests/` exclusion — recommendation, NOT actioned here; approved and done
+    as Phase 6a.**
     Measured it: removing `/tests/` from the exclusion fails immediately with
     **10 errors**, all `core-imports-nothing` on core's own test files importing
     `@crudo/core`. That is not drift — it is the rules' `from: "^packages/core"`
@@ -509,7 +538,8 @@ field selection)`. The first three restate the call directly beneath them;
     captured in `from.path` and excluded from `to` via `pathNot: "^$1/"`, so
     same-package imports stay legal without enumerating them. Cites ADR-0002.
   - **`core-tests-know-no-adapter`** — added beyond the approved three-point
-    shape, because scoping `core-imports-nothing` to `/src` would otherwise have
+    shape (flagged as such, and kept on review), because scoping
+    `core-imports-nothing` to `/src` would otherwise have
     left core's _tests_ free to import `@crudo/typeorm`. Core must not know an ORM
     exists, and its suite proves that by running the engine against an in-memory
     fake; this keeps the part that still matters enforced (ADR-0005, ADR-0001)
@@ -600,4 +630,93 @@ false`, but ADR-0007 explicitly rejected a top-level `http` field (it leaks
     HTTP into core) in favor of `meta.routes`, and Phase 3's own text describes
     the opaque `meta` slot. Code and all architecture docs follow the ADR; the
     spec example is the outlier. Candidate for an erratum — the user's call.
-- Phase 8:
+- Phase 8: Final gate. `pnpm check` green — `tsc -b` clean, depcruise
+  `✔ no dependency violations found (120 modules, 452 dependencies cruised)`,
+  **166/166 tests, the same count the refactor started with.**
+  - **The refactor kept its word: no behavior changed.** The complete
+    production-source diff across all eight phases (`git diff f70c1d5..HEAD --
+packages/*/src`) is four hunks in three files. Filtering that diff for lines
+    that are neither comments nor blank leaves exactly six: the `FilterBuilder`
+    interface signature and its dropped `CrudContext` import, the added
+    `import type { FilterBuilder }`, and the `implements FilterBuilder<Entity>`
+    clause. Every one of those is `interface` / `import type` / `implements` —
+    constructs that erase at compile time. **Not a single runtime line moved in
+    `packages/*/src` across the whole refactor.**
+  - **File-to-phase mapping — 19 of 20 files trace.** Phase 1:
+    `core/src/query/filter-builder.ts`, `orms/typeorm/src/filter-translator.ts`,
+    `core/src/persistence/transaction-manager.ts`, `orms/typeorm/README.md`.
+    Phase 3: `docs/architecture/01`, `07`. Phase 4:
+    `core/src/engine/crud-engine.ts`. Phase 5: `core/tests/filter-parser.spec.ts`,
+    `core/tests/query-normalizer.spec.ts`, `core/tests/support/query-issues.ts`
+    (new). Phases 6 + 6a: `.dependency-cruiser.cjs`. Phase 7:
+    `docs/architecture/01, 02, 03, 05, 06, 07, 09, 10, 11`. Phases 1–8:
+    `REFACTOR-PLAN.md`.
+  - **One file does not trace: `.claude/agents/test-writer.md`** (+74 lines),
+    added by commit `0e17a24` "chore(agents): add a test-writer subagent" — a
+    commit outside the refactor's own sequence and unrelated to any phase. Not
+    written by this refactor; reported rather than reverted, since the commit is
+    already in history and removing it is the maintainer's call.
+  - **Pre-existing flake found, not caused here.** The first `pnpm check` of this
+    phase failed one test — `examples/tests/app.e2e.spec.ts` "embeds relations
+    both ways", `POST /cats` returning 302 instead of 201. It is intermittent: the
+    file passes 18/18 in isolation, and the full suite passed 5/5 on retry. It was
+    then **reproduced on the pre-refactor tree** (a detached worktree at `f70c1d5`,
+    the refactor's starting commit): 2 failures in 12 full-suite runs, versus 1 in
+    ~20 on `HEAD`. Combined with the proof above that no runtime line changed, the
+    flake is pre-existing and independent of this work. It is a real defect and is
+    carried to Open items — a suite that fails ~1 run in 10 will eventually be
+    "fixed" by someone re-running CI, which is worse than a red build.
+  - Changelog entries re-read against the commits and corrected where later phases
+    overtook them (Phase 1's and Phase 3's deferrals to Phase 7 now record that
+    Phase 7 fixed them; Phase 5's boundary note records that Phase 6a made it
+    enforced; Phase 6's `/tests/` recommendation records that it became Phase 6a).
+    The plan's opening premise was also corrected — see the Phase 8 note under
+    "Starting point", which records that "the codebase is clean" held for the
+    source and not for the CI rules or the docs.
+
+---
+
+## Open items (carried past this plan)
+
+This file goes quiet after Phase 8. These four survive it.
+
+1. **Phase 3a — Strategy applied inconsistently in the query subsystem.**
+   `CrudEngineDependencies` types `normalizer` as the concrete `QueryNormalizer`
+   while every sibling collaborator is a core-declared interface, and the exported
+   `FilterParser` contract is hard-instantiated inside `QueryNormalizer` rather
+   than injected. **Deferred past Phase 8 by the user**, to be revisited alongside
+   Phase 16's DX API work, when the public surface is being revised anyway. Full
+   finding in the Phase 3 entry.
+2. **Relation-path filter values are never coerced.** `DefaultFilterParser` builds
+   its field map from the **root** entity's columns only, so
+   `filter[profile.city][eq]=…` passes through as a string — no target-entity
+   metadata, no numeric/date/enum coercion, no allowlist-driven kind check. Doc 05
+   promised Phase 15 would wire this; Phase 15 shipped without it. Phase 7
+   corrected the doc to describe what the code does. **This is a real behavior gap,
+   not doc drift** — deciding whether relation-path filters should coerce (and what
+   a mismatch should return) is a feature decision, deliberately left open.
+3. **`T`-prefixed type parameters in doc 03 (ambiguous — both readings recorded).**
+   Doc 03 §1–§2 name the generics `TEntity`, `TCreateDto`, …,
+   `FieldPath<TEntity, TMaxDepth>`; the code uses `Entity`, `CreateDto`, …,
+   `FieldPath<Entity, MaxDepth>`. ADR-0006 and ADR-0008 carry the same prefix.
+   Reading A: real drift from a `T`-prefix removal the docs never followed —
+   fix the docs. Reading B: `T*` is expository placeholder notation — fix nothing.
+   A third option, renaming the code's parameters, was out of Phase 7's scope.
+   The spec's Naming Conventions section is silent on type-parameter naming, so
+   nothing is in violation either way.
+4. **Spec erratum candidate — `crudo-phases-v6.md:847-853`.** The spec's Phase 13
+   example gives custom operations a top-level `http: { method, path }` /
+   `http: false`. ADR-0007 explicitly rejected a top-level `http` field (it leaks
+   HTTP into core) in favor of `meta.routes`, which is what the code and every
+   architecture doc use — and the spec's own Phase 3 text describes the opaque
+   `meta` slot. The spec is the outlier. **The spec is authoritative and was not
+   edited: this is the user's call.**
+5. **Flaky e2e test (found in Phase 8, pre-existing).**
+   `packages/examples/tests/app.e2e.spec.ts` → "embeds relations both ways: a
+   joined owner and batched pets (Phase 15)" intermittently gets `302` instead of
+   `201` from `POST /cats`, roughly 1 run in 10 of the full suite, never in
+   isolation. Reproduced at `f70c1d5` (pre-refactor), so it is not this work.
+   Undiagnosed: a 302 from a `POST` points at something outside the route handler
+   (Express/Nest middleware or Swagger's UI redirect), not at the CRUD pipeline.
+   Worth a real fix rather than a retry, since an intermittently red suite trains
+   people to re-run CI.
