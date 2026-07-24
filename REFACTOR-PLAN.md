@@ -387,7 +387,56 @@ _(Fill in as each phase completes — actual findings, not planned findings.)_
   Net: the pipeline shape is documented once (class doc), each surviving inline
   comment carries only WHY, and the one genuine constraint the numbering hid is
   now stated in prose.
-- Phase 5:
+- Phase 5: Full pass over all 15 test files (3,112 lines, 4 locations — the
+  three named plus `packages/examples/tests/`). **Verdict: conventions are
+  consistent and every cross-package difference is layer-justified.** One real
+  in-package duplication found and fixed; one cross-package duplication found
+  and deliberately left alone.
+  - **Per-package conventions, each internally consistent.** Core: no
+    `beforeEach` anywhere — every spec builds its subject through a local
+    `makeX()` factory (`makeCrud`, `makeAccountCrud`, `blog`), with entities and
+    fakes imported from `tests/support/*-fixture.ts`. TypeORM: all three specs use
+    the identical `beforeAll` (new `DataSource` → `initialize`) / `afterAll`
+    (`destroy`) / `beforeEach` (`clear()` repos in FK-safe child-before-parent
+    order) triple, entities declared inline per spec with explicit column types.
+    Nest: a module-level `bootstrap(controller)` + `afterEach(app.close)`, with a
+    fresh Testing module per `describe`. Examples: one `beforeAll`/`afterAll` app.
+  - **Differences checked, all forced by the layer.** Core has no `beforeEach`
+    because it has no external resource to reset — its factories are pure, so
+    per-test isolation comes free; TypeORM needs `beforeEach` truncation because a
+    shared in-memory SQLite connection carries rows between tests. Nest builds per
+    `describe` rather than once because `@Crud` generates routes at *decoration*
+    time (ADR-0012), so each `describe`'s controller/config combination needs its
+    own module; Examples can use `beforeAll` because it boots one fixed
+    `AppModule`. TypeORM declares entities inline rather than in `support/`
+    because each spec needs a *different* schema shape (unique index, relations,
+    `@DeleteDateColumn` vs. config-named marker) and `synchronize: true` builds it
+    per file. None of these is arbitrary.
+  - **Fixed (real, mechanical, same package):** `issuesOf` — 9 byte-identical
+    lines unwrapping a `QueryValidationException` — was duplicated in
+    `core/tests/filter-parser.spec.ts` and `core/tests/query-normalizer.spec.ts`.
+    Exactly 2 call sites, same package, solving the same problem, and
+    `tests/support/` already existed as the home, so extraction cost no boundary
+    and no new concept. Now `core/tests/support/query-issues.ts`.
+  - **Found but NOT extracted (boundary beats DRY):** `InMemoryTodoAdapter`
+    (`nest/tests/support/fake-infrastructure.ts`) and `InMemoryAccountAdapter`
+    (`core/tests/support/account-fixture.ts`) share ~40 lines of near-identical
+    soft-delete fake (`visible`/`delete`/`restore`/`purge`/`require`). This is
+    genuine duplication, not similar-looking code — but any shared home is worse
+    than the duplication: `@crudo/nest` importing `packages/core/tests/...` is a
+    deep cross-package import the architecture forbids, and a new shared test
+    package is disproportionate. Worth flagging separately: `.dependency-cruiser.cjs`
+    excludes `/tests/` from cruising entirely, so such an import would **not** fail
+    `pnpm depcruise` — the boundary is convention-only inside `tests/`. Reported to
+    the coordinator rather than actioned.
+  - **Judged not-duplication:** the three core in-memory adapters
+    (`InMemoryUserAdapter`, `InMemoryAccountAdapter`, `SeededAdapter`) share
+    row-array mechanics but diverge exactly where each test needs it — User
+    deliberately skips filter evaluation, Account reads `context.config.softDelete`
+    rather than deciding for itself, Seeded returns pre-stitched rows. Each carries
+    a comment saying why. Collapsing them would erase the distinctions the tests
+    exist to make. Likewise `server()` (2 lines) in the two e2e suites.
+  Test count unchanged at 166/166.
 - Phase 6:
 - Phase 7:
 - Phase 8:
