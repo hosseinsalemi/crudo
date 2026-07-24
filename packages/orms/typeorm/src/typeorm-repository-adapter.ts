@@ -2,6 +2,8 @@ import type {
   ClassRef,
   CrudContext,
   EntityId,
+  IncludeNode,
+  IncludeTree,
   NormalizedQueryContext,
   RepositoryAdapter,
   ResolvedSoftDelete,
@@ -22,8 +24,10 @@ import { mapDriverError } from "./error-mapping.js";
  * serves writes, where entity hydration and column defaults matter and no
  * dynamic SQL is needed.
  *
- * Attachment seams for later phases: transactions pick up
- * `context.transaction`, include loading extends `buildQuery` (Phase 15).
+ * Relation includes (Phase 15) load two ways, per the strategy core
+ * resolved: to-one nodes join into the main query, to-many nodes take one
+ * extra batched query per level. The engine's transaction handle
+ * (`context.transaction`) is the remaining attachment seam.
  */
 export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements RepositoryAdapter<Entity> {
   private readonly repository: Repository<Entity>;
@@ -37,13 +41,19 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
    * write for a `softDelete.field` that is an ordinary column.
    */
   private readonly deleteDateColumn: string | null;
+  /** Kept for batch loading, which re-enters through the DataSource. */
+  private readonly entity: ClassRef<Entity>;
 
-  constructor(dataSource: DataSource, entity: ClassRef<Entity>) {
+  constructor(
+    private readonly dataSource: DataSource,
+    entity: ClassRef<Entity>,
+  ) {
     this.repository = dataSource.getRepository(entity);
     const metadata = dataSource.getMetadata(entity);
     this.alias = metadata.name;
     this.idField = metadata.primaryColumns[0]!.propertyName;
     this.deleteDateColumn = metadata.deleteDateColumn?.propertyName ?? null;
+    this.entity = entity;
   }
 
   // ── Reads (QueryBuilder API) ────────────────────────────────────────
@@ -54,7 +64,12 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
     context: CrudContext<Entity>,
   ): Promise<Entity | null> {
     try {
-      return await this.byId(id, context, query?.withDeleted ?? false).getOne();
+      const include = query?.include ?? {};
+      const qb = this.byId(id, context, query?.withDeleted ?? false);
+      this.joinIncludes(qb, include, this.alias);
+      const entity = await qb.getOne();
+      if (entity !== null) await this.loadBatches([entity], this.entity, include);
+      return entity;
     } catch (error) {
       throw mapDriverError(error, errorContext(context));
     }
@@ -62,7 +77,9 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
 
   async findOne(query: NormalizedQueryContext<Entity>, context: CrudContext<Entity>): Promise<Entity | null> {
     try {
-      return await this.buildQuery(query, context).take(1).getOne();
+      const entity = await this.buildQuery(query, context).take(1).getOne();
+      if (entity !== null) await this.loadBatches([entity], this.entity, query.include);
+      return entity;
     } catch (error) {
       throw mapDriverError(error, errorContext(context));
     }
@@ -70,7 +87,12 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
 
   async findMany(query: NormalizedQueryContext<Entity>, context: CrudContext<Entity>): Promise<readonly Entity[]> {
     try {
-      return await this.buildQuery(query, context).skip(query.pagination.offset).take(query.pagination.limit).getMany();
+      const entities = await this.buildQuery(query, context)
+        .skip(query.pagination.offset)
+        .take(query.pagination.limit)
+        .getMany();
+      await this.loadBatches(entities, this.entity, query.include);
+      return entities;
     } catch (error) {
       throw mapDriverError(error, errorContext(context));
     }
@@ -81,7 +103,8 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
       // A dedicated count query — never getManyAndCount: the engine only
       // calls this when `query.count` is true, so `total: null` costs
       // zero queries (Phase 9 count strategy).
-      return await this.buildQuery(query, context, { sorted: false }).getCount();
+      // No includes: counting distinct roots never needs their relations.
+      return await this.buildQuery(query, context, { sorted: false, includes: false }).getCount();
     } catch (error) {
       throw mapDriverError(error, errorContext(context));
     }
@@ -94,11 +117,17 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
   private buildQuery(
     query: NormalizedQueryContext<Entity>,
     context: CrudContext<Entity>,
-    options: { sorted?: boolean } = {},
+    options: { sorted?: boolean; includes?: boolean } = {},
   ): SelectQueryBuilder<Entity> {
     const qb = this.repository.createQueryBuilder(this.alias);
     this.scopeToLive(qb, context, query.withDeleted);
     const translator = new FilterTranslator(qb, this.alias);
+    // Include joins first, then filters: both name joins the same way, so
+    // a filter on `owner.name` reuses the selecting join instead of adding
+    // a second one under a duplicate alias.
+    if (options.includes !== false) {
+      this.joinIncludes(qb, query.include, this.alias, translator);
+    }
     translator.apply(query.filter);
     if (options.sorted !== false) {
       for (const sort of query.sort) {
@@ -106,6 +135,91 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
       }
     }
     return qb;
+  }
+
+  // ── Relation includes (Phase 15) ────────────────────────────────────
+
+  /**
+   * Join every `join`-strategy node of the tree into one query. Aliases are
+   * deterministic (`Owner__pets__owner`) and match `FilterTranslator`'s
+   * scheme, so a filter on an included path reuses the same join; each
+   * alias is registered with the translator to keep it from adding a
+   * second one.
+   */
+  private joinIncludes<Row extends ObjectLiteral>(
+    qb: SelectQueryBuilder<Row>,
+    tree: IncludeTree,
+    parentAlias: string,
+    translator?: FilterTranslator<Entity>,
+  ): void {
+    for (const node of Object.values(tree)) {
+      if (node.strategy !== "join") continue;
+      this.joinNode(qb, node, parentAlias, translator);
+    }
+  }
+
+  /** One join node plus its own join-strategy subtree. */
+  private joinNode<Row extends ObjectLiteral>(
+    qb: SelectQueryBuilder<Row>,
+    node: IncludeNode,
+    parentAlias: string,
+    translator?: FilterTranslator<Entity>,
+  ): string {
+    const alias = `${parentAlias}__${node.relation.name}`;
+    // Soft-deleted related rows are excluded from includes — spelled out
+    // rather than left to TypeORM's default, because a root `withDeleted`
+    // must not silently widen the relation too (Phase 14).
+    const live = node.softDelete.strategy === "soft" ? `${alias}.${node.softDelete.field} IS NULL` : undefined;
+    qb.leftJoinAndSelect(`${parentAlias}.${node.relation.name}`, alias, live);
+    translator?.registerJoin(alias);
+    this.joinIncludes(qb, node.children, alias, translator);
+    return alias;
+  }
+
+  /**
+   * Load every `batch` node for a set of already-fetched parents: one
+   * query per relation level, parents batched by id, stitched in memory.
+   *
+   * The parents are re-selected by id with the relation joined, which
+   * needs no inverse-side declaration and keeps the shape identical to the
+   * join path. Root pagination has already happened by then, which is the
+   * point: a to-many never multiplies the rows that pagination counts.
+   */
+  private async loadBatches(rows: readonly ObjectLiteral[], entity: ClassRef, tree: IncludeTree): Promise<void> {
+    if (rows.length === 0) return;
+    for (const node of Object.values(tree)) {
+      if (node.strategy === "batch") {
+        await this.batchLoad(rows, entity, node);
+        continue;
+      }
+      // A join node arrived with the main query; its own to-many children
+      // still need their batch, one level down.
+      await this.loadBatches(relatedRows(rows, node.relation.name), node.relation.target(), node.children);
+    }
+  }
+
+  private async batchLoad(parents: readonly ObjectLiteral[], entity: ClassRef, node: IncludeNode): Promise<void> {
+    const metadata = this.dataSource.getMetadata(entity);
+    const idField = metadata.primaryColumns[0]!.propertyName;
+    const ids = [...new Set(parents.map((parent) => parent[idField] as unknown))];
+    const alias = metadata.name;
+
+    const qb = this.dataSource
+      .getRepository<ObjectLiteral>(entity as ClassRef<ObjectLiteral>)
+      .createQueryBuilder(alias)
+      // The parents are already chosen; their own deleted state must not
+      // filter them back out of their own reload.
+      .withDeleted()
+      .whereInIds(ids);
+    this.joinNode(qb, node, alias);
+
+    const loaded = await qb.getMany();
+    const byId = new Map(loaded.map((row) => [row[idField], row[node.relation.name]]));
+    const empty = node.relation.cardinality === "many" ? [] : null;
+    for (const parent of parents) {
+      parent[node.relation.name] = byId.get(parent[idField]) ?? empty;
+    }
+    await this.loadBatches(relatedRows(parents, node.relation.name), node.relation.target(), node.children);
   }
 
   // ── Soft delete (Phase 14) ──────────────────────────────────────────
@@ -269,6 +383,18 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
       context: errorContext(context),
     });
   }
+}
+
+/** The loaded rows on one relation of a set of parents, flattened. */
+function relatedRows(parents: readonly ObjectLiteral[], name: string): readonly ObjectLiteral[] {
+  const rows: ObjectLiteral[] = [];
+  for (const parent of parents) {
+    const value = parent[name];
+    if (value === null || value === undefined) continue;
+    if (Array.isArray(value)) rows.push(...(value as ObjectLiteral[]));
+    else rows.push(value as ObjectLiteral);
+  }
+  return rows;
 }
 
 function errorContext<Entity>(context: CrudContext<Entity>) {

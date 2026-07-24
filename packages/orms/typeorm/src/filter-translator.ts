@@ -12,8 +12,10 @@ import type { SelectQueryBuilder, ObjectLiteral } from "typeorm";
  *
  * Relation-path conditions (`profile.city`) add a **non-selecting** left
  * join per path segment: they restrict root rows, they never load the
- * relation (loading is Phase 15's). Join aliases are deterministic
- * (`root__profile`), so repeated paths reuse one join.
+ * relation — loading is what `include=` does. Join aliases are
+ * deterministic (`root__profile`), so repeated paths reuse one join, and
+ * an include join registered under the same alias is reused rather than
+ * duplicated.
  */
 export class FilterTranslator<Entity extends ObjectLiteral> {
   private parameterIndex = 0;
@@ -23,6 +25,16 @@ export class FilterTranslator<Entity extends ObjectLiteral> {
     private readonly qb: SelectQueryBuilder<Entity>,
     private readonly rootAlias: string,
   ) {}
+
+  /**
+   * Record a join someone else already added under this alias scheme, so
+   * `columnRef` reuses it instead of adding a duplicate. Include joins
+   * (Phase 15) select their relation; filters only restrict, so the
+   * selecting join must win and this is how it is claimed.
+   */
+  registerJoin(alias: string): void {
+    this.joins.add(alias);
+  }
 
   apply(filter: Filter<Entity>): void {
     const root = filter.root;
