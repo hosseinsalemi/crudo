@@ -131,14 +131,55 @@ describe("Pet example app", () => {
     ]);
   });
 
-  it("rejects unsupported params explicitly, never silently", async () => {
-    // `include` is deferred to Phase 15; `withDeleted` is real but
-    // meaningless here — cats are not soft-deletable, owners are.
-    const response = await request(server()).get("/cats").query("include=owner&withDeleted=true").expect(400);
+  it("rejects params that do not apply to this entity, never silently", async () => {
+    // Cats are not soft-deletable (owners are), and `pets` is not a
+    // relation of Cat — both are told, not ignored.
+    const response = await request(server()).get("/cats").query("include=pets&withDeleted=true").expect(400);
     expect(response.body.errors.map((e: { code: string }) => e.code)).toEqual([
       "CRUDO_QUERY_UNSUPPORTED_PARAM",
-      "CRUDO_QUERY_UNSUPPORTED_PARAM",
+      "CRUDO_QUERY_INVALID_FIELD",
     ]);
+  });
+
+  it("embeds relations both ways: a joined owner and batched pets (Phase 15)", async () => {
+    const owner = await request(server()).post("/owners").send({ name: "Rae", email: "rae@x.io" }).expect(201);
+    const ownerId = owner.body.id as number;
+    await request(server())
+      .post("/cats")
+      .send({ name: "Kit", age: 1, size: "small", indoor: true, livesLeft: 9, owner: ownerId })
+      .expect(201);
+
+    // To-one: joined into the list query, projected through OwnerItemDto
+    // (so the owner's own `deletedAt` never leaks through the relation).
+    const cats = await request(server()).get(`/cats?include=owner&filter[name][eq]=Kit`).expect(200);
+    expect(cats.body.items[0]).toMatchObject({ name: "Kit", owner: { id: ownerId, name: "Rae" } });
+    expect(cats.body.items[0].owner).not.toHaveProperty("deletedAt");
+
+    // …and narrowed by a per-node fieldset.
+    const narrowed = await request(server())
+      .get(`/cats?include=owner&fields[owner]=id,name&filter[name][eq]=Kit`)
+      .expect(200);
+    expect(narrowed.body.items[0].owner).toEqual({ id: ownerId, name: "Rae" });
+
+    // To-many: batched, on both the list and the detail route.
+    const owners = await request(server()).get(`/owners?include=pets&filter[id][eq]=${ownerId}`).expect(200);
+    expect(owners.body.items[0].pets).toEqual([expect.objectContaining({ name: "Kit" })]);
+    const one = await request(server()).get(`/owners/${ownerId}?include=pets`).expect(200);
+    expect(one.body.pets).toHaveLength(1);
+  });
+
+  it("keeps a relation out of the response until it is included", async () => {
+    const owner = await request(server()).post("/owners").send({ name: "Ivo", email: "ivo@x.io" }).expect(201);
+    // OwnerItemDto declares `pets`, but the shape is documentation — the
+    // include decides the load.
+    expect(owner.body).not.toHaveProperty("pets");
+  });
+
+  it("documents include and its per-relation fieldsets in the OpenAPI schema", () => {
+    const document = SwaggerModule.createDocument(app, new DocumentBuilder().build());
+    const params = (document.paths["/cats"]?.get?.parameters ?? []) as { name: string; description?: string }[];
+    expect(params.find((param) => param.name === "include")?.description).toContain("Includable: owner");
+    expect(params.map((param) => param.name)).toContain("fields[owner]");
   });
 
   it("soft-deletes, restores, and purges owners (Phase 14)", async () => {

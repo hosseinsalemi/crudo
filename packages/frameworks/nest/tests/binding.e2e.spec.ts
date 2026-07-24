@@ -259,6 +259,55 @@ describe("@Crud soft-delete routes (Phase 14)", () => {
   });
 });
 
+describe("@Crud relation includes (Phase 15)", () => {
+  @Crud(Todo, { relations: { edges: { list: { includable: true } } } })
+  @Controller("todos")
+  class IncludingController {}
+
+  beforeEach(async () => {
+    await bootstrap(IncludingController);
+  });
+
+  it("parses include= off the wire and embeds the loaded relation", async () => {
+    await request(server()).post("/todos").send({ title: "x", list: 7 }).expect(201);
+    // The fake adapter stores what deserialization produced: an `{ id }`
+    // association, which is what a real adapter would resolve.
+    expect(adapter.rows[0]?.list).toEqual({ id: 7 });
+
+    const response = await request(server()).get("/todos?include=list").expect(200);
+    expect(response.body.items[0]).toMatchObject({ title: "x", list: { id: 7 } });
+  });
+
+  it("narrows an included node with fields[relation]", async () => {
+    await request(server()).post("/todos").send({ title: "x", list: 7 }).expect(201);
+    const response = await request(server()).get("/todos/1?include=list&fields[list]=id").expect(200);
+    expect(response.body.list).toEqual({ id: 7 });
+  });
+
+  it("rejects a relation that is not includable, with problem details", async () => {
+    @Crud(Todo)
+    @Controller("todos")
+    class ClosedController {}
+
+    // Replace the including app with one that opted nothing in.
+    await app.close();
+    await bootstrap(ClosedController);
+    const response = await request(server()).get("/todos?include=list").expect(400);
+    expect(response.body).toMatchObject({
+      code: "CRUDO_QUERY_INVALID",
+      errors: [{ field: "list", code: "CRUDO_QUERY_INVALID_FIELD" }],
+    });
+  });
+
+  it("documents include and fields[relation] in the OpenAPI schema", async () => {
+    const document = SwaggerModule.createDocument(app, new DocumentBuilder().build());
+    const params = (document.paths["/todos"]?.get?.parameters ?? []) as { name: string; description?: string }[];
+    const include = params.find((param) => param.name === "include");
+    expect(include?.description).toContain("Includable: list");
+    expect(params.map((param) => param.name)).toContain("fields[list]");
+  });
+});
+
 describe("@Crud Swagger request-body schemas", () => {
   class CreateTodoDto {
     title = "";

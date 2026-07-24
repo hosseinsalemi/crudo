@@ -20,6 +20,14 @@ export class Todo {
   done = false;
   priority = 0;
   deletedAt: Date | null = null;
+  /** To-one relation, so `include=list` exercises the join path. */
+  list: TodoList | null = null;
+}
+
+/** The other side of the relation — never routed, only included. */
+export class TodoList {
+  id = 0;
+  name = "";
 }
 
 export const todoMetadata: EntityMetadata<Todo> = {
@@ -33,8 +41,27 @@ export const todoMetadata: EntityMetadata<Todo> = {
     { name: "priority", kind: "number", nullable: false, generated: false },
     { name: "deletedAt", kind: "date", nullable: true, generated: true },
   ],
-  relations: [],
+  relations: [
+    {
+      name: "list",
+      target: () => TodoList,
+      cardinality: "one",
+      includable: false,
+      strategy: "auto",
+    },
+  ],
   softDeleteField: "deletedAt",
+};
+
+export const todoListMetadata: EntityMetadata<TodoList> = {
+  entity: TodoList,
+  name: "TodoList",
+  idField: "id",
+  fields: [
+    { name: "id", kind: "number", nullable: false, generated: true },
+    { name: "name", kind: "string", nullable: false, generated: false },
+  ],
+  relations: [],
 };
 
 /**
@@ -76,6 +103,9 @@ export class InMemoryTodoAdapter implements RepositoryAdapter<Todo> {
 
   async create(data: Partial<Todo>): Promise<Todo> {
     const row = { ...new Todo(), ...data, id: this.nextId++ };
+    // A relation arrives as an `{ id }` reference (Phase 15); a real
+    // adapter would resolve it, and this fake keeps it as-is so the
+    // binding tests can see what deserialization produced.
     this.rows.push(row);
     return row;
   }
@@ -153,6 +183,9 @@ export class InMemoryTodoAdapter implements RepositoryAdapter<Todo> {
 export function fakeInfrastructure(adapter: InMemoryTodoAdapter): CrudInfrastructure {
   return {
     metadataFor<Entity extends object>(entity: ClassRef<Entity>) {
+      if ((entity as ClassRef) === TodoList) {
+        return todoListMetadata as unknown as EntityMetadata<Entity>;
+      }
       if ((entity as ClassRef) !== Todo) {
         throw new Error(`no metadata for ${entity.name}`);
       }

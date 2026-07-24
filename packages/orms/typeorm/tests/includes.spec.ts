@@ -1,0 +1,211 @@
+import "reflect-metadata";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { Column, DataSource, DeleteDateColumn, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import type { CrudoInstance, DefaultCrudService } from "@crudo/core";
+import { createTypeOrmCrudo } from "@crudo/typeorm";
+
+@Entity()
+class Blog {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column("varchar")
+  name!: string;
+
+  @OneToMany(() => Article, (article) => article.blog)
+  articles!: Article[];
+}
+
+@Entity()
+class Article {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column("varchar")
+  title!: string;
+
+  @ManyToOne(() => Blog, (blog) => blog.articles, { nullable: true })
+  blog!: Blog | null;
+
+  @OneToMany(() => Note, (note) => note.article)
+  notes!: Note[];
+
+  @DeleteDateColumn()
+  deletedAt!: Date | null;
+}
+
+@Entity()
+class Note {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column("varchar")
+  body!: string;
+
+  @ManyToOne(() => Article, (article) => article.notes, { nullable: true })
+  article!: Article | null;
+}
+
+let dataSource: DataSource;
+let crudo: CrudoInstance;
+let blogs: DefaultCrudService<Blog>;
+let joinedBlogs: DefaultCrudService<Blog>;
+let articles: DefaultCrudService<Article>;
+
+beforeAll(async () => {
+  dataSource = new DataSource({
+    type: "better-sqlite3",
+    database: ":memory:",
+    entities: [Blog, Article, Note],
+    synchronize: true,
+  });
+  await dataSource.initialize();
+  crudo = createTypeOrmCrudo(dataSource);
+  blogs = crudo.createCrud(Blog, {
+    relations: { edges: { articles: { includable: true } } },
+  }) as DefaultCrudService<Blog>;
+  articles = crudo.createCrud(Article, {
+    softDelete: { strategy: "soft" },
+    relations: { edges: { blog: { includable: true }, notes: { includable: true } } },
+    // Filtering across a relation path is its own allowlist decision,
+    // independent of whether the relation may be included.
+    allowlists: { filterable: ["id", "title", "blog.name"] },
+  } as never) as DefaultCrudService<Article>;
+  crudo.createCrud(Note, { relations: { edges: { article: { includable: true } } } });
+  // The same entity with the to-many forced to `join`: the case the
+  // normative pagination rule exists for.
+  joinedBlogs = createTypeOrmCrudo(dataSource).createCrud(Blog, {
+    relations: { edges: { articles: { includable: true, strategy: "join" } } },
+  }) as DefaultCrudService<Blog>;
+});
+
+afterAll(async () => {
+  await dataSource.destroy();
+});
+
+beforeEach(async () => {
+  await dataSource.getRepository(Note).clear();
+  await dataSource.getRepository(Article).clear();
+  await dataSource.getRepository(Blog).clear();
+});
+
+/** One blog, two articles, one note on the first article. */
+async function seed(): Promise<{ blogId: number; articleId: number }> {
+  const blog = await dataSource.getRepository(Blog).save({ name: "Crudo weekly" });
+  const first = await dataSource.getRepository(Article).save({ title: "Includes", blog });
+  await dataSource.getRepository(Article).save({ title: "Soft delete", blog });
+  await dataSource.getRepository(Note).save({ body: "typo on line 3", article: first });
+  return { blogId: blog.id, articleId: first.id };
+}
+
+describe("TypeOrmRepositoryAdapter — join loading (Phase 15)", () => {
+  it("embeds a to-one relation from the main query", async () => {
+    const { blogId } = await seed();
+    const list = await articles.findMany({ include: ["blog"], sort: [{ field: "id", direction: "asc" }] });
+    expect(list.items[0]).toMatchObject({ title: "Includes", blog: { id: blogId, name: "Crudo weekly" } });
+  });
+
+  it("supports include on findOne with identical semantics", async () => {
+    const { articleId, blogId } = await seed();
+    const item = await articles.findOne(articleId, { include: ["blog"] } as never);
+    expect(item).toMatchObject({ blog: { id: blogId } });
+  });
+
+  it("reuses the include join for a filter on the same path", async () => {
+    await seed();
+    const list = await articles.findMany({
+      include: ["blog"],
+      filter: { kind: "condition", field: "blog.name" as never, operator: "EQ", value: "Crudo weekly" },
+    });
+    expect(list.items).toHaveLength(2);
+    expect(list.items[0]).toMatchObject({ blog: { name: "Crudo weekly" } });
+  });
+});
+
+describe("TypeOrmRepositoryAdapter — batch loading (Phase 15)", () => {
+  it("embeds a to-many relation without disturbing root pagination", async () => {
+    await seed();
+    const list = await blogs.findMany({ include: ["articles"] });
+    // One root row, not one per article — the to-many was batched, so
+    // pagination counted distinct roots.
+    expect(list.items).toHaveLength(1);
+    expect(list.total).toBe(1);
+    expect((list.items[0] as { articles: unknown[] }).articles).toHaveLength(2);
+  });
+
+  it("paginates roots, then batches — a page of one still gets its children", async () => {
+    await seed();
+    await dataSource.getRepository(Blog).save({ name: "Empty" });
+    const page = await blogs.findMany({ include: ["articles"], limit: 1, offset: 0 });
+    expect(page.items).toHaveLength(1);
+    expect(page.total).toBe(2);
+    expect((page.items[0] as { articles: unknown[] }).articles).toHaveLength(2);
+  });
+
+  it("loads a nested level below a batched node", async () => {
+    await seed();
+    const list = await blogs.findMany({ include: ["articles.notes"] });
+    const embedded = (list.items[0] as { articles: { title: string; notes: unknown[] }[] }).articles;
+    expect(embedded.find((article) => article.title === "Includes")?.notes).toHaveLength(1);
+    expect(embedded.find((article) => article.title === "Soft delete")?.notes).toEqual([]);
+  });
+
+  it("returns an empty array for a root with no related rows", async () => {
+    await dataSource.getRepository(Blog).save({ name: "Empty" });
+    const list = await blogs.findMany({ include: ["articles"] });
+    expect((list.items[0] as { articles: unknown[] }).articles).toEqual([]);
+  });
+});
+
+describe("Pagination correctness with a joined to-many (Phase 15, normative)", () => {
+  it("counts and slices distinct roots even when the join multiplies rows", async () => {
+    await seed(); // one blog, two articles
+    await dataSource.getRepository(Blog).save({ name: "Second" });
+
+    const page = await joinedBlogs.findMany({ include: ["articles"], limit: 1 });
+    // The joined to-many yields two rows for the first blog; pagination
+    // still counts and slices roots, so limit 1 means one blog with both
+    // of its articles — never half a blog.
+    expect(page.items).toHaveLength(1);
+    expect(page.total).toBe(2);
+    expect((page.items[0] as { articles: unknown[] }).articles).toHaveLength(2);
+  });
+});
+
+describe("Includes and soft delete (Phases 14–15)", () => {
+  it("excludes soft-deleted related rows", async () => {
+    const { articleId } = await seed();
+    await articles.deleteOne(articleId);
+
+    const list = await blogs.findMany({ include: ["articles"] });
+    const embedded = (list.items[0] as { articles: { title: string }[] }).articles;
+    expect(embedded.map((article) => article.title)).toEqual(["Soft delete"]);
+  });
+
+  it("keeps a root withDeleted from widening the relation", async () => {
+    const { articleId } = await seed();
+    await articles.deleteOne(articleId);
+
+    // `withDeleted` is the *root's* opt-in; the included relation stays
+    // scoped to live rows.
+    const list = await articles.findMany({ withDeleted: true, include: ["notes"] });
+    expect(list.items).toHaveLength(2);
+    const deleted = (list.items as { id: number; notes: unknown[] }[]).find((row) => row.id === articleId);
+    expect(deleted?.notes).toHaveLength(1);
+  });
+});
+
+describe("Sparse fieldsets on included nodes (Phase 15)", () => {
+  it("narrows the embedded shape and strips keys fetched for stitching", async () => {
+    await seed();
+    const list = await blogs.findMany({
+      include: ["articles"],
+      fields: { root: ["id", "name"], relations: { articles: ["title"] } },
+    });
+    expect(list.items[0]).toEqual({
+      id: expect.any(Number),
+      name: "Crudo weekly",
+      articles: [{ title: "Includes" }, { title: "Soft delete" }],
+    });
+  });
+});
