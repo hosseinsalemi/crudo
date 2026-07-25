@@ -34,20 +34,30 @@ export type DeepPartial<T> = {
 type DeepPartialValue<V> = V extends readonly unknown[] ? V : V extends object ? DeepPartial<V> : V;
 
 /**
- * Property keys of `T` whose values are scalars: methods, arrays and nested
- * objects are all excluded.
+ * Property keys of `T` whose values are scalars for write purposes: methods
+ * and relation-shaped properties are excluded; a primitive-element array
+ * (`string[]`, a TypeORM `simple-array` column) counts as scalar, since it is
+ * a column, not a relation.
  *
  * Relation-shaped properties are excluded deliberately, not for convenience.
  * ADR-0014 makes association by id the only write path, so a relation
- * *object* is never a valid write body — this is the type system agreeing
- * with the runtime rather than a separate opinion.
+ * *object* — or an array *of* them, a to-many relation — is never a valid
+ * write body. An array of primitives carries no such ambiguity, which is why
+ * it is treated differently from an array of objects here.
+ *
+ * `json`/`jsonb` columns (typed as `Record<string, unknown>` or similar) stay
+ * excluded: at the type level a plain object column is indistinguishable
+ * from a to-one relation, so admitting one would admit the other. A `create`
+ * DTO is the escape hatch for either, same as any other slot override.
  */
 export type ScalarKeys<T> = {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   [K in keyof T]-?: NonNullable<T[K]> extends Function
     ? never
-    : NonNullable<T[K]> extends readonly unknown[]
-      ? never
+    : NonNullable<T[K]> extends readonly (infer Element)[]
+      ? NonNullable<Element> extends Primitive
+        ? K
+        : never
       : NonNullable<T[K]> extends Primitive
         ? K
         : never;

@@ -17,15 +17,18 @@ class Widget {
   price: number | null = null;
   releasedAt: Date = new Date(0);
   tags: string[] = [];
+  reviews: { rating: number }[] = [];
   owner: { id: number } | null = null;
   describe(): string {
     return this.label;
   }
 }
 
-// `Date` counts as a scalar (it is in `Primitive`); arrays, nested objects
-// and methods do not.
-expectTypeOf<ScalarKeys<Widget>>().toEqualTypeOf<"id" | "label" | "price" | "releasedAt">();
+// `Date` counts as a scalar (it is in `Primitive`); a primitive-element array
+// (`tags`, a TypeORM `simple-array` column) counts as scalar too — it is a
+// column, not a relation. An object-element array (`reviews`, a to-many
+// relation shape), a nested object, and methods do not.
+expectTypeOf<ScalarKeys<Widget>>().toEqualTypeOf<"id" | "label" | "price" | "releasedAt" | "tags">();
 
 // Every key optional: the zero-config write path must accept a partial body
 // without demanding generated columns. This is the call that failed before.
@@ -48,9 +51,14 @@ void unknownKey;
 const relationKey: EntityInput<Widget> = { owner: { id: 1 } };
 void relationKey;
 
-// @ts-expect-error — collection properties are not writable either.
+// A primitive-element array is a writable scalar column, not a relation.
 const arrayKey: EntityInput<Widget> = { tags: ["a"] };
 void arrayKey;
+
+// @ts-expect-error — an object-element array is a to-many relation, and
+// relations are associated by id, never written inline (ADR-0014).
+const relationArrayKey: EntityInput<Widget> = { reviews: [{ rating: 5 }] };
+void relationArrayKey;
 
 // @ts-expect-error — methods are not part of the write shape.
 const methodKey: EntityInput<Widget> = { describe: () => "x" };

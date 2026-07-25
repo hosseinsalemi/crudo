@@ -58,3 +58,23 @@ expectTypeOf<IncludePath<Bag>>().toEqualTypeOf<string>();
 // `QueryContext`'s default entity is `unknown`, so untyped callers keep the
 // old `readonly string[]` contract exactly.
 expectTypeOf<readonly IncludePath<unknown>[]>().toEqualTypeOf<readonly string[]>();
+
+/**
+ * A primitive-element array (`tags`, a TypeORM `simple-array` column) is a
+ * scalar column, not a relation — mirrors `ScalarKeys`'s treatment of the
+ * same shape in `EntityInput`. It must not appear as an include path: there
+ * is nothing under it to include, and offering it would let a caller "include"
+ * a field the runtime relation registry has never heard of.
+ */
+class Tagged {
+  id = 0;
+  tags: string[] = [];
+  reviews: { rating: number }[] = [];
+}
+
+expectTypeOf<IncludePath<Tagged>>().toEqualTypeOf<"reviews">();
+
+// @ts-expect-error — a primitive-array column is excluded, exactly as a bare
+// scalar field is.
+const primitiveArray: IncludePath<Tagged> = "tags";
+void primitiveArray;

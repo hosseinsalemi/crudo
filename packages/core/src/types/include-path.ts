@@ -28,7 +28,15 @@ type IncludeInto<T, Depth extends 0 | FieldPathDepth> =
                         // *field*, never something you can include.
                         never
                       : NonNullable<T[K]> extends readonly (infer Element)[]
-                        ? K | `${K}.${IncludeInto<NonNullable<Element>, Prev[Depth]>}`
+                        ? // Mirrors `ScalarKeys`: an array of primitives
+                          // (`tags: string[]`) is a column, not a relation —
+                          // there is nothing under it to include, so it is
+                          // excluded exactly as a bare scalar is, rather than
+                          // being offered as a path with nothing reachable
+                          // past it.
+                          NonNullable<Element> extends Primitive
+                          ? never
+                          : K | `${K}.${IncludeInto<NonNullable<Element>, Prev[Depth]>}`
                         : NonNullable<T[K]> extends object
                           ? K | `${K}.${IncludeInto<NonNullable<T[K]>, Prev[Depth]>}`
                           : never;

@@ -173,4 +173,27 @@ describe("QueryNormalizer — the three fields spellings", () => {
       });
     }
   });
+
+  // Runtime strings can defeat every one of these; the type system is not
+  // the only gate, and a malformed `fields` value must never throw — that
+  // would surface as a 500, not a 400.
+  it("reports a non-object fields value as a query issue rather than throwing", () => {
+    for (const bad of [null, "id,name", 42, true]) {
+      const issues = issuesOf(() => normalizer.normalizeInput({ fields: bad } as never, config));
+      expect(issues[0]).toMatchObject({
+        field: "fields",
+        code: "CRUDO_QUERY_INVALID_VALUE",
+      });
+    }
+  });
+
+  it("rejects mixing the structured and relation-keyed spellings rather than dropping the relation fieldset", () => {
+    const issues = issuesOf(() =>
+      normalizer.normalizeInput({ fields: { root: ["id"], posts: ["title"] } } as never, config),
+    );
+    expect(issues[0]).toMatchObject({
+      field: "fields.posts",
+      code: "CRUDO_QUERY_INVALID_VALUE",
+    });
+  });
 });

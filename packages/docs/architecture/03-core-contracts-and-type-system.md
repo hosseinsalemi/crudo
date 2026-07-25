@@ -34,10 +34,16 @@ runtime derivation never disagree about _which slot follows which_.
 `EntityInput<TEntity>` is `Partial<Pick<TEntity, ScalarKeys<TEntity>>>`:
 the entity's **scalar** properties, **all optional**.
 
-- **Relations, collections and methods are excluded** (`ScalarKeys`).
+- **Relation-shaped properties and methods are excluded** (`ScalarKeys`).
   Excluding relations is not convenience — ADR-0014 makes association by
-  id the only write path, so a relation _object_ is never a valid body.
-  `Date` and other `Primitive` members are kept.
+  id the only write path, so a relation _object_ — or an array of them, a
+  to-many relation — is never a valid body. `Date` and other `Primitive`
+  members are kept, and so is a primitive-element array (`tags: string[]`,
+  a TypeORM `simple-array` column): it is a column, not a relation, and
+  carries none of a to-many relation's ambiguity. A `json`/`jsonb` column
+  (`Record<string, unknown>`) stays excluded — at the type level it is
+  indistinguishable from a to-one relation, so admitting one would admit
+  the other; a registered `create` DTO is the escape hatch for either.
 - **Every key is optional** because only ORM metadata knows which columns
   are generated, defaulted or nullable, and the type system cannot see it.
   Requiring every key made the zero-config write path unusable:
@@ -104,10 +110,23 @@ registry's `includable` flag and the include-depth budget.
 | `{ posts: ['id', 'title'] }`                   | `?fields[posts]=…`  |
 
 `root` and `relations` are therefore **reserved keys**: a relation
-genuinely named `root` must use the structured form. The normalized
-`FieldSelection` is deliberately _not_ widened — adapters and the engine
-still see exactly one shape, and all three spellings face the same
-allowlist validation.
+genuinely named `root` or `relations` must use the structured form. This is
+enforced at both levels. At the type level, the third (relation-keyed)
+member of the union excludes `root`/`relations` (`& { root?: never;
+relations?: never }`) — without that exclusion it structurally satisfies
+`Partial<FieldSelection<Entity>>` too, which silently defeats the
+structured form's own spell-checking (`{ root: ['nope'] }` would typecheck).
+At runtime, `QueryNormalizer`'s collapse step rejects — rather than
+silently drops — any relation-keyed key mixed into a structured literal, so
+a caller who blends the two spellings gets a `CRUDO_QUERY_INVALID_VALUE`
+issue naming the stray key, not a quietly ignored fieldset. A malformed
+`fields` value (not an array, not an object) is also an issue, never a
+thrown error — the one place in the pipeline where a shape mistake in this
+parameter has no later gate to catch it.
+
+The normalized `FieldSelection` is deliberately _not_ widened — adapters
+and the engine still see exactly one shape, and all three spellings face
+the same allowlist validation.
 
 ## 3. Module augmentation of `OperationMetadata`
 
