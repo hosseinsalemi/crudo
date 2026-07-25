@@ -12,6 +12,7 @@
     "depcruise": "depcruise packages --config .dependency-cruiser.cjs",
     "test": "vitest run",
     "prettify": "prettier --write .",
+    "format:check": "prettier --check .",
     "check": "pnpm run build && pnpm run depcruise && pnpm run test"
   },
   "devDependencies": {

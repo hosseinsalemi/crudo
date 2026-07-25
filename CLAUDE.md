@@ -6,7 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A production-grade CRUD framework for TypeScript: define an entity once (via TypeORM) and get the full REST CRUD surface — filtering, sorting, pagination, nested includes, field selection, optional per-operation DTOs, transactions, and problem-details errors — behind generated NestJS routes, configurable at global → entity → operation → per-call scope.
 
-Crudo is built phase-by-phase from [`crudo-phases-v6.md`](crudo-phases-v6.md), which is the **authoritative spec**. Its "Naming Conventions (normative)" section governs all names — deviations are review findings. When implementing or extending, consult the relevant phase there rather than inventing behavior.
+The authoritative sources are `packages/docs/` (architecture notes and ADRs) and the **Conventions** section below, which is normative — naming deviations are review findings. Consult the governing ADR before changing behavior it covers, rather than inventing behavior.
+
+Crudo was originally built from a phased plan (`crudo-phases-v6.md`), now retired. `Phase N` references survive in code comments and docs as historical provenance; the remaining unbuilt work lives in [`packages/docs/roadmap.md`](packages/docs/roadmap.md).
 
 ## Commands
 
@@ -22,7 +24,7 @@ pnpm prettify     # prettier --write . (printWidth 120)
 Run a single test file or test by name:
 
 ```bash
-pnpm vitest run packages/core/tests/query/filter-parser.spec.ts
+pnpm vitest run packages/core/tests/filter-parser.spec.ts
 pnpm vitest run -t "coerces numeric ids"
 ```
 
@@ -71,16 +73,38 @@ Standard operations delegate to the typed `DefaultCrudService` surface; custom o
 
 See `packages/examples/src/app.module.ts`: `CrudoModule.forRootAsync({ useFactory: () => ({ infrastructure: createTypeOrmInfrastructure(dataSource), defaults: {...} }) })` supplies the global scope, and `CrudoModule.forFeature([...Controllers])` registers the `@Crud` controllers. The app is what hands Nest its infrastructure — the packages never import each other.
 
-## Conventions (from the spec's normative section)
+## Conventions (normative)
 
 - **DTO slots** are bare verbs: `create`, `update`, `patch`, `query`, `item`, `list` (because `createOne`/`createMany` share the `create` DTO).
 - **DTO classes**: request bodies are `<Verb><Entity>Dto` (`CreateUserDto`); query/response shapes are `<Entity><Slot>Dto` (`UserItemDto`, `UserListDto`). Every wire-crossing shape carries the `Dto` suffix; behavioral contracts (services, adapters, registries) never do.
 - **Operations** are camelCase and always name cardinality: `<verb>One` / `<verb>Many`. "Bulk" is the feature term (config key `bulk`, `/bulk` routes, `BulkResultDto`), never a method prefix.
-- **Filter operators**: AST enum in `SCREAMING_SNAKE` (`EQ`…`IS_NOT_NULL`); wire tokens in camelCase (`eq`…`isNotNull`), exact-case matched. Phase 5's mapping table is the single source of truth.
+- **Filter operators**: AST enum in `SCREAMING_SNAKE` (`EQ`…`IS_NOT_NULL`); wire tokens in camelCase (`eq`…`isNotNull`), exact-case matched. The mapping table in `packages/docs/architecture/05-query-grammar.md` is the single source of truth.
+- **Envelope fields**: `items`, `limit`, `offset`, `total`, `meta` — the default pagination wire params use the same `limit`/`offset` names, so request and response mirror each other.
+- **Factories** are `create*` (`createCrudo`, `createCrud`). **Data access**: `EntityReader` (reads) + `EntityWriter` (writes); `RepositoryAdapter` is both, and adapters are named for what they adapt (`TypeOrmRepositoryAdapter`).
 - **Exceptions**: `*Exception` classes with stable `CRUDO_SNAKE_CASE` codes.
 - **Config keys**: camelCase, booleans phrased positively (`exposeInternals`, never `hideInternals`).
 - **No `I` prefix** on interfaces.
 - The core barrel (`packages/core/src/index.ts`) is a **deliberate explicit named list** (no `export *`) — the public surface changes only on purpose. Add exports there intentionally.
+
+## The development workflow
+
+Work moves one issue at a time, on one branch, through slash commands in `.claude/commands/`:
+
+```
+/issue "rough idea"   →  a plannable GitHub issue (acceptance criteria, affected packages, constraints)
+/next [n]             →  crudo-architect plans it  →  YOU APPROVE  →  branch created off main
+/implement            →  code + tests written here, in the main thread  →  pnpm check  →  commit
+/review               →  crudo-reviewer ‖ crudo-boundary-guard ‖ crudo-test-auditor, consolidated
+/ship                 →  pnpm check  →  push  →  PR opened, "Closes #n"
+/merge                →  CI verified  →  squash merge  →  branch deleted  →  back on green main
+```
+
+`/commit` splits the working tree into logical commits at any point.
+
+Two rules make this work:
+
+- **Planning and review are delegated; implementation is not.** The four agents in `.claude/agents/` are all read-only. Planning benefits from a cold, focused read of the issue, and review benefits from independent fresh eyes — but implementation needs the conversation's full context, so it happens in the main thread.
+- **`pnpm check` is the gate, and it is never worked around.** `/implement`, `/ship`, and `/merge` each run it and report the real result. A red gate is not shipped, and a test is never weakened to make it pass.
 
 ## Where to read more
 
