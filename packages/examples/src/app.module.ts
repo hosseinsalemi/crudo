@@ -8,9 +8,9 @@ import { CatController } from "./cat/cat.controller.js";
 import { DogController } from "./dog/dog.controller.js";
 
 /**
- * Milestone B checkpoint wiring: the app hands `@crudo/nest` its
- * infrastructure (here TypeORM's) — the packages never import each other
- * (Phase 2 boundary; adapters meet the framework in the DI container).
+ * Reference wiring: the app hands `@crudo/nest` its infrastructure (here
+ * TypeORM's) — the packages never import each other (Phase 2 boundary;
+ * adapters meet the framework in the DI container).
  */
 @Module({
   imports: [

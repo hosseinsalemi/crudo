@@ -11,8 +11,8 @@ import { AppModule } from "../src/app.module.js";
  * engine → TypeORM → SQLite — with filtering, sorting, pagination, DTO
  * projections, layered config, and problem-details errors. The schema
  * models single-table inheritance (Cat/Dog over one `pet` table) and an
- * Owner relation; crudo serves plain CRUD on each concrete entity, and
- * relation includes remain a deferred feature (asserted below).
+ * Owner relation; crudo serves plain CRUD on each concrete entity, plus
+ * opt-in relation includes in both directions (asserted below).
  */
 let app: INestApplication;
 

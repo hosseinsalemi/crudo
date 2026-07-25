@@ -28,9 +28,9 @@ export class OwnerItemDto {
   email = "";
   startedAt: Date | null = null;
   createdAt: Date = new Date(0);
-  // Documented as a `oneOf` array of pet subtypes. Relation includes are a
-  // deferred feature, so the field is absent from responses until a later
-  // phase populates it — but the schema advertises its shape today.
+  // Documented as a `oneOf` array of pet subtypes. The declaration is the
+  // shape, not the load: the field appears only when asked for with
+  // `?include=pets`, so a plain GET does not pay for the relation.
   pets = oneOfArray<CatItemDto | DogItemDto>([CatItemDto, DogItemDto]);
 }
 
