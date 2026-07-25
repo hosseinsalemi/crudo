@@ -11,16 +11,7 @@
 export type { EntityId } from "./types/entity-id.js";
 export type { FieldPath, FieldPathDepth } from "./types/field-path.js";
 export type { IncludePath } from "./types/include-path.js";
-export type {
-  ClassRef,
-  DeepPartial,
-  EntityInput,
-  IsAny,
-  IsUnknown,
-  NonFunctionKeys,
-  Primitive,
-  ScalarKeys,
-} from "./types/utility.js";
+export type { ClassRef, DeepPartial, EntityInput, IsAny, IsUnknown, Primitive, ScalarKeys } from "./types/utility.js";
 
 // ── Query model ───────────────────────────────────────────────────────
 export type {

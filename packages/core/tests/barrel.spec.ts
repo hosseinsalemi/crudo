@@ -107,7 +107,6 @@ const PUBLIC_SURFACE: readonly string[] = [
   "ListResultDto",
   "LogicalOperator",
   "MetadataSource",
-  "NonFunctionKeys",
   "NormalizedQueryContext",
   "NotDeletedException",
   "NotFoundException",

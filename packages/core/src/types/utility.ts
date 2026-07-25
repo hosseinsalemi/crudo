@@ -33,12 +33,6 @@ export type DeepPartial<T> = {
  */
 type DeepPartialValue<V> = V extends readonly unknown[] ? V : V extends object ? DeepPartial<V> : V;
 
-/** Property keys of `T` that are not methods. */
-export type NonFunctionKeys<T> = {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  [K in keyof T]-?: NonNullable<T[K]> extends Function ? never : K;
-}[keyof T];
-
 /**
  * Property keys of `T` whose values are scalars: methods, arrays and nested
  * objects are all excluded.
