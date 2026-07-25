@@ -5,6 +5,7 @@ import { Column, CreateDateColumn, Entity, ManyToOne, OneToMany, PrimaryGenerate
 import {
   ConflictException,
   NotFoundException,
+  PersistenceException,
   QueryValidationException,
   type CrudoInstance,
   type DefaultCrudService,
@@ -244,6 +245,26 @@ describe("TypeOrmRepositoryAdapter — query translation", () => {
     });
     expect(list.total).toBeNull();
     expect(list.items).toHaveLength(4);
+  });
+
+  it("refuses an operator outside the AST enum rather than dropping the predicate", async () => {
+    await seed();
+    // The parser can never emit this, but a programmatic caller hand-builds
+    // the AST and `validateExpression` checks allowlists, not operators.
+    // Falling through the translator's switch would add no predicate at
+    // all — the caller asked to narrow to one row and would silently get
+    // all four back. The guard surfaces as PersistenceException: a forged
+    // AST is an internal contract violation (500), not a bad request.
+    await expect(
+      authors.findMany({
+        filter: {
+          kind: "condition",
+          field: "status",
+          operator: "SOUNDS_LIKE" as never,
+          value: "active",
+        },
+      }),
+    ).rejects.toBeInstanceOf(PersistenceException);
   });
 
   it("still rejects non-allowlisted programmatic filters", async () => {

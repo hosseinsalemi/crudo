@@ -1,4 +1,5 @@
 import type { Filter, FilterBuilder, FilterCondition, FilterExpression, FilterScalar } from "@crudo/core";
+import { assertNever } from "@crudo/core";
 import { Brackets, NotBrackets, type WhereExpressionBuilder } from "typeorm";
 import type { SelectQueryBuilder, ObjectLiteral } from "typeorm";
 
@@ -148,6 +149,11 @@ export class FilterTranslator<Entity extends ObjectLiteral> implements FilterBui
       case "IS_NOT_NULL":
         where.where(`${column} IS NOT NULL`);
         return;
+      default:
+        // Every AST operator must translate to a predicate. Falling through
+        // silently would drop the condition and widen the result set, so the
+        // union is proven total here at build time.
+        assertNever(condition.operator, "filter operator");
     }
   }
 }
