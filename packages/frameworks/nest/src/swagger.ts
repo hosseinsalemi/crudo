@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
-import type { ClassRef, EntityConfig, OperationDescriptor } from "@crudo/core";
+import type { ClassRef, DtoResolver, EntityConfig, OperationDescriptor, OperationDtoMap } from "@crudo/core";
+import { DefaultDtoResolver } from "@crudo/core";
 import type { CrudHttpMethod } from "./operation-metadata.js";
 import { isSchemaHint, readSchemaHint, type SchemaHint } from "./schema-hints.js";
 
@@ -144,7 +145,13 @@ export function applySwaggerMetadata(
     }
   }
 
-  const bodyDto = bodyDtoFor(descriptor, config);
+  // The slot fallbacks (`patch`→`update`, `list`→`item`) belong to the core
+  // resolver, not to this file: documenting a shape the engine would not
+  // actually use is a lie that no test would catch. The resolver needs only
+  // the DTO map, so it is legal at decoration time (ADR-0012).
+  const dtoResolver = new DefaultDtoResolver(config?.dto as OperationDtoMap<object> | undefined);
+
+  const bodyDto = bodyDtoFor(descriptor, dtoResolver);
   if (bodyDto !== null) {
     apply(swagger.ApiBody(bodyOptionsFor(bodyDto)));
   }
@@ -153,7 +160,7 @@ export function applySwaggerMetadata(
     swagger.ApiResponse({
       status: route.status,
       description: "Success",
-      ...successBodyFor(descriptor, route, entity, config),
+      ...successBodyFor(descriptor, route, entity, dtoResolver),
     }),
   );
   apply(
@@ -211,10 +218,11 @@ function successBodyFor(
   descriptor: OperationDescriptor<object>,
   route: RouteShape,
   entity: ClassRef,
-  config: EntityConfig<object> | undefined,
+  dtoResolver: DtoResolver<object>,
 ): object {
   if (route.status === 204) return {};
-  const dto = config?.dto as { item?: ClassRef; list?: ClassRef } | undefined;
+  const resolve = (slot: "item" | "list"): ClassRef =>
+    (dtoResolver.resolve(slot, descriptor.id) as ClassRef | null) ?? entity;
   switch (descriptor.id) {
     case "createOne":
     case "updateOne":
@@ -222,12 +230,13 @@ function successBodyFor(
     case "findOne":
     // Restore reuses the `item` slot — no dedicated restore shape.
     case "restoreOne": {
-      const itemDto = dto?.item ?? entity;
+      const itemDto = resolve("item");
       const schema = schemaFromDto(itemDto);
       return schema === null ? { type: itemDto } : { schema: { title: itemDto.name, ...schema } };
     }
     case "findMany": {
-      const listDto = dto?.list ?? dto?.item ?? entity;
+      // `list` falls back to `item` inside the resolver.
+      const listDto = resolve("list");
       const element = schemaFromDto(listDto);
       return { schema: listEnvelopeSchema(element, listDto.name) };
     }
@@ -327,20 +336,18 @@ function includableRelations(config: EntityConfig<object> | undefined): readonly
     .map(([name]) => name);
 }
 
-function bodyDtoFor(
-  descriptor: OperationDescriptor<object>,
-  config: EntityConfig<object> | undefined,
-): ClassRef | null {
+function bodyDtoFor(descriptor: OperationDescriptor<object>, dtoResolver: DtoResolver<object>): ClassRef | null {
   if (descriptor.input !== null) return descriptor.input as ClassRef;
-  const dto = config?.dto;
-  if (dto === undefined) return null;
+  const resolve = (slot: "create" | "update" | "patch"): ClassRef | null =>
+    dtoResolver.resolve(slot, descriptor.id) as ClassRef | null;
   switch (descriptor.id) {
     case "createOne":
-      return (dto.create as ClassRef | undefined) ?? null;
+      return resolve("create");
     case "updateOne":
-      return (dto.update as ClassRef | undefined) ?? null;
+      return resolve("update");
     case "patchOne":
-      return (dto.patch as ClassRef | undefined) ?? (dto.update as ClassRef | undefined) ?? null;
+      // `patch` falls back to `update` inside the resolver.
+      return resolve("patch");
     default:
       return null;
   }

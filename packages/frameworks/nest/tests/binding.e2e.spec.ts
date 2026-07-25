@@ -393,6 +393,58 @@ describe("@Crud Swagger request-body schemas", () => {
   });
 });
 
+describe("@Crud Swagger DTO slot fallbacks", () => {
+  class UpdateTodoDto {
+    title = "";
+    done = false;
+  }
+
+  class TodoOnlyItemDto {
+    id = 0;
+    title = "";
+  }
+
+  // `patch` and `list` are deliberately left unregistered. The core
+  // resolver falls `patch` back to `update` and `list` back to `item`, and
+  // the docs must follow the same chain the engine will actually use —
+  // otherwise the published schema advertises a shape the API never emits.
+  @Crud(Todo, { dto: { update: UpdateTodoDto, item: TodoOnlyItemDto } })
+  @Controller("todos")
+  class FallbackController {}
+
+  let document: ReturnType<typeof SwaggerModule.createDocument>;
+
+  beforeEach(async () => {
+    await bootstrap(FallbackController);
+    document = SwaggerModule.createDocument(app, new DocumentBuilder().setTitle("t").setVersion("0").build());
+  });
+
+  type Schema = {
+    properties?: Record<string, { type: string }>;
+    items?: Schema;
+  };
+
+  it("documents the patch body from the update DTO when no patch DTO is registered", () => {
+    const schema = (
+      document.paths["/todos/{id}"] as Record<
+        string,
+        { requestBody?: { content?: Record<string, { schema?: Schema }> } }
+      >
+    )?.["patch"]?.requestBody?.content?.["application/json"]?.schema;
+    expect(Object.keys(schema?.properties ?? {})).toEqual(["title", "done"]);
+  });
+
+  it("documents the list envelope from the item DTO when no list DTO is registered", () => {
+    const schema = (
+      document.paths["/todos"] as Record<
+        string,
+        { responses?: Record<string, { content?: Record<string, { schema?: Schema }> }> }
+      >
+    )?.["get"]?.responses?.["200"]?.content?.["application/json"]?.schema;
+    expect(Object.keys(schema?.properties?.items?.items?.properties ?? {})).toEqual(["id", "title"]);
+  });
+});
+
 describe("@Crud Swagger schema hints (enum, oneOf)", () => {
   class VariantA {
     id = 0;
