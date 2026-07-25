@@ -1,5 +1,5 @@
 import { Body, Delete, Get, HttpCode, Inject, Param, Patch, Post, Put, Query } from "@nestjs/common";
-import type { ClassRef, DefaultCrudService, EntityConfig, OperationDescriptor } from "@crudo/core";
+import type { ClassRef, DefaultCrudService, EntityConfig, OperationDescriptor, StandardOperationId } from "@crudo/core";
 import { WireQuery, createOperationRegistry } from "@crudo/core";
 import type { CrudHttpMethod, CrudRouteOptions } from "./operation-metadata.js";
 import { CRUD_CONTROLLER_METADATA, CRUD_SERVICE_PROPERTY, getCrudServiceToken } from "./tokens.js";
@@ -12,8 +12,14 @@ export interface CrudControllerMetadata {
   readonly config?: EntityConfig<object>;
 }
 
-/** The default route shape of each standard operation (Phase 11). */
-const STANDARD_ROUTES: Readonly<Record<string, { method: CrudHttpMethod; path: string; status: number }>> = {
+/**
+ * The default route shape of each standard operation (Phase 11). `Partial`
+ * because the disabled batch operations have no route yet; keyed by the
+ * union so a misspelled id cannot sit here unread.
+ */
+const STANDARD_ROUTES: Readonly<
+  Partial<Record<StandardOperationId, { method: CrudHttpMethod; path: string; status: number }>>
+> = {
   createOne: { method: "POST", path: "", status: 201 },
   findMany: { method: "GET", path: "", status: 200 },
   findOne: { method: "GET", path: ":id", status: 200 },
@@ -32,7 +38,7 @@ const STANDARD_ROUTES: Readonly<Record<string, { method: CrudHttpMethod; path: s
  * (Phase 14). Without this, `PATCH /:id/restore` would be given a `@Body`
  * parameter that is always empty.
  */
-const BODYLESS_WRITES: ReadonlySet<string> = new Set(["restoreOne", "purgeOne"]);
+const BODYLESS_WRITES: ReadonlySet<StandardOperationId> = new Set<StandardOperationId>(["restoreOne", "purgeOne"]);
 
 const METHOD_DECORATORS: Record<CrudHttpMethod, (path: string) => MethodDecorator> = {
   GET: Get,
@@ -56,9 +62,15 @@ interface ResolvedRoute {
  * `createOperationRegistry` the engine uses) and generates one route per
  * **enabled** entry: disabled operations get no route, custom operations
  * get theirs from `meta.routes`, and `meta.routes.enabled: false` keeps an
- * operation service-only. Because generation reads the registry rather
- * than a verb list, later phases add routes by adding entries — this file
- * does not change.
+ * operation service-only.
+ *
+ * Driving the loop from the registry is what lets a **custom** operation
+ * need no change here: it arrives as an entry and carries its own route in
+ * `meta.routes`. A new **standard** operation is a different matter — it
+ * also needs a default shape in `STANDARD_ROUTES`, a delegation arm in
+ * `makeHandler`, and, if it takes no body, an entry in `BODYLESS_WRITES`.
+ * Those three tables are keyed by `StandardOperationId`, so a typo fails
+ * the build, but they are still three tables and this file does change.
  *
  * **Manual-method-wins:** a hand-written controller method whose name
  * matches an operation id suppresses that generated route — no conflicts,
@@ -98,7 +110,9 @@ export function Crud(entity: ClassRef, config?: EntityConfig<object>): ClassDeco
 function resolveRoute(descriptor: OperationDescriptor<object>): ResolvedRoute | null {
   const options: CrudRouteOptions = descriptor.meta.routes ?? {};
   if (options.enabled === false) return null; // service-only
-  const standard = STANDARD_ROUTES[descriptor.id];
+  // Custom ids are absent from the table by design — they carry their own
+  // route in `meta.routes` and fall back to the defaults below.
+  const standard = STANDARD_ROUTES[descriptor.id as StandardOperationId];
   const method = options.method ?? standard?.method ?? "POST";
   const path = options.path ?? standard?.path ?? descriptor.id;
   const status = options.successStatus ?? standard?.status ?? (method === "POST" ? 201 : 200);
@@ -143,7 +157,7 @@ function applyParamDecorators(
   }
   if (descriptor.kind === "read") {
     Query()(prototype, methodName, index++);
-  } else if (usesBody(route.method) && !BODYLESS_WRITES.has(descriptor.id)) {
+  } else if (usesBody(route.method) && !BODYLESS_WRITES.has(descriptor.id as StandardOperationId)) {
     Body()(prototype, methodName, index++);
   }
 }

@@ -8,6 +8,7 @@ import type { ErrorHandler } from "../errors/crud-exception.js";
 import type { NormalizedQueryContext } from "../query/query-context.js";
 import type { QueryContext } from "../query/query-context.js";
 import type { OperationDescriptor, OperationRegistry } from "../operations/operation-registry.js";
+import type { StandardOperationId } from "../operations/operation.js";
 import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
 import type { CrudoSettings } from "../config/settings.js";
 import { OperationDisabledException, QueryValidationException } from "../errors/exceptions.js";
@@ -38,8 +39,13 @@ export interface CrudEngineDependencies<Entity extends object> {
   readonly errorHandler: ErrorHandler;
 }
 
-/** Which DTO slot feeds each standard write operation's input. */
-const INPUT_SLOTS: Readonly<Partial<Record<string, DtoSlot>>> = {
+/**
+ * Which DTO slot feeds each standard write operation's input. `Partial` is
+ * deliberate — reads and the bodyless writes take no input DTO — but the
+ * key is the union, so a misspelled id fails the build instead of quietly
+ * adding an entry nothing will ever read.
+ */
+const INPUT_SLOTS: Readonly<Partial<Record<StandardOperationId, DtoSlot>>> = {
   createOne: "create",
   createMany: "create",
   updateOne: "update",
@@ -169,7 +175,9 @@ export class CrudEngine<Entity extends object> {
     context: CrudContext<Entity>,
   ): unknown {
     const { deserializer, config } = this.deps;
-    const slot = INPUT_SLOTS[descriptor.id];
+    // A custom id is simply absent from the table; the cast narrows for the
+    // lookup and `noUncheckedIndexedAccess` keeps the miss visible.
+    const slot = INPUT_SLOTS[descriptor.id as StandardOperationId];
     const dto = descriptor.input ?? (slot !== undefined ? config.dto.resolve(slot, descriptor.id) : null);
 
     switch (descriptor.id) {
