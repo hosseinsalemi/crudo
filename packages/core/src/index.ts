@@ -105,6 +105,9 @@ export type { CrudService, IdentifiedInput } from "./service/crud-service.js";
 // Runtime (Milestone B) — implementations of the contracts above.
 // ════════════════════════════════════════════════════════════════════
 
+// ── Type-system guards ────────────────────────────────────────────────
+export { assertNever } from "./types/assert-never.js";
+
 // ── Entity metadata seam ──────────────────────────────────────────────
 export type { CrudInfrastructure, EntityMetadata, FieldKind, FieldMetadata } from "./metadata/entity-metadata.js";
 export {
