@@ -6,8 +6,9 @@ pagination, nested includes, field selection, optional per-operation DTOs,
 transactions, and problem-details errors — behind generated NestJS routes,
 configurable at global, entity, operation, and per-call scope.
 
-Built phase-by-phase from [`crudo-phases-v6.md`](crudo-phases-v6.md) (the
-authoritative spec; its Naming Conventions section is normative).
+The design is documented in [`packages/docs`](packages/docs) — the
+architecture notes and ADRs there are authoritative, and the naming
+conventions in [`CLAUDE.md`](CLAUDE.md) are normative.
 
 ## Packages
 
@@ -21,9 +22,13 @@ Design docs, glossary, and ADRs live in [`packages/docs`](packages/docs).
 
 ## Status
 
-**Milestone A — Blueprint (Phases 1–3): complete.** Architecture,
-monorepo, and the full `@crudo/core` contract/type system; no runtime
-code yet. Next: Milestone B (walking skeleton), starting at Phase 4.
+**Milestones A–C: complete.** The full CRUD surface runs end-to-end —
+filtering, sorting, pagination, layered configuration, problem-details
+errors, operation control, soft delete/restore/purge, and nested relation
+includes — through TypeORM behind generated NestJS routes.
+
+Remaining work (DX API, reference application, npm release) is tracked in
+[`packages/docs/roadmap.md`](packages/docs/roadmap.md).
 
 ## Development
 

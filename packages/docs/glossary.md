@@ -1,9 +1,9 @@
 # Glossary
 
-One canonical name per concept. Every phase and document uses these terms
-and no synonyms; a synonym in a later phase is a review finding. Naming
-rules themselves (prefixes, casing, suffixes) live in the Naming
-Conventions section of `crudo-phases-v6.md`.
+One canonical name per concept. Every document uses these terms and no
+synonyms; a synonym introduced later is a review finding. The naming rules
+themselves (prefixes, casing, suffixes) live in the Conventions section of
+[`CLAUDE.md`](../../CLAUDE.md).
 
 | Term                   | Meaning                                                                                                                                  | Not called                      |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |

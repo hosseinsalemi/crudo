@@ -1,7 +1,10 @@
 # Crudo documentation
 
-Design documentation for the Crudo framework, produced by Milestones A–C
-of `crudo-phases-v6.md` and maintained alongside the code.
+Design documentation for the Crudo framework, maintained alongside the code.
+
+These documents and the [ADRs](adr/) are authoritative. The `(Phase N)` tags
+below are historical provenance from the retired build plan; remaining unbuilt
+work lives in [roadmap.md](roadmap.md).
 
 ## Milestone A — Blueprint
 
