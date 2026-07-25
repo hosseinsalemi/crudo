@@ -52,7 +52,7 @@ export class DefaultOperationRegistry<Entity = unknown> implements OperationRegi
 interface StandardOperationShape {
   readonly kind: OperationKind;
   readonly cardinality: OperationCardinality;
-  /** Enabled in the Milestone B skeleton; the rest activate in C. */
+  /** Whether the operation is on unless config says otherwise. */
   readonly enabled: boolean;
   /**
    * Operates on soft-deleted rows (Phase 14), so it only makes sense on a
@@ -67,25 +67,18 @@ interface StandardOperationShape {
  * through the registry — these are just its default entries (ADR-0006),
  * and `@crudo/nest` route generation walks the same registry.
  *
- * `enabled` here is the *unconditional* default. The batch (`*Many`)
- * entries are registered disabled until bulk is built: calling one raises
- * `OperationDisabledException`, and no route is generated — a real seam,
- * not a TODO. `restoreOne`/`purgeOne` layer the Phase 14 rule on top
- * (see {@link createOperationRegistry}).
+ * `enabled` here is the *unconditional* default;
+ * `restoreOne`/`purgeOne` layer the Phase 14 soft-delete rule on top (see
+ * {@link createOperationRegistry}).
  */
 export const STANDARD_OPERATIONS: Readonly<Record<StandardOperationId, StandardOperationShape>> = Object.freeze({
   createOne: { kind: "write", cardinality: "one", enabled: true },
-  createMany: { kind: "write", cardinality: "many", enabled: false },
   findOne: { kind: "read", cardinality: "one", enabled: true },
   findMany: { kind: "read", cardinality: "many", enabled: true },
   updateOne: { kind: "write", cardinality: "one", enabled: true },
-  updateMany: { kind: "write", cardinality: "many", enabled: false },
   patchOne: { kind: "write", cardinality: "one", enabled: true },
-  patchMany: { kind: "write", cardinality: "many", enabled: false },
   deleteOne: { kind: "write", cardinality: "one", enabled: true },
-  deleteMany: { kind: "write", cardinality: "many", enabled: false },
   restoreOne: { kind: "write", cardinality: "one", enabled: false, requiresSoftDelete: true },
-  restoreMany: { kind: "write", cardinality: "many", enabled: false, requiresSoftDelete: true },
   purgeOne: { kind: "write", cardinality: "one", enabled: false, requiresSoftDelete: true },
 });
 

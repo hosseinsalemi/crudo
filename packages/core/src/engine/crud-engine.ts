@@ -47,11 +47,8 @@ export interface CrudEngineDependencies<Entity extends object> {
  */
 const INPUT_SLOTS: Readonly<Partial<Record<StandardOperationId, DtoSlot>>> = {
   createOne: "create",
-  createMany: "create",
   updateOne: "update",
-  updateMany: "update",
   patchOne: "patch",
-  patchMany: "patch",
 };
 
 /**
@@ -241,13 +238,12 @@ export class CrudEngine<Entity extends object> {
           total,
           meta: {},
         },
-        bulk: null,
       };
     }
 
     if (result === null || result === undefined) {
       // Void results: deleteOne and purgeOne.
-      return { operation: descriptor.id, item: null, list: null, bulk: null };
+      return { operation: descriptor.id, item: null, list: null };
     }
 
     const itemDto = (descriptor.output as DtoClass<object> | null) ?? config.dto.resolve("item", descriptor.id);
@@ -255,7 +251,6 @@ export class CrudEngine<Entity extends object> {
       operation: descriptor.id,
       item: serializer.serializeItem(result as Entity, itemDto, context),
       list: null,
-      bulk: null,
     };
   }
 }

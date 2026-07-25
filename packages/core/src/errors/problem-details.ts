@@ -8,13 +8,6 @@ export interface QueryIssueDto {
   readonly detail: string;
 }
 
-/** One per-index failure of a bulk request (`items[]` extension). */
-export interface BulkItemIssueDto {
-  readonly index: number;
-  readonly code: CrudoErrorCode;
-  readonly detail: string;
-}
-
 /**
  * Default serialized error shape: an RFC 9457 problem-details document
  * with Crudo extensions. The `@crudo/nest` exception filter maps it 1:1;
@@ -34,6 +27,4 @@ export interface ProblemDetailsDto {
   readonly code: CrudoErrorCode;
   /** Crudo extension: field-level query issues (400s from Phase 5). */
   readonly errors?: readonly QueryIssueDto[];
-  /** Crudo extension: per-index bulk failures (Phase 14). */
-  readonly items?: readonly BulkItemIssueDto[];
 }

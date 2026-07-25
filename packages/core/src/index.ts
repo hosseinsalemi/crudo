@@ -41,16 +41,13 @@ export type { FilterBuilder } from "./query/filter-builder.js";
 // ── DTO system ────────────────────────────────────────────────────────
 export type { DtoClass, DtoSlot, Dto, DtoResolver, OperationDtoMap } from "./dto/dto.js";
 export type { ListMetaDto, ListResultDto } from "./dto/list-result.js";
-export type { BulkItemFailureDto, BulkResultDto } from "./dto/bulk-result.js";
 
 // ── Errors ────────────────────────────────────────────────────────────
 export type { CrudoErrorCode, CrudException, ErrorContext, ErrorHandler } from "./errors/crud-exception.js";
-export type { BulkItemIssueDto, ProblemDetailsDto, QueryIssueDto } from "./errors/problem-details.js";
+export type { ProblemDetailsDto, QueryIssueDto } from "./errors/problem-details.js";
 
 // ── Configuration ─────────────────────────────────────────────────────
 export type {
-  BulkMode,
-  BulkSettings,
   CrudoSettings,
   ErrorSettings,
   PaginationSettings,
@@ -99,7 +96,7 @@ export type {
 
 // ── Service surface ───────────────────────────────────────────────────
 export type { CrudCallOptions } from "./service/crud-call-options.js";
-export type { CrudService, IdentifiedInput } from "./service/crud-service.js";
+export type { CrudService } from "./service/crud-service.js";
 
 // ════════════════════════════════════════════════════════════════════
 // Runtime (Milestone B) — implementations of the contracts above.
@@ -126,7 +123,6 @@ export {
 } from "./errors/error-catalog.js";
 export {
   AlreadyDeletedException,
-  BulkOperationException,
   ConfigurationException,
   ConflictException,
   CrudoException,

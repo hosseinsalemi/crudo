@@ -1,7 +1,7 @@
 import type { CrudException } from "./crud-exception.js";
 import type { ProblemDetailsDto } from "./problem-details.js";
 import { ERROR_CATALOG } from "./error-catalog.js";
-import { BulkOperationException, QueryValidationException } from "./exceptions.js";
+import { QueryValidationException } from "./exceptions.js";
 
 /** Base URI under which every problem `type` lives (ADR-0009). */
 const PROBLEM_TYPE_BASE = "https://crudo.dev/errors/";
@@ -42,9 +42,6 @@ export function toProblemDetails(exception: CrudException, options: ProblemDetai
     code: exception.code,
     ...(exception instanceof QueryValidationException && {
       errors: exception.issues,
-    }),
-    ...(exception instanceof BulkOperationException && {
-      items: exception.items,
     }),
   };
 }

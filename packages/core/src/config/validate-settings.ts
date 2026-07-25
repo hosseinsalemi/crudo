@@ -89,13 +89,4 @@ export function validateSettings(entityName: string, settings: CrudoSettings): v
       );
     }
   }
-
-  if (settings.bulk.mode !== "atomic" && settings.bulk.mode !== "bestEffort") {
-    throw new ConfigurationException(
-      entityName,
-      "bulk.mode",
-      `expected "atomic" or "bestEffort", got ${JSON.stringify(settings.bulk.mode)}`,
-    );
-  }
-  positiveInt("bulk.maxBatchSize", settings.bulk.maxBatchSize);
 }

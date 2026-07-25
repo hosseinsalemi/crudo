@@ -75,14 +75,6 @@ export interface SoftDeleteSettings {
   readonly strategy: SoftDeleteMode;
 }
 
-/** Reserved for Phase 14 (bulk). */
-export type BulkMode = "atomic" | "bestEffort";
-
-export interface BulkSettings {
-  readonly mode: BulkMode;
-  readonly maxBatchSize: number;
-}
-
 /** The full settings tree. */
 export interface CrudoSettings {
   readonly pagination: PaginationSettings;
@@ -90,5 +82,4 @@ export interface CrudoSettings {
   readonly errors: ErrorSettings;
   readonly relations: RelationSettings;
   readonly softDelete: SoftDeleteSettings | false;
-  readonly bulk: BulkSettings;
 }

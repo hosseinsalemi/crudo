@@ -81,11 +81,6 @@ export const ERROR_CATALOG = {
     title: "Operation disabled",
     message: "Operation '{operation}' is disabled for {entity}.",
   },
-  CRUDO_BULK_FAILED: {
-    status: 422,
-    title: "Bulk operation failed",
-    message: "{failedCount} of {totalCount} items failed.",
-  },
   CRUDO_PERSISTENCE_FAILED: {
     status: 500,
     title: "Persistence failure",

@@ -97,9 +97,9 @@ describe("CrudEngine pipeline (Phase 7)", () => {
     expect(counted.total).toBe(1);
   });
 
-  it("raises OperationDisabledException for Milestone C operations", async () => {
+  it("raises OperationDisabledException for operations off by default", async () => {
     const { crud } = makeCrud();
-    await expect(crud.createMany([])).rejects.toBeInstanceOf(OperationDisabledException);
+    // `restoreOne` stays off until the entity config declares soft delete.
     await expect(crud.restoreOne(1)).rejects.toBeInstanceOf(OperationDisabledException);
   });
 

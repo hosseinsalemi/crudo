@@ -3,8 +3,8 @@ import type { CrudContext } from "../context/crud-context.js";
 
 /**
  * The write half of a repository adapter. Writer methods are single-entity
- * primitives — batch (`*Many`) operations are a thin engine-level loop over
- * these plus the bulk envelope (Phase 14), never adapter methods.
+ * primitives. Were the spec's optional batch surface ever built, it would
+ * be an engine-level loop over these — never new adapter methods.
  *
  * Writes participate in the ambient transaction on `context.transaction`
  * when one is active; until an adapter supplies one they are

@@ -1,7 +1,6 @@
-import type { BulkResultDto } from "../dto/bulk-result.js";
 import type { CrudCallOptions } from "./crud-call-options.js";
 import type { CrudRequest } from "../context/crud-request.js";
-import type { CrudService, IdentifiedInput } from "./crud-service.js";
+import type { CrudService } from "./crud-service.js";
 import type { EntityId } from "../types/entity-id.js";
 import type { EntityInput } from "../types/utility.js";
 import type { ListResultDto } from "../dto/list-result.js";
@@ -15,10 +14,10 @@ import { CrudEngine } from "../engine/crud-engine.js";
  * agnostic `CrudRequest`/`CrudResponse` envelopes; generated NestJS routes
  * delegate to the same engine, so both paths run the identical pipeline.
  *
- * Milestone C operations (`*Many`, restore, purge) exist on the interface
- * (contracts are complete since Phase 3) and dispatch like everything
- * else — their registry entries are disabled, so calling one raises
- * `OperationDisabledException` until their phase lands.
+ * Soft-delete operations (restore, purge) dispatch like everything else;
+ * their registry entries are enabled from config, so calling one on an
+ * entity that does not declare soft delete raises
+ * `OperationDisabledException`.
  */
 export class DefaultCrudService<
   Entity extends object,
@@ -35,7 +34,6 @@ export class DefaultCrudService<
   private request(partial: Partial<CrudRequest<Entity>> & { operation: OperationId }): CrudRequest<Entity> {
     return {
       id: null,
-      ids: null,
       body: null,
       query: null,
       options: null,
@@ -52,17 +50,6 @@ export class DefaultCrudService<
       }),
     );
     return response.item as ItemDto;
-  }
-
-  async createMany(data: readonly CreateDto[], options?: CrudCallOptions): Promise<BulkResultDto<ItemDto>> {
-    const response = await this.engine.execute(
-      this.request({
-        operation: "createMany",
-        body: data as never,
-        options: options ?? null,
-      }),
-    );
-    return response.bulk as BulkResultDto<ItemDto>;
   }
 
   async findOne(id: Id, query?: QueryDto, options?: CrudCallOptions): Promise<ItemDto> {
@@ -100,20 +87,6 @@ export class DefaultCrudService<
     return response.item as ItemDto;
   }
 
-  async updateMany(
-    items: readonly IdentifiedInput<Id, UpdateDto>[],
-    options?: CrudCallOptions,
-  ): Promise<BulkResultDto<ItemDto>> {
-    const response = await this.engine.execute(
-      this.request({
-        operation: "updateMany",
-        body: items as never,
-        options: options ?? null,
-      }),
-    );
-    return response.bulk as BulkResultDto<ItemDto>;
-  }
-
   async patchOne(id: Id, data: PatchDto, options?: CrudCallOptions): Promise<ItemDto> {
     const response = await this.engine.execute(
       this.request({
@@ -126,41 +99,13 @@ export class DefaultCrudService<
     return response.item as ItemDto;
   }
 
-  async patchMany(
-    items: readonly IdentifiedInput<Id, PatchDto>[],
-    options?: CrudCallOptions,
-  ): Promise<BulkResultDto<ItemDto>> {
-    const response = await this.engine.execute(
-      this.request({
-        operation: "patchMany",
-        body: items as never,
-        options: options ?? null,
-      }),
-    );
-    return response.bulk as BulkResultDto<ItemDto>;
-  }
-
   async deleteOne(id: Id, options?: CrudCallOptions): Promise<void> {
     await this.engine.execute(this.request({ operation: "deleteOne", id, options: options ?? null }));
-  }
-
-  async deleteMany(ids: readonly Id[], options?: CrudCallOptions): Promise<BulkResultDto<Id>> {
-    const response = await this.engine.execute(
-      this.request({ operation: "deleteMany", ids, options: options ?? null }),
-    );
-    return response.bulk as BulkResultDto<Id>;
   }
 
   async restoreOne(id: Id, options?: CrudCallOptions): Promise<ItemDto> {
     const response = await this.engine.execute(this.request({ operation: "restoreOne", id, options: options ?? null }));
     return response.item as ItemDto;
-  }
-
-  async restoreMany(ids: readonly Id[], options?: CrudCallOptions): Promise<BulkResultDto<ItemDto>> {
-    const response = await this.engine.execute(
-      this.request({ operation: "restoreMany", ids, options: options ?? null }),
-    );
-    return response.bulk as BulkResultDto<ItemDto>;
   }
 
   async purgeOne(id: Id, options?: CrudCallOptions): Promise<void> {

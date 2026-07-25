@@ -33,10 +33,4 @@ export const BUILT_IN_DEFAULTS: CrudoSettings = Object.freeze({
     field: "deletedAt",
     strategy: "auto" as const,
   }),
-  // `bulk` is a reserved key — validated and merged now so a later
-  // feature adds behavior, never a second config mechanism.
-  bulk: Object.freeze({
-    mode: "atomic" as const,
-    maxBatchSize: 500,
-  }),
 });

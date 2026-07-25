@@ -1,23 +1,12 @@
 /**
  * The standard operation ids. Every operation names its cardinality
- * explicitly: `<verb>One` for single-target, `<verb>Many` for batch.
- * "Bulk" is the feature term (config key `bulk`, `/bulk` routes), never a
- * method prefix.
+ * explicitly — all of them are `<verb>One` here, because the optional
+ * batch (`*Many`) surface the spec describes is not built: it says to drop
+ * it when out of scope, and the single-item CRUD surface is complete
+ * without it.
  */
 export type StandardOperationId =
-  | "createOne"
-  | "createMany"
-  | "findOne"
-  | "findMany"
-  | "updateOne"
-  | "updateMany"
-  | "patchOne"
-  | "patchMany"
-  | "deleteOne"
-  | "deleteMany"
-  | "restoreOne"
-  | "restoreMany"
-  | "purgeOne";
+  "createOne" | "findOne" | "findMany" | "updateOne" | "patchOne" | "deleteOne" | "restoreOne" | "purgeOne";
 
 /**
  * Any operation id — standard or custom (Phase 13). The `string & {}`

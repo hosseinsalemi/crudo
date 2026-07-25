@@ -19,7 +19,6 @@ const SETTINGS_KEYS = [
   "errors",
   "relations",
   "softDelete",
-  "bulk",
 ] as const satisfies readonly (keyof CrudoSettings)[];
 
 /**

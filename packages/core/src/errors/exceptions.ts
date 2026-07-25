@@ -1,5 +1,5 @@
 import type { CrudException, ErrorContext } from "./crud-exception.js";
-import type { BulkItemIssueDto, QueryIssueDto } from "./problem-details.js";
+import type { QueryIssueDto } from "./problem-details.js";
 import type { CatalogedErrorCode } from "./error-catalog.js";
 import { ERROR_CATALOG, renderMessage } from "./error-catalog.js";
 
@@ -116,19 +116,6 @@ export class NotDeletedException extends CrudoException {
 export class OperationDisabledException extends CrudoException {
   constructor(options: CrudoExceptionOptions = {}) {
     super("CRUDO_OPERATION_DISABLED", options);
-  }
-}
-
-/**
- * Reserved for bulk (Phase 14): an atomic batch that failed. Carries the
- * per-index failures that serialize into the `items[]` extension.
- */
-export class BulkOperationException extends CrudoException {
-  readonly items: readonly BulkItemIssueDto[];
-
-  constructor(items: readonly BulkItemIssueDto[], options: CrudoExceptionOptions = {}) {
-    super("CRUDO_BULK_FAILED", options);
-    this.items = items;
   }
 }
 

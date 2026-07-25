@@ -39,7 +39,10 @@ export function builtInHandlers<Entity extends object>(
     });
   };
 
-  const handlers: Partial<Record<StandardOperationId, OperationHandler<Entity, never, unknown>>> = {
+  // Total, not `Partial`: every standard operation has a built-in behavior
+  // now that the optional batch surface is gone, so a new operation cannot
+  // be added without one.
+  const handlers: Record<StandardOperationId, OperationHandler<Entity, never, unknown>> = {
     createOne: {
       async execute(input: Partial<Entity>, context: CrudContext<Entity>) {
         return adapter.create(input, context);
@@ -96,17 +99,5 @@ export function builtInHandlers<Entity extends object>(
     },
   };
 
-  return (id) => {
-    const handler = handlers[id];
-    if (handler === undefined) {
-      // The batch (`*Many`) operations are registered disabled; their
-      // handlers are unreachable until bulk binds real ones.
-      return {
-        execute(): Promise<never> {
-          throw new Error(`operation '${id}' has no built-in behavior yet`);
-        },
-      };
-    }
-    return handler as OperationHandler<Entity>;
-  };
+  return (id) => handlers[id] as OperationHandler<Entity>;
 }

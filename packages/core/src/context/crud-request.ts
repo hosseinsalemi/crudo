@@ -8,8 +8,8 @@ import type { CrudCallOptions } from "../service/crud-call-options.js";
  * The transport-agnostic request envelope handed to the engine — what the
  * framework layer (`@crudo/nest`) builds from an HTTP request, and what
  * programmatic callers are sugar for. Which members are populated depends
- * on the operation: `id` for `*One` targets, `ids` for id-based batches,
- * `body` for writes, `query` for reads.
+ * on the operation: `id` for `*One` targets, `body` for writes,
+ * `query` for reads.
  */
 export interface CrudRequest<
   Entity = unknown,
@@ -21,8 +21,7 @@ export interface CrudRequest<
 > {
   readonly operation: OperationId;
   readonly id: Id | null;
-  readonly ids: readonly Id[] | null;
-  readonly body: CreateDto | UpdateDto | PatchDto | readonly CreateDto[] | null;
+  readonly body: CreateDto | UpdateDto | PatchDto | null;
   readonly query: QueryDto | null;
   /** Per-call override scope — parameters, never config writes. */
   readonly options: CrudCallOptions | null;

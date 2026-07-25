@@ -154,7 +154,7 @@ function requireSoftDeletable<Entity extends object>(
   registry: OperationRegistry<Entity>,
 ): void {
   if (config.softDelete.strategy === "soft") return;
-  for (const id of ["restoreOne", "restoreMany", "purgeOne"] as const) {
+  for (const id of ["restoreOne", "purgeOne"] as const) {
     if (registry.get(id)?.enabled !== true) continue;
     throw new ConfigurationException(
       config.entityName,

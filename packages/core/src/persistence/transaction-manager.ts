@@ -31,14 +31,15 @@ export interface TransactionOptions {
  * Commit on resolve, rollback on reject — no partial outcomes.
  *
  * @remarks
- * Intentionally unimplemented, not dead. v6 has no standalone transaction
- * phase (see "Transactions, scoped down" under Phase 9/10 in
- * `crudo-phases-v6.md`): the only consumer of multi-write atomicity is bulk
- * `atomic` mode, which Phase 14 declares optional and this build dropped.
- * The binder, when bulk is built, is the adapter-level `runInTransaction`
- * hook — this interface (with `TransactionOptions` / `TransactionPropagation`)
- * is the Phase 3 contract it would be expressed through, kept because Phase 3
- * fixes the type system once and later phases never mutate core's types.
+ * Intentionally unimplemented, not dead — but read the caveat. v6 has no
+ * standalone transaction phase (see "Transactions, scoped down" under
+ * Phase 9/10 in `crudo-phases-v6.md`), and the only consumer multi-write
+ * atomicity ever had was the optional batch surface, which this build
+ * dropped outright: its types are gone from core, not merely disabled.
+ * That leaves this interface with **no** consumer in sight, which is a
+ * weaker justification than it had before. It is kept because Phase 3 fixes
+ * the type system once and later phases never mutate core's types; if that
+ * stops being reason enough, deleting it is the honest next step.
  * `TransactionContext` is already live: it is threaded through `CrudContext`
  * and `CrudCallOptions` as an opaque adapter handle.
  */

@@ -218,7 +218,6 @@ function makeHandler(
         const response = await this[CRUD_SERVICE_PROPERTY].engine.execute({
           operation: id,
           id: requestId,
-          ids: null,
           body: (body ?? null) as never,
           query: null,
           options: null,
