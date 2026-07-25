@@ -9,24 +9,39 @@ import { coerceScalar, isIssue } from "./value-coercion.js";
 import { parseBracketKey } from "./bracket-notation.js";
 
 /**
- * Wire token → AST operator (the Phase 5 single-source-of-truth table).
+ * The Phase 5 single-source-of-truth operator table, declared AST → wire so
+ * `satisfies Record<FilterOperator, string>` makes it *total*: adding a
+ * member to `FilterOperator` fails the build here until its wire token
+ * exists. Declared the other way round the table would only prove its
+ * values are operators, and a new operator would silently become
+ * unreachable from HTTP.
+ *
  * Tokens are camelCase and exact-case matched — one spelling, no aliases.
  */
-const WIRE_OPERATORS: Readonly<Record<string, FilterOperator>> = {
-  eq: "EQ",
-  ne: "NE",
-  gt: "GT",
-  gte: "GTE",
-  lt: "LT",
-  lte: "LTE",
-  in: "IN",
-  notIn: "NOT_IN",
-  like: "LIKE",
-  ilike: "ILIKE",
-  between: "BETWEEN",
-  isNull: "IS_NULL",
-  isNotNull: "IS_NOT_NULL",
-};
+const OPERATOR_TOKENS = {
+  EQ: "eq",
+  NE: "ne",
+  GT: "gt",
+  GTE: "gte",
+  LT: "lt",
+  LTE: "lte",
+  IN: "in",
+  NOT_IN: "notIn",
+  LIKE: "like",
+  ILIKE: "ilike",
+  BETWEEN: "between",
+  IS_NULL: "isNull",
+  IS_NOT_NULL: "isNotNull",
+} as const satisfies Record<FilterOperator, string>;
+
+/**
+ * The parse-direction lookup, derived so the two directions cannot drift.
+ * Keyed by `string` on purpose: it takes untrusted wire input, so a miss
+ * must yield `undefined` rather than be assumed present.
+ */
+const WIRE_OPERATORS: Readonly<Record<string, FilterOperator>> = Object.freeze(
+  Object.fromEntries(Object.entries(OPERATOR_TOKENS).map(([operator, token]) => [token, operator as FilterOperator])),
+);
 
 const LOGICAL_TOKENS = new Set(["and", "or", "not"]);
 
