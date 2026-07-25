@@ -4,8 +4,19 @@ import type { FieldPath } from "../types/field-path.js";
  * Comparison operators of the filter AST, in SCREAMING_SNAKE per the naming
  * conventions. Their camelCase wire tokens (`eq`, `notIn`, `isNotNull`, …)
  * belong to the query-string grammar (Phase 5); the AST never sees wire
- * spellings. Modeled as a string-literal union rather than an `enum` so
- * `@crudo/core` stays free of runtime code.
+ * spellings.
+ *
+ * Modeled as a string-literal union rather than a TypeScript `enum`:
+ * `isolatedModules` bans `const enum` outright, a plain `enum` emits a
+ * reverse-mapped runtime object that does not tree-shake, and its nominal
+ * typing would force every adapter to import a *value* from core just to
+ * spell an operator. (Not for lack of runtime code — ADR-0005 is about
+ * runtime *dependencies*, and core ships plenty of runtime: `ERROR_CATALOG`,
+ * `BUILT_IN_DEFAULTS`, `CrudEngine`, every exception class.)
+ *
+ * The union is kept honest by `OPERATOR_TOKENS` in `default-filter-parser`
+ * (every operator must have a wire token) and by the exhaustive switch in
+ * `@crudo/typeorm`'s `FilterTranslator` (every operator must translate).
  */
 export type FilterOperator =
   | "EQ"
