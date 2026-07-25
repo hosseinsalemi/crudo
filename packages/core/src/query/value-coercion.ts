@@ -1,6 +1,7 @@
 import type { FieldKind, FieldMetadata } from "../metadata/entity-metadata.js";
 import type { FilterScalar } from "./filter.js";
 import type { QueryIssueDto } from "../errors/problem-details.js";
+import { assertNever } from "../types/assert-never.js";
 
 /**
  * Locale-independent wire-value coercion (Phase 5): raw query-string
@@ -57,6 +58,11 @@ export function coerceScalar(
     }
     case "json":
       return issue(field, text, "filterable column (json columns cannot be compared)");
+    default:
+      // Today the return type alone forces every branch to produce a value;
+      // that safety is incidental and would lapse the moment someone adds an
+      // early return. This states it instead.
+      return assertNever(metadata.kind, "field kind");
   }
 }
 
