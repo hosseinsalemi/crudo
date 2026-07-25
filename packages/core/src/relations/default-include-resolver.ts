@@ -170,6 +170,22 @@ export class DefaultIncludeResolver<Entity extends object = object> implements I
   ): readonly string[] | null {
     const requested = request.fields[draft.path];
     if (requested === undefined) return null;
+    // `IncludeRequest.fields` types this as `readonly string[]`, but the
+    // programmatic `QueryContext.fields` entry point can hand a caller's
+    // malformed value straight through — the wire path (`parseFields`)
+    // guarantees an array of strings and never reaches this branch. A
+    // shape this far from what was declared must become an issue, not an
+    // uncaught `TypeError` from the loop below: that would surface as a
+    // 500, the same class of bug already closed for the top-level `fields`
+    // value in `QueryNormalizer.collapseFieldSelection`.
+    if (!Array.isArray(requested)) {
+      issues.push({
+        field: draft.path,
+        code: "CRUDO_QUERY_INVALID_VALUE",
+        detail: `'fields.${draft.path}' must be an array of field names.`,
+      });
+      return null;
+    }
     const allowed = target.allowlists.selectable as readonly string[];
     const fields: string[] = [];
     for (const field of requested) {

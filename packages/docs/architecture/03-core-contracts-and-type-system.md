@@ -121,8 +121,13 @@ silently drops — any relation-keyed key mixed into a structured literal, so
 a caller who blends the two spellings gets a `CRUDO_QUERY_INVALID_VALUE`
 issue naming the stray key, not a quietly ignored fieldset. A malformed
 `fields` value (not an array, not an object) is also an issue, never a
-thrown error — the one place in the pipeline where a shape mistake in this
-parameter has no later gate to catch it.
+thrown error. The same guarantee holds one level down: a per-relation
+fieldset value that is not an array (reachable only by a programmatic
+caller bypassing `FieldSelectionInput`'s type, never through the wire path,
+which always produces an array of strings) is rejected by
+`DefaultIncludeResolver.fieldsFor` the same way, rather than reaching the
+loop that walks it. A malformed shape anywhere in this parameter has no
+later gate to catch it, so each level guards itself.
 
 The normalized `FieldSelection` is deliberately _not_ widened — adapters
 and the engine still see exactly one shape, and all three spellings face

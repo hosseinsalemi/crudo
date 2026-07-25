@@ -289,6 +289,22 @@ describe("include serialization (Phase 15)", () => {
     });
   });
 
+  it("rejects a non-array relation fieldset value rather than throwing", async () => {
+    // Runtime strings — or, here, a caller bypassing the type entirely —
+    // can hand the resolver a shape `IncludeRequest.fields` was never meant
+    // to carry. This must fail the same way a malformed top-level `fields`
+    // value does: one issue, never an uncaught error that surfaces as 500.
+    const fixture = blog({
+      author: { relations: { edges: { posts: { includable: true } } } },
+    });
+    const { authors } = fixture;
+    await expect(
+      authors.findMany({ include: ["posts"], fields: { relations: { posts: 5 as never } } }),
+    ).rejects.toMatchObject({
+      issues: [{ field: "posts", code: "CRUDO_QUERY_INVALID_VALUE" }],
+    });
+  });
+
   it("omits relation keys that were not included", async () => {
     const fixture = blog({ author: { relations: { edges: { posts: { includable: true } } } } });
     const { authors, authorRows } = fixture;
