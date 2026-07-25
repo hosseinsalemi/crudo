@@ -46,7 +46,7 @@ describe("CrudEngine pipeline (Phase 7)", () => {
     } as never);
     const row = adapter.rows[0]!;
     expect(row.id).toBe(1); // client-sent id ignored (generated column)
-    expect((row as Record<string, unknown>)["role"]).toBeUndefined();
+    expect((row as unknown as Record<string, unknown>)["role"]).toBeUndefined();
   });
 
   it("returns the ListResultDto envelope from findMany", async () => {
@@ -144,7 +144,6 @@ describe("CrudEngine pipeline (Phase 7)", () => {
     const response = await crud.engine.execute({
       operation: "activate",
       id: null,
-      ids: null,
       body: {},
       query: null,
       options: null,

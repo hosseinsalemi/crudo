@@ -506,7 +506,8 @@ describe("@Crud Swagger request-body schemas", () => {
   });
 
   type Schema = {
-    properties?: Record<string, { type: string }>;
+    type?: string;
+    properties?: Record<string, Schema>;
     items?: Schema;
   };
 
@@ -527,8 +528,9 @@ describe("@Crud Swagger request-body schemas", () => {
     )?.[op]?.responses?.[status]?.content?.["application/json"]?.schema;
 
   it("documents the create body with the DTO's runtime shape", async () => {
-    const schema = document.paths["/todos"]?.post?.requestBody?.content?.["application/json"]?.schema as
-      Schema | undefined;
+    const schema = (
+      document.paths["/todos"] as Record<string, { requestBody?: { content?: Record<string, { schema?: Schema }> } }>
+    )?.["post"]?.requestBody?.content?.["application/json"]?.schema;
 
     // The body renders with real fields (not an empty {}): the bug was an
     // empty schema because @nestjs/swagger can't read runtime initializers.
@@ -586,7 +588,8 @@ describe("@Crud Swagger DTO slot fallbacks", () => {
   });
 
   type Schema = {
-    properties?: Record<string, { type: string }>;
+    type?: string;
+    properties?: Record<string, Schema>;
     items?: Schema;
   };
 

@@ -190,7 +190,7 @@ describe("Includes and soft delete (Phases 14–15)", () => {
     // scoped to live rows.
     const list = await articles.findMany({ withDeleted: true, include: ["notes"] });
     expect(list.items).toHaveLength(2);
-    const deleted = (list.items as { id: number; notes: unknown[] }[]).find((row) => row.id === articleId);
+    const deleted = (list.items as readonly { id: number; notes: unknown[] }[]).find((row) => row.id === articleId);
     expect(deleted?.notes).toHaveLength(1);
   });
 });
