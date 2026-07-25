@@ -10,6 +10,7 @@
 // ── Foundational types ────────────────────────────────────────────────
 export type { EntityId } from "./types/entity-id.js";
 export type { FieldPath, FieldPathDepth } from "./types/field-path.js";
+export type { IncludePath } from "./types/include-path.js";
 export type {
   ClassRef,
   DeepPartial,
@@ -18,6 +19,7 @@ export type {
   IsUnknown,
   NonFunctionKeys,
   Primitive,
+  ScalarKeys,
 } from "./types/utility.js";
 
 // ── Query model ───────────────────────────────────────────────────────
@@ -33,7 +35,7 @@ export type {
 } from "./query/filter.js";
 export type { Pagination, PaginationLimits, PaginationStrategy } from "./query/pagination.js";
 export type { Sort, SortDirection } from "./query/sort.js";
-export type { FieldSelection } from "./query/field-selection.js";
+export type { FieldSelection, FieldSelectionInput } from "./query/field-selection.js";
 export type { NormalizedQueryContext, QueryContext } from "./query/query-context.js";
 export type { FilterParser } from "./query/filter-parser.js";
 export type { FilterBuilder } from "./query/filter-builder.js";

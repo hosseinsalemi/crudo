@@ -90,7 +90,9 @@ fields:     root: [id, name, email]
 - **Field selection:** `fields=id,name,email` — sparse fieldset for the
   root resource, validated against the selectable allowlist.
   `fields[<relation path>]=id,title` narrows an included node, validated
-  against the _target_ entity's allowlist (doc 12).
+  against the _target_ entity's allowlist (doc 12). Programmatic callers
+  pass `FieldSelectionInput`, whose three spellings mirror these wire forms
+  and collapse to the same normalized selection (doc 03).
 - **Soft delete:** `withDeleted=true` includes soft-deleted rows, which
   are otherwise excluded from every read (Phase 14, doc 11). On an entity
   that is not soft-deletable it is rejected with

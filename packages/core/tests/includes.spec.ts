@@ -7,6 +7,7 @@ import type {
   EntityConfig,
   EntityMetadata,
   IncludeNode,
+  IncludePath,
 } from "@crudo/core";
 import {
   Author,
@@ -49,12 +50,16 @@ function blog(
   const authorAdapter = new SeededAdapter<Author>([]);
   const postAdapter = new SeededAdapter<Post>([]);
   const commentAdapter = new SeededAdapter<Comment>([]);
+  const adapters = new Map<unknown, unknown>([
+    [Author, authorAdapter],
+    [Post, postAdapter],
+    [Comment, commentAdapter],
+  ]);
   const crudo = createCrudo({
     ...options,
     infrastructure: {
       metadataFor: (entity) => metadata.get(entity) as never,
-      adapterFor: (entity) =>
-        (entity === Author ? authorAdapter : entity === Post ? postAdapter : commentAdapter) as never,
+      adapterFor: (entity) => adapters.get(entity) as never,
     },
   });
   const authors = crudo.createCrud(Author, configs.author as never) as DefaultCrudService<Author>;
@@ -97,7 +102,12 @@ describe("include resolution (Phase 15)", () => {
   it("rejects an unknown relation with the same 400", async () => {
     const fixture = blog({ author: { relations: { edges: { posts: { includable: true } } } } });
     const { authors } = fixture;
-    await expect(authors.findMany({ include: ["ghosts"] })).rejects.toBeInstanceOf(QueryValidationException);
+    // `IncludePath` rejects 'ghosts' at compile time now, which is the point
+    // of the type — but the *runtime* rejection is a separate guarantee and
+    // still has to hold: wire requests arrive as strings and never meet the
+    // type. Casting keeps that path under test.
+    const unknownPath = ["ghosts"] as unknown as readonly IncludePath<Author>[];
+    await expect(authors.findMany({ include: unknownPath })).rejects.toBeInstanceOf(QueryValidationException);
   });
 
   it("fails at bootstrap when an edge names a relation the entity does not have", () => {
@@ -246,6 +256,22 @@ describe("include serialization (Phase 15)", () => {
     const list = await authors.findMany({
       include: ["posts"],
       fields: { relations: { posts: ["id", "title"] } },
+    });
+    expect((list.items[0] as { posts: unknown[] }).posts[0]).toEqual({ id: 10, title: "First" });
+  });
+
+  it("accepts the relation-keyed fields spelling identically", async () => {
+    const fixture = blog({
+      author: { relations: { edges: { posts: { includable: true } } } },
+    });
+    const { authors, authorRows } = fixture;
+    authorRows.push(authorWithPosts());
+
+    // `{ posts: [...] }` is sugar for `{ relations: { posts: [...] } }` — the
+    // sugar has to survive include resolution, not just normalization.
+    const list = await authors.findMany({
+      include: ["posts"],
+      fields: { posts: ["id", "title"] },
     });
     expect((list.items[0] as { posts: unknown[] }).posts[0]).toEqual({ id: 10, title: "First" });
   });

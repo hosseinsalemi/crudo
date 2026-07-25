@@ -1,4 +1,4 @@
-import type { FieldSelection } from "./field-selection.js";
+import type { FieldSelection, FieldSelectionInput } from "./field-selection.js";
 import type { Filter, FilterExpression } from "./filter.js";
 import type { NormalizedQueryContext, QueryContext } from "./query-context.js";
 import type { PaginationStrategy } from "./pagination.js";
@@ -115,7 +115,7 @@ export class QueryNormalizer<Entity = unknown> {
       requireAllowlisted(entry.field as string, config.allowlists.sortable, "sorting", issues);
     }
 
-    const rootFields = input.fields?.root ?? null;
+    const { root: rootFields, relations: relationFields } = collapseFieldSelection<Entity>(input.fields);
     if (rootFields != null) {
       for (const field of rootFields) {
         requireAllowlisted(field as string, config.allowlists.selectable, "selection", issues);
@@ -123,7 +123,7 @@ export class QueryNormalizer<Entity = unknown> {
     }
     const fields: FieldSelection<Entity> = {
       root: rootFields,
-      relations: input.fields?.relations ?? {},
+      relations: relationFields,
     };
     const include = this.resolveIncludes(input.include ?? [], fields, config, issues);
 
@@ -292,6 +292,35 @@ function parseSort<Entity>(
     }
   }
   return result;
+}
+
+/**
+ * Collapse the three caller-facing `fields` spellings into the canonical
+ * `{ root, relations }` pair — the programmatic mirror of what
+ * {@link parseFields} does for wire params.
+ *
+ * Discrimination is structural and in this order: an array is root-only
+ * sugar; an object naming `root` or `relations` is the structured form;
+ * anything else is relation-keyed. That is what makes `root` and
+ * `relations` reserved keys (documented on `FieldSelectionInput`).
+ *
+ * Validation is deliberately *not* part of this function: the caller
+ * allowlist-checks `root` and hands `relations` to the include resolver, so
+ * every spelling passes through the same gates and the three cannot drift.
+ */
+function collapseFieldSelection<Entity>(input: FieldSelectionInput<Entity> | undefined): {
+  readonly root: readonly FieldPath<Entity, 1>[] | null;
+  readonly relations: Readonly<Record<string, readonly string[]>>;
+} {
+  if (input === undefined) return { root: null, relations: {} };
+  if (Array.isArray(input)) {
+    return { root: input as readonly FieldPath<Entity, 1>[], relations: {} };
+  }
+  const structured = input as Partial<FieldSelection<Entity>>;
+  if ("root" in structured || "relations" in structured) {
+    return { root: structured.root ?? null, relations: structured.relations ?? {} };
+  }
+  return { root: null, relations: input as Readonly<Record<string, readonly string[]>> };
 }
 
 function parseFields<Entity>(

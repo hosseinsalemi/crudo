@@ -126,3 +126,51 @@ describe("QueryNormalizer — programmatic input", () => {
     expect(issues[0]?.code).toBe("CRUDO_QUERY_INVALID_FIELD");
   });
 });
+
+/**
+ * `FieldSelectionInput` accepts three spellings so programmatic callers can
+ * write what the wire format looks like. They are sugar and nothing more:
+ * each must collapse to the *same* `NormalizedQueryContext` before the
+ * engine or any adapter sees it, and each must face the same validation.
+ */
+describe("QueryNormalizer — the three fields spellings", () => {
+  it("collapses root-only sugar and the structured form to one selection", () => {
+    const sugar = normalizer.normalizeInput({ fields: ["id", "name"] }, config);
+    const structured = normalizer.normalizeInput({ fields: { root: ["id", "name"] } }, config);
+
+    expect(sugar.fields).toEqual({ root: ["id", "name"], relations: {} });
+    expect(sugar).toEqual(structured);
+  });
+
+  it("treats an omitted and an empty selection alike", () => {
+    const omitted = normalizer.normalizeInput({}, config);
+    expect(omitted.fields).toEqual({ root: null, relations: {} });
+    expect(normalizer.normalizeInput({ fields: {} }, config)).toEqual(omitted);
+  });
+
+  it("reads a relation-keyed selection as relations, not as root fields", () => {
+    // No include resolver here, so a relation fieldset is *unsupported* —
+    // which is exactly the tell that `{ posts: [...] }` was routed to
+    // `relations` rather than misread as a root field list.
+    const relationKeyed = issuesOf(() => normalizer.normalizeInput({ fields: { posts: ["title"] } }, config));
+    const structured = issuesOf(() =>
+      normalizer.normalizeInput({ fields: { relations: { posts: ["title"] } } }, config),
+    );
+
+    expect(relationKeyed).toEqual(structured);
+    expect(relationKeyed[0]).toMatchObject({
+      field: "include",
+      code: "CRUDO_QUERY_UNSUPPORTED_PARAM",
+    });
+  });
+
+  it("rejects a non-allowlisted root field in either root spelling", () => {
+    for (const fields of [["password"], { root: ["password"] }] as const) {
+      const issues = issuesOf(() => normalizer.normalizeInput({ fields } as never, config));
+      expect(issues[0]).toMatchObject({
+        field: "password",
+        code: "CRUDO_QUERY_INVALID_FIELD",
+      });
+    }
+  });
+});

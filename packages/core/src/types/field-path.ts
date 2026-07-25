@@ -9,8 +9,14 @@ import type { IsAny, IsUnknown, Primitive } from "./utility.js";
  */
 export type FieldPathDepth = 1 | 2 | 3 | 4 | 5;
 
-/** Depth decrement table: `Prev[3]` is `2`. */
-type Prev = [never, 0, 1, 2, 3, 4, 5];
+/**
+ * Depth decrement table: `Prev[3]` is `2`.
+ *
+ * Exported for {@link IncludePath}, which reuses this counter rather than
+ * declaring a second one — ADR-0008's cap is meant to be one policy, not a
+ * pattern each path type re-implements. Internal: not on the barrel.
+ */
+export type Prev = [never, 0, 1, 2, 3, 4, 5];
 
 type PathInto<T, Depth extends 0 | FieldPathDepth> =
   // `any` / `unknown` (untyped entities, index-signature bags): degrade to

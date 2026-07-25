@@ -1,5 +1,13 @@
 import { Body, Delete, Get, HttpCode, Inject, Param, Patch, Post, Put, Query } from "@nestjs/common";
-import type { ClassRef, DefaultCrudService, EntityConfig, OperationDescriptor, StandardOperationId } from "@crudo/core";
+import type {
+  ClassRef,
+  DefaultCrudService,
+  EntityConfig,
+  EntityInput,
+  OperationDescriptor,
+  QueryContext,
+  StandardOperationId,
+} from "@crudo/core";
 import { WireQuery, createOperationRegistry } from "@crudo/core";
 import type { CrudHttpMethod, CrudRouteOptions } from "./operation-metadata.js";
 import { CRUD_CONTROLLER_METADATA, CRUD_SERVICE_PROPERTY, getCrudServiceToken } from "./tokens.js";
@@ -81,18 +89,42 @@ interface ResolvedRoute {
  * scan — Nest maps routes before any module lifecycle hook runs, so this
  * is the only moment that works. The service instance arrives later, via
  * the `forFeature` provider, through property injection.
+ *
+ * The generic parameters are inferred and exist purely to typecheck the
+ * call site: allowlist and relation-edge keys, DTO slots and custom-operation
+ * handlers are all checked against the entity, with no manual generic
+ * argument. The chain mirrors `createCrud`'s — `Entity` is inferred from
+ * `entity` alone, while each DTO slot stays its own inference site, so
+ * registering one slot does not constrain the others. Route generation
+ * itself is entity-agnostic, so everything below consumes the erased view.
  */
-export function Crud(entity: ClassRef, config?: EntityConfig<object>): ClassDecorator {
+export function Crud<
+  Entity extends object,
+  CreateDto = EntityInput<Entity>,
+  UpdateDto = EntityInput<Entity>,
+  PatchDto = Partial<UpdateDto>,
+  QueryDto = QueryContext<Entity>,
+  ItemDto = Entity,
+  ListDto = ItemDto,
+>(
+  entity: ClassRef<Entity>,
+  config?: EntityConfig<Entity, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto>,
+): ClassDecorator {
   return (target) => {
     const controller = target as unknown as {
       prototype: Record<string, unknown>;
     };
-    Reflect.defineMetadata(CRUD_CONTROLLER_METADATA, { entity, config } satisfies CrudControllerMetadata, target);
+    const erasedConfig = config as EntityConfig<object> | undefined;
+    Reflect.defineMetadata(
+      CRUD_CONTROLLER_METADATA,
+      { entity, config: erasedConfig } satisfies CrudControllerMetadata,
+      target,
+    );
     // Property injection: generated methods reach the bound service via
     // `this[CRUD_SERVICE_PROPERTY]` without touching the constructor.
     Inject(getCrudServiceToken(entity))(controller.prototype, CRUD_SERVICE_PROPERTY);
 
-    const registry = createOperationRegistry(config);
+    const registry = createOperationRegistry(erasedConfig);
     for (const descriptor of registry.all()) {
       if (!descriptor.enabled) continue;
       const route = resolveRoute(descriptor);
@@ -102,7 +134,7 @@ export function Crud(entity: ClassRef, config?: EntityConfig<object>): ClassDeco
         continue; // manual-method-wins
       }
       defineRoute(controller.prototype, methodName, descriptor, route);
-      applySwaggerMetadata(controller.prototype, methodName, descriptor, route, entity, config);
+      applySwaggerMetadata(controller.prototype, methodName, descriptor, route, entity, erasedConfig);
     }
   };
 }
