@@ -16,7 +16,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [20, "lts/*", "current"]
+        # Relative LTS aliases rather than a hardcoded major: this matrix
+        # tracks "current LTS and the two before it" and shifts forward on
+        # every Node LTS transition automatically, so it never drifts onto
+        # an unsupported major the way a pinned literal (previously `20`)
+        # eventually does.
+        node: ["lts/-2", "lts/-1", "lts/*", "current"]
 
     steps:
       - uses: actions/checkout@v4
@@ -49,7 +54,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: lts/*
           cache: pnpm
 
       - name: Install dependencies
