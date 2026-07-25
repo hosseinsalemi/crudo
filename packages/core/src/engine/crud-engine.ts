@@ -63,10 +63,10 @@ const INPUT_SLOTS: Readonly<Partial<Record<StandardOperationId, DtoSlot>>> = {
  * and deserialization needs the context — architecture doc 07 documents
  * this order as the authoritative one.
  *
- * Every stage boundary is a seam: handlers come from the registry
- * (Phase 13 swaps them), the serializer/deserializer and pagination
- * strategies are constructor-injected strategies, and the include stage
- * holds a plain default until Phase 15 lands.
+ * Every stage boundary is a seam: handlers come from the registry (config
+ * and `customOperations` swap them), and the serializer/deserializer,
+ * pagination strategies, and include resolver are all constructor-injected
+ * — `createCrud` supplies the defaults, callers may supply their own.
  */
 export class CrudEngine<Entity extends object> {
   constructor(private readonly deps: CrudEngineDependencies<Entity>) {}

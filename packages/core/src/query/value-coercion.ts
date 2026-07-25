@@ -21,8 +21,10 @@ export function coerceScalar(
   metadata: FieldMetadata | undefined,
 ): FilterScalar | QueryIssueDto {
   // Relation paths and unknown-but-allowlisted fields have no local column
-  // metadata in Milestone B; their values pass through as strings and the
-  // database compares them (Phase 15 wires target-entity metadata).
+  // metadata: the parser indexes the root entity's columns only, so their
+  // values pass through as strings and the database compares them. Wiring
+  // target-entity metadata through the relation registry would close the
+  // gap — Phase 15 shipped without doing it, so this is still open.
   if (metadata === undefined) return String(raw);
 
   if (raw === null || raw === "null") {

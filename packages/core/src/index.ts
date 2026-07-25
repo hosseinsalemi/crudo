@@ -99,7 +99,7 @@ export type { CrudCallOptions } from "./service/crud-call-options.js";
 export type { CrudService } from "./service/crud-service.js";
 
 // ════════════════════════════════════════════════════════════════════
-// Runtime (Milestone B) — implementations of the contracts above.
+// Runtime — implementations of the contracts above.
 // ════════════════════════════════════════════════════════════════════
 
 // ── Type-system guards ────────────────────────────────────────────────

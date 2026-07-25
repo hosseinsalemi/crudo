@@ -53,7 +53,10 @@ describe("QueryNormalizer — wire params (Phase 5 pipeline)", () => {
     });
   });
 
-  it("rejects include and withDeleted=true explicitly (deferred features)", () => {
+  // Both features ship; this normalizer is built without an include
+  // resolver and against a config that does not declare soft delete, so
+  // asking for either is unsupported *here* rather than unimplemented.
+  it("rejects include and withDeleted=true when neither is configured", () => {
     const issues = issuesOf(() => normalizer.normalizeWire({ include: "posts", withDeleted: "true" }, config));
     const codes = issues.map((issue) => issue.code);
     expect(codes).toEqual(["CRUDO_QUERY_UNSUPPORTED_PARAM", "CRUDO_QUERY_UNSUPPORTED_PARAM"]);
