@@ -20,3 +20,32 @@ export interface FieldSelection<Entity = unknown> {
    */
   readonly relations: Readonly<Record<string, readonly string[]>>;
 }
+
+/**
+ * The three caller-facing spellings of a fieldset, all collapsing to one
+ * {@link FieldSelection} in `QueryNormalizer.normalizeInput`:
+ *
+ * - `['id', 'name']` — root-only sugar, mirroring `?fields=id,name`.
+ * - `{ root: [...], relations: { posts: [...] } }` — the structured form.
+ * - `{ posts: ['id', 'title'] }` — relation-keyed, mirroring `?fields[posts]=`.
+ *
+ * The normalized form is deliberately *not* widened: adapters and the engine
+ * still see exactly one shape. Only the input is forgiving.
+ *
+ * `root` and `relations` are therefore reserved keys — a relation genuinely
+ * named `root` or `relations` must use the structured form, which is the
+ * price of the sugar reading the way the wire format does.
+ *
+ * The third member excludes `root`/`relations` (`& { root?: never;
+ * relations?: never }`) so it cannot structurally satisfy the second: without
+ * that, a relation-keyed record is a subtype of `Partial<FieldSelection>`
+ * with every property optional, which swallows the structured form and
+ * silences its excess-property checking — `{ root: ['nope'] }` would
+ * typecheck with no complaint about the misspelled field. `normalizeInput`'s
+ * runtime discrimination keys off exactly these two names, so this keeps the
+ * type and the runtime agreeing on what "structured" means.
+ */
+export type FieldSelectionInput<Entity = unknown> =
+  | readonly FieldPath<Entity, 1>[]
+  | Partial<FieldSelection<Entity>>
+  | (Readonly<Record<string, readonly string[]>> & { root?: never; relations?: never });

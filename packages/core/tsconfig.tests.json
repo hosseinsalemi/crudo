@@ -1,0 +1,19 @@
+{
+  // Typecheck-only project for `tests/`. The build (`tsconfig.json`) deliberately
+  // compiles `src` alone so tests never reach `dist/`, which left test sources
+  // unchecked entirely — this config closes that gap and is what makes the
+  // `expectTypeOf` assertions in `tests/types/` enforceable. Not composite and
+  // not referenced from the root solution: it emits nothing.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "types": ["node"],
+    // Mirrors the vitest aliases: tests exercise sources, not `dist/`.
+    "paths": {
+      "@crudo/core": ["./src/index.ts"]
+    }
+  },
+  "include": ["tests"]
+}

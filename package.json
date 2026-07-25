@@ -11,12 +11,14 @@
     "clean": "tsc -b --clean",
     "depcruise": "depcruise packages --config .dependency-cruiser.cjs",
     "test": "vitest run",
+    "typecheck": "tsc -p packages/core/tsconfig.tests.json && tsc -p packages/orms/typeorm/tsconfig.tests.json && tsc -p packages/frameworks/nest/tsconfig.tests.json && tsc -p packages/examples/tsconfig.tests.json",
     "prettify": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "pnpm run build && pnpm run depcruise && pnpm run test"
+    "check": "pnpm run build && pnpm run typecheck && pnpm run depcruise && pnpm run test"
   },
   "devDependencies": {
     "@swc/core": "^1.7.26",
+    "@types/node": "^22.0.0",
     "dependency-cruiser": "^16.10.0",
     "prettier": "^3.9.6",
     "typescript": "^5.5.4",

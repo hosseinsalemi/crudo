@@ -1,4 +1,4 @@
-import type { FieldSelection } from "./field-selection.js";
+import type { FieldSelection, FieldSelectionInput } from "./field-selection.js";
 import type { Filter, FilterExpression } from "./filter.js";
 import type { NormalizedQueryContext, QueryContext } from "./query-context.js";
 import type { PaginationStrategy } from "./pagination.js";
@@ -115,7 +115,7 @@ export class QueryNormalizer<Entity = unknown> {
       requireAllowlisted(entry.field as string, config.allowlists.sortable, "sorting", issues);
     }
 
-    const rootFields = input.fields?.root ?? null;
+    const { root: rootFields, relations: relationFields } = collapseFieldSelection<Entity>(input.fields, issues);
     if (rootFields != null) {
       for (const field of rootFields) {
         requireAllowlisted(field as string, config.allowlists.selectable, "selection", issues);
@@ -123,7 +123,7 @@ export class QueryNormalizer<Entity = unknown> {
     }
     const fields: FieldSelection<Entity> = {
       root: rootFields,
-      relations: input.fields?.relations ?? {},
+      relations: relationFields,
     };
     const include = this.resolveIncludes(input.include ?? [], fields, config, issues);
 
@@ -292,6 +292,58 @@ function parseSort<Entity>(
     }
   }
   return result;
+}
+
+/**
+ * Collapse the three caller-facing `fields` spellings into the canonical
+ * `{ root, relations }` pair — the programmatic mirror of what
+ * {@link parseFields} does for wire params.
+ *
+ * Discrimination is structural and in this order: an array is root-only
+ * sugar; an object naming `root` or `relations` is the structured form;
+ * anything else is relation-keyed. That is what makes `root` and
+ * `relations` reserved keys (documented on `FieldSelectionInput`).
+ *
+ * Shape validation *is* part of this function — unlike the rest of the
+ * fieldset (which the caller allowlist-checks and the include resolver
+ * validates), a malformed `fields` value has no later gate to catch it, so
+ * this is the one place it can be. A non-object value or a structured
+ * literal mixing in a relation-keyed key both fail the same way `parseFields`
+ * fails the equivalent wire input: an issue, not a thrown error — nothing
+ * here may throw, or it surfaces as a 500 instead of a 400.
+ */
+function collapseFieldSelection<Entity>(
+  input: FieldSelectionInput<Entity> | undefined,
+  issues: QueryIssueDto[],
+): {
+  readonly root: readonly FieldPath<Entity, 1>[] | null;
+  readonly relations: Readonly<Record<string, readonly string[]>>;
+} {
+  if (input === undefined) return { root: null, relations: {} };
+  if (Array.isArray(input)) {
+    return { root: input as readonly FieldPath<Entity, 1>[], relations: {} };
+  }
+  if (input === null || typeof input !== "object") {
+    issues.push({
+      field: "fields",
+      code: "CRUDO_QUERY_INVALID_VALUE",
+      detail: "'fields' must be an array, or an object of relation fieldsets.",
+    });
+    return { root: null, relations: {} };
+  }
+  const structured = input as Partial<FieldSelection<Entity>>;
+  if ("root" in structured || "relations" in structured) {
+    const unknownKeys = Object.keys(structured).filter((key) => key !== "root" && key !== "relations");
+    for (const key of unknownKeys) {
+      issues.push({
+        field: `fields.${key}`,
+        code: "CRUDO_QUERY_INVALID_VALUE",
+        detail: `'fields.${key}' cannot be mixed with 'root'/'relations' — use 'relations.${key}' instead.`,
+      });
+    }
+    return { root: structured.root ?? null, relations: structured.relations ?? {} };
+  }
+  return { root: null, relations: input as Readonly<Record<string, readonly string[]>> };
 }
 
 function parseFields<Entity>(

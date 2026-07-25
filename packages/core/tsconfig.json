@@ -3,7 +3,12 @@
   "compilerOptions": {
     "composite": true,
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    // ADR-0005: core imports nothing. Without this, TS auto-includes every
+    // root @types package (added for tests/ — see tsconfig.tests.json) as
+    // ambient globals, which depcruise cannot see because they are not
+    // imports: `process.env` and `Buffer` would silently compile in src.
+    "types": []
   },
   "include": ["src"]
 }

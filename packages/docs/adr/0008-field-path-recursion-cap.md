@@ -26,3 +26,8 @@ Depth is capped by a tuple-decrement counter: default 3, hard maximum 5
 - The degrade-to-`string` rule means untyped entities lose checking
   silently; documented, and acceptable against the alternative of breaking
   them.
+- The cap is **one policy, not a pattern**: `IncludePath` (issue #6) reuses
+  this decision's `Prev` counter, default depth, hard maximum and
+  degradation rules rather than declaring its own. A second path type that
+  needed a different recursion policy would be a reason to revisit this
+  ADR, not to fork it.
