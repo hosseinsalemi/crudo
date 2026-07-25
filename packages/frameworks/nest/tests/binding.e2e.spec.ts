@@ -4,22 +4,39 @@ import request from "supertest";
 import { Controller, Get, type INestApplication } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { Test } from "@nestjs/testing";
-import type { DefaultCrudService, OperationHandler } from "@crudo/core";
+import type { DefaultCrudService, NormalizedQueryContext, OperationHandler } from "@crudo/core";
+import type { CrudoModuleOptions } from "@crudo/nest";
 import { Crud, CrudoModule, enumProp, getCrudServiceToken, oneOfArray } from "@crudo/nest";
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
 
 let app: INestApplication;
 let adapter: InMemoryTodoAdapter;
 
-async function bootstrap(controller: unknown): Promise<void> {
+interface BootstrapOptions {
+  readonly defaults?: CrudoModuleOptions["defaults"];
+  /**
+   * Serve the app behind the qs-"extended" query parser (Express 4's
+   * default) instead of Express 5's "simple" one — the nested-object shape
+   * `flattenQuery` exists to normalize.
+   */
+  readonly extendedQueryParser?: boolean;
+}
+
+async function bootstrap(controller: unknown, options: BootstrapOptions = {}): Promise<void> {
   adapter = new InMemoryTodoAdapter();
   const moduleRef = await Test.createTestingModule({
     imports: [
-      CrudoModule.forRoot({ infrastructure: fakeInfrastructure(adapter) }),
+      CrudoModule.forRoot({ infrastructure: fakeInfrastructure(adapter), defaults: options.defaults }),
       CrudoModule.forFeature([controller as never]),
     ],
   }).compile();
   app = moduleRef.createNestApplication();
+  if (options.extendedQueryParser === true) {
+    (app.getHttpAdapter().getInstance() as { set(setting: string, value: string): void }).set(
+      "query parser",
+      "extended",
+    );
+  }
   await app.init();
 }
 
@@ -76,6 +93,16 @@ describe("@Crud route generation (Phases 11–12)", () => {
     expect(response.body.items).toHaveLength(2);
   });
 
+  it("rejects a repeated pagination param with a 400 rather than crashing", async () => {
+    // `?limit=1&limit=2` reaches the binding as an array; it must survive
+    // flattening intact so the normalizer can call it a bad value.
+    const response = await request(server()).get("/todos?limit=1&limit=2").expect(400);
+    expect(response.body).toMatchObject({ code: "CRUDO_QUERY_INVALID" });
+    expect(response.body.errors).toContainEqual(
+      expect.objectContaining({ field: "limit", code: "CRUDO_QUERY_INVALID_VALUE" }),
+    );
+  });
+
   it("parses the wire grammar into the filter AST (flat bracket keys)", async () => {
     await request(server()).post("/todos").send({ title: "x" }).expect(201);
     await request(server()).get("/todos?filter[done][eq]=true&filter[priority][gte]=2&sort=-priority").expect(200);
@@ -127,6 +154,97 @@ describe("@Crud route generation (Phases 11–12)", () => {
   it("generates no *Many/restore/purge routes while those are disabled", async () => {
     await request(server()).patch("/todos/1/restore").expect(404);
     await request(server()).delete("/todos/1/purge").expect(404);
+  });
+});
+
+describe("@Crud page pagination over the wire (Phase 5)", () => {
+  @Crud(Todo, { pagination: { strategy: "page", defaultLimit: 2, maxLimit: 3 } })
+  @Controller("todos")
+  class PagedController {}
+
+  beforeEach(async () => {
+    await bootstrap(PagedController);
+    for (let i = 1; i <= 7; i++) {
+      await request(server())
+        .post("/todos")
+        .send({ title: `t${i}` })
+        .expect(201);
+    }
+  });
+
+  const titles = (body: { items: { title: string }[] }): string[] => body.items.map((item) => item.title);
+
+  it("serves the requested 1-indexed page", async () => {
+    const response = await request(server()).get("/todos?page[number]=2&page[size]=2").expect(200);
+    expect(titles(response.body)).toEqual(["t3", "t4"]);
+  });
+
+  it("reports limit/offset in the envelope even under the page strategy", async () => {
+    const response = await request(server()).get("/todos?page[number]=2&page[size]=2").expect(200);
+    expect(response.body).toMatchObject({ limit: 2, offset: 2, total: 7 });
+  });
+
+  it("starts page 1 at offset 0 and falls back to defaultLimit", async () => {
+    const response = await request(server()).get("/todos?page[number]=1").expect(200);
+    expect(response.body).toMatchObject({ limit: 2, offset: 0 });
+    expect(titles(response.body)).toEqual(["t1", "t2"]);
+  });
+
+  it("clamps page[size] to maxLimit before computing the offset", async () => {
+    const response = await request(server()).get("/todos?page[number]=3&page[size]=99").expect(200);
+    expect(response.body).toMatchObject({ limit: 3, offset: 6, total: 7 });
+    expect(titles(response.body)).toEqual(["t7"]);
+  });
+
+  it("ignores limit/offset once the page strategy is in force", async () => {
+    const response = await request(server()).get("/todos?limit=5&offset=5").expect(200);
+    expect(response.body).toMatchObject({ limit: 2, offset: 0 });
+  });
+
+  it("maps a page number below 1 to a 400 problem-details document", async () => {
+    const response = await request(server())
+      .get("/todos?page[number]=0")
+      .expect(400)
+      .expect("Content-Type", /application\/problem\+json/);
+    expect(response.body.errors).toContainEqual(
+      expect.objectContaining({ field: "page[number]", code: "CRUDO_QUERY_INVALID_VALUE" }),
+    );
+  });
+});
+
+describe("@Crud query-parser agnosticism (Phases 11–12)", () => {
+  @Crud(Todo)
+  @Controller("todos")
+  class TodoController {}
+
+  const wireQuery =
+    "?filter[done][eq]=true&filter[priority][gte]=2&filter[title][in][]=a&filter[title][in][]=b" +
+    "&filter[or][0][priority][eq]=5&filter[or][1][title][eq]=z&sort=-priority,title&limit=2&offset=1";
+
+  async function normalizedQueryUnder(extendedQueryParser: boolean): Promise<NormalizedQueryContext<Todo> | null> {
+    await bootstrap(TodoController, { extendedQueryParser });
+    await request(server()).get(`/todos${wireQuery}`).expect(200);
+    return adapter.lastQuery;
+  }
+
+  it("reaches the same normalized query whether the parser is simple or extended", async () => {
+    const simple = await normalizedQueryUnder(false);
+    await app.close();
+    const extended = await normalizedQueryUnder(true);
+    // The nested-object parse is the branch `flattenQuery` exists for
+    // (doc 10 §2); equality of the normalized query is what "the binding is
+    // parser-agnostic" means.
+    expect(extended).toEqual(simple);
+  });
+
+  it("still builds the filter AST under the extended parser", async () => {
+    const query = await normalizedQueryUnder(true);
+    expect(query?.filter.root).toMatchObject({ kind: "group", operator: "AND" });
+    expect(query?.sort).toEqual([
+      { field: "priority", direction: "desc" },
+      { field: "title", direction: "asc" },
+    ]);
+    expect(query?.pagination).toEqual({ limit: 2, offset: 1 });
   });
 });
 
@@ -194,6 +312,54 @@ describe("@Crud operation control surface", () => {
     expect(response.body).toMatchObject({ id: 1, done: true });
     // Service-only: no route.
     await request(server()).post("/todos/recalculate").expect(404);
+  });
+});
+
+describe("CrudoExceptionFilter — non-Crudo handler failures (Phase 6)", () => {
+  const exploding: OperationHandler<Todo> = {
+    async execute() {
+      throw new Error("connection to shard-7 refused");
+    },
+  };
+
+  @Crud(Todo, {
+    customOperations: {
+      explode: { handler: exploding, meta: { routes: { method: "POST", path: "explode" } } },
+    },
+  })
+  @Controller("todos")
+  class ExplodingController {}
+
+  it("answers with a problem-details document at the catalog status", async () => {
+    await bootstrap(ExplodingController);
+    const response = await request(server())
+      .post("/todos/explode")
+      .expect(500)
+      .expect("Content-Type", /application\/problem\+json/);
+    expect(response.body).toMatchObject({
+      type: "https://crudo.dev/errors/crudo-persistence-failed",
+      title: "Persistence failure",
+      status: 500,
+      code: "CRUDO_PERSISTENCE_FAILED",
+    });
+  });
+
+  it("keeps the driver detail out of the body while exposeInternals is off", async () => {
+    await bootstrap(ExplodingController);
+    const response = await request(server()).post("/todos/explode").expect(500);
+    expect(JSON.stringify(response.body)).not.toContain("shard-7");
+  });
+
+  it("leaks the cause only when exposeInternals is turned on", async () => {
+    await bootstrap(ExplodingController, { defaults: { errors: { exposeInternals: true } } });
+    const response = await request(server()).post("/todos/explode").expect(500);
+    expect(response.body.detail).toContain("shard-7");
+  });
+
+  it("reports the occurrence as a correlation URN", async () => {
+    await bootstrap(ExplodingController);
+    const response = await request(server()).post("/todos/explode").expect(500);
+    expect(response.body.instance).toMatch(/^urn:crudo:request:/);
   });
 });
 
