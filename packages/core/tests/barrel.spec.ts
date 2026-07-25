@@ -1,0 +1,216 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+import * as barrel from "@crudo/core";
+
+/**
+ * The public surface of `@crudo/core`, as a manifest.
+ *
+ * ADR-0010 makes the barrel a deliberate explicit named list so the public
+ * surface "changes only on purpose", and the Phase 18 api-extractor gate
+ * will diff against it. Until that gate exists nothing detects an export
+ * added or removed by accident — a stray `export` in an unrelated commit
+ * is invisible in review once the diff is long enough.
+ *
+ * Kept as an inline list rather than a vitest snapshot on purpose: a
+ * snapshot invites `-u`, which turns an intentional-by-design change into
+ * a reflex. Adding a name here should cost a moment's thought.
+ *
+ * Type-only exports erase at runtime, so the manifest is checked against
+ * the *source* of the barrel — `import * as` would see barely a third of
+ * it. The last test pins the runtime half against the same list, catching
+ * what source-parsing cannot: a name the barrel claims but cannot resolve.
+ */
+const PUBLIC_SURFACE: readonly string[] = [
+  "AlreadyDeletedException",
+  "BUILT_IN_DEFAULTS",
+  "CatalogedErrorCode",
+  "ClassRef",
+  "ConfigurationException",
+  "ConflictException",
+  "CrudCallOptions",
+  "CrudContext",
+  "CrudContextInit",
+  "CrudContextState",
+  "CrudEngine",
+  "CrudEngineDependencies",
+  "CrudException",
+  "CrudInfrastructure",
+  "CrudRequest",
+  "CrudResponse",
+  "CrudRuntime",
+  "CrudService",
+  "CrudoErrorCode",
+  "CrudoException",
+  "CrudoExceptionOptions",
+  "CrudoInstance",
+  "CrudoOptions",
+  "CrudoSettings",
+  "CustomOperationConfig",
+  "DeepPartial",
+  "DefaultCrudContextState",
+  "DefaultCrudService",
+  "DefaultDeserializer",
+  "DefaultDtoResolver",
+  "DefaultEntityCatalog",
+  "DefaultErrorHandler",
+  "DefaultFilterParser",
+  "DefaultIncludeResolver",
+  "DefaultOperationRegistry",
+  "DefaultRelationRegistry",
+  "DefaultSerializer",
+  "DeleteStrategy",
+  "Deserializer",
+  "Dto",
+  "DtoClass",
+  "DtoResolver",
+  "DtoSlot",
+  "ERROR_CATALOG",
+  "EntityCatalog",
+  "EntityConfig",
+  "EntityId",
+  "EntityInput",
+  "EntityMetadata",
+  "EntityReader",
+  "EntityRuntimeInfo",
+  "EntityWriter",
+  "ErrorCatalogEntry",
+  "ErrorContext",
+  "ErrorHandler",
+  "ErrorSettings",
+  "FieldKind",
+  "FieldMetadata",
+  "FieldPath",
+  "FieldPathDepth",
+  "FieldSelection",
+  "Filter",
+  "FilterBuilder",
+  "FilterCondition",
+  "FilterExpression",
+  "FilterGroup",
+  "FilterOperator",
+  "FilterParser",
+  "FilterScalar",
+  "FilterValue",
+  "FindManyResult",
+  "GlobalConfig",
+  "HARD_DELETE",
+  "IdentifiedWrite",
+  "IncludeNode",
+  "IncludeRequest",
+  "IncludeResolver",
+  "IncludeTree",
+  "IsAny",
+  "IsUnknown",
+  "ListMetaDto",
+  "ListResultDto",
+  "LogicalOperator",
+  "MetadataSource",
+  "NonFunctionKeys",
+  "NormalizedQueryContext",
+  "NotDeletedException",
+  "NotFoundException",
+  "OffsetPaginationStrategy",
+  "OperationCardinality",
+  "OperationConfig",
+  "OperationDescriptor",
+  "OperationDisabledException",
+  "OperationDtoMap",
+  "OperationHandler",
+  "OperationId",
+  "OperationKind",
+  "OperationMetadata",
+  "OperationRegistry",
+  "PagePaginationStrategy",
+  "Pagination",
+  "PaginationLimits",
+  "PaginationSettings",
+  "PaginationStrategy",
+  "PaginationStrategyName",
+  "PersistenceException",
+  "Primitive",
+  "ProblemDetailsDto",
+  "ProblemDetailsOptions",
+  "QueryAllowlists",
+  "QueryContext",
+  "QueryIssueDto",
+  "QueryNormalizer",
+  "QuerySettings",
+  "QueryValidationException",
+  "RelationCardinality",
+  "RelationDescriptor",
+  "RelationEdgeSettings",
+  "RelationLoadStrategy",
+  "RelationRegistry",
+  "RelationSettings",
+  "RepositoryAdapter",
+  "ResolvedEntityConfig",
+  "ResolvedQueryAllowlists",
+  "ResolvedSoftDelete",
+  "STANDARD_OPERATIONS",
+  "Serializer",
+  "SoftDeletable",
+  "SoftDeleteMode",
+  "SoftDeleteSettings",
+  "Sort",
+  "SortDirection",
+  "StandardHandlerFactory",
+  "StandardOperationId",
+  "StateKey",
+  "TransactionContext",
+  "TransactionException",
+  "TransactionManager",
+  "TransactionOptions",
+  "TransactionPropagation",
+  "WireQuery",
+  "assertNever",
+  "builtInHandlers",
+  "builtInPaginationStrategies",
+  "createCrud",
+  "createCrudContext",
+  "createCrudo",
+  "createOperationRegistry",
+  "deepFreeze",
+  "describeResolvedConfig",
+  "dtoShapeKeys",
+  "mergeSettings",
+  "parseBracketKey",
+  "renderMessage",
+  "resolveEntityConfig",
+  "resolveSoftDelete",
+  "toProblemDetails",
+  "validateSettings",
+];
+
+/** Export names in the barrel source, both `export type` and value forms. */
+function exportedNames(): string[] {
+  const source = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/[^\n]*/g, "");
+  const names: string[] = [];
+  for (const match of source.matchAll(/export\s+(?:type\s+)?\{([^}]*)\}\s*from/g)) {
+    for (const raw of (match[1] ?? "").split(",")) {
+      const name = raw.trim().replace(/^type\s+/, "");
+      if (name.length > 0) names.push(name.includes(" as ") ? (name.split(" as ").pop() as string).trim() : name);
+    }
+  }
+  return names;
+}
+
+describe("@crudo/core public surface (ADR-0010)", () => {
+  it("exports exactly the manifest", () => {
+    expect([...exportedNames()].sort()).toEqual([...PUBLIC_SURFACE].sort());
+  });
+
+  it("names each export once", () => {
+    const names = exportedNames();
+    expect(names).toHaveLength(new Set(names).size);
+  });
+
+  it("resolves every runtime export the manifest claims", () => {
+    // Guards the half source-parsing cannot see: a name listed in the
+    // barrel that does not actually resolve at runtime.
+    const runtime = Object.keys(barrel).sort();
+    expect(runtime.filter((name) => !PUBLIC_SURFACE.includes(name))).toEqual([]);
+    expect(runtime.length).toBeGreaterThan(0);
+  });
+});
