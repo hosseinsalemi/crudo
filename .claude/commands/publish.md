@@ -27,7 +27,7 @@ phase applies from the context above:
   yet) — this is the normal case on a feature/main state with unreleased
   commits.
 - **Tag phase** applies when you're on `main`, the tree is clean, `main` is
-  up to date with `origin/main`, and the *current* lockstep version has no
+  up to date with `origin/main`, and the _current_ lockstep version has no
   tag yet but the commit that set that version (a `chore(release): vX.Y.Z`
   commit) is already on `main` — i.e. the prepare-phase PR was just merged.
   `$ARGUMENTS` of `tag` forces this phase explicitly if detection is wrong.
@@ -50,7 +50,7 @@ phase applies from the context above:
 
    Take the highest severity found. Bump `packages/core/package.json`'s
    current version by that level (standard semver: major resets minor/patch
-   to 0, minor resets patch to 0). State the computed version and *why*
+   to 0, minor resets patch to 0). State the computed version and _why_
    (which commits triggered the bump level) before touching any files.
 
 3. **Apply the version, in lockstep** (ADR-0004 — [`packages/docs/adr/0004-lockstep-versioning.md`](../../packages/docs/adr/0004-lockstep-versioning.md)):
