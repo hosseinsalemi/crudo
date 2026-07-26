@@ -90,6 +90,11 @@ guarantee — the join table never reaches the main query. `Pet.tags` (the
 example app) is what first exercises this path; no adapter or core change
 was needed to support it.
 
+`Owner.address` (`@OneToOne`, owning side on `Owner`) is the example app's
+one-to-one relation: cardinality falls out of the metadata adapter's
+existing `isOneToMany || isManyToMany ? "many" : "one"` rule with no special
+case, and `auto` resolves it to `join` exactly like `Pet.owner`.
+
 ## 4. Interplay
 
 - **Sparse fieldsets:** keys needed for stitching are always fetched and

@@ -26,8 +26,9 @@ import { CreateOwnerDto, UpdateOwnerDto, OwnerItemDto, OwnerListDto } from "./ow
   softDelete: { strategy: "soft" },
   // `include=pets` — opt-in per relation (Phase 15). Pets are a to-many,
   // so they batch-load: one extra query per page of owners, never a joined
-  // row explosion under pagination.
-  relations: { edges: { pets: { includable: true } } },
+  // row explosion under pagination. `address` is the to-one counterpart —
+  // it joins instead.
+  relations: { edges: { pets: { includable: true }, address: { includable: true } } },
   operations: {
     purgeOne: true,
   },
