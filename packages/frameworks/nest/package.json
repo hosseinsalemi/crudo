@@ -1,10 +1,19 @@
 {
   "name": "@kavo/nest",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Kavo NestJS binding — @Crud decorator, registry-driven route generation, problem-details exception filter, Swagger integration.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kavo-labs/kavo.git",
+    "directory": "packages/frameworks/nest"
+  },
+  "homepage": "https://github.com/kavo-labs/kavo/tree/main/packages/frameworks/nest#readme",
   "type": "module",
   "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -18,7 +27,7 @@
     "build": "tsc -b"
   },
   "dependencies": {
-    "@kavo/core": "workspace:*"
+    "@kavo/core": "workspace:^"
   },
   "peerDependencies": {
     "@nestjs/common": "^10.0.0 || ^11.0.0",

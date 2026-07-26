@@ -1,10 +1,19 @@
 {
   "name": "@kavo/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Kavo core — framework- and ORM-independent contracts and type system. Zero runtime dependencies.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kavo-labs/kavo.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/kavo-labs/kavo/tree/main/packages/core#readme",
   "type": "module",
   "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

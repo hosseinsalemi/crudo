@@ -81,7 +81,7 @@ importers:
   packages/frameworks/nest:
     dependencies:
       '@kavo/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../../core
     devDependencies:
       '@nestjs/common':
@@ -115,7 +115,7 @@ importers:
   packages/orms/typeorm:
     dependencies:
       '@kavo/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../../core
     devDependencies:
       better-sqlite3:
