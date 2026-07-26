@@ -353,11 +353,46 @@ describe("Pet example app", () => {
       .post("/owners")
       .send({ name: "First", email: "first@x.io", address: address.body.id })
       .expect(201);
-    await request(server())
+    const conflict = await request(server())
       .post("/owners")
       .send({ name: "Second", email: "second@x.io", address: address.body.id })
       .expect(409)
       .expect("Content-Type", /application\/problem\+json/);
+    expect(conflict.body.code).toBe("CRUDO_CONFLICT");
+  });
+
+  it("rejects associating a nonexistent address id as a conflict, not a silent drop", async () => {
+    const created = await request(server())
+      .post("/owners")
+      .send({ name: "Rex", email: "rex@x.io", address: 999999 })
+      .expect(409)
+      .expect("Content-Type", /application\/problem\+json/);
+    expect(created.body.code).toBe("CRUDO_CONFLICT");
+
+    const owner = await request(server()).post("/owners").send({ name: "Sam", email: "sam@x.io" }).expect(201);
+    const updateConflict = await request(server())
+      .put(`/owners/${owner.body.id}`)
+      .send({ name: "Sam", email: "sam@x.io", address: 999999 })
+      .expect(409)
+      .expect("Content-Type", /application\/problem\+json/);
+    expect(updateConflict.body.code).toBe("CRUDO_CONFLICT");
+  });
+
+  it("refuses to delete an address still referenced by an owner (409, not a silent null or cascade)", async () => {
+    const address = await request(server())
+      .post("/addresses")
+      .send({ street: "1 Referenced Ln", city: "Bindingtown", postalCode: "60006" })
+      .expect(201);
+    await request(server())
+      .post("/owners")
+      .send({ name: "Tara", email: "tara@x.io", address: address.body.id })
+      .expect(201);
+
+    const conflict = await request(server())
+      .delete(`/addresses/${address.body.id}`)
+      .expect(409)
+      .expect("Content-Type", /application\/problem\+json/);
+    expect(conflict.body.code).toBe("CRUDO_CONFLICT");
   });
 
   it("documents include=address and fields[address] in the OpenAPI schema", () => {
