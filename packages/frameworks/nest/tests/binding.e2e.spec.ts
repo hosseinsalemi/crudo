@@ -425,6 +425,26 @@ describe("@Crud @Override — controller-method overrides that keep generated ro
     expect(response.body).toMatchObject({ title: "LOUD" });
   });
 
+  it("wires an explicit operationId to a differently-named method (id+body write), not just name-matched ones", async () => {
+    @Crud(Todo)
+    @Controller("todos")
+    class ExplicitIdOverrideController {
+      constructor(@Inject(getCrudServiceToken(Todo)) private readonly base: DefaultCrudService<Todo>) {}
+
+      // The method name is unrelated to "updateOne" — proves resolution
+      // uses the override map's target, not descriptor.id, end to end.
+      @Override("updateOne")
+      async customUpdate(id: string, body: { title: string }): Promise<unknown> {
+        return this.base.updateOne(id as never, { ...body, title: body.title.toUpperCase() } as never);
+      }
+    }
+
+    await bootstrap(ExplicitIdOverrideController);
+    await request(server()).post("/todos").send({ title: "x" }).expect(201);
+    const response = await request(server()).put("/todos/1").send({ title: "loud" }).expect(200);
+    expect(response.body).toMatchObject({ id: 1, title: "LOUD" });
+  });
+
   it("keeps a custom operation's own meta.routes shape (id-bearing route)", async () => {
     @Crud(Todo, {
       customOperations: {
