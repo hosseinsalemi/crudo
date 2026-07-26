@@ -191,9 +191,15 @@ export class CrudEngine<Entity extends object> {
           id: this.coerceId(request.id),
           data: deserializer.deserialize(request.body, dto, context),
         };
-      default:
-        // createOne and custom operations: the (deserialized) body.
-        return deserializer.deserialize(request.body, dto, context);
+      default: {
+        // createOne and custom operations: the (deserialized) body — plus
+        // the request id when one is present, so a custom operation
+        // addressed by `:id` (cardinality "one", same as updateOne/patchOne)
+        // can identify its target instead of losing it. createOne never
+        // carries an id, so this falls through to the body alone there.
+        const body = deserializer.deserialize(request.body, dto, context);
+        return request.id === null ? body : { id: this.coerceId(request.id), body };
+      }
     }
   }
 
