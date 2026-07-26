@@ -10,7 +10,7 @@ import type { QueryContext } from "../query/query-context.js";
 import type { OperationDescriptor, OperationRegistry } from "../operations/operation-registry.js";
 import type { StandardOperationId } from "../operations/operation.js";
 import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
-import type { CrudoSettings } from "../config/settings.js";
+import type { KavoSettings } from "../config/settings.js";
 import { OperationDisabledException, QueryValidationException } from "../errors/exceptions.js";
 import { QueryNormalizer } from "../query/query-normalizer.js";
 import { createCrudContext, randomUuid } from "../context/default-crud-context.js";
@@ -21,7 +21,7 @@ import type { FindManyResult } from "./built-in-handlers.js";
 
 /**
  * Marker wrapping *raw wire params* (`filter[age][gte]=18` as flat keys).
- * The framework layer (`@crudo/nest`) hands the engine one of these so the
+ * The framework layer (`@kavo/nest`) hands the engine one of these so the
  * full Phase 5 parse-and-coerce pipeline runs; programmatic callers pass a
  * typed `QueryContext` instead, which normalizes without coercion.
  */
@@ -134,7 +134,7 @@ export class CrudEngine<Entity extends object> {
     const { config } = this.deps;
     const base = config.settingsFor(request.operation);
     const overrides = request.options?.settings;
-    let settings: CrudoSettings = base;
+    let settings: KavoSettings = base;
     if (overrides !== undefined) {
       settings = mergeSettings(base, overrides);
       validateSettings(`${config.entityName} (per-call)`, settings);
@@ -210,7 +210,7 @@ export class CrudEngine<Entity extends object> {
     if (Number.isNaN(value)) {
       throw QueryValidationException.single({
         field: metadata.idField,
-        code: "CRUDO_QUERY_INVALID_VALUE",
+        code: "KAVO_QUERY_INVALID_VALUE",
         detail: `Value '${id}' for field '${metadata.idField}' is not a valid number.`,
       });
     }

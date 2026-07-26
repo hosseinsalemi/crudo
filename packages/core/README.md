@@ -1,6 +1,6 @@
-# @crudo/core
+# @kavo/core
 
-Framework- and ORM-independent contracts and type system for Crudo.
+Framework- and ORM-independent contracts and type system for Kavo.
 
 **Zero runtime dependencies** — this package must not depend on NestJS or
 TypeORM, directly or transitively (enforced by `.dependency-cruiser.cjs`).
@@ -25,7 +25,7 @@ src/
 └─ index.ts        Explicit named barrel — the public API surface
 ```
 
-Only the barrel (`@crudo/core`) is public API; deep imports are not.
+Only the barrel (`@kavo/core`) is public API; deep imports are not.
 
 See `packages/docs/architecture/03-core-contracts-and-type-system.md` for
 the generic-parameter table, `FieldPath` notes, and the module-augmentation

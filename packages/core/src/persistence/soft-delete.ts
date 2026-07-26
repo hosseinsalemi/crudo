@@ -1,4 +1,4 @@
-import type { CrudoSettings } from "../config/settings.js";
+import type { KavoSettings } from "../config/settings.js";
 import type { EntityMetadata } from "../metadata/entity-metadata.js";
 import { ConfigurationException } from "../errors/exceptions.js";
 
@@ -54,13 +54,13 @@ export const HARD_DELETE: ResolvedSoftDelete = Object.freeze({
  *
  * The marker field is the configured name when the entity has such a
  * column, else the one the ORM declares (`@DeleteDateColumn` in
- * `@crudo/typeorm`, surfaced as `EntityMetadata.softDeleteField`).
+ * `@kavo/typeorm`, surfaced as `EntityMetadata.softDeleteField`).
  * Explicit configuration therefore wins over ORM detection, and an entity
  * with neither costs nothing.
  */
 export function resolveSoftDelete<Entity>(
   metadata: EntityMetadata<Entity>,
-  settings: CrudoSettings,
+  settings: KavoSettings,
   scope: string = metadata.name,
 ): ResolvedSoftDelete {
   const softDelete = settings.softDelete;

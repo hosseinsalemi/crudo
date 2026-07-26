@@ -1,4 +1,4 @@
-import { oneOfArray } from "@crudo/nest";
+import { oneOfArray } from "@kavo/nest";
 import { CatItemDto } from "../cat/cat.dtos.js";
 import { DogItemDto } from "../dog/dog.dtos.js";
 import { AddressItemDto } from "../address/address.dtos.js";

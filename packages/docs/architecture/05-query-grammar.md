@@ -96,7 +96,7 @@ fields:     root: [id, name, email]
 - **Soft delete:** `withDeleted=true` includes soft-deleted rows, which
   are otherwise excluded from every read (Phase 14, doc 11). On an entity
   that is not soft-deletable it is rejected with
-  `CRUDO_QUERY_UNSUPPORTED_PARAM`, not ignored; a non-boolean value is a
+  `KAVO_QUERY_UNSUPPORTED_PARAM`, not ignored; a non-boolean value is a
   field-level 400.
 - **Includes:** `include=posts.comments,profile` — comma-separated
   dot-paths, merged into one validated tree (Phase 15, doc 12). A
@@ -109,7 +109,7 @@ fields:     root: [id, name, email]
   lists at bootstrap — explicitly configured, or defaulting to the
   entity's **own scalar columns** (relation paths are never allowlisted
   implicitly). Anything outside a list → 400
-  (`CRUDO_QUERY_INVALID_FIELD`), never a silent drop. Programmatic
+  (`KAVO_QUERY_INVALID_FIELD`), never a silent drop. Programmatic
   callers (`findMany({ filter })`) pass through the **same** allowlist
   and limit checks — typed input skips coercion, not security.
 - **Limits** (configurable per scope, Phase 8): `query.maxFilterDepth`

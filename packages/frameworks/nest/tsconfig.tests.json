@@ -10,8 +10,8 @@
     "useDefineForClassFields": false,
     "types": ["node"],
     "paths": {
-      "@crudo/core": ["../../core/src/index.ts"],
-      "@crudo/nest": ["./src/index.ts"]
+      "@kavo/core": ["../../core/src/index.ts"],
+      "@kavo/nest": ["./src/index.ts"]
     }
   },
   "include": ["tests"]

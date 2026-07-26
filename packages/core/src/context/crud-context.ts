@@ -32,7 +32,7 @@ export interface CrudContext<Entity = unknown> {
   readonly config: ResolvedEntityConfig<Entity>;
   /**
    * The authenticated caller — opaque to core. Set by the framework layer
-   * (`@crudo/nest` from the request), available to custom operation
+   * (`@kavo/nest` from the request), available to custom operation
    * handlers; core never inspects it (v6 ships no policy layer).
    */
   readonly principal: unknown;

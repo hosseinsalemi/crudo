@@ -12,7 +12,7 @@
     "types": ["node"],
     // Mirrors the vitest aliases: tests exercise sources, not `dist/`.
     "paths": {
-      "@crudo/core": ["./src/index.ts"]
+      "@kavo/core": ["./src/index.ts"]
     }
   },
   "include": ["tests"]

@@ -10,7 +10,7 @@ export interface OperationDescriptor<Entity = unknown, Input = unknown, Output =
   /**
    * Disabled entries stay in the registry (so tooling can report them) but
    * never execute — calling one raises `OperationDisabledException`, and
-   * `@crudo/nest` generates no route for it.
+   * `@kavo/nest` generates no route for it.
    */
   readonly enabled: boolean;
   readonly handler: OperationHandler<Entity, Input, Output>;
@@ -26,7 +26,7 @@ export interface OperationDescriptor<Entity = unknown, Input = unknown, Output =
  * operation through this registry — the built-in CRUD handlers are just
  * default entries, nothing about them is special-cased. Phase 13's
  * disable/override/custom config is a control surface over this registry,
- * and `@crudo/nest` route generation reads it — which is what makes later
+ * and `@kavo/nest` route generation reads it — which is what makes later
  * operations appear as routes with zero changes to the generator.
  */
 export interface OperationRegistry<Entity = unknown> {

@@ -11,7 +11,7 @@ import { AppModule } from "../src/app.module.js";
  * engine → TypeORM → SQLite — with filtering, sorting, pagination, DTO
  * projections, layered config, and problem-details errors. The schema
  * models single-table inheritance (Cat/Dog over one `pet` table) and an
- * Owner relation; crudo serves plain CRUD on each concrete entity, plus
+ * Owner relation; kavo serves plain CRUD on each concrete entity, plus
  * opt-in relation includes in both directions (asserted below).
  */
 let app: INestApplication;
@@ -122,12 +122,12 @@ describe("Pet example app", () => {
       .expect("Content-Type", /application\/problem\+json/);
     expect(response.body).toMatchObject({
       status: 400,
-      code: "CRUDO_QUERY_INVALID",
+      code: "KAVO_QUERY_INVALID",
       title: "Invalid query",
     });
     expect(response.body.errors).toEqual([
-      expect.objectContaining({ field: "password", code: "CRUDO_QUERY_INVALID_FIELD" }),
-      expect.objectContaining({ field: "age", code: "CRUDO_QUERY_INVALID_VALUE" }),
+      expect.objectContaining({ field: "password", code: "KAVO_QUERY_INVALID_FIELD" }),
+      expect.objectContaining({ field: "age", code: "KAVO_QUERY_INVALID_VALUE" }),
     ]);
   });
 
@@ -136,8 +136,8 @@ describe("Pet example app", () => {
     // relation of Cat — both are told, not ignored.
     const response = await request(server()).get("/cats").query("include=pets&withDeleted=true").expect(400);
     expect(response.body.errors.map((e: { code: string }) => e.code)).toEqual([
-      "CRUDO_QUERY_UNSUPPORTED_PARAM",
-      "CRUDO_QUERY_INVALID_FIELD",
+      "KAVO_QUERY_UNSUPPORTED_PARAM",
+      "KAVO_QUERY_INVALID_FIELD",
     ]);
   });
 
@@ -357,7 +357,7 @@ describe("Pet example app", () => {
       .send({ name: "Second", email: "second@x.io", address: address.body.id })
       .expect(409)
       .expect("Content-Type", /application\/problem\+json/);
-    expect(conflict.body.code).toBe("CRUDO_CONFLICT");
+    expect(conflict.body.code).toBe("KAVO_CONFLICT");
   });
 
   it("rejects associating a nonexistent address id as a conflict, not a silent drop", async () => {
@@ -366,7 +366,7 @@ describe("Pet example app", () => {
       .send({ name: "Rex", email: "rex@x.io", address: 999999 })
       .expect(409)
       .expect("Content-Type", /application\/problem\+json/);
-    expect(created.body.code).toBe("CRUDO_CONFLICT");
+    expect(created.body.code).toBe("KAVO_CONFLICT");
 
     const owner = await request(server()).post("/owners").send({ name: "Sam", email: "sam@x.io" }).expect(201);
     const updateConflict = await request(server())
@@ -374,7 +374,7 @@ describe("Pet example app", () => {
       .send({ name: "Sam", email: "sam@x.io", address: 999999 })
       .expect(409)
       .expect("Content-Type", /application\/problem\+json/);
-    expect(updateConflict.body.code).toBe("CRUDO_CONFLICT");
+    expect(updateConflict.body.code).toBe("KAVO_CONFLICT");
   });
 
   it("refuses to delete an address still referenced by an owner (409, not a silent null or cascade)", async () => {
@@ -391,7 +391,7 @@ describe("Pet example app", () => {
       .delete(`/addresses/${address.body.id}`)
       .expect(409)
       .expect("Content-Type", /application\/problem\+json/);
-    expect(conflict.body.code).toBe("CRUDO_CONFLICT");
+    expect(conflict.body.code).toBe("KAVO_CONFLICT");
   });
 
   it("documents include=address and fields[address] in the OpenAPI schema", () => {
@@ -515,7 +515,7 @@ describe("Pet example app", () => {
       .send({ name: "BadTag", age: 1, size: "small", indoor: true, livesLeft: 9, tags: [999999] })
       .expect(409)
       .expect("Content-Type", /application\/problem\+json/);
-    expect(response.body.code).toBe("CRUDO_CONFLICT");
+    expect(response.body.code).toBe("KAVO_CONFLICT");
   });
 
   it("cleans up the join table when a still-referenced tag is deleted", async () => {
@@ -536,7 +536,7 @@ describe("Pet example app", () => {
     // Dogs never declared `tags` includable — same allowlist rule as any
     // other relation (Phase 15).
     const response = await request(server()).get("/dogs").query("include=tags").expect(400);
-    expect(response.body.errors.map((e: { code: string }) => e.code)).toEqual(["CRUDO_QUERY_INVALID_FIELD"]);
+    expect(response.body.errors.map((e: { code: string }) => e.code)).toEqual(["KAVO_QUERY_INVALID_FIELD"]);
   });
 
   it("counts and slices distinct roots under pagination even when a cat has several tags", async () => {

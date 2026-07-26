@@ -10,9 +10,9 @@
     "useDefineForClassFields": false,
     "types": ["node"],
     "paths": {
-      "@crudo/core": ["../core/src/index.ts"],
-      "@crudo/typeorm": ["../orms/typeorm/src/index.ts"],
-      "@crudo/nest": ["../frameworks/nest/src/index.ts"]
+      "@kavo/core": ["../core/src/index.ts"],
+      "@kavo/typeorm": ["../orms/typeorm/src/index.ts"],
+      "@kavo/nest": ["../frameworks/nest/src/index.ts"]
     }
   },
   "include": ["tests"]

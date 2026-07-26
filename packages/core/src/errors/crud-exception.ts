@@ -6,7 +6,7 @@ import type { OperationId } from "../operations/operation.js";
  * Phase 6, and renaming a code is a breaking change (Phase 18 semver
  * policy).
  */
-export type CrudoErrorCode = `CRUDO_${string}`;
+export type KavoErrorCode = `KAVO_${string}`;
 
 /** Where an error happened — attached to exceptions and problem details. */
 export interface ErrorContext {
@@ -16,16 +16,16 @@ export interface ErrorContext {
 }
 
 /**
- * Contract every Crudo exception class (Phase 6) satisfies. Deliberately
- * an interface, not a base class: `@crudo/core` in Milestone A ships types
- * only, and downstream layers (the `@crudo/nest` exception filter) program
+ * Contract every Kavo exception class (Phase 6) satisfies. Deliberately
+ * an interface, not a base class: `@kavo/core` in Milestone A ships types
+ * only, and downstream layers (the `@kavo/nest` exception filter) program
  * against this shape, never against `instanceof`.
  *
  * Human-readable text is built from `messageKey` + `messageParams` so a
  * consumer can localize; `detail` carries the English default.
  */
 export interface CrudException {
-  readonly code: CrudoErrorCode;
+  readonly code: KavoErrorCode;
   /** HTTP status this error maps to (from the Phase 6 catalog). */
   readonly status: number;
   readonly messageKey: string;
@@ -41,7 +41,7 @@ export interface CrudException {
 }
 
 /**
- * Maps arbitrary thrown values to Crudo exceptions at the engine boundary.
+ * Maps arbitrary thrown values to Kavo exceptions at the engine boundary.
  * Adapter errors are translated by the adapter's own mapping table
  * (Phase 9); anything unrecognized becomes a `PersistenceException` with
  * the original as `cause`.

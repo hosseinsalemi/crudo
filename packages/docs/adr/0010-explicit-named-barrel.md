@@ -1,4 +1,4 @@
-# ADR-0010 — Explicit named barrel in `@crudo/core`
+# ADR-0010 — Explicit named barrel in `@kavo/core`
 
 **Status:** accepted (Phase 3)
 

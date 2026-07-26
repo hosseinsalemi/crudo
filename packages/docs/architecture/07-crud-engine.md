@@ -24,7 +24,7 @@ CrudResponse
 
 Deliberately lean: no validation stage, no hooks, no policy stage — the
 v6 tradeoff. Cross-cutting behavior lives in the consumer's own code
-around Crudo.
+around Kavo.
 
 ## 2. `CrudContext` contents
 
@@ -64,12 +64,12 @@ files and the ADR behind each, is
 - **Strategy** — repository adapter, serializer/deserializer, pagination
   strategies, error handler: all constructor-injected interfaces.
 - **Dependency Injection** — `CrudEngineDependencies` is plain
-  constructor injection; no container in core (`@crudo/nest` provides
+  constructor injection; no container in core (`@kavo/nest` provides
   one at the framework layer).
 
-## 5. Root factory (`createCrudo` / `createCrud`)
+## 5. Root factory (`createKavo` / `createCrud`)
 
-`createCrudo(options)` holds the global scope; `createCrud(Entity,
+`createKavo(options)` holds the global scope; `createCrud(Entity,
 config?, runtime?)` is bootstrap: resolve config (doc 08), build the
 registry with built-in handlers, wire serializer/deserializer/normalizer
 from entity metadata, and return the bound service. Metadata and adapter

@@ -1,13 +1,13 @@
 ---
 name: add-operation
-description: The end-to-end procedure for adding, overriding, or disabling a Crudo operation — registry entry, DTO slots, handler, route metadata, and tests. Use when a change introduces a new CRUD operation or a custom per-entity operation.
+description: The end-to-end procedure for adding, overriding, or disabling a Kavo operation — registry entry, DTO slots, handler, route metadata, and tests. Use when a change introduces a new CRUD operation or a custom per-entity operation.
 ---
 
 # Adding an operation
 
-The whole point of Crudo's design is that **adding an operation is adding a
+The whole point of Kavo's design is that **adding an operation is adding a
 registry entry** (ADR-0006). The engine loops over registry entries and
-`@crudo/nest` generates one route per enabled entry from the same registry. If
+`@kavo/nest` generates one route per enabled entry from the same registry. If
 your change needs a new `if` in the engine or in the route generator, the design
 is wrong — stop and reconsider.
 
@@ -44,7 +44,7 @@ Every entry is an `OperationDescriptor`
 ## Route metadata
 
 Core knows nothing about HTTP. Routes are expressed through `meta`, which
-`@crudo/nest` augments:
+`@kavo/nest` augments:
 
 ```ts
 meta: {
@@ -69,7 +69,7 @@ meta: {
 - DTO classes: request bodies `<Verb><Entity>Dto`; query/response shapes
   `<Entity><Slot>Dto`. Every wire-crossing shape carries `Dto`; behavioral
   contracts never do.
-- New exceptions are `*Exception` with a stable `CRUDO_SNAKE_CASE` code.
+- New exceptions are `*Exception` with a stable `KAVO_SNAKE_CASE` code.
 
 ## Where the work lands
 

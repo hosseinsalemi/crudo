@@ -4,7 +4,7 @@
 
 ## Context
 
-v6 ships `@crudo/core`, `@crudo/typeorm`, `@crudo/nest` — nothing else.
+v6 ships `@kavo/core`, `@kavo/typeorm`, `@kavo/nest` — nothing else.
 But the architecture claims ORM/framework independence, and a flat layout
 would make a future second adapter an awkward restructuring.
 

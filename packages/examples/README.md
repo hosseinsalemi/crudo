@@ -1,14 +1,14 @@
 # examples
 
 The checkpoint app: a small Pet domain served over HTTP by the real stack
-— `@Crud(...)`-generated NestJS routes → CRUD engine → `@crudo/typeorm` →
+— `@Crud(...)`-generated NestJS routes → CRUD engine → `@kavo/typeorm` →
 in-memory SQLite — with filtering, sorting, pagination, DTO projections
 (`item` vs. leaner `list`), layered config, Swagger docs, and RFC 9457
 problem-details errors. `Cat` and `Dog` are single-table-inheritance
 subtypes of `Pet`; `Owner` is the relation side, and is soft-deletable.
 
 ```bash
-pnpm build && pnpm --filter @crudo/examples start
+pnpm build && pnpm --filter @kavo/examples start
 # → http://localhost:3000/cats   (Swagger at /docs)
 ```
 

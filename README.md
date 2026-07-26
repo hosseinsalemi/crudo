@@ -1,4 +1,4 @@
-# Crudo
+# Kavo
 
 A production-grade CRUD framework for TypeScript: define an entity once
 (via TypeORM) and get the full REST CRUD surface — filtering, sorting,
@@ -12,11 +12,11 @@ conventions in [`CLAUDE.md`](CLAUDE.md) are normative.
 
 ## Packages
 
-| Package                                   | Role                                                       |
-| ----------------------------------------- | ---------------------------------------------------------- |
-| [`@crudo/core`](packages/core)            | Contracts, type system, engine — zero runtime dependencies |
-| [`@crudo/typeorm`](packages/orms/typeorm) | TypeORM adapter (`RepositoryAdapter` implementation)       |
-| [`@crudo/nest`](packages/frameworks/nest) | NestJS binding (`@Crud` decorator, route generation)       |
+| Package                                  | Role                                                       |
+| ---------------------------------------- | ---------------------------------------------------------- |
+| [`@kavo/core`](packages/core)            | Contracts, type system, engine — zero runtime dependencies |
+| [`@kavo/typeorm`](packages/orms/typeorm) | TypeORM adapter (`RepositoryAdapter` implementation)       |
+| [`@kavo/nest`](packages/frameworks/nest) | NestJS binding (`@Crud` decorator, route generation)       |
 
 Design docs, glossary, and ADRs live in [`packages/docs`](packages/docs).
 

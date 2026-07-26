@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { QueryNormalizer, resolveEntityConfig } from "@crudo/core";
+import { QueryNormalizer, resolveEntityConfig } from "@kavo/core";
 import { userMetadata } from "./support/user-fixture.js";
 import { issuesOf } from "./support/query-issues.js";
 
@@ -41,7 +41,7 @@ describe("QueryNormalizer — wire params (Phase 5 pipeline)", () => {
     const issues = issuesOf(() => normalizer.normalizeWire({ limit: "abc" }, config));
     expect(issues[0]).toMatchObject({
       field: "limit",
-      code: "CRUDO_QUERY_INVALID_VALUE",
+      code: "KAVO_QUERY_INVALID_VALUE",
     });
   });
 
@@ -49,7 +49,7 @@ describe("QueryNormalizer — wire params (Phase 5 pipeline)", () => {
     const issues = issuesOf(() => normalizer.normalizeWire({ sort: "-password" }, config));
     expect(issues[0]).toMatchObject({
       field: "password",
-      code: "CRUDO_QUERY_INVALID_FIELD",
+      code: "KAVO_QUERY_INVALID_FIELD",
     });
   });
 
@@ -59,7 +59,7 @@ describe("QueryNormalizer — wire params (Phase 5 pipeline)", () => {
   it("rejects include and withDeleted=true when neither is configured", () => {
     const issues = issuesOf(() => normalizer.normalizeWire({ include: "posts", withDeleted: "true" }, config));
     const codes = issues.map((issue) => issue.code);
-    expect(codes).toEqual(["CRUDO_QUERY_UNSUPPORTED_PARAM", "CRUDO_QUERY_UNSUPPORTED_PARAM"]);
+    expect(codes).toEqual(["KAVO_QUERY_UNSUPPORTED_PARAM", "KAVO_QUERY_UNSUPPORTED_PARAM"]);
   });
 
   it("accepts withDeleted=false (the default) without complaint", () => {
@@ -123,7 +123,7 @@ describe("QueryNormalizer — programmatic input", () => {
         config,
       ),
     );
-    expect(issues[0]?.code).toBe("CRUDO_QUERY_INVALID_FIELD");
+    expect(issues[0]?.code).toBe("KAVO_QUERY_INVALID_FIELD");
   });
 });
 
@@ -160,7 +160,7 @@ describe("QueryNormalizer — the three fields spellings", () => {
     expect(relationKeyed).toEqual(structured);
     expect(relationKeyed[0]).toMatchObject({
       field: "include",
-      code: "CRUDO_QUERY_UNSUPPORTED_PARAM",
+      code: "KAVO_QUERY_UNSUPPORTED_PARAM",
     });
   });
 
@@ -169,7 +169,7 @@ describe("QueryNormalizer — the three fields spellings", () => {
       const issues = issuesOf(() => normalizer.normalizeInput({ fields } as never, config));
       expect(issues[0]).toMatchObject({
         field: "password",
-        code: "CRUDO_QUERY_INVALID_FIELD",
+        code: "KAVO_QUERY_INVALID_FIELD",
       });
     }
   });
@@ -182,7 +182,7 @@ describe("QueryNormalizer — the three fields spellings", () => {
       const issues = issuesOf(() => normalizer.normalizeInput({ fields: bad } as never, config));
       expect(issues[0]).toMatchObject({
         field: "fields",
-        code: "CRUDO_QUERY_INVALID_VALUE",
+        code: "KAVO_QUERY_INVALID_VALUE",
       });
     }
   });
@@ -193,7 +193,7 @@ describe("QueryNormalizer — the three fields spellings", () => {
     );
     expect(issues[0]).toMatchObject({
       field: "fields.posts",
-      code: "CRUDO_QUERY_INVALID_VALUE",
+      code: "KAVO_QUERY_INVALID_VALUE",
     });
   });
 });

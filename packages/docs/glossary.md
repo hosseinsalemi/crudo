@@ -27,11 +27,11 @@ themselves (prefixes, casing, suffixes) live in the Conventions section of
 | **Include tree**       | The validated tree of relation nodes handed to the adapter.                                                                              | include graph                   |
 | **Field selection**    | Sparse fieldsets (`fields=`, `fields[rel]=`), applied after DTO mapping.                                                                 | projection                      |
 | **Bulk**               | The feature term for batch operations (config key `bulk`, `/bulk` routes, `BulkResultDto`). Never a method prefix — methods are `*Many`. | batch (in API names)            |
-| **Settings**           | The layered config values (`CrudoSettings`) merged through the precedence chain.                                                         | options (reserved for per-call) |
+| **Settings**           | The layered config values (`KavoSettings`) merged through the precedence chain.                                                          | options (reserved for per-call) |
 | **Resolved config**    | The frozen per-entity merge result (`ResolvedEntityConfig`), computed once at bootstrap.                                                 | effective config                |
 | **Per-call options**   | The last precedence link, passed as parameters (`CrudCallOptions`) — never config writes.                                                | overrides object                |
 | **Principal**          | The authenticated caller carried opaquely on the context.                                                                                | user, actor                     |
 | **Problem details**    | The RFC 9457 error document (`ProblemDetailsDto`) all errors serialize to.                                                               | error response                  |
-| **Error code**         | The stable `CRUDO_*` string identifying an error kind; API surface.                                                                      | error type                      |
+| **Error code**         | The stable `KAVO_*` string identifying an error kind; API surface.                                                                       | error type                      |
 | **Soft delete**        | Marking a row deleted via the marker field instead of removing it (Phase 14, doc 11). `restore` un-deletes; `purge` permanently removes. | archive, trash                  |
 | **Include**            | Embedding a relation in a response (`include=posts.comments`), opt-in per relation (Phase 15, doc 12).                                   | expand, join, populate          |

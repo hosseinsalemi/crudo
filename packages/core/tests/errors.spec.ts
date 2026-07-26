@@ -1,11 +1,11 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import type { CatalogedErrorCode, CrudException, QueryIssueDto } from "@crudo/core";
+import type { CatalogedErrorCode, CrudException, QueryIssueDto } from "@kavo/core";
 import {
   AlreadyDeletedException,
   ConfigurationException,
   ConflictException,
-  CrudoException,
+  KavoException,
   DefaultErrorHandler,
   ERROR_CATALOG,
   NotDeletedException,
@@ -16,40 +16,40 @@ import {
   TransactionException,
   renderMessage,
   toProblemDetails,
-} from "@crudo/core";
+} from "@kavo/core";
 
 /**
  * The shipped catalog, pinned. Codes are API surface — renaming, restatusing
  * or dropping one is a breaking change (Phase 6; Phase 18 semver policy), so
  * it should cost a deliberate edit here.
  *
- * `CRUDO_BULK_FAILED` is absent on purpose: bulk was dropped, so the code is
+ * `KAVO_BULK_FAILED` is absent on purpose: bulk was dropped, so the code is
  * not shipped (doc 06's table still lists it as reserved).
  */
 const CATALOG: Readonly<Record<CatalogedErrorCode, { status: number; title: string }>> = {
-  CRUDO_QUERY_INVALID: { status: 400, title: "Invalid query" },
-  CRUDO_QUERY_INVALID_FIELD: { status: 400, title: "Invalid query field" },
-  CRUDO_QUERY_INVALID_OPERATOR: { status: 400, title: "Invalid filter operator" },
-  CRUDO_QUERY_INVALID_VALUE: { status: 400, title: "Invalid query value" },
-  CRUDO_QUERY_LIMIT_EXCEEDED: { status: 400, title: "Query limit exceeded" },
-  CRUDO_QUERY_UNSUPPORTED_PARAM: { status: 400, title: "Unsupported query parameter" },
-  CRUDO_NOT_FOUND: { status: 404, title: "Not found" },
-  CRUDO_CONFLICT: { status: 409, title: "Conflict" },
-  CRUDO_ALREADY_DELETED: { status: 409, title: "Already deleted" },
-  CRUDO_NOT_DELETED: { status: 409, title: "Not deleted" },
-  CRUDO_OPERATION_DISABLED: { status: 405, title: "Operation disabled" },
-  CRUDO_PERSISTENCE_FAILED: { status: 500, title: "Persistence failure" },
-  CRUDO_TRANSACTION_FAILED: { status: 500, title: "Transaction failure" },
-  CRUDO_CONFIG_INVALID: { status: 500, title: "Invalid configuration" },
+  KAVO_QUERY_INVALID: { status: 400, title: "Invalid query" },
+  KAVO_QUERY_INVALID_FIELD: { status: 400, title: "Invalid query field" },
+  KAVO_QUERY_INVALID_OPERATOR: { status: 400, title: "Invalid filter operator" },
+  KAVO_QUERY_INVALID_VALUE: { status: 400, title: "Invalid query value" },
+  KAVO_QUERY_LIMIT_EXCEEDED: { status: 400, title: "Query limit exceeded" },
+  KAVO_QUERY_UNSUPPORTED_PARAM: { status: 400, title: "Unsupported query parameter" },
+  KAVO_NOT_FOUND: { status: 404, title: "Not found" },
+  KAVO_CONFLICT: { status: 409, title: "Conflict" },
+  KAVO_ALREADY_DELETED: { status: 409, title: "Already deleted" },
+  KAVO_NOT_DELETED: { status: 409, title: "Not deleted" },
+  KAVO_OPERATION_DISABLED: { status: 405, title: "Operation disabled" },
+  KAVO_PERSISTENCE_FAILED: { status: 500, title: "Persistence failure" },
+  KAVO_TRANSACTION_FAILED: { status: 500, title: "Transaction failure" },
+  KAVO_CONFIG_INVALID: { status: 500, title: "Invalid configuration" },
 };
 
-/** Every `CRUDO_*` code literal appearing anywhere in core's source. */
+/** Every `KAVO_*` code literal appearing anywhere in core's source. */
 function codesUsedInSource(): string[] {
   const root = new URL("../src/", import.meta.url);
   const files = readdirSync(root, { recursive: true, encoding: "utf8" }).filter((name) => name.endsWith(".ts"));
   const codes = new Set<string>();
   for (const file of files) {
-    for (const match of readFileSync(new URL(file, root), "utf8").matchAll(/CRUDO_[A-Z][A-Z0-9_]*/g)) {
+    for (const match of readFileSync(new URL(file, root), "utf8").matchAll(/KAVO_[A-Z][A-Z0-9_]*/g)) {
       codes.add(match[0]);
     }
   }
@@ -58,7 +58,7 @@ function codesUsedInSource(): string[] {
 
 describe("ERROR_CATALOG completeness (Phase 6)", () => {
   it("catalogs every error code core's source actually uses", () => {
-    // `CrudoErrorCode` is an open template type, so the compiler cannot
+    // `KavoErrorCode` is an open template type, so the compiler cannot
     // close this gap: a new code with no catalog entry would render a title
     // of "Error" at runtime and go unnoticed.
     const used = codesUsedInSource();
@@ -89,19 +89,19 @@ describe("ERROR_CATALOG completeness (Phase 6)", () => {
 
 describe("renderMessage — message key + params (Phase 6)", () => {
   it("interpolates every {param} placeholder from the params bag", () => {
-    expect(renderMessage("CRUDO_NOT_FOUND", { entity: "User", id: "7" })).toBe("User with id '7' was not found.");
+    expect(renderMessage("KAVO_NOT_FOUND", { entity: "User", id: "7" })).toBe("User with id '7' was not found.");
   });
 
   it("stringifies numeric params", () => {
-    expect(renderMessage("CRUDO_NOT_FOUND", { entity: "User", id: 7 })).toContain("'7'");
+    expect(renderMessage("KAVO_NOT_FOUND", { entity: "User", id: 7 })).toContain("'7'");
   });
 
   it("returns a placeholder-free template untouched", () => {
-    expect(renderMessage("CRUDO_TRANSACTION_FAILED", {})).toBe(ERROR_CATALOG.CRUDO_TRANSACTION_FAILED.message);
+    expect(renderMessage("KAVO_TRANSACTION_FAILED", {})).toBe(ERROR_CATALOG.KAVO_TRANSACTION_FAILED.message);
   });
 
   it("ignores params the template does not name", () => {
-    expect(renderMessage("CRUDO_CONFLICT", { entity: "User", stray: "x" })).toBe(
+    expect(renderMessage("KAVO_CONFLICT", { entity: "User", stray: "x" })).toBe(
       "The operation conflicts with the current state of User.",
     );
   });
@@ -110,21 +110,21 @@ describe("renderMessage — message key + params (Phase 6)", () => {
     // The spec fixes key + params as the localization contract but is silent
     // on a missing param; keeping the placeholder is what core does, and it
     // keeps the gap legible in the rendered detail.
-    expect(renderMessage("CRUDO_NOT_FOUND", { entity: "User" })).toBe("User with id '{id}' was not found.");
+    expect(renderMessage("KAVO_NOT_FOUND", { entity: "User" })).toBe("User with id '{id}' was not found.");
   });
 });
 
 describe("exception hierarchy (Phase 6)", () => {
   const leaves = [
-    { exception: new NotFoundException(), code: "CRUDO_NOT_FOUND", status: 404 },
-    { exception: new ConflictException(), code: "CRUDO_CONFLICT", status: 409 },
-    { exception: new AlreadyDeletedException(), code: "CRUDO_ALREADY_DELETED", status: 409 },
-    { exception: new NotDeletedException(), code: "CRUDO_NOT_DELETED", status: 409 },
-    { exception: new OperationDisabledException(), code: "CRUDO_OPERATION_DISABLED", status: 405 },
-    { exception: new PersistenceException(), code: "CRUDO_PERSISTENCE_FAILED", status: 500 },
-    { exception: new TransactionException(), code: "CRUDO_TRANSACTION_FAILED", status: 500 },
-    { exception: new QueryValidationException([]), code: "CRUDO_QUERY_INVALID", status: 400 },
-    { exception: new ConfigurationException("User", "operations.x", "why"), code: "CRUDO_CONFIG_INVALID", status: 500 },
+    { exception: new NotFoundException(), code: "KAVO_NOT_FOUND", status: 404 },
+    { exception: new ConflictException(), code: "KAVO_CONFLICT", status: 409 },
+    { exception: new AlreadyDeletedException(), code: "KAVO_ALREADY_DELETED", status: 409 },
+    { exception: new NotDeletedException(), code: "KAVO_NOT_DELETED", status: 409 },
+    { exception: new OperationDisabledException(), code: "KAVO_OPERATION_DISABLED", status: 405 },
+    { exception: new PersistenceException(), code: "KAVO_PERSISTENCE_FAILED", status: 500 },
+    { exception: new TransactionException(), code: "KAVO_TRANSACTION_FAILED", status: 500 },
+    { exception: new QueryValidationException([]), code: "KAVO_QUERY_INVALID", status: 400 },
+    { exception: new ConfigurationException("User", "operations.x", "why"), code: "KAVO_CONFIG_INVALID", status: 500 },
   ] as const;
 
   it("binds each leaf to its catalog code and status", () => {
@@ -135,10 +135,10 @@ describe("exception hierarchy (Phase 6)", () => {
     }
   });
 
-  it("is catchable as an Error and through the CrudoException base token", () => {
+  it("is catchable as an Error and through the KavoException base token", () => {
     for (const { exception } of leaves) {
       expect(exception).toBeInstanceOf(Error);
-      expect(exception).toBeInstanceOf(CrudoException);
+      expect(exception).toBeInstanceOf(KavoException);
       expect(exception.name).toBe(exception.constructor.name);
     }
   });
@@ -175,16 +175,16 @@ describe("exception hierarchy (Phase 6)", () => {
 
   it("carries field-level issues on QueryValidationException under the aggregate code", () => {
     const issues: QueryIssueDto[] = [
-      { field: "age", code: "CRUDO_QUERY_INVALID_VALUE", detail: "bad" },
-      { field: "password", code: "CRUDO_QUERY_INVALID_FIELD", detail: "not allowlisted" },
+      { field: "age", code: "KAVO_QUERY_INVALID_VALUE", detail: "bad" },
+      { field: "password", code: "KAVO_QUERY_INVALID_FIELD", detail: "not allowlisted" },
     ];
     const exception = new QueryValidationException(issues);
-    expect(exception.code).toBe("CRUDO_QUERY_INVALID");
+    expect(exception.code).toBe("KAVO_QUERY_INVALID");
     expect(exception.issues).toEqual(issues);
   });
 
   it("wraps the single-issue case into the same issues array", () => {
-    const issue: QueryIssueDto = { field: "limit", code: "CRUDO_QUERY_INVALID_VALUE", detail: "bad" };
+    const issue: QueryIssueDto = { field: "limit", code: "KAVO_QUERY_INVALID_VALUE", detail: "bad" };
     const exception = QueryValidationException.single(issue);
     expect(exception).toBeInstanceOf(QueryValidationException);
     expect(exception.issues).toEqual([issue]);
@@ -211,11 +211,11 @@ describe("toProblemDetails — RFC 9457 document (Phase 6, ADR-0009)", () => {
   it("produces type, title, status, detail, and the code extension", () => {
     const exception = new NotFoundException({ messageParams: { entity: "User", id: 7 } });
     expect(toProblemDetails(exception)).toEqual({
-      type: "https://crudo.dev/errors/crudo-not-found",
+      type: "https://kavo.dev/errors/kavo-not-found",
       title: "Not found",
       status: 404,
       detail: "User with id '7' was not found.",
-      code: "CRUDO_NOT_FOUND",
+      code: "KAVO_NOT_FOUND",
     });
   });
 
@@ -229,21 +229,21 @@ describe("toProblemDetails — RFC 9457 document (Phase 6, ADR-0009)", () => {
         detail: "",
         context: {},
       });
-      expect(problem.type).toBe(`https://crudo.dev/errors/${code.toLowerCase().replace(/_/g, "-")}`);
+      expect(problem.type).toBe(`https://kavo.dev/errors/${code.toLowerCase().replace(/_/g, "-")}`);
       expect(problem.title).toBe(ERROR_CATALOG[code].title);
     }
   });
 
   it("emits one errors[] entry per issue of a multi-issue query failure", () => {
     const issues: QueryIssueDto[] = [
-      { field: "age", code: "CRUDO_QUERY_INVALID_VALUE", detail: "not a number" },
-      { field: "password", code: "CRUDO_QUERY_INVALID_FIELD", detail: "not filterable" },
+      { field: "age", code: "KAVO_QUERY_INVALID_VALUE", detail: "not a number" },
+      { field: "password", code: "KAVO_QUERY_INVALID_FIELD", detail: "not filterable" },
     ];
     const problem = toProblemDetails(new QueryValidationException(issues));
     expect(problem).toMatchObject({
-      type: "https://crudo.dev/errors/crudo-query-invalid",
+      type: "https://kavo.dev/errors/kavo-query-invalid",
       status: 400,
-      code: "CRUDO_QUERY_INVALID",
+      code: "KAVO_QUERY_INVALID",
     });
     expect(problem.errors).toEqual(issues);
   });
@@ -254,7 +254,7 @@ describe("toProblemDetails — RFC 9457 document (Phase 6, ADR-0009)", () => {
 
   it("reports the correlation id as the instance URN, and omits it when absent", () => {
     const correlated = toProblemDetails(new NotFoundException({ context: { correlationId: "req-1" } }));
-    expect(correlated.instance).toBe("urn:crudo:request:req-1");
+    expect(correlated.instance).toBe("urn:kavo:request:req-1");
     expect(toProblemDetails(new NotFoundException()).instance).toBeUndefined();
   });
 
@@ -268,11 +268,11 @@ describe("toProblemDetails — RFC 9457 document (Phase 6, ADR-0009)", () => {
 describe("DefaultErrorHandler — engine boundary mapping (Phase 6)", () => {
   const handler = new DefaultErrorHandler();
 
-  it("passes a Crudo exception through with its code, status, and payload intact", () => {
-    const original = new QueryValidationException([{ field: "age", code: "CRUDO_QUERY_INVALID_VALUE", detail: "x" }]);
+  it("passes a Kavo exception through with its code, status, and payload intact", () => {
+    const original = new QueryValidationException([{ field: "age", code: "KAVO_QUERY_INVALID_VALUE", detail: "x" }]);
     const handled = handler.handle(original, { entityName: "User", operation: "findMany" });
     expect(handled).toBeInstanceOf(QueryValidationException);
-    expect(handled).toMatchObject({ code: "CRUDO_QUERY_INVALID", status: 400, detail: original.detail });
+    expect(handled).toMatchObject({ code: "KAVO_QUERY_INVALID", status: 400, detail: original.detail });
     expect((handled as QueryValidationException).issues).toEqual(original.issues);
   });
 
@@ -294,7 +294,7 @@ describe("DefaultErrorHandler — engine boundary mapping (Phase 6)", () => {
     const driverError = new Error("ECONNRESET");
     const handled = handler.handle(driverError, { entityName: "User", operation: "createOne" });
     expect(handled).toBeInstanceOf(PersistenceException);
-    expect(handled.code).toBe("CRUDO_PERSISTENCE_FAILED");
+    expect(handled.code).toBe("KAVO_PERSISTENCE_FAILED");
     expect(handled.status).toBe(500);
     expect(handled.cause).toBe(driverError);
     expect(handled.context).toMatchObject({ entityName: "User", operation: "createOne" });
@@ -314,9 +314,9 @@ describe("DefaultErrorHandler — engine boundary mapping (Phase 6)", () => {
       correlationId: "req-2",
     });
     expect(toProblemDetails(handled)).toMatchObject({
-      type: "https://crudo.dev/errors/crudo-persistence-failed",
+      type: "https://kavo.dev/errors/kavo-persistence-failed",
       status: 500,
-      instance: "urn:crudo:request:req-2",
+      instance: "urn:kavo:request:req-2",
     });
   });
 });

@@ -1,4 +1,4 @@
-import { enumProp } from "@crudo/nest";
+import { enumProp } from "@kavo/nest";
 import { PetSizeEnum } from "../pet/pet.entity.js";
 
 /**

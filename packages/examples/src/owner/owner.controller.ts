@@ -1,5 +1,5 @@
 import { Controller } from "@nestjs/common";
-import { Crud } from "@crudo/nest";
+import { Crud } from "@kavo/nest";
 import { Owner } from "./owner.entity.js";
 import { CreateOwnerDto, UpdateOwnerDto, OwnerItemDto, OwnerListDto } from "./owner.dtos.js";
 

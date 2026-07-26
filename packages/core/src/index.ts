@@ -1,5 +1,5 @@
 /**
- * @crudo/core — framework- and ORM-independent contracts and type system.
+ * @kavo/core — framework- and ORM-independent contracts and type system.
  *
  * This barrel is an **explicit named list**, kept deliberately (no
  * `export *`): the public surface should only ever change on purpose, the
@@ -36,12 +36,12 @@ export type { DtoClass, DtoSlot, Dto, DtoResolver, OperationDtoMap } from "./dto
 export type { ListMetaDto, ListResultDto } from "./dto/list-result.js";
 
 // ── Errors ────────────────────────────────────────────────────────────
-export type { CrudoErrorCode, CrudException, ErrorContext, ErrorHandler } from "./errors/crud-exception.js";
+export type { KavoErrorCode, CrudException, ErrorContext, ErrorHandler } from "./errors/crud-exception.js";
 export type { ProblemDetailsDto, QueryIssueDto } from "./errors/problem-details.js";
 
 // ── Configuration ─────────────────────────────────────────────────────
 export type {
-  CrudoSettings,
+  KavoSettings,
   ErrorSettings,
   PaginationSettings,
   QuerySettings,
@@ -118,14 +118,14 @@ export {
   AlreadyDeletedException,
   ConfigurationException,
   ConflictException,
-  CrudoException,
+  KavoException,
   NotDeletedException,
   NotFoundException,
   OperationDisabledException,
   PersistenceException,
   QueryValidationException,
   TransactionException,
-  type CrudoExceptionOptions,
+  type KavoExceptionOptions,
 } from "./errors/exceptions.js";
 export { toProblemDetails, type ProblemDetailsOptions } from "./errors/problem-details-serializer.js";
 export { DefaultErrorHandler } from "./errors/default-error-handler.js";
@@ -166,4 +166,4 @@ export { DefaultRelationRegistry } from "./relations/default-relation-registry.j
 
 // ── Service & root factory ────────────────────────────────────────────
 export { DefaultCrudService } from "./service/default-crud-service.js";
-export { createCrud, createCrudo, type CrudRuntime, type CrudoInstance, type CrudoOptions } from "./crudo.js";
+export { createCrud, createKavo, type CrudRuntime, type KavoInstance, type KavoOptions } from "./kavo.js";

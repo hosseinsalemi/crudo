@@ -1,6 +1,6 @@
 # 11 — Soft Delete, Restore & Purge (Phase 14)
 
-Deleting a row can mean two things. Crudo resolves which one **per
+Deleting a row can mean two things. Kavo resolves which one **per
 entity, at bootstrap**, and every layer downstream reads that one answer
 instead of re-deciding.
 
@@ -29,7 +29,7 @@ instead of removing the row, and every read excludes stamped rows.
 The marker field is the configured `softDelete.field` when the entity has
 such a column, otherwise the one the ORM declares
 (`EntityMetadata.softDeleteField` — `@DeleteDateColumn` in
-`@crudo/typeorm`). Explicit configuration wins over detection; an entity
+`@kavo/typeorm`). Explicit configuration wins over detection; an entity
 with neither costs nothing, which is the phase's constraint.
 
 Resolution runs at every settings scope, so an operation or a single call
@@ -39,11 +39,11 @@ on that object — they never re-derive the decision.
 
 ## 2. Operations
 
-| Operation    | Behavior                                                                                                                          |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| `deleteOne`  | Hard or soft per the resolved strategy. Soft-deleting a deleted row → 409 `CRUDO_ALREADY_DELETED`.                                |
-| `restoreOne` | Clears the marker, returns the revived row in the **`item`** slot — no new DTO shape. A live row → 409 `CRUDO_NOT_DELETED`.       |
-| `purgeOne`   | Permanently removes an already-soft-deleted row. A live row → 409 `CRUDO_NOT_DELETED`. Under a hard strategy it is just a delete. |
+| Operation    | Behavior                                                                                                                         |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `deleteOne`  | Hard or soft per the resolved strategy. Soft-deleting a deleted row → 409 `KAVO_ALREADY_DELETED`.                                |
+| `restoreOne` | Clears the marker, returns the revived row in the **`item`** slot — no new DTO shape. A live row → 409 `KAVO_NOT_DELETED`.       |
+| `purgeOne`   | Permanently removes an already-soft-deleted row. A live row → 409 `KAVO_NOT_DELETED`. Under a hard strategy it is just a delete. |
 
 Enablement is config-declared, not metadata-driven (**ADR-0013**):
 `restoreOne` switches on with `softDelete: { strategy: "soft" }` (or an
@@ -63,10 +63,10 @@ row (reviving one is `restoreOne`'s job, not a side effect of a write).
 
 `withDeleted=true` opts back in, on both wire and programmatic paths. On
 an entity that is not soft-deletable the parameter is **rejected**
-(`CRUDO_QUERY_UNSUPPORTED_PARAM`) rather than ignored: a client that
+(`KAVO_QUERY_UNSUPPORTED_PARAM`) rather than ignored: a client that
 believes it is seeing deleted rows should be told it is not.
 
-In `@crudo/typeorm` the flag translates two ways, because a marker column
+In `@kavo/typeorm` the flag translates two ways, because a marker column
 is not always the ORM's own: for a `@DeleteDateColumn`, TypeORM already
 excludes deleted rows and the adapter opts in with `.withDeleted()`; for
 an ordinary column named through config, the adapter adds
@@ -77,7 +77,7 @@ an ordinary column named through config, the adapter adds
 **Unique constraints.** A soft-deleted row still occupies its unique
 indexes, so re-creating "the same" row raises a unique violation — mapped
 to a 409 like any other conflict, which is the honest answer: the value
-_is_ taken. Crudo does not rewrite indexes. The standard fix is a
+_is_ taken. Kavo does not rewrite indexes. The standard fix is a
 partial/filtered unique index over live rows only:
 
 ```sql

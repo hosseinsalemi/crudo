@@ -45,7 +45,7 @@ Deep nested writes are **out of scope**, not merely unimplemented.
   rule, and the failure behavior for that specific case.
 - ORM caveat, deliberately not papered over: setting a _to-many_ by id
   only persists where the ORM supports it from the non-owning side
-  (TypeORM needs `cascade` or the owning side / a join table). Crudo maps
+  (TypeORM needs `cascade` or the owning side / a join table). Kavo maps
   the payload; it does not synthesize writes the ORM declined to make.
 - The extension point, if a later version wants deep writes: they belong
   at the deserializer seam plus an explicit per-relation `write` policy

@@ -1,6 +1,6 @@
 import { expectTypeOf } from "vitest";
-import { createCrudo } from "@crudo/core";
-import type { CrudContext, ListResultDto, OperationHandler, QueryContext } from "@crudo/core";
+import { createKavo } from "@kavo/core";
+import type { CrudContext, ListResultDto, OperationHandler, QueryContext } from "@kavo/core";
 import { Author } from "../support/blog-fixture.js";
 
 /**
@@ -39,7 +39,7 @@ class PromoteResultDto {
   promoted = false;
 }
 
-const crudo = createCrudo({
+const kavo = createKavo({
   defaults: { pagination: { defaultLimit: 20, maxLimit: 100 } },
 });
 
@@ -51,7 +51,7 @@ const promote: OperationHandler<Author> = {
   },
 };
 
-const authors = crudo.createCrud(Author, {
+const authors = kavo.createCrud(Author, {
   dto: {
     create: CreateAuthorDto,
     update: UpdateAuthorDto,
@@ -91,7 +91,7 @@ void authors.createOne({});
 void authors.createOne({ name: "Ada", bio: "x" });
 
 // @ts-expect-error — an allowlist entry has to name a real field.
-void crudo.createCrud(Author, { allowlists: { filterable: ["nmae"] } });
+void kavo.createCrud(Author, { allowlists: { filterable: ["nmae"] } });
 
 // Custom operations dispatch through the engine, one pipeline either way.
 void authors.engine.execute({ operation: "promoteOne", id: 1, body: null, query: null, options: null });

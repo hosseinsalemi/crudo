@@ -34,13 +34,13 @@ importers:
 
   packages/examples:
     dependencies:
-      '@crudo/core':
+      '@kavo/core':
         specifier: workspace:*
         version: link:../core
-      '@crudo/nest':
+      '@kavo/nest':
         specifier: workspace:*
         version: link:../frameworks/nest
-      '@crudo/typeorm':
+      '@kavo/typeorm':
         specifier: workspace:*
         version: link:../orms/typeorm
       '@nestjs/common':
@@ -80,7 +80,7 @@ importers:
 
   packages/frameworks/nest:
     dependencies:
-      '@crudo/core':
+      '@kavo/core':
         specifier: workspace:*
         version: link:../../core
     devDependencies:
@@ -114,7 +114,7 @@ importers:
 
   packages/orms/typeorm:
     dependencies:
-      '@crudo/core':
+      '@kavo/core':
         specifier: workspace:*
         version: link:../../core
     devDependencies:

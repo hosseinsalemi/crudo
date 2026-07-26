@@ -1,5 +1,5 @@
 import { Controller } from "@nestjs/common";
-import { Crud } from "@crudo/nest";
+import { Crud } from "@kavo/nest";
 import { Dog } from "./dog.entity.js";
 import { CreateDogDto, UpdateDogDto, DogItemDto, DogListDto } from "./dog.dtos.js";
 

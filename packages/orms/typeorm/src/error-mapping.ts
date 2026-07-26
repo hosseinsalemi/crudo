@@ -1,9 +1,9 @@
-import type { ErrorContext } from "@crudo/core";
-import { ConflictException, CrudoException, PersistenceException, TransactionException } from "@crudo/core";
+import type { ErrorContext } from "@kavo/core";
+import { ConflictException, KavoException, PersistenceException, TransactionException } from "@kavo/core";
 import { QueryFailedError } from "typeorm";
 
 /**
- * The Phase 9 error-mapping table: driver error → Crudo exception.
+ * The Phase 9 error-mapping table: driver error → Kavo exception.
  *
  * | Driver condition                  | Exception                          |
  * | --------------------------------- | ---------------------------------- |
@@ -19,14 +19,14 @@ import { QueryFailedError } from "typeorm";
  * **Soft delete and unique indexes (Phase 14).** A soft-deleted row still
  * occupies its unique indexes, so re-creating "the same" row after a soft
  * delete raises a unique violation — mapped here to a 409 like any other
- * conflict, which is the honest answer: the value *is* taken. Crudo never
+ * conflict, which is the honest answer: the value *is* taken. Kavo never
  * rewrites indexes; the standard fix is a partial/filtered unique index
  * on the live rows only, e.g. in Postgres
  * `CREATE UNIQUE INDEX … ON owner (email) WHERE deleted_at IS NULL`
  * (SQLite supports the same form; MySQL needs a generated column).
  */
-export function mapDriverError(error: unknown, context: ErrorContext): CrudoException {
-  if (error instanceof CrudoException) return error;
+export function mapDriverError(error: unknown, context: ErrorContext): KavoException {
+  if (error instanceof KavoException) return error;
 
   const entity = context.entityName ?? "entity";
   if (error instanceof QueryFailedError) {

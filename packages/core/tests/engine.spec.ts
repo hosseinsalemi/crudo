@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { NotFoundException, OperationDisabledException, createCrudo, toProblemDetails } from "@crudo/core";
+import { NotFoundException, OperationDisabledException, createKavo, toProblemDetails } from "@kavo/core";
 import { InMemoryUserAdapter, User, userMetadata } from "./support/user-fixture.js";
 
-function makeCrud(config?: Parameters<ReturnType<typeof createCrudo>["createCrud"]>[1]) {
+function makeCrud(config?: Parameters<ReturnType<typeof createKavo>["createCrud"]>[1]) {
   const adapter = new InMemoryUserAdapter();
-  const crudo = createCrudo();
-  const crud = crudo.createCrud(User, config as never, {
+  const kavo = createKavo();
+  const crud = kavo.createCrud(User, config as never, {
     adapter,
     metadata: userMetadata,
   });
-  return { crud, adapter, crudo };
+  return { crud, adapter, kavo };
 }
 
 describe("CrudEngine pipeline (Phase 7)", () => {
@@ -160,17 +160,17 @@ describe("CrudEngine pipeline (Phase 7)", () => {
       const problem = toProblemDetails(error as never);
       expect(problem).toMatchObject({
         status: 404,
-        code: "CRUDO_NOT_FOUND",
-        type: "https://crudo.dev/errors/crudo-not-found",
+        code: "KAVO_NOT_FOUND",
+        type: "https://kavo.dev/errors/kavo-not-found",
       });
       expect(problem.detail).toContain("123");
-      expect(problem.instance).toMatch(/^urn:crudo:request:/);
+      expect(problem.instance).toMatch(/^urn:kavo:request:/);
     }
   });
 
-  it("exposes the debug dump through crudo.describe", () => {
-    const { crudo } = makeCrud();
-    const dump = crudo.describe("User");
+  it("exposes the debug dump through kavo.describe", () => {
+    const { kavo } = makeCrud();
+    const dump = kavo.describe("User");
     expect(dump).toMatchObject({ entityName: "User" });
   });
 });

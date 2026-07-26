@@ -16,7 +16,7 @@ Core defines an ORM-independent description —
 `EntityMetadata`/`FieldMetadata` (`core/src/metadata/`) — and a
 `CrudInfrastructure` contract (`metadataFor` + `adapterFor` per entity).
 Adapter packages implement it (`createTypeOrmInfrastructure(dataSource)`
-translates TypeORM metadata); `createCrudo` receives it once, and
+translates TypeORM metadata); `createKavo` receives it once, and
 `createCrud` may override per entity (`runtime.adapter`/`runtime.metadata`),
 which is also the unit-test path (in-memory fakes, no ORM).
 
@@ -26,8 +26,8 @@ which is also the unit-test path (in-memory fakes, no ORM).
   the dependency direction of ADR-0001 holds with runtime code.
 - One extra concept for adapter authors, but it is the entire adapter
   bootstrap contract — everything else is `RepositoryAdapter`.
-- `@crudo/nest` receives infrastructure through DI options
-  (`CrudoModule.forRoot({ infrastructure })`), not an `orm: "typeorm"`
+- `@kavo/nest` receives infrastructure through DI options
+  (`KavoModule.forRoot({ infrastructure })`), not an `orm: "typeorm"`
   string — no name registry, no framework→adapter import, any future
   adapter plugs in unchanged.
 - Field kinds are deliberately coarse (`string`/`number`/`boolean`/

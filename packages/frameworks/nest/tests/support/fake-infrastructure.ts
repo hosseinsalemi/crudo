@@ -6,8 +6,8 @@ import type {
   EntityMetadata,
   NormalizedQueryContext,
   RepositoryAdapter,
-} from "@crudo/core";
-import { AlreadyDeletedException, NotDeletedException, NotFoundException } from "@crudo/core";
+} from "@kavo/core";
+import { AlreadyDeletedException, NotDeletedException, NotFoundException } from "@kavo/core";
 
 /**
  * Test entity for binding tests — no ORM anywhere near this package. The
@@ -68,7 +68,7 @@ export const todoListMetadata: EntityMetadata<TodoList> = {
  * In-memory adapter for the binding tests: pagination honored, the last
  * normalized query recorded so tests can assert the wire → AST wiring.
  * Filter *evaluation* belongs to real adapters (covered in
- * @crudo/typeorm's suite); the binding's job ends at handing the adapter
+ * @kavo/typeorm's suite); the binding's job ends at handing the adapter
  * a validated query.
  */
 export class InMemoryTodoAdapter implements RepositoryAdapter<Todo> {

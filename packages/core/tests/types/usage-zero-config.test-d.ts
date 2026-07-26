@@ -1,6 +1,6 @@
 import { expectTypeOf } from "vitest";
-import { createCrud } from "@crudo/core";
-import type { EntityInput, ListResultDto } from "@crudo/core";
+import { createCrud } from "@kavo/core";
+import type { EntityInput, ListResultDto } from "@kavo/core";
 import { Author } from "../support/blog-fixture.js";
 
 /**

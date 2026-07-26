@@ -1,4 +1,4 @@
-import type { ClassRef } from "@crudo/core";
+import type { ClassRef } from "@kavo/core";
 
 /**
  * Schema hints let a DTO field carry richer OpenAPI shape than its plain
@@ -11,7 +11,7 @@ import type { ClassRef } from "@crudo/core";
  * (see `jsonSchemaForValue` in `swagger.ts`). The field keeps its declared
  * TypeScript type via each helper's return type.
  */
-const SCHEMA_HINT = Symbol.for("crudo.nest.schemaHint");
+const SCHEMA_HINT = Symbol.for("kavo.nest.schemaHint");
 
 /** The shape a schema hint documents. */
 export type SchemaHint =

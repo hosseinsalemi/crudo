@@ -1,11 +1,11 @@
 # 09 — TypeORM Adapter (Phases 9–10)
 
-`@crudo/typeorm` implements `RepositoryAdapter` (= `EntityReader` +
+`@kavo/typeorm` implements `RepositoryAdapter` (= `EntityReader` +
 `EntityWriter`) over a TypeORM `DataSource` and feeds core's metadata
 seam. Skeleton scope: CRUD with hard delete, filtering (incl. `NOT` and
 relation paths), sorting, pagination, optional counting; Phases 14–15 added
 soft delete/restore/purge (§3) and relation loading (§6). `typeorm` is a
-peerDependency; `@crudo/core` never imports it.
+peerDependency; `@kavo/core` never imports it.
 
 ## 1. The metadata seam
 
@@ -16,7 +16,7 @@ column — composite keys rejected at bootstrap), scalar columns with
 update/delete-date, version columns), enum members, and relation
 descriptors (`includable: false` always — ORM metadata supplies shape,
 never permission). `createTypeOrmInfrastructure(dataSource)` packages
-metadata + adapters, cached per entity; `createTypeOrmCrudo` is the
+metadata + adapters, cached per entity; `createTypeOrmKavo` is the
 zero-config sugar.
 
 ## 2. Query translation (Filter AST → QueryBuilder)

@@ -29,11 +29,11 @@ Review this branch. Focus, if given: **$ARGUMENTS**
 3. **Run the three reviewers in parallel**, in a single message. They are
    read-only and deliberately non-overlapping:
 
-   - `crudo-reviewer` — correctness, engine and registry design invariants,
+   - `kavo-reviewer` — correctness, engine and registry design invariants,
      naming compliance. Also runs `pnpm check`.
-   - `crudo-boundary-guard` — ADR-0005 core purity, deep imports, ORM/framework
+   - `kavo-boundary-guard` — ADR-0005 core purity, deep imports, ORM/framework
      leakage, barrel and breaking-change audit.
-   - `crudo-test-auditor` — coverage gaps, weak tests, misplaced test files.
+   - `kavo-test-auditor` — coverage gaps, weak tests, misplaced test files.
 
 4. **Consolidate.** Merge their findings into one ranked list and drop the
    duplicates. Do not just paste three reports.

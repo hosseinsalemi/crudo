@@ -2,7 +2,7 @@ import type { Filter } from "./filter.js";
 
 /**
  * Translates a validated filter AST into an ORM-native query, implemented
- * by adapter packages (`@crudo/typeorm`'s `FilterTranslator` targets
+ * by adapter packages (`@kavo/typeorm`'s `FilterTranslator` targets
  * TypeORM's `QueryBuilder`).
  *
  * The target query object is bound by the implementer at construction

@@ -7,8 +7,8 @@ import type {
   NormalizedQueryContext,
   RepositoryAdapter,
   ResolvedSoftDelete,
-} from "@crudo/core";
-import { AlreadyDeletedException, ConfigurationException, NotDeletedException, NotFoundException } from "@crudo/core";
+} from "@kavo/core";
+import { AlreadyDeletedException, ConfigurationException, NotDeletedException, NotFoundException } from "@kavo/core";
 import type { DataSource, DeepPartial, ObjectLiteral, Repository, SelectQueryBuilder } from "typeorm";
 import { FilterTranslator } from "./filter-translator.js";
 import { mapDriverError } from "./error-mapping.js";

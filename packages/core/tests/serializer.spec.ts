@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { CrudContext, IncludeNode, NormalizedQueryContext, ResolvedEntityConfig } from "@crudo/core";
+import type { CrudContext, IncludeNode, NormalizedQueryContext, ResolvedEntityConfig } from "@kavo/core";
 import {
   DefaultDeserializer,
   DefaultDtoResolver,
   DefaultSerializer,
   createCrudContext,
   resolveEntityConfig,
-} from "@crudo/core";
+} from "@kavo/core";
 import { User, contextStub, userMetadata } from "./support/user-fixture.js";
 import { Author, Post, postMetadata } from "./support/blog-fixture.js";
 

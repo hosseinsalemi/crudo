@@ -77,5 +77,5 @@ projection ∩ selection, applied to every item and list element.
 
 When a response embeds an included relation, the node's shape resolves
 from the **target entity's own registered `item`/`list` DTOs** when that
-entity has a Crudo config, else its entity-derived default. There is no
+entity has a Kavo config, else its entity-derived default. There is no
 per-include DTO slot — the related resource owns its own contract.

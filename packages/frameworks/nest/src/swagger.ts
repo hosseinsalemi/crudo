@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
-import type { ClassRef, DtoResolver, EntityConfig, OperationDescriptor, OperationDtoMap } from "@crudo/core";
-import { DefaultDtoResolver } from "@crudo/core";
+import type { ClassRef, DtoResolver, EntityConfig, OperationDescriptor, OperationDtoMap } from "@kavo/core";
+import { DefaultDtoResolver } from "@kavo/core";
 import type { CrudHttpMethod } from "./operation-metadata.js";
 import { isSchemaHint, readSchemaHint, type SchemaHint } from "./schema-hints.js";
 
@@ -26,7 +26,7 @@ let cached: SwaggerModule | null | undefined;
  * routes are documented (operation ids, the `:id` param, the Phase 5 query
  * params on list routes, registered DTO classes as body schemas, and the
  * problem-details error responses from the Phase 6 catalog); when it is
- * not, this whole module is a no-op — Crudo never forces the dependency.
+ * not, this whole module is a no-op — Kavo never forces the dependency.
  */
 function loadSwagger(): SwaggerModule | null {
   if (cached !== undefined) return cached;
@@ -42,12 +42,12 @@ function loadSwagger(): SwaggerModule | null {
 const PROBLEM_DETAILS_SCHEMA = {
   type: "object",
   properties: {
-    type: { type: "string", example: "https://crudo.dev/errors/crudo-not-found" },
+    type: { type: "string", example: "https://kavo.dev/errors/kavo-not-found" },
     title: { type: "string" },
     status: { type: "integer" },
     detail: { type: "string" },
     instance: { type: "string" },
-    code: { type: "string", example: "CRUDO_NOT_FOUND" },
+    code: { type: "string", example: "KAVO_NOT_FOUND" },
     errors: {
       type: "array",
       items: {
@@ -191,7 +191,7 @@ export function applySwaggerMetadata(
 }
 
 /**
- * Choose how `@ApiBody` documents a DTO. Crudo DTOs carry their shape in
+ * Choose how `@ApiBody` documents a DTO. Kavo DTOs carry their shape in
  * runtime field initializers (no `@ApiProperty` decorators, by design), and
  * `@nestjs/swagger` cannot read those — passing `{ type }` alone yields an
  * empty schema, so the request body renders with no fields. When a fresh
@@ -211,7 +211,7 @@ function bodyOptionsFor(bodyDto: ClassRef): object {
  * explicit JSON schema; decorated/declarative classes fall back to
  * Swagger's own `{ type }` introspection). Single-item operations document
  * the `item` DTO (or the entity when no `item` slot is registered);
- * `findMany` wraps the `list` element in Crudo's list envelope. `deleteOne`
+ * `findMany` wraps the `list` element in Kavo's list envelope. `deleteOne`
  * (204) and everything else keep the description-only response.
  */
 function successBodyFor(

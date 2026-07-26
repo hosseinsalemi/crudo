@@ -36,11 +36,11 @@ looks exactly like working config until the first client asks.
 1. **Parse** dot-paths into a tree; overlapping paths merge, so `posts`
    and `posts.comments` produce one `posts` node with a `comments` child.
 2. **Validate** each edge against the registry of the entity that _owns_
-   it — unknown or non-includable → `CRUDO_QUERY_INVALID_FIELD` (400).
+   it — unknown or non-includable → `KAVO_QUERY_INVALID_FIELD` (400).
 3. **Limit**: `relations.maxIncludeDepth` (default 2) as a budget spent
    per level, a relation's own `maxDepth` replacing that budget for its
    subtree, and `relations.maxIncludedNodes` (default 10) across the whole
-   tree → `CRUDO_QUERY_LIMIT_EXCEEDED`.
+   tree → `KAVO_QUERY_LIMIT_EXCEEDED`.
 4. **Cycle guard is depth, and only depth.** `manager.manager.manager` is
    legal until the budget runs out. Visited-type tracking would forbid a
    legitimate self-relation, and depth is the rule a client can predict.
@@ -78,7 +78,7 @@ line: TypeORM's `skip`/`take` paginate root ids in a subquery first, and
 `count` is a dedicated query with no include joins at all. A page of one
 blog is one blog with all of its articles, never half a blog.
 
-In `@crudo/typeorm`, join aliases are deterministic (`Owner__pets__owner`)
+In `@kavo/typeorm`, join aliases are deterministic (`Owner__pets__owner`)
 and share `FilterTranslator`'s scheme, so `filter[blog.name][eq]=…`
 alongside `include=blog` reuses the one selecting join instead of adding a
 second, non-selecting one under a duplicate alias.

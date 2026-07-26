@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BUILT_IN_DEFAULTS, ConfigurationException, mergeSettings, resolveEntityConfig } from "@crudo/core";
+import { BUILT_IN_DEFAULTS, ConfigurationException, mergeSettings, resolveEntityConfig } from "@kavo/core";
 import { User, userMetadata } from "./support/user-fixture.js";
 
 describe("mergeSettings (Phase 8 merge algebra)", () => {

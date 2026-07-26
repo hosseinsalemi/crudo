@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { FilterCondition, FilterGroup } from "@crudo/core";
-import { DefaultFilterParser, resolveEntityConfig } from "@crudo/core";
+import type { FilterCondition, FilterGroup } from "@kavo/core";
+import { DefaultFilterParser, resolveEntityConfig } from "@kavo/core";
 import { userMetadata } from "./support/user-fixture.js";
 import { issuesOf } from "./support/query-issues.js";
 
@@ -77,7 +77,7 @@ describe("DefaultFilterParser — bracket grammar (Phase 5)", () => {
     const filter = parse({ "filter[age][between]": "18,65" }).root as FilterCondition;
     expect(filter.value).toEqual([18, 65]);
     const issues = issuesOf(() => parse({ "filter[age][between]": "1,2,3" }));
-    expect(issues[0]?.code).toBe("CRUDO_QUERY_INVALID_VALUE");
+    expect(issues[0]?.code).toBe("KAVO_QUERY_INVALID_VALUE");
   });
 });
 
@@ -97,7 +97,7 @@ describe("DefaultFilterParser — JSON escape hatch", () => {
 
   it("rejects malformed JSON explicitly", () => {
     const issues = issuesOf(() => parse({ filter: "{nope" }));
-    expect(issues[0]?.code).toBe("CRUDO_QUERY_INVALID_VALUE");
+    expect(issues[0]?.code).toBe("KAVO_QUERY_INVALID_VALUE");
   });
 });
 
@@ -106,30 +106,30 @@ describe("DefaultFilterParser — security posture", () => {
     const issues = issuesOf(() => parse({ "filter[password][eq]": "x" }));
     expect(issues[0]).toMatchObject({
       field: "password",
-      code: "CRUDO_QUERY_INVALID_FIELD",
+      code: "KAVO_QUERY_INVALID_FIELD",
     });
   });
 
   it("rejects unknown operators (exact-case, no aliases)", () => {
     const issues = issuesOf(() => parse({ "filter[age][GTE]": "18" }));
-    expect(issues[0]?.code).toBe("CRUDO_QUERY_INVALID_OPERATOR");
+    expect(issues[0]?.code).toBe("KAVO_QUERY_INVALID_OPERATOR");
   });
 
   it("rejects coercion failures as field-level issues", () => {
     const issues = issuesOf(() => parse({ "filter[age][eq]": "abc" }));
-    expect(issues[0]?.code).toBe("CRUDO_QUERY_INVALID_VALUE");
+    expect(issues[0]?.code).toBe("KAVO_QUERY_INVALID_VALUE");
     expect(issues[0]?.detail).toContain("abc");
   });
 
   it("rejects enum values outside the member list", () => {
     const issues = issuesOf(() => parse({ "filter[status][eq]": "vip" }));
-    expect(issues[0]?.code).toBe("CRUDO_QUERY_INVALID_VALUE");
+    expect(issues[0]?.code).toBe("KAVO_QUERY_INVALID_VALUE");
   });
 
   it("enforces maxInValues", () => {
     const many = Array.from({ length: 101 }, (_, i) => String(i)).join(",");
     const issues = issuesOf(() => parse({ "filter[age][in]": many }));
-    expect(issues[0]?.code).toBe("CRUDO_QUERY_LIMIT_EXCEEDED");
+    expect(issues[0]?.code).toBe("KAVO_QUERY_LIMIT_EXCEEDED");
   });
 
   it("enforces maxFilterDepth", () => {
@@ -140,7 +140,7 @@ describe("DefaultFilterParser — security posture", () => {
         }),
       }),
     );
-    expect(issues.some((i) => i.code === "CRUDO_QUERY_LIMIT_EXCEEDED")).toBe(true);
+    expect(issues.some((i) => i.code === "KAVO_QUERY_LIMIT_EXCEEDED")).toBe(true);
   });
 
   it("collects every issue into one exception", () => {
@@ -155,6 +155,6 @@ describe("DefaultFilterParser — security posture", () => {
 
   it("restricts LIKE to string columns", () => {
     const issues = issuesOf(() => parse({ "filter[age][like]": "%1%" }));
-    expect(issues[0]?.code).toBe("CRUDO_QUERY_INVALID_VALUE");
+    expect(issues[0]?.code).toBe("KAVO_QUERY_INVALID_VALUE");
   });
 });

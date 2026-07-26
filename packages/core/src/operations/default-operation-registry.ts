@@ -65,7 +65,7 @@ interface StandardOperationShape {
 /**
  * The standard operation table. The engine dispatches every operation
  * through the registry — these are just its default entries (ADR-0006),
- * and `@crudo/nest` route generation walks the same registry.
+ * and `@kavo/nest` route generation walks the same registry.
  *
  * `enabled` here is the *unconditional* default;
  * `restoreOne`/`purgeOne` layer the Phase 14 soft-delete rule on top (see
@@ -109,14 +109,14 @@ const unboundHandler = (id: OperationId): OperationHandler<unknown> => ({
  * declares soft delete (`softDelete.strategy: "soft"` or an explicit
  * `softDelete.field`), `purgeOne` only when named outright. Route
  * generation runs at decoration time, where no ORM metadata exists
- * (ADR-0012), so both registry builds — engine and `@crudo/nest` — must
+ * (ADR-0012), so both registry builds — engine and `@kavo/nest` — must
  * reach the same answer from the same input (ADR-0013). Enabling either
  * on an entity that does not resolve to a soft delete strategy is a
  * bootstrap error, raised in `createCrud` where metadata is known.
  *
  * `handlers` binds the built-in behaviors; when omitted the entries carry
  * throwing placeholders — that mode exists for consumers that only need
- * the table (`@crudo/nest` route generation), never for execution.
+ * the table (`@kavo/nest` route generation), never for execution.
  */
 export function createOperationRegistry<Entity extends object>(
   config: EntityConfig<Entity> | undefined,

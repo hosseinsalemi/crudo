@@ -1,4 +1,4 @@
-import type { CrudoSettings } from "./settings.js";
+import type { KavoSettings } from "./settings.js";
 import type { DeepPartial } from "../types/utility.js";
 import type { EntityConfig, OperationConfig } from "./entity-config.js";
 import type { ResolvedEntityConfig, ResolvedQueryAllowlists } from "./resolved-entity-config.js";
@@ -19,20 +19,20 @@ const SETTINGS_KEYS = [
   "errors",
   "relations",
   "softDelete",
-] as const satisfies readonly (keyof CrudoSettings)[];
+] as const satisfies readonly (keyof KavoSettings)[];
 
 /**
  * An `EntityConfig`/`OperationConfig` mixes settings keys with structural
  * keys (`dto`, `allowlists`, `handler`, …); only the settings subset
  * participates in the merge algebra.
  */
-function pickSettings(config: Readonly<Record<string, unknown>> | undefined): DeepPartial<CrudoSettings> | undefined {
+function pickSettings(config: Readonly<Record<string, unknown>> | undefined): DeepPartial<KavoSettings> | undefined {
   if (config === undefined) return undefined;
   const picked: Record<string, unknown> = {};
   for (const key of SETTINGS_KEYS) {
     if (config[key] !== undefined) picked[key] = config[key];
   }
-  return picked as DeepPartial<CrudoSettings>;
+  return picked as DeepPartial<KavoSettings>;
 }
 
 /**
@@ -44,7 +44,7 @@ function pickSettings(config: Readonly<Record<string, unknown>> | undefined): De
 export function resolveEntityConfig<Entity extends object>(
   metadata: EntityMetadata<Entity>,
   entityConfig: EntityConfig<Entity> | undefined,
-  globalDefaults: DeepPartial<CrudoSettings> | undefined,
+  globalDefaults: DeepPartial<KavoSettings> | undefined,
 ): ResolvedEntityConfig<Entity> {
   const entityName = metadata.name;
   const entitySettings = mergeSettings(
@@ -57,7 +57,7 @@ export function resolveEntityConfig<Entity extends object>(
   // Per-operation settings views, precomputed for every operation that
   // declares overrides. `false` (disabled) contributes no settings — the
   // registry handles disabling.
-  const perOperation = new Map<OperationId, CrudoSettings>();
+  const perOperation = new Map<OperationId, KavoSettings>();
   for (const [operation, config] of Object.entries(entityConfig?.operations ?? {}) as [
     StandardOperationId,
     OperationConfig<Entity> | boolean,
@@ -82,7 +82,7 @@ export function resolveEntityConfig<Entity extends object>(
   const resolved: ResolvedEntityConfig<Entity> = {
     entityName,
     settings: deepFreeze(entitySettings),
-    settingsFor(operation: OperationId): CrudoSettings {
+    settingsFor(operation: OperationId): KavoSettings {
       return perOperation.get(operation) ?? entitySettings;
     },
     allowlists,

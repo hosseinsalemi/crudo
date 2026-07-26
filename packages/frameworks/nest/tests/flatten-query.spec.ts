@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { flattenQuery } from "@crudo/nest";
+import { flattenQuery } from "@kavo/nest";
 
 /**
  * Each row is one Phase 5 query written the two ways a query parser can

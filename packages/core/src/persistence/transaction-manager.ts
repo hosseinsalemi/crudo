@@ -16,7 +16,7 @@ export interface TransactionContext {
   readonly id: string;
   /**
    * The adapter's native transaction object (a TypeORM `QueryRunner` in
-   * `@crudo/typeorm`) — opaque to core, meaningful only to the adapter
+   * `@kavo/typeorm`) — opaque to core, meaningful only to the adapter
    * that created it.
    */
   readonly handle: unknown;
@@ -31,7 +31,7 @@ export interface TransactionOptions {
  * Commit on resolve, rollback on reject — no partial outcomes.
  *
  * @remarks
- * Intentionally unimplemented, not dead — but read the caveat. Crudo has no
+ * Intentionally unimplemented, not dead — but read the caveat. Kavo has no
  * standalone cross-cutting transaction system: multi-write atomicity was
  * scoped down to a narrow adapter-level hook, and the only consumer it ever
  * had was the optional batch surface, which this build dropped outright —

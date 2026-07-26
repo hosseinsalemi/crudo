@@ -1,8 +1,8 @@
 {
-  "name": "@crudo/examples",
+  "name": "@kavo/examples",
   "version": "0.0.0",
   "private": true,
-  "description": "Crudo reference application (Pet example: single-table inheritance, a relation, and full CRUD over HTTP).",
+  "description": "Kavo reference application (Pet example: single-table inheritance, a relation, and full CRUD over HTTP).",
   "license": "MIT",
   "type": "module",
   "scripts": {
@@ -10,9 +10,9 @@
     "start": "node dist/main.js"
   },
   "dependencies": {
-    "@crudo/core": "workspace:*",
-    "@crudo/nest": "workspace:*",
-    "@crudo/typeorm": "workspace:*",
+    "@kavo/core": "workspace:*",
+    "@kavo/nest": "workspace:*",
+    "@kavo/typeorm": "workspace:*",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
