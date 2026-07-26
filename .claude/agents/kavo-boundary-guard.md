@@ -34,7 +34,9 @@ violations in a change. You do not fix them and you do not edit files.
 ## Procedure
 
 1. Get the change: `git diff main...HEAD --stat`, then read the diffs that
-   matter. If nothing is on the branch, review the working tree instead.
+   matter. If nothing is committed on the branch yet, review the uncommitted
+   working tree instead — `/implement` does not commit, so this is the normal
+   case, not an edge case.
 2. Run the mechanical gate first — it is cheap and authoritative:
    `pnpm depcruise`. A pass here does **not** end your review: dependency-cruiser
    catches import graphs, not type leakage or barrel intent.

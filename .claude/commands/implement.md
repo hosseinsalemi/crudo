@@ -1,7 +1,7 @@
 ---
-description: Implement the approved plan on the current branch, with tests, and commit it
+description: Implement the approved plan on the current branch, with tests — does not commit
 argument-hint: "[extra instructions or corrections to the plan]"
-allowed-tools: Bash(git:*), Bash(pnpm:*), Bash(gh:*), Read, Edit, Write, Grep, Glob, Skill
+allowed-tools: Bash(git:*), Bash(pnpm:*), Read, Edit, Write, Grep, Glob, Skill
 ---
 
 ## Context
@@ -16,7 +16,7 @@ Implement the plan approved earlier in this conversation. Additional
 instructions: **$ARGUMENTS**
 
 1. **Preflight.** If you are on `main`, stop — work belongs on a branch, run
-   `/next` first. If there is no approved plan in this conversation, stop and
+   `/plan` first. If there is no approved plan in this conversation, stop and
    ask for one rather than inventing scope.
 
 2. **Implement it yourself, task by task**, in the plan's order. You have the
@@ -59,10 +59,8 @@ instructions: **$ARGUMENTS**
    `packages/docs/architecture/` document governs. Silent divergence is a
    review finding.
 
-7. **Commit** with a Conventional Commits message matching this repo's style
-   (`feat(core):`, `fix(typeorm):`, `test(nest):`). Reference the issue in the
-   body (`Refs #<n>`). Use `/commit` if the work splits cleanly into several
-   commits.
+7. **Do not commit.** Leave the changes in the working tree. Committing
+   happens after review, via `/commit`.
 
 8. **Report** what changed, the real `pnpm check` result, and anything in the
    plan you did **not** do and why. Then tell the user to run `/review`.

@@ -1,21 +1,24 @@
 ---
-description: Review the current branch with the full reviewer fan-out
+description: Review the current branch (uncommitted changes plus any prior commits) with the full reviewer fan-out
 argument-hint: "[area to focus on]"
-allowed-tools: Bash(git:*), Bash(pnpm:*), Bash(gh:*), Read, Grep, Glob, Agent, Task
+allowed-tools: Bash(git:*), Bash(pnpm:*), Read, Grep, Glob, Agent, Task
 ---
 
 ## Context
 
 - Branch: !`git rev-parse --abbrev-ref HEAD`
-- Changed files: !`git diff main...HEAD --stat`
-- Working tree: !`git status --short`
+- Committed-on-branch diff: !`git diff main...HEAD --stat`
+- Uncommitted diff (not yet run through `/commit`): !`git status --short`
 
 ## Your task
 
-Review this branch. Focus, if given: **$ARGUMENTS**
+Review this branch. `/implement` does not commit, so the work under review is
+usually still sitting uncommitted in the working tree — do not assume
+`git diff main...HEAD` alone tells you what changed. Focus, if given:
+**$ARGUMENTS**
 
-1. **Preflight.** If the branch is `main` or the diff above is empty, say so and
-   stop — there is nothing to review.
+1. **Preflight.** If the branch is `main`, or both diffs above are empty, say
+   so and stop — there is nothing to review.
 
 2. **Format the code**:
 
@@ -23,8 +26,8 @@ Review this branch. Focus, if given: **$ARGUMENTS**
    pnpm prettify
    ```
 
-   If this changes any files, commit them (`style: prettify` or similar)
-   before the reviewers run, so they review formatted code.
+   Leave any resulting changes uncommitted — `/commit` picks them up along
+   with everything else. Do not commit here.
 
 3. **Run the three reviewers in parallel**, in a single message. They are
    read-only and deliberately non-overlapping:
@@ -49,9 +52,9 @@ Review this branch. Focus, if given: **$ARGUMENTS**
    code, and drop what you cannot confirm. A short list of real findings beats a
    long list of plausible ones.
 
-6. **State the verdict plainly**: ready to ship, or blocked on N findings. If
-   the branch is clean, say so and list what was actually verified — including
-   the `pnpm check` result.
+6. **State the verdict plainly**: ready to commit (`/commit`), or blocked on N
+   findings. If the change is clean, say so and list what was actually
+   verified — including the `pnpm check` result.
 
 Report only. Do not fix anything unless the user asks — then fix the blocking
 findings and re-run `pnpm check`.

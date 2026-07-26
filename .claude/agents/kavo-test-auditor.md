@@ -24,7 +24,9 @@ enough that someone else can close them.
 
 ## Procedure
 
-1. Get the change: `git diff main...HEAD --stat` and read the source diff.
+1. Get the change: `git diff main...HEAD --stat` and read the source diff. If
+   nothing is committed on the branch yet, read the uncommitted working-tree
+   diff instead (`/implement` does not commit — this is the normal case).
 2. Find the tests that cover it — by path convention and by grepping for the
    changed symbols. Run them and report the real result.
 3. For each behavior the change introduces or alters, ask which test would fail

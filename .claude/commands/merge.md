@@ -65,4 +65,4 @@ Close the loop on this PR. Argument: **$ARGUMENTS**
 
 7. **Report**: what merged, that the branch is deleted, the `pnpm check` result
    on `main`, and what the next ready issue is (`gh issue list --label
-"status:ready"`). Then the loop restarts at `/next`.
+"status:ready"`). Then the loop restarts at `/plan`.

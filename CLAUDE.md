@@ -95,10 +95,11 @@ Work moves one issue at a time, on one branch, through slash commands in `.claud
 
 ```
 /issue "rough idea"   →  a plannable GitHub issue (acceptance criteria, affected packages, constraints)
-/next [n]             →  kavo-architect plans it  →  YOU APPROVE  →  branch created off main
-/implement            →  code + tests written here, in the main thread  →  pnpm check  →  commit
+/plan [n]             →  kavo-architect plans it  →  YOU APPROVE  →  branch created off main
+/implement            →  code + tests written here, in the main thread  →  pnpm check  →  left uncommitted
 /review               →  kavo-reviewer ‖ kavo-boundary-guard ‖ kavo-test-auditor, consolidated
-/ship                 →  pnpm check  →  push  →  PR opened, "Closes #n"
+/commit               →  working tree split into logical commits
+/push                 →  pnpm check  →  push  →  PR opened, "Closes #n"
 /merge                →  CI verified  →  squash merge  →  branch deleted  →  back on green main
 ```
 
@@ -107,7 +108,7 @@ Work moves one issue at a time, on one branch, through slash commands in `.claud
 Two rules make this work:
 
 - **Planning and review are delegated; implementation is not.** The four agents in `.claude/agents/` are all read-only. Planning benefits from a cold, focused read of the issue, and review benefits from independent fresh eyes — but implementation needs the conversation's full context, so it happens in the main thread.
-- **`pnpm check` is the gate, and it is never worked around.** `/implement`, `/ship`, and `/merge` each run it and report the real result. A red gate is not shipped, and a test is never weakened to make it pass.
+- **`pnpm check` is the gate, and it is never worked around.** `/implement`, `/push`, and `/merge` each run it and report the real result. A red gate is not shipped, and a test is never weakened to make it pass.
 
 ## Where to read more
 

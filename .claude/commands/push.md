@@ -13,9 +13,9 @@ allowed-tools: Bash(git:*), Bash(pnpm:*), Bash(gh:*), Read, Grep, Glob
 
 ## Your task
 
-Open a PR for this branch. Notes: **$ARGUMENTS**
+Push this branch and open a PR. Notes: **$ARGUMENTS**
 
-1. **Refuse to ship if any of these hold** — say which one, and stop:
+1. **Refuse to push if any of these hold** — say which one, and stop:
    - the branch is `main`;
    - there is no GitHub remote;
    - the working tree is dirty (commit with `/commit` first);
@@ -52,4 +52,4 @@ Open a PR for this branch. Notes: **$ARGUMENTS**
 
 6. **Print the PR URL** and tell the user to run `/merge` once CI is green.
 
-Do not merge here. `/ship` opens the PR; `/merge` closes the loop.
+Do not merge here. `/push` opens the PR; `/merge` closes the loop.
