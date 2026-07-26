@@ -299,30 +299,69 @@ describe("Pet example app", () => {
     );
     expect(fetched.body.tags).toHaveLength(2);
 
+    // Narrowed by a per-node fieldset, same as the to-one `owner` edge.
+    const narrowed = await request(server())
+      .get(`/cats/${catId}?include=tags&fields[tags]=id`)
+      .expect(200);
+    expect(narrowed.body.tags).toEqual(
+      expect.arrayContaining([{ id: tagIdA }, { id: tagIdB }]),
+    );
+
     // Replacing the tag set on update: this is the case that would fail if
     // the join table needed the prior relation state preloaded before save.
-    await request(server()).put(`/cats/${catId}`).send({
-      name: "Tagged",
-      age: 2,
-      size: "small",
-      indoor: true,
-      livesLeft: 9,
-      tags: [tagIdB],
-    });
+    await request(server())
+      .put(`/cats/${catId}`)
+      .send({
+        name: "Tagged",
+        age: 2,
+        size: "small",
+        indoor: true,
+        livesLeft: 9,
+        tags: [tagIdB],
+      })
+      .expect(200);
     const afterUpdate = await request(server()).get(`/cats/${catId}?include=tags`).expect(200);
     expect(afterUpdate.body.tags).toEqual([expect.objectContaining({ id: tagIdB, name: "lazy" })]);
 
     // Clearing the set removes every association.
-    await request(server()).put(`/cats/${catId}`).send({
-      name: "Tagged",
-      age: 2,
-      size: "small",
-      indoor: true,
-      livesLeft: 9,
-      tags: [],
-    });
+    await request(server())
+      .put(`/cats/${catId}`)
+      .send({
+        name: "Tagged",
+        age: 2,
+        size: "small",
+        indoor: true,
+        livesLeft: 9,
+        tags: [],
+      })
+      .expect(200);
     const cleared = await request(server()).get(`/cats/${catId}?include=tags`).expect(200);
     expect(cleared.body.tags).toEqual([]);
+  });
+
+  it("rejects associating a nonexistent tag id as a conflict, not a silent drop", async () => {
+    // ADR-0014's association-by-id path has no existence check of its own —
+    // an unknown id surfaces as the join table's own FK-constraint violation.
+    const response = await request(server())
+      .post("/cats")
+      .send({ name: "BadTag", age: 1, size: "small", indoor: true, livesLeft: 9, tags: [999999] })
+      .expect(409)
+      .expect("Content-Type", /application\/problem\+json/);
+    expect(response.body.code).toBe("CRUDO_CONFLICT");
+  });
+
+  it("cleans up the join table when a still-referenced tag is deleted", async () => {
+    const tag = await request(server()).post("/tags").send({ name: "temporary" }).expect(201);
+    const tagId = tag.body.id as number;
+    const cat = await request(server())
+      .post("/cats")
+      .send({ name: "Referencing", age: 1, size: "small", indoor: true, livesLeft: 9, tags: [tagId] })
+      .expect(201);
+
+    await request(server()).delete(`/tags/${tagId}`).expect(204);
+
+    const afterDelete = await request(server()).get(`/cats/${cat.body.id}?include=tags`).expect(200);
+    expect(afterDelete.body.tags).toEqual([]);
   });
 
   it("keeps include=tags an opt-in allowlist entry, not a free pass", async () => {
@@ -344,19 +383,26 @@ describe("Pet example app", () => {
       .post("/cats")
       .send({ name: "FanOut", age: 1, size: "small", indoor: true, livesLeft: 9, tags })
       .expect(201);
+    const fanOutId = fanOut.body.id as number;
 
+    // Sorted newest-first so the just-created fan-out cat is guaranteed to
+    // land inside the requested page, not merely outside its window.
     const page = await request(server())
       .get("/cats")
-      .query("include=tags&limit=2&offset=0")
+      .query("include=tags&sort=-id&limit=2&offset=0")
       .expect(200);
     // Root count/slice is over distinct cats, never joined (cat × tag) rows —
-    // a fan-out of 3 tags on one cat must not multiply `total` or the page.
+    // a fan-out of 3 tags on one cat must not multiply `total` or the page,
+    // and must not appear duplicated within the page either.
     expect(page.body.total).toBe(totalBefore + 1);
     expect(page.body.items).toHaveLength(2);
+    const fanOutInPage = page.body.items.filter((item: { id: number }) => item.id === fanOutId);
+    expect(fanOutInPage).toHaveLength(1);
+    expect(fanOutInPage[0].tags).toHaveLength(3);
 
-    const fanOutRow = (
-      await request(server()).get(`/cats/${fanOut.body.id}?include=tags`).expect(200)
-    ).body as { tags: unknown[] };
+    const fanOutRow = (await request(server()).get(`/cats/${fanOutId}?include=tags`).expect(200)).body as {
+      tags: unknown[];
+    };
     expect(fanOutRow.tags).toHaveLength(3);
   });
 
