@@ -300,12 +300,8 @@ describe("Pet example app", () => {
     expect(fetched.body.tags).toHaveLength(2);
 
     // Narrowed by a per-node fieldset, same as the to-one `owner` edge.
-    const narrowed = await request(server())
-      .get(`/cats/${catId}?include=tags&fields[tags]=id`)
-      .expect(200);
-    expect(narrowed.body.tags).toEqual(
-      expect.arrayContaining([{ id: tagIdA }, { id: tagIdB }]),
-    );
+    const narrowed = await request(server()).get(`/cats/${catId}?include=tags&fields[tags]=id`).expect(200);
+    expect(narrowed.body.tags).toEqual(expect.arrayContaining([{ id: tagIdA }, { id: tagIdB }]));
 
     // Replacing the tag set on update: this is the case that would fail if
     // the join table needed the prior relation state preloaded before save.
@@ -387,10 +383,7 @@ describe("Pet example app", () => {
 
     // Sorted newest-first so the just-created fan-out cat is guaranteed to
     // land inside the requested page, not merely outside its window.
-    const page = await request(server())
-      .get("/cats")
-      .query("include=tags&sort=-id&limit=2&offset=0")
-      .expect(200);
+    const page = await request(server()).get("/cats").query("include=tags&sort=-id&limit=2&offset=0").expect(200);
     // Root count/slice is over distinct cats, never joined (cat × tag) rows —
     // a fan-out of 3 tags on one cat must not multiply `total` or the page,
     // and must not appear duplicated within the page either.
