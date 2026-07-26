@@ -71,6 +71,12 @@ Constraints, because `@Crud` still owns the route:
 - Distinct from plain manual-method-wins (an _undecorated_ method whose name
   happens to match an operation id): that suppresses the route entirely, with
   none of `@Crud`'s wiring applied. `@Override` keeps all of it.
+- **A read override's `query` is Nest's raw `@Query()` object, not
+  normalized.** A generated route always wraps it — `new
+WireQuery(flattenQuery(query))` (`WireQuery` from `@kavo/core`,
+  `flattenQuery` from `@kavo/nest`) — before it reaches
+  `DefaultCrudService`. Skip that and wire-format params (`?fields=`,
+  `?include=`) reach the engine unparsed and 400.
 
 ## The descriptor
 

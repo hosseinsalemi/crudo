@@ -28,7 +28,10 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await app.close();
+  // Guards against beforeAll throwing before `app` is assigned — without
+  // this, a real bootstrap failure (e.g. a DI-wiring regression) is masked
+  // by an unrelated TypeError here instead of surfacing its own message.
+  if (app !== undefined) await app.close();
 });
 
 function server(): Parameters<typeof request>[0] {
@@ -685,6 +688,20 @@ describe("Address operation overrides (issue #21)", () => {
 
     const fetched = await request(server()).get(`/addresses/${id}`).expect(200);
     expect(fetched.body.formattedAddress).toBe("1 Elm St, Springfield 10001");
+  });
+
+  it("wires GET /addresses/:id query params through the same normalization a generated route would", async () => {
+    // Regression: an @Override'd findOne must wrap Nest's raw query object
+    // the same way the generated route does (WireQuery + flattenQuery), or
+    // wire-format params reach the engine unparsed and 400.
+    const created = await request(server())
+      .post("/addresses")
+      .send({ street: "1 Elm St", city: "Springfield", postalCode: "10001" })
+      .expect(201);
+    const id = created.body.id as number;
+
+    const narrowed = await request(server()).get(`/addresses/${id}`).query("fields=street,city,postalCode").expect(200);
+    expect(Object.keys(narrowed.body).sort()).toEqual(["city", "formattedAddress", "postalCode", "street"]);
   });
 
   it("corrects a dirty postalCode via the custom route", async () => {

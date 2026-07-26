@@ -20,6 +20,22 @@ export interface OverrideMetadata {
  * Adding your own `@Param`/`@Query`/`@Body` on an overridden method is a
  * decoration-time error (duplicate route-argument metadata).
  *
+ * For a read operation, `query` arrives as Nest's **raw** `@Query()`
+ * object — a generated route always wraps it (`new WireQuery(flattenQuery(query))`,
+ * both exported from `@kavo/core`/`@kavo/nest`) before it reaches
+ * `DefaultCrudService`, because the engine's query-normalization stage
+ * expects that wrapper to parse wire-format strings (`?fields=`, `?include=`,
+ * …). An override that forwards `query` unwrapped sends it down the
+ * already-normalized-input path instead, and any wire-format param 400s. Do
+ * the same wrapping before delegating, e.g.:
+ *
+ * ```ts
+ * @Override()
+ * async findOne(id: EntityId, query: unknown) {
+ *   return this.base.findOne(id as never, new WireQuery(flattenQuery(query as object)) as never);
+ * }
+ * ```
+ *
  * Distinct from plain manual-method-wins: an undecorated method whose name
  * matches an operation id suppresses that route entirely — no method/path/
  * status/Swagger wiring happens for it. `@Override` keeps all of that,

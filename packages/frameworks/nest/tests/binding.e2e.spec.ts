@@ -5,9 +5,9 @@ import { Controller, Get, Inject, Param, type INestApplication } from "@nestjs/c
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { Test } from "@nestjs/testing";
 import type { DefaultCrudService, NormalizedQueryContext, OperationHandler } from "@kavo/core";
-import { ConfigurationException } from "@kavo/core";
+import { ConfigurationException, WireQuery } from "@kavo/core";
 import type { KavoModuleOptions } from "@kavo/nest";
-import { Crud, KavoModule, Override, enumProp, getCrudServiceToken, oneOfArray } from "@kavo/nest";
+import { Crud, KavoModule, Override, enumProp, flattenQuery, getCrudServiceToken, oneOfArray } from "@kavo/nest";
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
 
 let app: INestApplication;
@@ -47,6 +47,17 @@ afterEach(async () => {
 
 function server(): Parameters<typeof request>[0] {
   return app.getHttpServer() as Parameters<typeof request>[0];
+}
+
+/**
+ * What an `@Override`'d read method must do to Nest's raw `@Query()`
+ * object before handing it to `DefaultCrudService` — the same wrapping
+ * `crud.decorator.ts`'s generated routes apply internally. Skipping this
+ * sends wire-format query strings straight into `normalizeInput` instead
+ * of `normalizeWire`, and they 400.
+ */
+function wireQuery(query: unknown): WireQuery {
+  return new WireQuery(flattenQuery((query ?? {}) as Readonly<Record<string, unknown>>));
 }
 
 describe("@Crud route generation (Phases 11–12)", () => {
@@ -397,7 +408,7 @@ describe("@Crud @Override — controller-method overrides that keep generated ro
 
       @Override()
       async findOne(id: string, query: unknown): Promise<unknown> {
-        const item = await this.base.findOne(id as never, query as never);
+        const item = await this.base.findOne(id as never, wireQuery(query) as never);
         return { ...item, viaOverride: true };
       }
     }
@@ -406,6 +417,11 @@ describe("@Crud @Override — controller-method overrides that keep generated ro
     await request(server()).post("/todos").send({ title: "x" }).expect(201);
     const response = await request(server()).get("/todos/1").expect(200);
     expect(response.body).toMatchObject({ id: 1, title: "x", viaOverride: true });
+
+    // Regression: a wire-format query string must reach the override
+    // normalized, not passed through raw — this is what wireQuery() buys.
+    const narrowed = await request(server()).get("/todos/1").query("fields=id,title").expect(200);
+    expect(Object.keys(narrowed.body).sort()).toEqual(["id", "title", "viaOverride"]);
   });
 
   it("keeps createOne's generated route/param wiring (body alone, 201, no :id)", async () => {
@@ -483,7 +499,7 @@ describe("@Crud @Override — controller-method overrides that keep generated ro
 
       @Override()
       async findOne(id: string, query: unknown): Promise<unknown> {
-        return this.base.findOne(id as never, query as never);
+        return this.base.findOne(id as never, wireQuery(query) as never);
       }
     }
 

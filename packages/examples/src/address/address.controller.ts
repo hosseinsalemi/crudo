@@ -1,6 +1,7 @@
 import { Controller, Inject } from "@nestjs/common";
-import { Crud, Override, getCrudServiceToken } from "@kavo/nest";
+import { Crud, Override, flattenQuery, getCrudServiceToken } from "@kavo/nest";
 import type { DefaultCrudService, EntityId } from "@kavo/core";
+import { WireQuery } from "@kavo/core";
 import type { DataSource } from "typeorm";
 import { Address } from "./address.entity.js";
 import { CreateAddressDto, UpdateAddressDto, AddressItemDto, AddressListDto } from "./address.dtos.js";
@@ -86,10 +87,18 @@ export class AddressController {
     await this.base.deleteOne(id as never);
   }
 
-  /** Augments the response with a derived, unpersisted field. */
+  /**
+   * Augments the response with a derived, unpersisted field. `query`
+   * arrives as Nest's raw `@Query()` object — the generated route always
+   * wraps it in `WireQuery` (via `flattenQuery`) before it reaches
+   * `DefaultCrudService`, so a read override must do the same, or wire-
+   * format params like `?fields=` / `?include=` reach the engine
+   * unparsed and 400.
+   */
   @Override()
   async findOne(id: EntityId, query: unknown): Promise<unknown> {
-    const address = await this.base.findOne(id as never, query as never);
+    const wired = new WireQuery(flattenQuery((query ?? {}) as Readonly<Record<string, unknown>>));
+    const address = await this.base.findOne(id as never, wired as never);
     return { ...address, formattedAddress: `${address.street}, ${address.city} ${address.postalCode}` };
   }
 

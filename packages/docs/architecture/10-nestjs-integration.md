@@ -97,6 +97,15 @@ fail-fast rule covers a duplicate override target (two methods claiming
 one operation id) and an override naming an operation id that is absent
 or disabled in the registry — a silent no-op override is a footgun.
 
+**A read override's `query` parameter is Nest's raw `@Query()` object,
+not a normalized one** — a generated route always wraps it in `WireQuery`
+(via `flattenQuery`, see below) before it reaches `DefaultCrudService`,
+because the engine's query stage parses wire-format strings only through
+that wrapper. An override that forwards `query` straight to
+`this.base.findOne(id, query)` sends it down the already-normalized-input
+path instead, and any wire-format param (`?fields=`, `?include=`, …) 400s.
+Wrap it the same way: `new WireQuery(flattenQuery(query as object))`.
+
 Mechanically, generated methods are defined on the prototype and
 decorated by _calling_ Nest's own decorators (`Post(path)(proto, name,
 descriptor)`, `Param("id")(…)`, …) — identical metadata to hand-written
