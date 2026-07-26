@@ -1,12 +1,13 @@
 import "reflect-metadata";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
-import { Controller, Get, type INestApplication } from "@nestjs/common";
+import { Controller, Get, Inject, Param, type INestApplication } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { Test } from "@nestjs/testing";
 import type { DefaultCrudService, NormalizedQueryContext, OperationHandler } from "@kavo/core";
+import { ConfigurationException } from "@kavo/core";
 import type { KavoModuleOptions } from "@kavo/nest";
-import { Crud, KavoModule, enumProp, getCrudServiceToken, oneOfArray } from "@kavo/nest";
+import { Crud, KavoModule, Override, enumProp, getCrudServiceToken, oneOfArray } from "@kavo/nest";
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
 
 let app: INestApplication;
@@ -384,6 +385,215 @@ describe("@Crud operation control surface", () => {
     await request(server()).get("/todos").expect(404);
 
     expect(seen).toEqual(["createOne", "updateOne", "patchOne", "deleteOne", "summarize"]);
+  });
+});
+
+describe("@Crud @Override — controller-method overrides that keep generated route metadata (issue #23)", () => {
+  it("keeps findOne's generated route/param wiring, delegating to the decorated method", async () => {
+    @Crud(Todo)
+    @Controller("todos")
+    class OverrideFindOneController {
+      constructor(@Inject(getCrudServiceToken(Todo)) private readonly base: DefaultCrudService<Todo>) {}
+
+      @Override()
+      async findOne(id: string, query: unknown): Promise<unknown> {
+        const item = await this.base.findOne(id as never, query as never);
+        return { ...item, viaOverride: true };
+      }
+    }
+
+    await bootstrap(OverrideFindOneController);
+    await request(server()).post("/todos").send({ title: "x" }).expect(201);
+    const response = await request(server()).get("/todos/1").expect(200);
+    expect(response.body).toMatchObject({ id: 1, title: "x", viaOverride: true });
+  });
+
+  it("keeps createOne's generated route/param wiring (body alone, 201, no :id)", async () => {
+    @Crud(Todo)
+    @Controller("todos")
+    class OverrideCreateOneController {
+      constructor(@Inject(getCrudServiceToken(Todo)) private readonly base: DefaultCrudService<Todo>) {}
+
+      @Override()
+      async createOne(body: { title: string }): Promise<unknown> {
+        return this.base.createOne({ ...body, title: body.title.toUpperCase() } as never);
+      }
+    }
+
+    await bootstrap(OverrideCreateOneController);
+    const response = await request(server()).post("/todos").send({ title: "loud" }).expect(201);
+    expect(response.body).toMatchObject({ title: "LOUD" });
+  });
+
+  it("keeps a custom operation's own meta.routes shape (id-bearing route)", async () => {
+    @Crud(Todo, {
+      customOperations: {
+        activate: {
+          // Never runs — @Override supplies the implementation instead.
+          handler: {
+            async execute() {
+              throw new Error("the registry handler must not run when @Override supplies the method");
+            },
+          },
+          meta: { routes: { method: "POST", path: ":id/activate" } },
+        },
+      },
+    })
+    @Controller("todos")
+    class OverrideCustomController {
+      @Override("activate")
+      async activate(id: string): Promise<unknown> {
+        const row = adapter.rows.find((candidate) => candidate.id === Number(id));
+        if (row !== undefined) row.done = true;
+        return row ?? null;
+      }
+    }
+
+    await bootstrap(OverrideCustomController);
+    await request(server()).post("/todos").send({ title: "x" }).expect(201);
+    const response = await request(server()).post("/todos/1/activate").expect(201);
+    expect(response.body).toMatchObject({ id: 1, done: true });
+  });
+
+  it("documents an overridden route with the same Swagger shape a generated one would carry", async () => {
+    @Crud(Todo)
+    @Controller("todos")
+    class OverrideSwaggerController {
+      constructor(@Inject(getCrudServiceToken(Todo)) private readonly base: DefaultCrudService<Todo>) {}
+
+      @Override()
+      async findOne(id: string, query: unknown): Promise<unknown> {
+        return this.base.findOne(id as never, query as never);
+      }
+    }
+
+    await bootstrap(OverrideSwaggerController);
+    const document = SwaggerModule.createDocument(app, new DocumentBuilder().setTitle("t").setVersion("0").build());
+    const getItem = (
+      document.paths["/todos/{id}"] as Record<
+        string,
+        { operationId?: string; parameters?: { name: string; in: string }[]; responses?: Record<string, unknown> }
+      >
+    )?.get;
+    expect(getItem?.operationId).toBe("Todo_findOne");
+    expect(getItem?.parameters).toEqual(expect.arrayContaining([expect.objectContaining({ name: "id", in: "path" })]));
+    expect(getItem?.responses).toHaveProperty("200");
+    expect(getItem?.responses).toHaveProperty("404");
+  });
+
+  it("leaves plain manual-method-wins (no @Override) exactly as before", async () => {
+    @Crud(Todo)
+    @Controller("todos")
+    class ManualStillWinsController {
+      @Get(":id")
+      findOne(): { manual: boolean } {
+        return { manual: true };
+      }
+    }
+
+    await bootstrap(ManualStillWinsController);
+    const response = await request(server()).get("/todos/1").expect(200);
+    expect(response.body).toEqual({ manual: true });
+  });
+
+  it("throws at decoration time when two methods override the same operation", () => {
+    let error: unknown;
+    try {
+      @Crud(Todo)
+      @Controller("todos")
+      class DuplicateOverrideController {
+        @Override("createOne")
+        first(): void {}
+        @Override("createOne")
+        second(): void {}
+      }
+      void DuplicateOverrideController;
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(ConfigurationException);
+    expect(error).toMatchObject({ code: "KAVO_CONFIG_INVALID", messageParams: { path: "override.createOne" } });
+  });
+
+  it("throws at decoration time when @Override names an operation that is off by default", () => {
+    let error: unknown;
+    try {
+      @Crud(Todo)
+      @Controller("todos")
+      class DisabledOverrideController {
+        @Override("purgeOne")
+        purge(): void {}
+      }
+      void DisabledOverrideController;
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(ConfigurationException);
+    expect(error).toMatchObject({ code: "KAVO_CONFIG_INVALID", messageParams: { path: "override.purgeOne" } });
+  });
+
+  it("throws at decoration time when @Override names an operation id absent from the registry", () => {
+    let error: unknown;
+    try {
+      @Crud(Todo)
+      @Controller("todos")
+      class GhostOverrideController {
+        @Override("ghost")
+        ghost(): void {}
+      }
+      void GhostOverrideController;
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(ConfigurationException);
+    expect(error).toMatchObject({ code: "KAVO_CONFIG_INVALID", messageParams: { path: "override.ghost" } });
+  });
+
+  it("throws at decoration time when @Override targets a service-only operation", () => {
+    let error: unknown;
+    try {
+      @Crud(Todo, {
+        customOperations: {
+          recalc: {
+            handler: {
+              async execute() {
+                return null;
+              },
+            },
+            meta: { routes: { enabled: false } },
+          },
+        },
+      })
+      @Controller("todos")
+      class ServiceOnlyOverrideController {
+        @Override("recalc")
+        recalc(): void {}
+      }
+      void ServiceOnlyOverrideController;
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(ConfigurationException);
+    expect(error).toMatchObject({ code: "KAVO_CONFIG_INVALID", messageParams: { path: "override.recalc" } });
+  });
+
+  it("throws at decoration time when the overridden method declares its own @Param/@Body", () => {
+    let error: unknown;
+    try {
+      @Crud(Todo)
+      @Controller("todos")
+      class SelfParamOverrideController {
+        @Override()
+        findOne(@Param("id") id: string): unknown {
+          return { id };
+        }
+      }
+      void SelfParamOverrideController;
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(ConfigurationException);
+    expect(error).toMatchObject({ code: "KAVO_CONFIG_INVALID", messageParams: { path: "override.findOne" } });
   });
 });
 

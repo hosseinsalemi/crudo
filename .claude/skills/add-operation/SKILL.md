@@ -11,19 +11,66 @@ registry entry** (ADR-0006). The engine loops over registry entries and
 your change needs a new `if` in the engine or in the route generator, the design
 is wrong — stop and reconsider.
 
-## Decide which of the three you are doing
+## Decide which of the four you are doing
 
-All three are the same mechanism (`EntityConfig` in
-`packages/core/src/config/entity-config.ts`):
+The first three are the same mechanism (`EntityConfig` in
+`packages/core/src/config/entity-config.ts`); the fourth is `@kavo/nest`-only
+and doesn't touch `EntityConfig` at all:
 
-| Intent                            | How                                                                                                                                                                          |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Disable** a standard operation  | `operations: { deleteOne: false }` — the entry stays in the registry so tooling can report it, but calling it raises `OperationDisabledException` and no route is generated. |
-| **Override** a standard operation | `operations: { findOne: { handler } }` — replaces the handler, keeps the default DTO and serialization scaffolding.                                                          |
-| **Add a custom** operation        | `customOperations: { complete: { handler, input, output, meta } }` — declares its own input/output DTOs, because its shape is not guaranteed CRUD-like.                      |
+| Intent                                   | How                                                                                                                                                                          |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Disable** a standard operation         | `operations: { deleteOne: false }` — the entry stays in the registry so tooling can report it, but calling it raises `OperationDisabledException` and no route is generated. |
+| **Override** a standard operation (data) | `operations: { findOne: { handler } }` — a plain `OperationHandler` object replaces the handler; keeps the default DTO and serialization scaffolding.                        |
+| **Add a custom** operation               | `customOperations: { complete: { handler, input, output, meta } }` — declares its own input/output DTOs, because its shape is not guaranteed CRUD-like.                      |
+| **Override** a standard operation (code) | `@Override(operationId?)` (issue #23) — a controller method is the implementation; `@Crud` still generates the route from the registry. See below.                           |
 
 Standard operations that are off by default (`purgeOne`, `restoreOne`) are
 turned on with `operations: { purgeOne: true }`.
+
+## `@Override`: a controller method instead of a handler object
+
+`operations.<id>.handler` and `@Override` both replace a standard
+operation's behavior; they differ in _where_ the replacement lives and what
+it can reach:
+
+- `operations.<id>.handler` is a plain `OperationHandler` object — no `this`,
+  no DI, just `execute(input, context)`. Use it when the override is pure
+  logic against the adapter/context Kavo already hands you.
+- `@Override` is a real controller method, decorated so `@Crud` still emits
+  that operation's route (method, path, status, params, Swagger) — only the
+  function backing the route changes. Use it when the override needs
+  constructor-injected dependencies (most commonly the entity's own
+  `DefaultCrudService`, via `getCrudServiceToken`, to delegate to default
+  behavior — `this.base.createOne(dto)`), or reads more naturally as a method
+  than a config value.
+
+```ts
+@Crud(Address)
+@Controller("addresses")
+class AddressController {
+  constructor(@Inject(getCrudServiceToken(Address)) private readonly base: DefaultCrudService<Address>) {}
+
+  @Override()
+  async createOne(dto: CreateAddressDto): Promise<AddressItemDto> {
+    return this.base.createOne({ ...dto, postalCode: normalize(dto.postalCode) });
+  }
+}
+```
+
+Constraints, because `@Crud` still owns the route:
+
+- `operationId` defaults to the method's own name (same inference
+  manual-method-wins uses); pass it explicitly when the method name differs.
+- The method's parameters must be in the same fixed position a generated
+  route would use — reads: `(id?, query)`; writes: `(id?, body)` — and must
+  **not** carry their own `@Param`/`@Query`/`@Body`. `@Crud` applies those
+  itself; a method that also declares its own throws at decoration time.
+- Overriding an operation that's absent, disabled, or service-only
+  (`meta.routes.enabled: false`) throws at decoration time too — there is no
+  route for `@Override` to attach to.
+- Distinct from plain manual-method-wins (an _undecorated_ method whose name
+  happens to match an operation id): that suppresses the route entirely, with
+  none of `@Crud`'s wiring applied. `@Override` keeps all of it.
 
 ## The descriptor
 
@@ -59,6 +106,8 @@ meta: {
   router scan sees the methods. Nothing may defer registration.
 - **Manual-method-wins**: a hand-written controller method whose name matches an
   operation id suppresses the generated route.
+- **`@Override`**: the same route still generates, backed by the decorated
+  method instead — see above.
 
 ## Naming (normative — get this right the first time)
 
@@ -96,6 +145,9 @@ Follow the `write-tests` skill, and cover at minimum:
 - the registry reports the entry via `all()` whether enabled or not;
 - the generated route exists with the expected method and path, and is absent
   when disabled or `meta.routes.enabled: false`;
-- manual-method-wins suppression, if a controller method could collide.
+- manual-method-wins suppression, if a controller method could collide;
+- for `@Override`: the route/param/Swagger shape matches what generation would
+  produce, and the decoration-time errors (duplicate target, absent/disabled/
+  service-only target, a method with its own `@Param`/`@Body`) all fire.
 
 Finish with `pnpm check`.

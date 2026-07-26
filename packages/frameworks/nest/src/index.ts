@@ -9,6 +9,7 @@
  * optional.
  */
 export { Crud, type CrudControllerMetadata } from "./crud.decorator.js";
+export { Override, type OverrideMetadata } from "./override.decorator.js";
 export { KavoModule, type KavoModuleAsyncOptions } from "./kavo.module.js";
 export type { KavoModuleOptions } from "./kavo-options.js";
 export { KavoExceptionFilter } from "./kavo-exception.filter.js";
