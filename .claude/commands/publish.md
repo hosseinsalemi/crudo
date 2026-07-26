@@ -105,8 +105,8 @@ Do not create or push a tag in this phase.
 2. **Confirm with the user before doing anything irreversible.** State
    plainly: pushing tag `vX.Y.Z` triggers `.github/workflows/publish.yml`,
    which publishes `@kavo/core`, `@kavo/typeorm`, and `@kavo/nest` to the
-   public npm registry — this cannot be meaningfully undone. Wait for an
-   explicit go-ahead.
+   public npm registry and creates a GitHub Release for the tag — this
+   cannot be meaningfully undone. Wait for an explicit go-ahead.
 
 3. **Tag and push:**
 
@@ -125,5 +125,6 @@ Do not create or push a tag in this phase.
    a failed OIDC trusted-publisher match or a stale npm CLI version are the
    most likely causes.
 
-5. **Report**: the tag, the workflow run URL, and (once it finishes) the
-   published package versions.
+5. **Report**: the tag, the workflow run URL, the published package
+   versions, and the GitHub Release URL
+   (`gh release view vX.Y.Z --json url --jq .url`).

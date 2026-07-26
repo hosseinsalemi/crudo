@@ -6,7 +6,7 @@ on:
       - "v*.*.*"
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
@@ -72,3 +72,15 @@ jobs:
 
       - name: Publish @kavo/nest
         run: npm publish /tmp/kavo-tarballs/kavo-nest-*.tgz --access public
+
+      # Only runs once every publish above succeeded. Attaches the exact
+      # published tarballs as release assets and lets GitHub generate the
+      # notes from merged PRs since the previous tag.
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            /tmp/kavo-tarballs/*.tgz \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes
