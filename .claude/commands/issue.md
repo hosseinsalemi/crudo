@@ -48,6 +48,14 @@ or private.
    `status:ready` once it is plannable. Create a missing label with
    `gh label create <name>` only if it fits that scheme.
 
-5. **Create it** with `gh issue create`, then print the issue number and URL.
+5. **Show it before creating anything.** Print the full drafted issue —
+   title, labels, and body exactly as they would be submitted — and stop.
+   Ask the user to confirm, and let them request edits. Do not run
+   `gh issue create` or `gh label create` until they explicitly confirm the
+   shown draft. If they ask for changes, revise and show the updated draft
+   again before asking for confirmation a second time.
+
+6. **Create it** with `gh issue create` only after confirmation, then print
+   the issue number and URL.
 
 Do not write any code. This command produces an issue and nothing else.
