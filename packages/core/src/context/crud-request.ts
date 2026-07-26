@@ -6,7 +6,7 @@ import type { CrudCallOptions } from "../service/crud-call-options.js";
 
 /**
  * The transport-agnostic request envelope handed to the engine — what the
- * framework layer (`@crudo/nest`) builds from an HTTP request, and what
+ * framework layer (`@kavo/nest`) builds from an HTTP request, and what
  * programmatic callers are sugar for. Which members are populated depends
  * on the operation: `id` for `*One` targets, `body` for writes,
  * `query` for reads.

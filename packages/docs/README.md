@@ -1,6 +1,6 @@
-# Crudo documentation
+# Kavo documentation
 
-Design documentation for the Crudo framework, maintained alongside the code.
+Design documentation for the Kavo framework, maintained alongside the code.
 
 These documents and the [ADRs](adr/) are authoritative. The `(Phase N)` tags
 below are historical provenance from the retired build plan; remaining unbuilt

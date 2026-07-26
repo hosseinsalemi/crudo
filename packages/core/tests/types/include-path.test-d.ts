@@ -1,5 +1,5 @@
 import { expectTypeOf } from "vitest";
-import type { IncludePath } from "@crudo/core";
+import type { IncludePath } from "@kavo/core";
 import { Author, Comment, Post } from "../support/blog-fixture.js";
 
 /**

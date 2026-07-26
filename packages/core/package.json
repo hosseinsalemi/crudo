@@ -1,7 +1,7 @@
 {
-  "name": "@crudo/core",
+  "name": "@kavo/core",
   "version": "0.0.0",
-  "description": "Crudo core — framework- and ORM-independent contracts and type system. Zero runtime dependencies.",
+  "description": "Kavo core — framework- and ORM-independent contracts and type system. Zero runtime dependencies.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

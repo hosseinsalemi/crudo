@@ -15,7 +15,7 @@ registry entry, from a registry built by the same
 `createOperationRegistry` the engine uses. If enablement of `restoreOne`
 and `purgeOne` depended on metadata, the two registry builds would
 disagree: the engine would enable an operation the router never mapped.
-Making `@crudo/nest` read TypeORM metadata to close the gap is exactly
+Making `@kavo/nest` read TypeORM metadata to close the gap is exactly
 the boundary Phase 2 forbids.
 
 ## Decision
@@ -46,7 +46,7 @@ exclude deleted rows; only the extra routes wait on the declaration.
 
 - Both registry builds reach the same answer from the same input; the
   route table and the service surface cannot drift.
-- `@crudo/nest` needs no ORM knowledge, and the generator itself needed
+- `@kavo/nest` needs no ORM knowledge, and the generator itself needed
   no change for Phase 14 — restore/purge appeared by enabling entries.
 - Cost: zero-config soft delete is not _entirely_ zero-config. An entity
   gets soft deletes and exclusion for free, but its restore route takes

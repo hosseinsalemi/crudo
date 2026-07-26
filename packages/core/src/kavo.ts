@@ -28,7 +28,7 @@ import { STANDARD_OPERATIONS } from "./operations/default-operation-registry.js"
  * ORM package plugs in (`createTypeOrmInfrastructure(dataSource)`) without
  * core ever importing it.
  */
-export interface CrudoOptions extends GlobalConfig {
+export interface KavoOptions extends GlobalConfig {
   readonly infrastructure?: CrudInfrastructure;
   /** Custom pagination strategies, addressable via `pagination.strategy`. */
   readonly paginationStrategies?: readonly PaginationStrategy[];
@@ -41,12 +41,12 @@ export interface CrudRuntime<Entity extends object> {
 }
 
 /**
- * A Crudo root instance: one merged global scope plus the entity registry
+ * A Kavo root instance: one merged global scope plus the entity registry
  * built from it. `createCrud` is the only way entities enter the system;
  * everything it resolves (config, DTOs, registry) happens at that call —
  * bootstrap — and is frozen after.
  */
-export interface CrudoInstance {
+export interface KavoInstance {
   createCrud<
     Entity extends object,
     CreateDto = EntityInput<Entity>,
@@ -66,11 +66,11 @@ export interface CrudoInstance {
 }
 
 /**
- * Create a Crudo root instance (Phase 8's `createCrudo`). The zero-config
- * path is `createCrudo({ infrastructure }).createCrud(Entity)` — built-in
+ * Create a Kavo root instance (Phase 8's `createKavo`). The zero-config
+ * path is `createKavo({ infrastructure }).createCrud(Entity)` — built-in
  * defaults, derived DTOs and allowlists, standard operations.
  */
-export function createCrudo(options: CrudoOptions = {}): CrudoInstance {
+export function createKavo(options: KavoOptions = {}): KavoInstance {
   const registered = new Map<string, Record<string, unknown>>();
   // The cross-entity view nested includes resolve against (Phase 15).
   // Entities that never go through `createCrud` are derived from
@@ -88,9 +88,9 @@ export function createCrudo(options: CrudoOptions = {}): CrudoInstance {
         throw new ConfigurationException(
           entity.name,
           "infrastructure",
-          "no metadata source: pass `infrastructure` to createCrudo " +
+          "no metadata source: pass `infrastructure` to createKavo " +
             "(e.g. createTypeOrmInfrastructure(dataSource) from " +
-            "@crudo/typeorm) or `runtime.metadata` to createCrud",
+            "@kavo/typeorm) or `runtime.metadata` to createCrud",
         );
       }
       const adapter = runtime?.adapter ?? options.infrastructure?.adapterFor(entity);
@@ -98,7 +98,7 @@ export function createCrudo(options: CrudoOptions = {}): CrudoInstance {
         throw new ConfigurationException(
           metadata.name,
           "infrastructure",
-          "no repository adapter: pass `infrastructure` to createCrudo or " + "`runtime.adapter` to createCrud",
+          "no repository adapter: pass `infrastructure` to createKavo or " + "`runtime.adapter` to createCrud",
         );
       }
 
@@ -170,8 +170,8 @@ function requireSoftDeletable<Entity extends object>(
  * The bare zero-config path (Phase 8): `createCrud(Entity, config?,
  * runtime)` — an implicit root instance with built-in defaults. At the
  * core level the runtime (adapter + metadata) must be explicit, because
- * core has no ORM to derive them from; `@crudo/typeorm`'s
- * `createTypeOrmCrudo` is the sugar that makes it disappear.
+ * core has no ORM to derive them from; `@kavo/typeorm`'s
+ * `createTypeOrmKavo` is the sugar that makes it disappear.
  */
 export function createCrud<
   Entity extends object,
@@ -186,5 +186,5 @@ export function createCrud<
   config?: EntityConfig<Entity, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto>,
   runtime?: CrudRuntime<Entity>,
 ): DefaultCrudService<Entity, EntityId, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto> {
-  return createCrudo().createCrud(entity, config, runtime);
+  return createKavo().createCrud(entity, config, runtime);
 }

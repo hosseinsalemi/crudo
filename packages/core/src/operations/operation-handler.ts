@@ -6,12 +6,12 @@ import type { CrudContext } from "../context/crud-context.js";
  * precedence (global routes → entity → operation), and hand it to the
  * framework layer.
  *
- * Consumers type their keys via declaration merging — `@crudo/nest`
+ * Consumers type their keys via declaration merging — `@kavo/nest`
  * augments it with route options:
  *
  * ```ts
- * // in @crudo/nest
- * declare module "@crudo/core" {
+ * // in @kavo/nest
+ * declare module "@kavo/core" {
  *   interface OperationMetadata {
  *     routes?: {
  *       method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";

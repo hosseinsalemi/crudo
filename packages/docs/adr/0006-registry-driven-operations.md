@@ -13,7 +13,7 @@ new one — plus route generation could each grow their own mechanism
 The engine dispatches **every** operation through
 `OperationRegistry<TEntity>`. Built-in CRUD handlers are ordinary default
 entries — nothing about them is special-cased. Disable = deactivate an
-entry; override = swap its handler; custom = add an entry. `@crudo/nest`
+entry; override = swap its handler; custom = add an entry. `@kavo/nest`
 generates routes by reading the registry, never from a verb list.
 
 ## Consequences

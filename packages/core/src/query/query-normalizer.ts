@@ -133,7 +133,7 @@ export class QueryNormalizer<Entity = unknown> {
     if (limit < 1 || offset < 0 || !Number.isInteger(limit) || !Number.isInteger(offset)) {
       issues.push({
         field: limit < 1 || !Number.isInteger(limit) ? "limit" : "offset",
-        code: "CRUDO_QUERY_INVALID_VALUE",
+        code: "KAVO_QUERY_INVALID_VALUE",
         detail: `Pagination values must be integers (limit ≥ 1, offset ≥ 0).`,
       });
     }
@@ -199,7 +199,7 @@ export class QueryNormalizer<Entity = unknown> {
 function unsupportedIssue(param: string): QueryIssueDto {
   return {
     field: param,
-    code: "CRUDO_QUERY_UNSUPPORTED_PARAM",
+    code: "KAVO_QUERY_UNSUPPORTED_PARAM",
     detail: `Query parameter '${param}' is not supported: this entity has no relation graph to resolve it against.`,
   };
 }
@@ -218,7 +218,7 @@ function parseIncludePaths(raw: unknown, issues: QueryIssueDto[]): readonly stri
     if (typeof token !== "string") {
       issues.push({
         field: "include",
-        code: "CRUDO_QUERY_INVALID_VALUE",
+        code: "KAVO_QUERY_INVALID_VALUE",
         detail: "'include' must be a comma-separated list of relation paths.",
       });
       continue;
@@ -247,7 +247,7 @@ function parseWithDeleted<Entity>(
   if (raw !== true && raw !== "true" && raw !== "1") {
     issues.push({
       field: "withDeleted",
-      code: "CRUDO_QUERY_INVALID_VALUE",
+      code: "KAVO_QUERY_INVALID_VALUE",
       detail: `Value '${String(raw)}' for field 'withDeleted' is not a valid boolean.`,
     });
     return false;
@@ -255,7 +255,7 @@ function parseWithDeleted<Entity>(
   if (config.softDelete.strategy !== "soft") {
     issues.push({
       field: "withDeleted",
-      code: "CRUDO_QUERY_UNSUPPORTED_PARAM",
+      code: "KAVO_QUERY_UNSUPPORTED_PARAM",
       detail:
         `Query parameter 'withDeleted' is not supported: ` +
         `${config.entityName} is not soft-deletable, so no rows are excluded.`,
@@ -274,7 +274,7 @@ function parseSort<Entity>(
   if (typeof raw !== "string") {
     issues.push({
       field: "sort",
-      code: "CRUDO_QUERY_INVALID_VALUE",
+      code: "KAVO_QUERY_INVALID_VALUE",
       detail: "'sort' must be a comma-separated field list.",
     });
     return [];
@@ -326,7 +326,7 @@ function collapseFieldSelection<Entity>(
   if (input === null || typeof input !== "object") {
     issues.push({
       field: "fields",
-      code: "CRUDO_QUERY_INVALID_VALUE",
+      code: "KAVO_QUERY_INVALID_VALUE",
       detail: "'fields' must be an array, or an object of relation fieldsets.",
     });
     return { root: null, relations: {} };
@@ -337,7 +337,7 @@ function collapseFieldSelection<Entity>(
     for (const key of unknownKeys) {
       issues.push({
         field: `fields.${key}`,
-        code: "CRUDO_QUERY_INVALID_VALUE",
+        code: "KAVO_QUERY_INVALID_VALUE",
         detail: `'fields.${key}' cannot be mixed with 'root'/'relations' — use 'relations.${key}' instead.`,
       });
     }
@@ -362,7 +362,7 @@ function parseFields<Entity>(
     if (typeof value !== "string") {
       issues.push({
         field: key,
-        code: "CRUDO_QUERY_INVALID_VALUE",
+        code: "KAVO_QUERY_INVALID_VALUE",
         detail: `'${key}' must be a comma-separated field list.`,
       });
       continue;
@@ -377,7 +377,7 @@ function parseFields<Entity>(
   if (typeof raw !== "string") {
     issues.push({
       field: "fields",
-      code: "CRUDO_QUERY_INVALID_VALUE",
+      code: "KAVO_QUERY_INVALID_VALUE",
       detail: "'fields' must be a comma-separated field list.",
     });
     return { root: null, relations };
@@ -401,7 +401,7 @@ function validateExpression<Entity>(
   if (depth > config.settings.query.maxFilterDepth) {
     issues.push({
       field: "filter",
-      code: "CRUDO_QUERY_LIMIT_EXCEEDED",
+      code: "KAVO_QUERY_LIMIT_EXCEEDED",
       detail: `Filter depth exceeds the configured maximum of ${config.settings.query.maxFilterDepth}.`,
     });
     return;
@@ -412,7 +412,7 @@ function validateExpression<Entity>(
     if (Array.isArray(value) && value.length > config.settings.query.maxInValues) {
       issues.push({
         field: expression.field as string,
-        code: "CRUDO_QUERY_LIMIT_EXCEEDED",
+        code: "KAVO_QUERY_LIMIT_EXCEEDED",
         detail: `'${expression.operator}' carries ${value.length} values; the maximum is ${config.settings.query.maxInValues}.`,
       });
     }
@@ -432,7 +432,7 @@ function requireAllowlisted(
   if ((allowlist as readonly string[]).includes(field)) return true;
   issues.push({
     field,
-    code: "CRUDO_QUERY_INVALID_FIELD",
+    code: "KAVO_QUERY_INVALID_FIELD",
     detail: `Field '${field}' cannot be used for ${usage}.`,
   });
   return false;

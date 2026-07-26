@@ -1,4 +1,4 @@
-import type { CrudoSettings } from "../config/settings.js";
+import type { KavoSettings } from "../config/settings.js";
 import type { DeepPartial } from "../types/utility.js";
 import type { TransactionContext } from "../persistence/transaction-manager.js";
 
@@ -13,5 +13,5 @@ export interface CrudCallOptions {
   /** Caller identity to expose on `CrudContext.principal`. */
   readonly principal?: unknown;
   /** Per-call settings overrides (e.g. a one-off `pagination.count`). */
-  readonly settings?: DeepPartial<CrudoSettings>;
+  readonly settings?: DeepPartial<KavoSettings>;
 }

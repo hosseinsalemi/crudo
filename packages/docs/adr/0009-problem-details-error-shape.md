@@ -11,10 +11,10 @@ details document.
 ## Decision
 
 The default serialized error is an RFC 9457 problem-details document
-(`ProblemDetailsDto`) with Crudo extensions: a stable `code`
-(`CRUDO_*`, catalog in Phase 6 — codes are API surface), `errors[]` for
-field-level query issues, `items[]` for per-index bulk failures. Crudo
-exceptions never extend Nest's; the `@crudo/nest` exception filter is the
+(`ProblemDetailsDto`) with Kavo extensions: a stable `code`
+(`KAVO_*`, catalog in Phase 6 — codes are API surface), `errors[]` for
+field-level query issues, `items[]` for per-index bulk failures. Kavo
+exceptions never extend Nest's; the `@kavo/nest` exception filter is the
 boundary that maps them.
 
 ## Consequences

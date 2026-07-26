@@ -23,7 +23,7 @@ export class DefaultCrudContextState implements CrudContextState {
 
 /**
  * Web Crypto is a runtime global on every supported platform (Node ≥ 20,
- * browsers), but `@crudo/core` compiles against pure ES lib types with
+ * browsers), but `@kavo/core` compiles against pure ES lib types with
  * zero imports (ADR-0005) — hence the typed accessor instead of a
  * `node:crypto` import.
  */

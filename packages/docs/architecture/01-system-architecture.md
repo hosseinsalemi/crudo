@@ -1,6 +1,6 @@
 # 01 — System Architecture (Phase 1)
 
-Crudo lets a developer define an entity once (via TypeORM) and get the full
+Kavo lets a developer define an entity once (via TypeORM) and get the full
 CRUD surface — `createOne` … `purgeOne`, the `*Many` batch variants
 (contracted and registered, but disabled: bulk is the optional half of
 Phase 14 and this build dropped it), and arbitrary custom operations —
@@ -10,7 +10,7 @@ transactions, and error handling, configurable at global, entity,
 operation, and per-call scope.
 
 v6 scope is deliberately narrow: REST only, three packages
-(`@crudo/core`, `@crudo/typeorm`, `@crudo/nest`), no validation subsystem,
+(`@kavo/core`, `@kavo/typeorm`, `@kavo/nest`), no validation subsystem,
 no hooks/events, no policy layer, no audit trail.
 
 ## 1. Layers and boundaries (C4 level 2)
@@ -21,14 +21,14 @@ flowchart TB
         C[Controllers / services / entities]
     end
 
-    subgraph nest["@crudo/nest — framework binding"]
-        N1["@Crud decorator + CrudoModule"]
+    subgraph nest["@kavo/nest — framework binding"]
+        N1["@Crud decorator + KavoModule"]
         N2[Route generation from operation registry]
         N3[Exception filter → problem details]
         N4[Swagger integration]
     end
 
-    subgraph core["@crudo/core — the hub (zero dependencies)"]
+    subgraph core["@kavo/core — the hub (zero dependencies)"]
         E["CrudEngine (request lifecycle)"]
         Q[Query model: filter AST, pagination, sort, fields]
         D[DTO resolution + serialization]
@@ -37,10 +37,10 @@ flowchart TB
         X[Exception hierarchy + error catalog]
     end
 
-    subgraph typeorm["@crudo/typeorm — ORM adapter"]
+    subgraph typeorm["@kavo/typeorm — ORM adapter"]
         T1[TypeOrmRepositoryAdapter]
         T2[Filter AST → QueryBuilder translation]
-        T3[Driver-error → Crudo-exception mapping]
+        T3[Driver-error → Kavo-exception mapping]
     end
 
     C --> N1
@@ -51,7 +51,7 @@ flowchart TB
     typeorm -->|imports| core
 ```
 
-Both outer packages depend on `@crudo/core`; core depends on nothing. The
+Both outer packages depend on `@kavo/core`; core depends on nothing. The
 adapter reaches the engine only through contracts it implements
 (`RepositoryAdapter`), and the framework binding reaches it only through
 contracts it consumes (`CrudService`, `OperationRegistry`). This is
@@ -61,16 +61,16 @@ technology.
 ## 2. Dependency graph (who may import whom)
 
 ```
-@crudo/nest ──▶ @crudo/core ◀── @crudo/typeorm
+@kavo/nest ──▶ @kavo/core ◀── @kavo/typeorm
      │                                │
      ▼ (peer)                         ▼ (peer)
   @nestjs/*                        typeorm
 ```
 
-- `@crudo/core` imports **nothing** (ADR-0005).
-- `@crudo/typeorm` imports `@crudo/core` + `typeorm` (peer). Never `@crudo/nest`.
-- `@crudo/nest` imports `@crudo/core` + `@nestjs/*` (peers). Never
-  `@crudo/typeorm` — adapters enter Nest's DI container as providers;
+- `@kavo/core` imports **nothing** (ADR-0005).
+- `@kavo/typeorm` imports `@kavo/core` + `typeorm` (peer). Never `@kavo/nest`.
+- `@kavo/nest` imports `@kavo/core` + `@nestjs/*` (peers). Never
+  `@kavo/typeorm` — adapters enter Nest's DI container as providers;
   the binding programs against `RepositoryAdapter` only.
 - Cross-package imports go through package barrels; deep imports are not API.
 
@@ -79,11 +79,11 @@ references — an illegal import fails CI, not code review.
 
 ## 3. Package overview
 
-| Package          | Owns                                                                                    | Must never depend on         |
-| ---------------- | --------------------------------------------------------------------------------------- | ---------------------------- |
-| `@crudo/core`    | Contracts, type system, engine, query model, DTO resolution, config merging, exceptions | anything (zero runtime deps) |
-| `@crudo/typeorm` | `RepositoryAdapter`/`FilterBuilder` over TypeORM; error mapping; relation loading       | NestJS, `@crudo/nest`        |
-| `@crudo/nest`    | `@Crud` decorator, module wiring, route generation, exception filter, Swagger           | TypeORM, `@crudo/typeorm`    |
+| Package         | Owns                                                                                    | Must never depend on         |
+| --------------- | --------------------------------------------------------------------------------------- | ---------------------------- |
+| `@kavo/core`    | Contracts, type system, engine, query model, DTO resolution, config merging, exceptions | anything (zero runtime deps) |
+| `@kavo/typeorm` | `RepositoryAdapter`/`FilterBuilder` over TypeORM; error mapping; relation loading       | NestJS, `@kavo/nest`         |
+| `@kavo/nest`    | `@Crud` decorator, module wiring, route generation, exception filter, Swagger           | TypeORM, `@kavo/typeorm`     |
 
 ORM independence inside core is a structural discipline even though only
 TypeORM is built — it is what keeps the core clean.
@@ -105,12 +105,12 @@ Request
 
 Deliberately lean: no validation stage, no hook/event stages, no policy
 stage. Cross-cutting behavior lives in the consumer's own controller/
-service code around Crudo — the v6 tradeoff, chosen for simplicity. Every
+service code around Kavo — the v6 tradeoff, chosen for simplicity. Every
 stage boundary is a seam with a plain default in it until its phase lands
 — seams, not TODOs — which is what makes Milestone B shippable without
 stubbing Milestones C–D as hacks.
 
-## 5. Module responsibilities (inside `@crudo/core`)
+## 5. Module responsibilities (inside `@kavo/core`)
 
 | Module           | Responsibility                                                                                               |
 | ---------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -138,11 +138,11 @@ pattern; classes that merely resemble one are not in the table.
 | **Template Method**           | `CrudEngine.execute`/`run` (`core/src/engine/crud-engine.ts`)                                                                                                                                                                                                                                                             | —                                                                                                                         | One fixed stage order with swappable stage internals beats a free-form middleware chain: ordering bugs become impossible, and the pipeline stays inspectable. Variability comes from injected collaborators, not subclass overrides — `run` is `private` and nothing extends `CrudEngine`. |
 | **Strategy**                  | `PaginationStrategy` (`core/src/query/pagination-strategies.ts`), `Serializer`/`Deserializer` (`core/src/serialization/`), `ErrorHandler` (`core/src/errors/default-error-handler.ts`), `OperationHandler` (`core/src/engine/built-in-handlers.ts`), `IncludeResolver` (`core/src/relations/default-include-resolver.ts`) | —                                                                                                                         | Open/Closed: new behavior = new implementation of a core contract, never an engine edit. Each is a core-declared interface with a `Default*`/built-in implementation, injected through `CrudEngineDependencies`.                                                                           |
 | **Registry (dispatch table)** | `DefaultOperationRegistry` + `createOperationRegistry` (`core/src/operations/default-operation-registry.ts`)                                                                                                                                                                                                              | [0006](../adr/0006-registry-driven-operations.md), [0007](../adr/0007-module-augmentable-operation-metadata.md)           | One mechanism for built-in, overridden, and custom operations (Phase 13's "one mechanism, several behaviors"); route generation reads the same table, so features get routes for free.                                                                                                     |
-| **Composition Root**          | `createCrudo`/`createCrud` (`core/src/crudo.ts`); framework-layer roots in `nest/src/crudo.module.ts` and `typeorm/src/infrastructure.ts`                                                                                                                                                                                 | —                                                                                                                         | Every `new` in the object graph happens once at bootstrap, so resolution order is a single readable function and the result can be frozen; no service locator, and no per-request construction.                                                                                            |
+| **Composition Root**          | `createKavo`/`createCrud` (`core/src/kavo.ts`); framework-layer roots in `nest/src/kavo.module.ts` and `typeorm/src/infrastructure.ts`                                                                                                                                                                                    | —                                                                                                                         | Every `new` in the object graph happens once at bootstrap, so resolution order is a single readable function and the result can be frozen; no service locator, and no per-request construction.                                                                                            |
 | **Adapter**                   | `TypeOrmRepositoryAdapter` (`typeorm/src/typeorm-repository-adapter.ts`) against core's `RepositoryAdapter`; `CrudInfrastructure` (`metadataFor` + `adapterFor`) supplies adapter _and_ metadata as one family                                                                                                            | [0001](../adr/0001-clean-architecture-core-owns-contracts.md), [0011](../adr/0011-entity-metadata-infrastructure-seam.md) | Core states persistence in its own vocabulary and the ORM package translates, which is what lets core keep zero runtime dependencies (ADR-0005) and stay testable with an in-memory fake.                                                                                                  |
 | **Specification**             | Filter AST (`core/src/query/filter.ts`)                                                                                                                                                                                                                                                                                   | —                                                                                                                         | Composable, provider-independent query trees that each adapter translates once, instead of per-ORM query fragments leaking upward. Composition only — the AST is pure data with no evaluation method; evaluation is the adapter's job (next row).                                          |
 | **Interpreter**               | `FilterTranslator.toBrackets` (`typeorm/src/filter-translator.ts`)                                                                                                                                                                                                                                                        | —                                                                                                                         | The AST is walked into `QueryBuilder` calls; keeps translation local to the adapter.                                                                                                                                                                                                       |
-| **Dependency Injection**      | `CrudEngineDependencies` (`core/src/engine/crud-engine.ts`); container wiring only in `nest/src/crudo.module.ts`                                                                                                                                                                                                          | —                                                                                                                         | Core receives its collaborators; only the framework binding knows the container.                                                                                                                                                                                                           |
+| **Dependency Injection**      | `CrudEngineDependencies` (`core/src/engine/crud-engine.ts`); container wiring only in `nest/src/kavo.module.ts`                                                                                                                                                                                                           | —                                                                                                                         | Core receives its collaborators; only the framework binding knows the container.                                                                                                                                                                                                           |
 | **Facade**                    | `DefaultCrudService` (`core/src/service/default-crud-service.ts`)                                                                                                                                                                                                                                                         | —                                                                                                                         | One narrow, typed entry point over engine + registry + config machinery; its methods are sugar over the same `CrudRequest` envelope the generated routes build.                                                                                                                            |
 
 Rejected: Active Record (couples entities to persistence — kills ORM
@@ -166,7 +166,7 @@ sequenceDiagram
     E->>D: deserialize(body, CreateDto)
     D-->>E: create input
     E->>A: create(data, ctx)
-    A-->>E: entity (or mapped CrudoException)
+    A-->>E: entity (or mapped KavoException)
     E->>S: serializeItem(entity, ItemDto, ctx)
     S-->>C: item DTO (201)
 ```
@@ -227,7 +227,7 @@ sequenceDiagram
 
 ## 8. Non-goals (scope-creep insurance)
 
-Crudo is **not**:
+Kavo is **not**:
 
 - an ORM — it sits on one; it never maps columns or runs migrations;
 - a query language beyond the CRUD surface — no aggregations, projections
@@ -246,14 +246,14 @@ Crudo is **not**:
 | [0002](../adr/0002-package-topology.md)                       | Three packages under `orms/` / `frameworks/` parents      |
 | [0003](../adr/0003-pnpm-plain-scripts-tsc-build.md)           | pnpm workspaces, plain scripts, `tsc -b` — no task runner |
 | [0004](../adr/0004-lockstep-versioning.md)                    | Lockstep versioning                                       |
-| [0005](../adr/0005-core-zero-runtime-dependencies.md)         | Zero runtime dependencies in `@crudo/core`                |
+| [0005](../adr/0005-core-zero-runtime-dependencies.md)         | Zero runtime dependencies in `@kavo/core`                 |
 | [0006](../adr/0006-registry-driven-operations.md)             | Registry-driven operation dispatch                        |
 | [0007](../adr/0007-module-augmentable-operation-metadata.md)  | Module-augmentable `OperationMetadata`                    |
 | [0008](../adr/0008-field-path-recursion-cap.md)               | `FieldPath` recursion cap (default 3, max 5)              |
 | [0009](../adr/0009-problem-details-error-shape.md)            | RFC 9457 problem details as the wire error shape          |
 | [0010](../adr/0010-explicit-named-barrel.md)                  | Explicit named barrel in core                             |
 | [0011](../adr/0011-entity-metadata-infrastructure-seam.md)    | Entity-metadata & infrastructure seam                     |
-| [0012](../adr/0012-decoration-time-route-generation.md)       | Decoration-time route generation in `@crudo/nest`         |
+| [0012](../adr/0012-decoration-time-route-generation.md)       | Decoration-time route generation in `@kavo/nest`          |
 | [0013](../adr/0013-config-declared-soft-delete-operations.md) | Soft-delete operations enabled from config, not metadata  |
 | [0014](../adr/0014-associate-by-id-not-deep-writes.md)        | Write-side relations: associate by id, no deep writes     |
 

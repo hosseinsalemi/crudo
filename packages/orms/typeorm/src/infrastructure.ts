@@ -1,12 +1,12 @@
 import type {
   ClassRef,
   CrudInfrastructure,
-  CrudoInstance,
-  CrudoOptions,
+  KavoInstance,
+  KavoOptions,
   EntityMetadata,
   RepositoryAdapter,
-} from "@crudo/core";
-import { createCrudo } from "@crudo/core";
+} from "@kavo/core";
+import { createKavo } from "@kavo/core";
 import type { DataSource, ObjectLiteral } from "typeorm";
 import { buildEntityMetadata } from "./metadata.js";
 import { TypeOrmRepositoryAdapter } from "./typeorm-repository-adapter.js";
@@ -42,15 +42,15 @@ export function createTypeOrmInfrastructure(dataSource: DataSource): CrudInfrast
 }
 
 /**
- * Sugar for the common case: a Crudo root instance wired to one TypeORM
- * `DataSource`, so `crudo.createCrud(UserEntity)` is genuinely
+ * Sugar for the common case: a Kavo root instance wired to one TypeORM
+ * `DataSource`, so `kavo.createCrud(UserEntity)` is genuinely
  * zero-config.
  */
-export function createTypeOrmCrudo(
+export function createTypeOrmKavo(
   dataSource: DataSource,
-  options: Omit<CrudoOptions, "infrastructure"> = {},
-): CrudoInstance {
-  return createCrudo({
+  options: Omit<KavoOptions, "infrastructure"> = {},
+): KavoInstance {
+  return createKavo({
     ...options,
     infrastructure: createTypeOrmInfrastructure(dataSource),
   });

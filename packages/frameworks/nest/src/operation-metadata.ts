@@ -1,5 +1,5 @@
 /**
- * `@crudo/nest`'s module augmentation of core's opaque `OperationMetadata`
+ * `@kavo/nest`'s module augmentation of core's opaque `OperationMetadata`
  * (ADR-0007): route concerns attach to operation registry entries without
  * core knowing HTTP exists. Route generation reads `meta.routes`; core
  * only stores and merges the bag.
@@ -21,7 +21,7 @@ export interface CrudRouteOptions {
   readonly successStatus?: number;
 }
 
-declare module "@crudo/core" {
+declare module "@kavo/core" {
   interface OperationMetadata {
     routes?: CrudRouteOptions;
   }

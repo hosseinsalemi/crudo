@@ -1,4 +1,4 @@
-import type { SoftDeletable } from "@crudo/core";
+import type { SoftDeletable } from "@kavo/core";
 import {
   Column,
   CreateDateColumn,
@@ -20,7 +20,7 @@ import type { Address } from "../address/address.entity.js";
  * column types keep the entity independent of `emitDecoratorMetadata`.
  *
  * Owners are soft-deletable: `@DeleteDateColumn` is all the ORM needs to
- * say so, and `@crudo/typeorm` surfaces it as the delete-marker field, so
+ * say so, and `@kavo/typeorm` surfaces it as the delete-marker field, so
  * `DELETE /owners/:id` stamps the row instead of removing it (Phase 14).
  *
  * Caveat worth seeing in a reference app: a soft-deleted owner still

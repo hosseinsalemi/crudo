@@ -1,6 +1,6 @@
 import { Controller } from "@nestjs/common";
-import { Crud } from "@crudo/nest";
-import type { CrudContext, OperationHandler } from "@crudo/core";
+import { Crud } from "@kavo/nest";
+import type { CrudContext, OperationHandler } from "@kavo/core";
 import { expectTypeOf } from "vitest";
 
 /**

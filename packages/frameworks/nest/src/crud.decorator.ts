@@ -7,14 +7,14 @@ import type {
   OperationDescriptor,
   QueryContext,
   StandardOperationId,
-} from "@crudo/core";
-import { WireQuery, createOperationRegistry } from "@crudo/core";
+} from "@kavo/core";
+import { WireQuery, createOperationRegistry } from "@kavo/core";
 import type { CrudHttpMethod, CrudRouteOptions } from "./operation-metadata.js";
 import { CRUD_CONTROLLER_METADATA, CRUD_SERVICE_PROPERTY, getCrudServiceToken } from "./tokens.js";
 import { flattenQuery } from "./flatten-query.js";
 import { applySwaggerMetadata } from "./swagger.js";
 
-/** What `@Crud` records on the controller for `CrudoModule.forFeature`. */
+/** What `@Crud` records on the controller for `KavoModule.forFeature`. */
 export interface CrudControllerMetadata {
   readonly entity: ClassRef;
   readonly config?: EntityConfig<object>;

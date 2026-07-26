@@ -1,6 +1,6 @@
 # 10 — NestJS Integration (Phases 11–12)
 
-`@crudo/nest` turns one decorator into a full CRUD controller:
+`@kavo/nest` turns one decorator into a full CRUD controller:
 
 ```ts
 @Crud(UserEntity)
@@ -14,16 +14,16 @@ boundary) — infrastructure arrives through DI.
 
 ## 1. Module design
 
-- **`CrudoModule.forRoot(options)`** (global): creates the Crudo root
-  instance (`createCrudo` skin — `defaults` passes through untouched),
+- **`KavoModule.forRoot(options)`** (global): creates the Kavo root
+  instance (`createKavo` skin — `defaults` passes through untouched),
   registers the problem-details exception filter app-wide (`APP_FILTER`),
-  and exposes `CRUDO_INSTANCE`. **`forRootAsync`** resolves the options
+  and exposes `KAVO_INSTANCE`. **`forRootAsync`** resolves the options
   via `useFactory`/`inject` — the checkpoint app uses it to wait for the
   `DataSource` before building `createTypeOrmInfrastructure(dataSource)`.
-- **`CrudoModule.forFeature(controllers)`**: for each `@Crud`-decorated
+- **`KavoModule.forFeature(controllers)`**: for each `@Crud`-decorated
   controller, registers the controller and provides the entity's service
   under `getCrudServiceToken(Entity)` (factory:
-  `crudo.createCrud(entity, config)` — bootstrap happens here, once).
+  `kavo.createCrud(entity, config)` — bootstrap happens here, once).
   A non-`@Crud` class fails fast with a `ConfigurationException`.
 
 **Singleton services, deliberately:** the engine threads every
@@ -73,10 +73,10 @@ bracket keys, making the binding query-parser-agnostic).
 
 ## 3. Exception mapping
 
-`CrudoExceptionFilter` (`@Catch(CrudoException)`) is the one boundary
-between Crudo's hierarchy and HTTP: catalog status +
+`KavoExceptionFilter` (`@Catch(KavoException)`) is the one boundary
+between Kavo's hierarchy and HTTP: catalog status +
 `application/problem+json` body via `toProblemDetails`, honoring
-`errors.exposeInternals`. Crudo exceptions never extend Nest's.
+`errors.exposeInternals`. Kavo exceptions never extend Nest's.
 
 ## 4. Swagger integration
 

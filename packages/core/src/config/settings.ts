@@ -4,8 +4,8 @@ import type { RelationLoadStrategy } from "../relations/relation-descriptor.js";
  * The complete, canonical settings schema — one schema for every scope.
  *
  * These interfaces describe *resolved* (complete) settings. Input scopes —
- * global (`createCrudo`), entity (`createCrud`), operation, and per-call —
- * all accept `DeepPartial<CrudoSettings>` of this same shape; there is
+ * global (`createKavo`), entity (`createCrud`), operation, and per-call —
+ * all accept `DeepPartial<KavoSettings>` of this same shape; there is
  * never a second config mechanism (Phase 8 schema-extensibility rule).
  * Later feature phases add keys here, reserved in the schema now.
  */
@@ -76,7 +76,7 @@ export interface SoftDeleteSettings {
 }
 
 /** The full settings tree. */
-export interface CrudoSettings {
+export interface KavoSettings {
   readonly pagination: PaginationSettings;
   readonly query: QuerySettings;
   readonly errors: ErrorSettings;

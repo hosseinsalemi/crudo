@@ -1,6 +1,6 @@
 import { expectTypeOf } from "vitest";
-import { createCrudo } from "@crudo/core";
-import type { EntityInput, ListResultDto, QueryContext } from "@crudo/core";
+import { createKavo } from "@kavo/core";
+import type { EntityInput, ListResultDto, QueryContext } from "@kavo/core";
 import { Author } from "../support/blog-fixture.js";
 
 /**
@@ -22,9 +22,9 @@ class AuthorListDto {
   id = 0;
 }
 
-const crudo = createCrudo({ defaults: { pagination: { maxLimit: 50 } } });
+const kavo = createKavo({ defaults: { pagination: { maxLimit: 50 } } });
 
-const authors = crudo.createCrud(Author, {
+const authors = kavo.createCrud(Author, {
   dto: { item: AuthorItemDto, list: AuthorListDto },
 });
 

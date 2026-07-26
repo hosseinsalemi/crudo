@@ -1,5 +1,5 @@
-import type { ClassRef, EntityMetadata, FieldKind, FieldMetadata, RelationDescriptor } from "@crudo/core";
-import { ConfigurationException } from "@crudo/core";
+import type { ClassRef, EntityMetadata, FieldKind, FieldMetadata, RelationDescriptor } from "@kavo/core";
+import { ConfigurationException } from "@kavo/core";
 import type { DataSource } from "typeorm";
 import type { ColumnMetadata } from "typeorm/metadata/ColumnMetadata.js";
 
@@ -44,7 +44,7 @@ export function buildEntityMetadata<Entity extends object>(
     throw new ConfigurationException(
       metadata.name,
       "primaryColumns",
-      `Crudo v6 requires exactly one primary column; found ${metadata.primaryColumns.length}`,
+      `Kavo v6 requires exactly one primary column; found ${metadata.primaryColumns.length}`,
     );
   }
   const primary = metadata.primaryColumns[0]!;

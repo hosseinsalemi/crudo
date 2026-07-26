@@ -1,4 +1,4 @@
-import type { CrudoSettings } from "./settings.js";
+import type { KavoSettings } from "./settings.js";
 import { ConfigurationException } from "../errors/exceptions.js";
 
 /**
@@ -6,7 +6,7 @@ import { ConfigurationException } from "../errors/exceptions.js";
  * entity, the key path, and the offending value — config errors surface at
  * startup, never as mysterious runtime behavior.
  */
-export function validateSettings(entityName: string, settings: CrudoSettings): void {
+export function validateSettings(entityName: string, settings: KavoSettings): void {
   const positiveInt = (path: string, value: unknown): void => {
     if (!Number.isInteger(value) || (value as number) <= 0) {
       throw new ConfigurationException(entityName, path, `expected a positive integer, got ${JSON.stringify(value)}`);

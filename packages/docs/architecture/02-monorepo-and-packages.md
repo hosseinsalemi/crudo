@@ -3,22 +3,22 @@
 ## 1. Structure
 
 ```
-crudo/
+kavo/
 ├─ package.json               # root: build/check scripts, dev tooling
 ├─ pnpm-workspace.yaml
 ├─ tsconfig.base.json         # shared strict compiler options
 ├─ tsconfig.json              # solution file: project-reference graph
 ├─ .dependency-cruiser.cjs    # mechanical boundary enforcement
 └─ packages/
-   ├─ core/                   # @crudo/core
+   ├─ core/                   # @kavo/core
    │  ├─ src/{types,query,dto,errors,config,operations,
    │  │       relations,context,serialization,persistence,service}/
    │  └─ src/index.ts         # explicit named barrel
    ├─ orms/
-   │  └─ typeorm/             # @crudo/typeorm (scaffold until Phase 10)
+   │  └─ typeorm/             # @kavo/typeorm (scaffold until Phase 10)
    │     └─ src/index.ts
    ├─ frameworks/
-   │  └─ nest/                # @crudo/nest (scaffold until Phase 12)
+   │  └─ nest/                # @kavo/nest (scaffold until Phase 12)
    │     └─ src/index.ts
    ├─ examples/               # Phase 17 reference application (empty)
    └─ docs/                   # this documentation
@@ -30,17 +30,17 @@ exactly three packages.
 
 ## 2. Responsibility statements
 
-- **`@crudo/core`** exists to own every contract and all ORM/framework-
+- **`@kavo/core`** exists to own every contract and all ORM/framework-
   independent runtime (engine, config merging, query parsing, DTO
   resolution, exceptions). It can't depend on **anything** — not TypeORM,
   not NestJS, not utility libraries. If core needs a helper, core writes it.
-- **`@crudo/typeorm`** exists to translate core's persistence contracts to
+- **`@kavo/typeorm`** exists to translate core's persistence contracts to
   TypeORM (adapter, filter translation, error mapping, transactions). It
-  can't depend on NestJS or `@crudo/nest` — an adapter must be usable from
+  can't depend on NestJS or `@kavo/nest` — an adapter must be usable from
   any future framework binding.
-- **`@crudo/nest`** exists to bind Crudo to NestJS (module, decorator,
+- **`@kavo/nest`** exists to bind Kavo to NestJS (module, decorator,
   route generation, exception filter, Swagger). It can't depend on TypeORM
-  or `@crudo/typeorm` — it sees persistence only as an injected
+  or `@kavo/typeorm` — it sees persistence only as an injected
   `RepositoryAdapter`.
 
 Every package earns its place: core is the hub, and the two edges each
@@ -63,13 +63,13 @@ Two independent enforcement layers:
 
    - **Both spellings are matched.** A workspace package specifier does not
      resolve to a path for dependency-cruiser, so a path-only rule silently
-     misses `from "@crudo/nest"` — the spelling anyone would actually write.
+     misses `from "@kavo/nest"` — the spelling anyone would actually write.
      The rules match the bare specifier as well as the relative path.
      `packages/examples` is in scope too: it is the reference app.
    - **`tests/` is cruised, not exempt.** Test files were once excluded
      entirely, which left the boundary convention-only exactly where fixture
      sharing tempts a shortcut. A test file may import its own package's
-     source and the `@crudo/*` barrels, never another package's `src` or
+     source and the `@kavo/*` barrels, never another package's `src` or
      `tests`; core's tests additionally may not reach an adapter or framework
      package, because core's ignorance of both is what its suite exists to
      prove.
@@ -108,12 +108,12 @@ dual ESM+CJS output is Phase 18's deliverable.
 `tsc -b` against the solution file: incremental (`.tsbuildinfo`),
 project-reference-ordered (core → typeorm/nest), each package emitting
 `dist/` with declarations + declaration maps. Consumers inside the
-workspace resolve `@crudo/*` via pnpm workspace links to the built
+workspace resolve `@kavo/*` via pnpm workspace links to the built
 `dist`, exactly as external consumers will.
 
 ## 7. Versioning: lockstep (ADR-0004)
 
-All `@crudo/*` packages share one version number and release together.
+All `@kavo/*` packages share one version number and release together.
 The packages form one tightly coupled contract surface — a core contract
 change almost always touches an edge package, and a single version answers
 "which adapter works with which core" permanently. Cost: occasional no-op
@@ -123,11 +123,11 @@ publish order) are Phase 18.
 
 ## 8. Dependency classification (decided now, executed in Phase 18)
 
-| Package          | `dependencies` | `peerDependencies`                                              |
-| ---------------- | -------------- | --------------------------------------------------------------- |
-| `@crudo/core`    | — (none, ever) | —                                                               |
-| `@crudo/typeorm` | `@crudo/core`  | `typeorm`                                                       |
-| `@crudo/nest`    | `@crudo/core`  | `@nestjs/common`, `@nestjs/core` (+ `@nestjs/swagger` optional) |
+| Package         | `dependencies` | `peerDependencies`                                              |
+| --------------- | -------------- | --------------------------------------------------------------- |
+| `@kavo/core`    | — (none, ever) | —                                                               |
+| `@kavo/typeorm` | `@kavo/core`   | `typeorm`                                                       |
+| `@kavo/nest`    | `@kavo/core`   | `@nestjs/common`, `@nestjs/core` (+ `@nestjs/swagger` optional) |
 
 Peers, not dependencies, because the consumer's app owns the TypeORM/Nest
 instance — a second copy via a nested dependency would fracture

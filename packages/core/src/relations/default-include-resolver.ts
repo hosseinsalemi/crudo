@@ -88,7 +88,7 @@ export class DefaultIncludeResolver<Entity extends object = object> implements I
       if (relation === undefined || !relation.includable) {
         issues.push({
           field: draft.path,
-          code: "CRUDO_QUERY_INVALID_FIELD",
+          code: "KAVO_QUERY_INVALID_FIELD",
           detail: `Field '${draft.path}' cannot be used for inclusion.`,
         });
         continue;
@@ -96,7 +96,7 @@ export class DefaultIncludeResolver<Entity extends object = object> implements I
       if (depthBudget < 1) {
         issues.push({
           field: draft.path,
-          code: "CRUDO_QUERY_LIMIT_EXCEEDED",
+          code: "KAVO_QUERY_LIMIT_EXCEEDED",
           detail:
             `Include path '${draft.path}' is deeper than the configured maximum ` +
             `of ${owner.settings.relations.maxIncludeDepth}.`,
@@ -106,7 +106,7 @@ export class DefaultIncludeResolver<Entity extends object = object> implements I
       if (nodeBudget.remaining < 1) {
         issues.push({
           field: draft.path,
-          code: "CRUDO_QUERY_LIMIT_EXCEEDED",
+          code: "KAVO_QUERY_LIMIT_EXCEEDED",
           detail: `Include tree exceeds the configured maximum of ${owner.settings.relations.maxIncludedNodes} nodes.`,
         });
         continue;
@@ -148,10 +148,10 @@ export class DefaultIncludeResolver<Entity extends object = object> implements I
     if (target === undefined) {
       issues.push({
         field: draft.path,
-        code: "CRUDO_QUERY_UNSUPPORTED_PARAM",
+        code: "KAVO_QUERY_UNSUPPORTED_PARAM",
         detail:
           `Query parameter 'include' cannot resolve '${draft.path}': the target entity is ` +
-          `unknown to this Crudo instance.`,
+          `unknown to this Kavo instance.`,
       });
     }
     return target;
@@ -181,7 +181,7 @@ export class DefaultIncludeResolver<Entity extends object = object> implements I
     if (!Array.isArray(requested)) {
       issues.push({
         field: draft.path,
-        code: "CRUDO_QUERY_INVALID_VALUE",
+        code: "KAVO_QUERY_INVALID_VALUE",
         detail: `'fields.${draft.path}' must be an array of field names.`,
       });
       return null;
@@ -195,7 +195,7 @@ export class DefaultIncludeResolver<Entity extends object = object> implements I
       }
       issues.push({
         field: `${draft.path}.${field}`,
-        code: "CRUDO_QUERY_INVALID_FIELD",
+        code: "KAVO_QUERY_INVALID_FIELD",
         detail: `Field '${field}' cannot be used for selection on '${draft.path}'.`,
       });
     }
@@ -209,7 +209,7 @@ function addPath(drafts: Map<string, DraftNode>, path: string, issues: QueryIssu
   if (segments.some((segment) => segment === "")) {
     issues.push({
       field: "include",
-      code: "CRUDO_QUERY_INVALID_VALUE",
+      code: "KAVO_QUERY_INVALID_VALUE",
       detail: `Include path '${path}' is malformed: segments must be non-empty, dot-separated relation names.`,
     });
     return;

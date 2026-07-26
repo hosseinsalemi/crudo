@@ -1,4 +1,4 @@
-import type { CrudoSettings } from "./settings.js";
+import type { KavoSettings } from "./settings.js";
 import type { DeepPartial } from "../types/utility.js";
 
 /**
@@ -10,18 +10,18 @@ import type { DeepPartial } from "../types/utility.js";
  *   (`softDelete: false`): the `false` replaces the whole subtree.
  * - Arrays replace wholesale (no element merging).
  *
- * The base is always a *complete* `CrudoSettings`, so the result is too.
+ * The base is always a *complete* `KavoSettings`, so the result is too.
  */
 export function mergeSettings(
-  base: CrudoSettings,
-  ...overrides: readonly (DeepPartial<CrudoSettings> | undefined)[]
-): CrudoSettings {
+  base: KavoSettings,
+  ...overrides: readonly (DeepPartial<KavoSettings> | undefined)[]
+): KavoSettings {
   let result: Record<string, unknown> = { ...base };
   for (const override of overrides) {
     if (override === undefined) continue;
     result = mergeLevel(result, override as Record<string, unknown>);
   }
-  return result as unknown as CrudoSettings;
+  return result as unknown as KavoSettings;
 }
 
 function mergeLevel(base: Record<string, unknown>, override: Record<string, unknown>): Record<string, unknown> {

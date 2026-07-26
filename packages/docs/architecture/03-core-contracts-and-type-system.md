@@ -4,7 +4,7 @@ All contracts live in `packages/core/src` and are exported through the
 explicit barrel. **Types only** — no classes, no implementations; the
 first runtime code lands in Milestone B. Contracts whose implementations
 land in Milestone C (relations, transactions, bulk, operation control) are
-declared now so later phases never mutate `@crudo/core` types.
+declared now so later phases never mutate `@kavo/core` types.
 
 ## 1. Generic parameters
 
@@ -118,7 +118,7 @@ relations?: never }`) — without that exclusion it structurally satisfies
 structured form's own spell-checking (`{ root: ['nope'] }` would typecheck).
 At runtime, `QueryNormalizer`'s collapse step rejects — rather than
 silently drops — any relation-keyed key mixed into a structured literal, so
-a caller who blends the two spellings gets a `CRUDO_QUERY_INVALID_VALUE`
+a caller who blends the two spellings gets a `KAVO_QUERY_INVALID_VALUE`
 issue naming the stray key, not a quietly ignored fieldset. A malformed
 `fields` value (not an array, not an object) is also an issue, never a
 thrown error. The same guarantee holds one level down: a per-relation
@@ -138,12 +138,12 @@ the same allowlist validation.
 `OperationMetadata` is an intentionally empty interface on every
 operation registry entry. Core stores it, merges it per Phase 8
 precedence, and hands it to the framework layer — it never reads it. A
-consumer types its keys via declaration merging; `@crudo/nest` declares a
+consumer types its keys via declaration merging; `@kavo/nest` declares a
 `routes` key:
 
 ```ts
 // packages/frameworks/nest/src/operation-metadata.ts (Phase 11)
-declare module "@crudo/core" {
+declare module "@kavo/core" {
   interface OperationMetadata {
     routes?: {
       method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -170,15 +170,15 @@ createCrud(UserEntity, {
 
 This pattern requires a stable augmentation target — one reason the barrel
 is an explicit named list (ADR-0010) and the `exports` map exposes exactly
-one module id, `@crudo/core`.
+one module id, `@kavo/core`.
 
 ## 4. Why zero runtime dependencies (ADR-0005)
 
-`@crudo/core` is imported by every Crudo package and every consumer app.
+`@kavo/core` is imported by every Kavo package and every consumer app.
 Any dependency it carried would be forced on all of them — version
 conflicts, install weight, supply-chain surface — and utility libraries in
 particular tend to leak types into public signatures, making third-party
-types part of Crudo's API contract. Framework/ORM independence is the same
+types part of Kavo's API contract. Framework/ORM independence is the same
 rule at its extreme: core not importing TypeORM or NestJS (directly or
 transitively) is what makes the adapter seam real rather than aspirational.
 Enforced by dependency-cruiser (`core-imports-nothing`), not convention.
@@ -192,8 +192,8 @@ Enforced by dependency-cruiser (`core-imports-nothing`), not convention.
 | Transactions  | `TransactionManager`, `TransactionContext`, `TransactionOptions`                                                                                                       | Not implemented — see below        |
 | Query         | `Filter*`, `FilterExpression`, `Sort`, `Pagination`, `PaginationStrategy`, `FieldSelection`, `QueryContext`, `NormalizedQueryContext`, `FilterParser`, `FilterBuilder` | Phase 5 (parse), Phase 10 (build)  |
 | DTO           | `Dto`, `DtoClass`, `OperationDtoMap`, `DtoResolver`, `ListResultDto`, `ListMetaDto`, `BulkResultDto`                                                                   | Phase 4 (bulk reserved)            |
-| Errors        | `CrudException`, `CrudoErrorCode`, `ErrorHandler`, `ProblemDetailsDto`                                                                                                 | Phase 6                            |
-| Config        | `CrudoSettings` (+ per-area settings), `GlobalConfig`, `EntityConfig`, `OperationConfig`, `CustomOperationConfig`, `ResolvedEntityConfig`                              | Phase 8 (operations Phase 13)      |
+| Errors        | `CrudException`, `KavoErrorCode`, `ErrorHandler`, `ProblemDetailsDto`                                                                                                  | Phase 6                            |
+| Config        | `KavoSettings` (+ per-area settings), `GlobalConfig`, `EntityConfig`, `OperationConfig`, `CustomOperationConfig`, `ResolvedEntityConfig`                               | Phase 8 (operations Phase 13)      |
 | Operations    | `OperationId`, `OperationHandler`, `OperationMetadata`, `OperationDescriptor`, `OperationRegistry`                                                                     | Phase 7 (control surface Phase 13) |
 | Relations     | `RelationDescriptor`, `RelationRegistry`, `IncludeTree`, `IncludeNode`, `IncludeResolver`, `EntityCatalog`                                                             | Phase 15                           |
 | Context       | `CrudContext`, `CrudContextState`, `StateKey`, `CrudRequest`, `CrudResponse`                                                                                           | Phase 7                            |

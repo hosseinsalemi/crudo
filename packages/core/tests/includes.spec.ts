@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { ConfigurationException, QueryValidationException, createCrudo } from "@crudo/core";
+import { ConfigurationException, QueryValidationException, createKavo } from "@kavo/core";
 import type {
-  CrudoInstance,
-  CrudoOptions,
+  KavoInstance,
+  KavoOptions,
   DefaultCrudService,
   EntityConfig,
   EntityMetadata,
   IncludeNode,
   IncludePath,
-} from "@crudo/core";
+} from "@kavo/core";
 import {
   Author,
   Comment,
@@ -20,7 +20,7 @@ import {
 } from "./support/blog-fixture.js";
 
 interface Blog {
-  crudo: CrudoInstance;
+  kavo: KavoInstance;
   authors: DefaultCrudService<Author>;
   posts: DefaultCrudService<Post>;
   authorAdapter: SeededAdapter<Author>;
@@ -40,7 +40,7 @@ function blog(
     post?: EntityConfig<Post>;
     comment?: EntityConfig<Comment>;
   } = {},
-  options: CrudoOptions = {},
+  options: KavoOptions = {},
 ): Blog {
   const metadata = new Map<unknown, EntityMetadata<object>>([
     [Author, authorMetadata as EntityMetadata<object>],
@@ -55,18 +55,18 @@ function blog(
     [Post, postAdapter],
     [Comment, commentAdapter],
   ]);
-  const crudo = createCrudo({
+  const kavo = createKavo({
     ...options,
     infrastructure: {
       metadataFor: (entity) => metadata.get(entity) as never,
       adapterFor: (entity) => adapters.get(entity) as never,
     },
   });
-  const authors = crudo.createCrud(Author, configs.author as never) as DefaultCrudService<Author>;
-  const posts = crudo.createCrud(Post, configs.post as never) as DefaultCrudService<Post>;
-  crudo.createCrud(Comment, configs.comment as never);
+  const authors = kavo.createCrud(Author, configs.author as never) as DefaultCrudService<Author>;
+  const posts = kavo.createCrud(Post, configs.post as never) as DefaultCrudService<Post>;
+  kavo.createCrud(Comment, configs.comment as never);
   return {
-    crudo,
+    kavo,
     authors,
     posts,
     authorAdapter,
@@ -95,7 +95,7 @@ describe("include resolution (Phase 15)", () => {
     const fixture = blog();
     const { authors } = fixture;
     await expect(authors.findMany({ include: ["posts"] })).rejects.toMatchObject({
-      issues: [{ field: "posts", code: "CRUDO_QUERY_INVALID_FIELD" }],
+      issues: [{ field: "posts", code: "KAVO_QUERY_INVALID_FIELD" }],
     });
   });
 
@@ -174,7 +174,7 @@ describe("include resolution (Phase 15)", () => {
     );
     const { authors } = fixture;
     await expect(authors.findMany({ include: ["posts.comments"] })).rejects.toMatchObject({
-      issues: [{ field: "posts.comments", code: "CRUDO_QUERY_LIMIT_EXCEEDED" }],
+      issues: [{ field: "posts.comments", code: "KAVO_QUERY_LIMIT_EXCEEDED" }],
     });
   });
 
@@ -201,7 +201,7 @@ describe("include resolution (Phase 15)", () => {
     const { posts, postRows } = fixture;
     postRows.push(Object.assign(new Post(), { id: 10 }));
     await expect(posts.findMany({ include: ["author", "comments"] })).rejects.toMatchObject({
-      issues: [{ code: "CRUDO_QUERY_LIMIT_EXCEEDED" }],
+      issues: [{ code: "KAVO_QUERY_LIMIT_EXCEEDED" }],
     });
   });
 
@@ -215,7 +215,7 @@ describe("include resolution (Phase 15)", () => {
     // posts.author revisits Author — legal, because depth is the contract.
     await expect(authors.findMany({ include: ["posts.author"] })).resolves.toBeDefined();
     await expect(authors.findMany({ include: ["posts.author.posts"] })).rejects.toMatchObject({
-      issues: [{ code: "CRUDO_QUERY_LIMIT_EXCEEDED" }],
+      issues: [{ code: "KAVO_QUERY_LIMIT_EXCEEDED" }],
     });
   });
 
@@ -285,7 +285,7 @@ describe("include serialization (Phase 15)", () => {
     await expect(
       authors.findMany({ include: ["posts"], fields: { relations: { posts: ["title"] } } }),
     ).rejects.toMatchObject({
-      issues: [{ field: "posts.title", code: "CRUDO_QUERY_INVALID_FIELD" }],
+      issues: [{ field: "posts.title", code: "KAVO_QUERY_INVALID_FIELD" }],
     });
   });
 
@@ -301,7 +301,7 @@ describe("include serialization (Phase 15)", () => {
     await expect(
       authors.findMany({ include: ["posts"], fields: { relations: { posts: 5 as never } } }),
     ).rejects.toMatchObject({
-      issues: [{ field: "posts", code: "CRUDO_QUERY_INVALID_VALUE" }],
+      issues: [{ field: "posts", code: "KAVO_QUERY_INVALID_VALUE" }],
     });
   });
 

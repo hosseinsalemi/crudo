@@ -1,6 +1,6 @@
 # Roadmap — remaining work
 
-Crudo was built from a phased build plan (`crudo-phases-v6.md`, retired once
+Kavo was built from a phased build plan (`kavo-phases-v6.md`, retired once
 Milestone C landed). Milestones A–C are done and their design is documented
 for real in [`architecture/`](architecture/) and [`adr/`](adr/) — those are now
 the authoritative sources, not a plan document.
@@ -29,8 +29,8 @@ Milestone C feature set.
 ```ts
 const userCrud = createCrud(UserEntity); // zero-config, implicit defaults
 
-const crudo = createCrudo({ defaults: { pagination: { maxLimit: 50 } } });
-const userCrud = crudo.createCrud(UserEntity, {
+const kavo = createKavo({ defaults: { pagination: { maxLimit: 50 } } });
+const userCrud = kavo.createCrud(UserEntity, {
   dto: { item: UserItemDto, list: UserListDto },
 });
 
@@ -42,7 +42,7 @@ const { items, total, limit, offset } = await userCrud.findMany({
 await userCrud.deleteOne(id); // soft delete, if UserEntity is SoftDeletable
 await userCrud.restoreOne(id);
 
-@Module({ imports: [CrudoModule.forFeature([UserEntity])] })
+@Module({ imports: [KavoModule.forFeature([UserEntity])] })
 export class UserModule {}
 ```
 
@@ -72,7 +72,7 @@ here is additive, never a tax on the simple case.
 **Depends on:** the Nest integration and Phase 16; exercises everything.
 
 **Goal:** one realistic application in `packages/examples/` that uses every
-shipped feature — living documentation and the `@crudo/nest` e2e bed at once,
+shipped feature — living documentation and the `@kavo/nest` e2e bed at once,
 grown from the existing example app.
 
 **Domain** (chosen to force the features): a project-management API — `User`,
@@ -98,7 +98,7 @@ or it is not in the app.
 
 **Depends on:** effectively everything. This is the shipping phase.
 
-**Goal:** ship `@crudo/core`, `@crudo/typeorm` and `@crudo/nest` to npm in a way
+**Goal:** ship `@kavo/core`, `@kavo/typeorm` and `@kavo/nest` to npm in a way
 that stays maintainable, not just one publishable release.
 
 **Deliverables**
@@ -106,10 +106,10 @@ that stays maintainable, not just one publishable release.
 1. **Build output:** dual ESM + CJS per package, correct `exports` map, shipped
    `.d.ts`. Address the dual-package pitfalls explicitly — default-export
    interop, and `instanceof` across module instances, which matters for the
-   exception hierarchy. Confirm tree-shakability for `@crudo/core`-only
+   exception hierarchy. Confirm tree-shakability for `@kavo/core`-only
    consumers.
 2. **Dependency classification:** `typeorm` and `@nestjs/*` as peer
-   dependencies of their own adapter packages, never of `@crudo/core`; regular
+   dependencies of their own adapter packages, never of `@kavo/core`; regular
    dependencies minimal everywhere; supported Node and peer ranges stated and
    CI-tested as a matrix.
 3. **API-surface gating:** api-extractor (or equivalent) produces a public API

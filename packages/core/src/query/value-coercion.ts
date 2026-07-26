@@ -75,7 +75,7 @@ export function isIssue(value: FilterScalar | QueryIssueDto): value is QueryIssu
 function issue(field: string, value: string, expected: FieldKind | string): QueryIssueDto {
   return {
     field,
-    code: "CRUDO_QUERY_INVALID_VALUE",
+    code: "KAVO_QUERY_INVALID_VALUE",
     detail: `Value '${value}' for field '${field}' is not a valid ${expected}.`,
   };
 }

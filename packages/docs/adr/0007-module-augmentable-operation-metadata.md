@@ -13,7 +13,7 @@ configuration, but core must stay route-ignorant. Alternatives: a typed
 
 Every registry entry carries `meta: OperationMetadata` — an empty
 interface in core, typed via TypeScript declaration merging by whoever
-consumes it. `@crudo/nest` augments it with a `routes` key. Core's whole
+consumes it. `@kavo/nest` augments it with a `routes` key. Core's whole
 contract: store it, merge it per Phase 8 precedence, hand it over.
 
 ## Consequences

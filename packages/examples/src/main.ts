@@ -9,7 +9,7 @@ async function bootstrap(): Promise<void> {
   const document = SwaggerModule.createDocument(
     app,
     new DocumentBuilder()
-      .setTitle("Crudo — Pet example")
+      .setTitle("Kavo — Pet example")
       .setDescription(
         "Cats, dogs, and owners: full CRUD over HTTP with filtering, " +
           "sorting, pagination, layered config, and RFC 9457 problem-details " +
@@ -23,7 +23,7 @@ async function bootstrap(): Promise<void> {
   SwaggerModule.setup("docs", app, document);
 
   await app.listen(3000);
-  console.log("Crudo pet example: http://localhost:3000 — /cats /dogs /owners (docs at /docs)");
+  console.log("Kavo pet example: http://localhost:3000 — /cats /dogs /owners (docs at /docs)");
 }
 
 void bootstrap();

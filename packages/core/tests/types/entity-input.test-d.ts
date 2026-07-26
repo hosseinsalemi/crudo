@@ -1,5 +1,5 @@
 import { expectTypeOf } from "vitest";
-import type { EntityInput, ScalarKeys } from "@crudo/core";
+import type { EntityInput, ScalarKeys } from "@kavo/core";
 
 /**
  * Type-level acceptance tests for the write-shape default.

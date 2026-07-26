@@ -1,16 +1,16 @@
 ---
 name: write-tests
-description: How to write tests for the Crudo monorepo — file placement, Vitest/SWC setup, fixtures, and the cases every change must pin down. Use when adding or updating tests in packages/core, packages/orms/typeorm, or packages/frameworks/nest.
+description: How to write tests for the Kavo monorepo — file placement, Vitest/SWC setup, fixtures, and the cases every change must pin down. Use when adding or updating tests in packages/core, packages/orms/typeorm, or packages/frameworks/nest.
 ---
 
-# Writing tests for Crudo
+# Writing tests for Kavo
 
 ## Placement and setup
 
 - Tests go in each package's `tests/` directory — **never in `src/`**, so they
   are not shipped in `dist/`. The layout is flat: `packages/core/tests/*.spec.ts`,
   with shared fixtures in `packages/core/tests/support/`.
-- Vitest aliases `@crudo/*` to package `src/` (see `vitest.config.ts`), so tests
+- Vitest aliases `@kavo/*` to package `src/` (see `vitest.config.ts`), so tests
   import the package by name and exercise sources directly. **Never import from
   `dist/`.**
 - The SWC vitest plugin is mandatory: TypeORM entities and Nest DI need
@@ -32,7 +32,7 @@ is usually a fixture that already exists.
 
 ## Test through the real seams
 
-Crudo is built from injected seams — handlers, serializer/deserializer, query
+Kavo is built from injected seams — handlers, serializer/deserializer, query
 normalizer, pagination strategies, error handler. Prefer driving the **real
 engine** with a test adapter over mocking the pipeline. A test that mocks the
 thing it is testing passes when the implementation is wrong.
@@ -49,7 +49,7 @@ silently regressed:
   `toBeDefined()`.
 - **Validation** — rejected input produces the right rejection, not a crash.
 - **Error path** — assert the thrown `*Exception` type **and** its
-  `CRUDO_SNAKE_CASE` code. The code is a public contract; asserting only the
+  `KAVO_SNAKE_CASE` code. The code is a public contract; asserting only the
   message lets the code drift silently.
 - **Edge cases** — empty results, `null` vs. absent, boundary pagination values,
   the field-path recursion cap (ADR-0008), unknown include paths,

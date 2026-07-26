@@ -25,9 +25,9 @@ instructions: **$ARGUMENTS**
    adds, overrides, or disables an operation.
 
    Hold the line on the invariants while you work:
-   - `@crudo/core` imports nothing (ADR-0005) — no TypeORM, no Nest, not even
+   - `@kavo/core` imports nothing (ADR-0005) — no TypeORM, no Nest, not even
      type-only.
-   - Adapters and bindings import the `@crudo/core` **barrel only**, never deep
+   - Adapters and bindings import the `@kavo/core` **barrel only**, never deep
      paths. The TypeORM adapter and the Nest binding never import each other.
    - Operations come from the registry (ADR-0006). No per-verb special-casing in
      the engine or the route generator.

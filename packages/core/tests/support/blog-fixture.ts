@@ -5,8 +5,8 @@ import type {
   NormalizedQueryContext,
   RelationDescriptor,
   RepositoryAdapter,
-} from "@crudo/core";
-import { NotFoundException } from "@crudo/core";
+} from "@kavo/core";
+import { NotFoundException } from "@kavo/core";
 
 /**
  * A small relation graph for include tests (Phase 15):
@@ -82,7 +82,7 @@ export const commentMetadata: EntityMetadata<Comment> = {
 /**
  * Adapter that hands back whatever rows it was seeded with, already
  * stitched. Loading is a real adapter's job (covered against SQLite in
- * @crudo/typeorm); what these tests need from it is a row shaped the way
+ * @kavo/typeorm); what these tests need from it is a row shaped the way
  * a loader would produce one, so serialization can be observed.
  */
 export class SeededAdapter<Entity extends object> implements RepositoryAdapter<Entity> {

@@ -1,4 +1,4 @@
-# ADR-0012 — Decoration-time route generation in @crudo/nest
+# ADR-0012 — Decoration-time route generation in @kavo/nest
 
 **Status:** accepted (Phases 11–12)
 

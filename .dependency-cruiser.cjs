@@ -4,9 +4,9 @@
  *
  * The rules here are the executable form of the dependency graph:
  *
- *   @crudo/nest ──▶ @crudo/core ◀── @crudo/typeorm
+ *   @kavo/nest ──▶ @kavo/core ◀── @kavo/typeorm
  *
- * `@crudo/core` imports nothing. Adapters and framework bindings import the
+ * `@kavo/core` imports nothing. Adapters and framework bindings import the
  * core barrel only — deep imports are not API. An illegal import fails CI
  * here, not in code review.
  */
@@ -16,9 +16,9 @@ module.exports = {
       name: "core-imports-nothing",
       severity: "error",
       comment:
-        "@crudo/core is the dependency-free hub: no other workspace package, " +
+        "@kavo/core is the dependency-free hub: no other workspace package, " +
         "no node_modules — zero runtime dependencies (ADR-0005). Scoped to " +
-        "`src`: core's own tests legitimately import the `@crudo/core` barrel " +
+        "`src`: core's own tests legitimately import the `@kavo/core` barrel " +
         "and vitest, and are governed by the `tests-*` rules below instead.",
       from: { path: "^packages/core/src" },
       to: {
@@ -30,36 +30,36 @@ module.exports = {
       name: "typeorm-only-imports-core",
       severity: "error",
       comment:
-        "@crudo/typeorm may depend on @crudo/core and the typeorm peer — " +
-        "never on @crudo/nest (ADR-0002). Both spellings are matched: a " +
+        "@kavo/typeorm may depend on @kavo/core and the typeorm peer — " +
+        "never on @kavo/nest (ADR-0002). Both spellings are matched: a " +
         "workspace package specifier does not resolve to a path here, so a " +
-        'path-only rule would miss `from "@crudo/nest"` — the spelling ' +
+        'path-only rule would miss `from "@kavo/nest"` — the spelling ' +
         "anyone would actually write.",
       from: { path: "^packages/orms/typeorm/src" },
-      to: { path: "^(packages/frameworks|@crudo/nest)" },
+      to: { path: "^(packages/frameworks|@kavo/nest)" },
     },
     {
       name: "nest-only-imports-core",
       severity: "error",
       comment:
-        "@crudo/nest may depend on @crudo/core and the @nestjs/* peers — " +
+        "@kavo/nest may depend on @kavo/core and the @nestjs/* peers — " +
         "never on an ORM adapter (ADR-0002). Adapters reach Nest's container " +
         "via DI, not via imports. Package-specifier form matched too, per the " +
         "note on typeorm-only-imports-core.",
       from: { path: "^packages/frameworks/nest/src" },
-      to: { path: "^(packages/orms|@crudo/typeorm)" },
+      to: { path: "^(packages/orms|@kavo/typeorm)" },
     },
     {
       name: "no-cross-package-deep-imports-core",
       severity: "error",
       comment:
-        "Cross-package imports go through the package barrel (@crudo/core), " +
+        "Cross-package imports go through the package barrel (@kavo/core), " +
         "which is an explicit named list (ADR-0010). Deep imports into " +
         "another package's src are not API — matched as a relative path and " +
-        "as a `@crudo/core/...` subpath. `packages/examples` is in scope: it " +
+        "as a `@kavo/core/...` subpath. `packages/examples` is in scope: it " +
         "is the reference app, so an illegal import there teaches one.",
       from: { path: "^packages/(orms|frameworks|examples)" },
-      to: { path: "^(packages/core/src/.+|@crudo/core/.+)" },
+      to: { path: "^(packages/core/src/.+|@kavo/core/.+)" },
     },
     {
       name: "no-cross-package-deep-imports-adapters",
@@ -72,7 +72,7 @@ module.exports = {
       name: "tests-no-other-package-internals",
       severity: "error",
       comment:
-        "A test file may import its own package's source and the @crudo/* " +
+        "A test file may import its own package's source and the @kavo/* " +
         "barrels — never another package's `src` or `tests`. Sharing a " +
         "fixture by reaching into a sibling package's tests is the same " +
         "boundary violation as doing it in production code (ADR-0002), and " +
@@ -96,7 +96,7 @@ module.exports = {
         "core's tests may use the barrel and vitest; this keeps the part that " +
         "still matters — no adapter, no framework — enforced for them too.",
       from: { path: "^packages/core/tests" },
-      to: { path: "^(@crudo/(typeorm|nest)|packages/(orms|frameworks))" },
+      to: { path: "^(@kavo/(typeorm|nest)|packages/(orms|frameworks))" },
     },
     {
       name: "no-circular",

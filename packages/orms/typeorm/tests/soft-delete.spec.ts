@@ -7,8 +7,8 @@ import {
   NotDeletedException,
   NotFoundException,
   type DefaultCrudService,
-} from "@crudo/core";
-import { buildEntityMetadata, createTypeOrmCrudo } from "@crudo/typeorm";
+} from "@kavo/core";
+import { buildEntityMetadata, createTypeOrmKavo } from "@kavo/typeorm";
 
 /** Soft delete the ORM-declared way: one `@DeleteDateColumn`. */
 @Entity()
@@ -51,12 +51,12 @@ beforeAll(async () => {
     synchronize: true,
   });
   await dataSource.initialize();
-  const crudo = createTypeOrmCrudo(dataSource);
-  tickets = crudo.createCrud(Ticket, {
+  const kavo = createTypeOrmKavo(dataSource);
+  tickets = kavo.createCrud(Ticket, {
     softDelete: { strategy: "soft" },
     operations: { purgeOne: true },
   }) as DefaultCrudService<Ticket>;
-  invoices = crudo.createCrud(Invoice, {
+  invoices = kavo.createCrud(Invoice, {
     softDelete: { field: "archivedAt" },
   }) as DefaultCrudService<Invoice>;
 });
@@ -138,7 +138,7 @@ describe("TypeOrmRepositoryAdapter — soft delete (Phase 14)", () => {
 
   it("still conflicts on a unique index held by a deleted row", async () => {
     // Documented adapter guidance: a soft-deleted row keeps its unique
-    // index entries, and the fix is a partial index — not a Crudo rewrite.
+    // index entries, and the fix is a partial index — not a Kavo rewrite.
     const id = await newTicket("T-dup");
     await tickets.deleteOne(id);
     await expect(tickets.createOne({ reference: "T-dup", title: "again" } as never)).rejects.toBeInstanceOf(

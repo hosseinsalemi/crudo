@@ -1,5 +1,5 @@
 import { Controller } from "@nestjs/common";
-import { Crud } from "@crudo/nest";
+import { Crud } from "@kavo/nest";
 import { Tag } from "./tag.entity.js";
 import { CreateTagDto, UpdateTagDto, TagItemDto, TagListDto } from "./tag.dtos.js";
 

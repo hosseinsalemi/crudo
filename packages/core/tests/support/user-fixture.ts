@@ -1,5 +1,5 @@
-import type { CrudContext, EntityId, EntityMetadata, NormalizedQueryContext, RepositoryAdapter } from "@crudo/core";
-import { NotFoundException } from "@crudo/core";
+import type { CrudContext, EntityId, EntityMetadata, NormalizedQueryContext, RepositoryAdapter } from "@kavo/core";
+import { NotFoundException } from "@kavo/core";
 
 /** Test entity: plain class, fields initialized so shapes exist at runtime. */
 export class User {
@@ -35,7 +35,7 @@ export const userMetadata: EntityMetadata<User> = {
 /**
  * In-memory adapter for engine tests: honors pagination and records the
  * queries it receives; filter evaluation is the *database's* job and is
- * covered by the @crudo/typeorm integration tests, not re-implemented
+ * covered by the @kavo/typeorm integration tests, not re-implemented
  * here.
  */
 export class InMemoryUserAdapter implements RepositoryAdapter<User> {

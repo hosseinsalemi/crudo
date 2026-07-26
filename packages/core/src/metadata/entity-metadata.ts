@@ -28,7 +28,7 @@ export interface FieldMetadata {
  * The ORM-independent entity description every adapter package supplies
  * (from its ORM's own metadata) and core consumes for DTO derivation,
  * allowlist defaults, and query-value coercion. This is the seam that
- * keeps `@crudo/core` free of ORM imports while still being
+ * keeps `@kavo/core` free of ORM imports while still being
  * metadata-driven.
  */
 export interface EntityMetadata<Entity = unknown> {
@@ -41,7 +41,7 @@ export interface EntityMetadata<Entity = unknown> {
   readonly relations: readonly RelationDescriptor[];
   /**
    * The delete-marker column the ORM itself declares (`@DeleteDateColumn`
-   * in `@crudo/typeorm`), or `null`/absent when it declares none. This is
+   * in `@kavo/typeorm`), or `null`/absent when it declares none. This is
    * the detection half of Phase 14's strategy resolution; explicit
    * `softDelete.field` configuration wins over it.
    */
@@ -49,10 +49,10 @@ export interface EntityMetadata<Entity = unknown> {
 }
 
 /**
- * What a Crudo root instance needs from an ORM integration: metadata and a
- * repository adapter per entity. `@crudo/typeorm` exports
+ * What a Kavo root instance needs from an ORM integration: metadata and a
+ * repository adapter per entity. `@kavo/typeorm` exports
  * `createTypeOrmInfrastructure(dataSource)`; a test can hand in an
- * in-memory fake. Passed to `createCrudo` once — individual `createCrud`
+ * in-memory fake. Passed to `createKavo` once — individual `createCrud`
  * calls may still override the adapter per entity.
  */
 export interface CrudInfrastructure {

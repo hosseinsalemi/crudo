@@ -4,16 +4,16 @@ import request from "supertest";
 import { Controller, Get, type INestApplication } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { Test } from "@nestjs/testing";
-import type { DefaultCrudService, NormalizedQueryContext, OperationHandler } from "@crudo/core";
-import type { CrudoModuleOptions } from "@crudo/nest";
-import { Crud, CrudoModule, enumProp, getCrudServiceToken, oneOfArray } from "@crudo/nest";
+import type { DefaultCrudService, NormalizedQueryContext, OperationHandler } from "@kavo/core";
+import type { KavoModuleOptions } from "@kavo/nest";
+import { Crud, KavoModule, enumProp, getCrudServiceToken, oneOfArray } from "@kavo/nest";
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
 
 let app: INestApplication;
 let adapter: InMemoryTodoAdapter;
 
 interface BootstrapOptions {
-  readonly defaults?: CrudoModuleOptions["defaults"];
+  readonly defaults?: KavoModuleOptions["defaults"];
   /**
    * Serve the app behind the qs-"extended" query parser (Express 4's
    * default) instead of Express 5's "simple" one — the nested-object shape
@@ -26,8 +26,8 @@ async function bootstrap(controller: unknown, options: BootstrapOptions = {}): P
   adapter = new InMemoryTodoAdapter();
   const moduleRef = await Test.createTestingModule({
     imports: [
-      CrudoModule.forRoot({ infrastructure: fakeInfrastructure(adapter), defaults: options.defaults }),
-      CrudoModule.forFeature([controller as never]),
+      KavoModule.forRoot({ infrastructure: fakeInfrastructure(adapter), defaults: options.defaults }),
+      KavoModule.forFeature([controller as never]),
     ],
   }).compile();
   app = moduleRef.createNestApplication();
@@ -97,9 +97,9 @@ describe("@Crud route generation (Phases 11–12)", () => {
     // `?limit=1&limit=2` reaches the binding as an array; it must survive
     // flattening intact so the normalizer can call it a bad value.
     const response = await request(server()).get("/todos?limit=1&limit=2").expect(400);
-    expect(response.body).toMatchObject({ code: "CRUDO_QUERY_INVALID" });
+    expect(response.body).toMatchObject({ code: "KAVO_QUERY_INVALID" });
     expect(response.body.errors).toContainEqual(
-      expect.objectContaining({ field: "limit", code: "CRUDO_QUERY_INVALID_VALUE" }),
+      expect.objectContaining({ field: "limit", code: "KAVO_QUERY_INVALID_VALUE" }),
     );
   });
 
@@ -118,7 +118,7 @@ describe("@Crud route generation (Phases 11–12)", () => {
       .expect("Content-Type", /application\/problem\+json/);
     expect(response.body).toMatchObject({
       status: 400,
-      code: "CRUDO_QUERY_INVALID",
+      code: "KAVO_QUERY_INVALID",
     });
     expect(response.body.errors).toHaveLength(2);
   });
@@ -129,8 +129,8 @@ describe("@Crud route generation (Phases 11–12)", () => {
       .expect(404)
       .expect("Content-Type", /application\/problem\+json/);
     expect(response.body).toMatchObject({
-      code: "CRUDO_NOT_FOUND",
-      type: "https://crudo.dev/errors/crudo-not-found",
+      code: "KAVO_NOT_FOUND",
+      type: "https://kavo.dev/errors/kavo-not-found",
     });
     expect(response.body.detail).toContain("99");
   });
@@ -207,7 +207,7 @@ describe("@Crud page pagination over the wire (Phase 5)", () => {
       .expect(400)
       .expect("Content-Type", /application\/problem\+json/);
     expect(response.body.errors).toContainEqual(
-      expect.objectContaining({ field: "page[number]", code: "CRUDO_QUERY_INVALID_VALUE" }),
+      expect.objectContaining({ field: "page[number]", code: "KAVO_QUERY_INVALID_VALUE" }),
     );
   });
 });
@@ -315,7 +315,7 @@ describe("@Crud operation control surface", () => {
   });
 });
 
-describe("CrudoExceptionFilter — non-Crudo handler failures (Phase 6)", () => {
+describe("KavoExceptionFilter — non-Kavo handler failures (Phase 6)", () => {
   const exploding: OperationHandler<Todo> = {
     async execute() {
       throw new Error("connection to shard-7 refused");
@@ -337,10 +337,10 @@ describe("CrudoExceptionFilter — non-Crudo handler failures (Phase 6)", () => 
       .expect(500)
       .expect("Content-Type", /application\/problem\+json/);
     expect(response.body).toMatchObject({
-      type: "https://crudo.dev/errors/crudo-persistence-failed",
+      type: "https://kavo.dev/errors/kavo-persistence-failed",
       title: "Persistence failure",
       status: 500,
-      code: "CRUDO_PERSISTENCE_FAILED",
+      code: "KAVO_PERSISTENCE_FAILED",
     });
   });
 
@@ -359,7 +359,7 @@ describe("CrudoExceptionFilter — non-Crudo handler failures (Phase 6)", () => 
   it("reports the occurrence as a correlation URN", async () => {
     await bootstrap(ExplodingController);
     const response = await request(server()).post("/todos/explode").expect(500);
-    expect(response.body.instance).toMatch(/^urn:crudo:request:/);
+    expect(response.body.instance).toMatch(/^urn:kavo:request:/);
   });
 });
 
@@ -400,7 +400,7 @@ describe("@Crud soft-delete routes (Phase 14)", () => {
     const response = await request(server()).patch("/todos/1/restore").expect(409);
     expect(response.body).toMatchObject({
       status: 409,
-      code: "CRUDO_NOT_DELETED",
+      code: "KAVO_NOT_DELETED",
     });
   });
 
@@ -460,8 +460,8 @@ describe("@Crud relation includes (Phase 15)", () => {
     await bootstrap(ClosedController);
     const response = await request(server()).get("/todos?include=list").expect(400);
     expect(response.body).toMatchObject({
-      code: "CRUDO_QUERY_INVALID",
-      errors: [{ field: "list", code: "CRUDO_QUERY_INVALID_FIELD" }],
+      code: "KAVO_QUERY_INVALID",
+      errors: [{ field: "list", code: "KAVO_QUERY_INVALID_FIELD" }],
     });
   });
 

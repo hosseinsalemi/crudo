@@ -4,9 +4,9 @@ import { ERROR_CATALOG } from "./error-catalog.js";
 import { QueryValidationException } from "./exceptions.js";
 
 /** Base URI under which every problem `type` lives (ADR-0009). */
-const PROBLEM_TYPE_BASE = "https://crudo.dev/errors/";
+const PROBLEM_TYPE_BASE = "https://kavo.dev/errors/";
 
-/** `CRUDO_NOT_FOUND` → `https://crudo.dev/errors/crudo-not-found`. */
+/** `KAVO_NOT_FOUND` → `https://kavo.dev/errors/kavo-not-found`. */
 function problemTypeFor(code: string): string {
   return PROBLEM_TYPE_BASE + code.toLowerCase().replace(/_/g, "-");
 }
@@ -20,7 +20,7 @@ export interface ProblemDetailsOptions {
 }
 
 /**
- * Serialize a Crudo exception into the RFC 9457 problem-details document
+ * Serialize a Kavo exception into the RFC 9457 problem-details document
  * (Phase 6). This is the default wire shape; a consumer wanting a
  * different one swaps this serializer, never the exception hierarchy.
  */
@@ -37,7 +37,7 @@ export function toProblemDetails(exception: CrudException, options: ProblemDetai
     status: exception.status,
     detail,
     ...(exception.context.correlationId !== undefined && {
-      instance: `urn:crudo:request:${exception.context.correlationId}`,
+      instance: `urn:kavo:request:${exception.context.correlationId}`,
     }),
     code: exception.code,
     ...(exception instanceof QueryValidationException && {

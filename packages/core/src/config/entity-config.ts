@@ -1,4 +1,4 @@
-import type { CrudoSettings } from "./settings.js";
+import type { KavoSettings } from "./settings.js";
 import type { DeepPartial } from "../types/utility.js";
 import type { FieldPath } from "../types/field-path.js";
 import type { QueryContext } from "../query/query-context.js";
@@ -25,7 +25,7 @@ export interface QueryAllowlists<Entity = unknown> {
  * Settings keys override entity scope for this operation only; `false` in
  * the parent `operations` record disables the operation outright.
  */
-export interface OperationConfig<Entity = unknown> extends DeepPartial<CrudoSettings> {
+export interface OperationConfig<Entity = unknown> extends DeepPartial<KavoSettings> {
   /**
    * Turn the operation on or off explicitly, overriding its default. The
    * long form of the `false` / `true` shorthands in the parent
@@ -43,7 +43,7 @@ export interface OperationConfig<Entity = unknown> extends DeepPartial<CrudoSett
  * A developer-defined operation (Phase 13). Unlike an override, a custom
  * operation declares its own input/output DTOs — its shape isn't
  * guaranteed CRUD-like. Route generation (including the `http: false`
- * service-only mode) is expressed through `meta` by `@crudo/nest`'s
+ * service-only mode) is expressed through `meta` by `@kavo/nest`'s
  * `OperationMetadata` augmentation.
  */
 export interface CustomOperationConfig<Entity = unknown> {
@@ -55,7 +55,7 @@ export interface CustomOperationConfig<Entity = unknown> {
 
 /**
  * Raw entity-scope configuration — the second argument to `createCrud`.
- * Settings keys (inherited from `DeepPartial<CrudoSettings>`) override
+ * Settings keys (inherited from `DeepPartial<KavoSettings>`) override
  * global scope for this entity.
  */
 export interface EntityConfig<
@@ -66,7 +66,7 @@ export interface EntityConfig<
   QueryDto = QueryContext<Entity>,
   ItemDto = Entity,
   ListDto = ItemDto,
-> extends DeepPartial<CrudoSettings> {
+> extends DeepPartial<KavoSettings> {
   readonly dto?: OperationDtoMap<Entity, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto>;
   readonly allowlists?: QueryAllowlists<Entity>;
   /**

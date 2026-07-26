@@ -1,5 +1,5 @@
 import { Controller } from "@nestjs/common";
-import { Crud } from "@crudo/nest";
+import { Crud } from "@kavo/nest";
 import { Address } from "./address.entity.js";
 import { CreateAddressDto, UpdateAddressDto, AddressItemDto, AddressListDto } from "./address.dtos.js";
 

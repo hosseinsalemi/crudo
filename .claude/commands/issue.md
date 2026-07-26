@@ -35,7 +35,7 @@ or private.
    - **Context** — why this is worth doing, in two or three sentences.
    - **Acceptance criteria** — a checklist of what must be true when it is done.
      These must be verifiable, not aspirational.
-   - **Affected packages** — `@crudo/core`, `@crudo/typeorm`, `@crudo/nest`,
+   - **Affected packages** — `@kavo/core`, `@kavo/typeorm`, `@kavo/nest`,
      docs, or a combination.
    - **Constraints** — the invariants that must survive: ADR-0005 core purity,
      registry-driven operations (ADR-0006), the explicit barrel (ADR-0010),

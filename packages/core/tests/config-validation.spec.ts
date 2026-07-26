@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { CrudoSettings, DeepPartial } from "@crudo/core";
-import { BUILT_IN_DEFAULTS, ConfigurationException, mergeSettings, validateSettings } from "@crudo/core";
+import type { KavoSettings, DeepPartial } from "@kavo/core";
+import { BUILT_IN_DEFAULTS, ConfigurationException, mergeSettings, validateSettings } from "@kavo/core";
 
 /**
  * Validate one override merged onto the built-in defaults, returning the
@@ -10,7 +10,7 @@ import { BUILT_IN_DEFAULTS, ConfigurationException, mergeSettings, validateSetti
  */
 function rejectionOf(override: unknown): ConfigurationException {
   try {
-    validateSettings("User", mergeSettings(BUILT_IN_DEFAULTS, override as DeepPartial<CrudoSettings>));
+    validateSettings("User", mergeSettings(BUILT_IN_DEFAULTS, override as DeepPartial<KavoSettings>));
   } catch (error) {
     if (error instanceof ConfigurationException) return error;
     throw error;
@@ -21,13 +21,13 @@ function rejectionOf(override: unknown): ConfigurationException {
 /** Phase 8's error bar: every config error names entity, key path, and offending value. */
 function expectRejected(override: unknown, path: string, offending: unknown): void {
   const error = rejectionOf(override);
-  expect(error.code).toBe("CRUDO_CONFIG_INVALID");
+  expect(error.code).toBe("KAVO_CONFIG_INVALID");
   expect(error.messageParams).toMatchObject({ entity: "User", path });
   expect(String(error.messageParams["problem"])).toContain(JSON.stringify(offending));
 }
 
 function accept(override: unknown): void {
-  validateSettings("User", mergeSettings(BUILT_IN_DEFAULTS, override as DeepPartial<CrudoSettings>));
+  validateSettings("User", mergeSettings(BUILT_IN_DEFAULTS, override as DeepPartial<KavoSettings>));
 }
 
 /** Values no positive-integer setting may take. */
@@ -158,7 +158,7 @@ describe("validateSettings — relation edges (Phase 15 keys, Phase 8 rules)", (
     const error = rejectionOf({
       relations: { edges: { posts: { includable: false, defaultInclude: true } } },
     });
-    expect(error.code).toBe("CRUDO_CONFIG_INVALID");
+    expect(error.code).toBe("KAVO_CONFIG_INVALID");
     expect(error.messageParams).toMatchObject({ entity: "User", path: "relations.edges.posts" });
   });
 

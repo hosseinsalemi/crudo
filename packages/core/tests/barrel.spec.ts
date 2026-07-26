@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import * as barrel from "@crudo/core";
+import * as barrel from "@kavo/core";
 
 /**
- * The public surface of `@crudo/core`, as a manifest.
+ * The public surface of `@kavo/core`, as a manifest.
  *
  * ADR-0010 makes the barrel a deliberate explicit named list so the public
  * surface "changes only on purpose", and the Phase 18 api-extractor gate
@@ -39,12 +39,12 @@ const PUBLIC_SURFACE: readonly string[] = [
   "CrudResponse",
   "CrudRuntime",
   "CrudService",
-  "CrudoErrorCode",
-  "CrudoException",
-  "CrudoExceptionOptions",
-  "CrudoInstance",
-  "CrudoOptions",
-  "CrudoSettings",
+  "KavoErrorCode",
+  "KavoException",
+  "KavoExceptionOptions",
+  "KavoInstance",
+  "KavoOptions",
+  "KavoSettings",
   "CustomOperationConfig",
   "DeepPartial",
   "DefaultCrudContextState",
@@ -169,7 +169,7 @@ const PUBLIC_SURFACE: readonly string[] = [
   "builtInPaginationStrategies",
   "createCrud",
   "createCrudContext",
-  "createCrudo",
+  "createKavo",
   "createOperationRegistry",
   "deepFreeze",
   "describeResolvedConfig",
@@ -198,7 +198,7 @@ function exportedNames(): string[] {
   return names;
 }
 
-describe("@crudo/core public surface (ADR-0010)", () => {
+describe("@kavo/core public surface (ADR-0010)", () => {
   it("exports exactly the manifest", () => {
     expect([...exportedNames()].sort()).toEqual([...PUBLIC_SURFACE].sort());
   });

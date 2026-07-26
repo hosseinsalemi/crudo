@@ -5,13 +5,13 @@ import type {
   OperationHandler,
   OperationMetadata,
   StandardOperationId,
-} from "@crudo/core";
+} from "@kavo/core";
 import {
   ConfigurationException,
   DefaultOperationRegistry,
   STANDARD_OPERATIONS,
   createOperationRegistry,
-} from "@crudo/core";
+} from "@kavo/core";
 import { User, contextStub } from "./support/user-fixture.js";
 
 type UserConfig = EntityConfig<User>;
@@ -103,7 +103,7 @@ describe("DefaultOperationRegistry — the operation table (Phase 7, ADR-0006)",
       } catch (error) {
         expect(error).toBeInstanceOf(ConfigurationException);
         expect(error).toMatchObject({
-          code: "CRUDO_CONFIG_INVALID",
+          code: "KAVO_CONFIG_INVALID",
           messageParams: { path: "operations.ghost" },
         });
       }
@@ -178,7 +178,7 @@ describe("createOperationRegistry — inspection-only mode (ADR-0012)", () => {
     const registry = createOperationRegistry<User>(undefined);
     const handler = registry.get("createOne")?.handler;
     await expect(async () => handler?.execute({}, contextStub())).rejects.toMatchObject({
-      code: "CRUDO_CONFIG_INVALID",
+      code: "KAVO_CONFIG_INVALID",
       messageParams: { path: "operations.createOne" },
     });
     await expect(async () => handler?.execute({}, contextStub())).rejects.toBeInstanceOf(ConfigurationException);

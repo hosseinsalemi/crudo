@@ -1,5 +1,5 @@
 import type { ClassRef, DeepPartial } from "../types/utility.js";
-import type { CrudoSettings } from "../config/settings.js";
+import type { KavoSettings } from "../config/settings.js";
 import type { EntityMetadata } from "./entity-metadata.js";
 import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
 import { resolveEntityConfig } from "../config/resolve-entity-config.js";
@@ -34,7 +34,7 @@ export interface EntityCatalog {
 export type MetadataSource = (entity: ClassRef) => EntityMetadata<object> | undefined;
 
 /**
- * The catalog a Crudo root instance keeps. Entities registered through
+ * The catalog a Kavo root instance keeps. Entities registered through
  * `createCrud` are served with their real configuration; anything else a
  * relation points at is *derived* from ORM metadata plus global defaults —
  * so an unregistered target is readable (its own scalar columns) but opens
@@ -46,7 +46,7 @@ export class DefaultEntityCatalog implements EntityCatalog {
 
   constructor(
     private readonly metadataSource: MetadataSource = () => undefined,
-    private readonly globalDefaults?: DeepPartial<CrudoSettings>,
+    private readonly globalDefaults?: DeepPartial<KavoSettings>,
   ) {}
 
   register(entity: ClassRef, info: EntityRuntimeInfo): void {

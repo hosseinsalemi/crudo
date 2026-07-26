@@ -1,7 +1,7 @@
 {
-  "name": "@crudo/typeorm",
+  "name": "@kavo/typeorm",
   "version": "0.0.0",
-  "description": "Crudo TypeORM adapter — implements @crudo/core's RepositoryAdapter and TransactionManager over TypeORM.",
+  "description": "Kavo TypeORM adapter — implements @kavo/core's RepositoryAdapter and TransactionManager over TypeORM.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -18,7 +18,7 @@
     "build": "tsc -b"
   },
   "dependencies": {
-    "@crudo/core": "workspace:*"
+    "@kavo/core": "workspace:*"
   },
   "peerDependencies": {
     "typeorm": "^0.3.20"

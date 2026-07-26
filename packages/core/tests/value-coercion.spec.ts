@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { FieldKind, FieldMetadata, IncludeRequest, IncludeResolver, IncludeTree } from "@crudo/core";
-import { QueryNormalizer, parseBracketKey, resolveEntityConfig } from "@crudo/core";
+import type { FieldKind, FieldMetadata, IncludeRequest, IncludeResolver, IncludeTree } from "@kavo/core";
+import { QueryNormalizer, parseBracketKey, resolveEntityConfig } from "@kavo/core";
 // `coerceScalar`/`isIssue` are internal to the query pipeline and not on the
 // public barrel (ADR-0010), so the unit test reaches into its own package's
 // source — the one place that import is legal.
@@ -38,13 +38,13 @@ describe("coerceScalar — locale-independent wire coercion (Phase 5)", () => {
   });
 
   it("rejects a non-numeric value rather than yielding NaN", () => {
-    expect(issueOf(coerce("number", "abc")).code).toBe("CRUDO_QUERY_INVALID_VALUE");
+    expect(issueOf(coerce("number", "abc")).code).toBe("KAVO_QUERY_INVALID_VALUE");
     expect(Number.isNaN(coerce("number", "abc") as number)).toBe(false);
   });
 
   it("rejects blank and locale-formatted numbers — no separators are honored", () => {
     for (const raw of ["", "   ", "1,5", "1 000"]) {
-      expect(issueOf(coerce("number", raw)).code).toBe("CRUDO_QUERY_INVALID_VALUE");
+      expect(issueOf(coerce("number", raw)).code).toBe("KAVO_QUERY_INVALID_VALUE");
     }
   });
 
@@ -57,7 +57,7 @@ describe("coerceScalar — locale-independent wire coercion (Phase 5)", () => {
 
   it("rejects any other boolean spelling, including case variants", () => {
     for (const raw of ["TRUE", "False", "yes", "on", ""]) {
-      expect(issueOf(coerce("boolean", raw)).code).toBe("CRUDO_QUERY_INVALID_VALUE");
+      expect(issueOf(coerce("boolean", raw)).code).toBe("KAVO_QUERY_INVALID_VALUE");
     }
   });
 
@@ -68,23 +68,23 @@ describe("coerceScalar — locale-independent wire coercion (Phase 5)", () => {
 
   it("rejects an unparseable date rather than yielding Invalid Date", () => {
     const result = coerce("date", "not-a-date");
-    expect(issueOf(result).code).toBe("CRUDO_QUERY_INVALID_VALUE");
+    expect(issueOf(result).code).toBe("KAVO_QUERY_INVALID_VALUE");
     expect(result).not.toBeInstanceOf(Date);
   });
 
   it("accepts enum members by exact match only", () => {
     const members = { enumValues: ["active", "pending"] as const };
     expect(coerce("enum", "active", members)).toBe("active");
-    expect(issueOf(coerce("enum", "Active", members)).code).toBe("CRUDO_QUERY_INVALID_VALUE");
-    expect(issueOf(coerce("enum", "vip", members)).code).toBe("CRUDO_QUERY_INVALID_VALUE");
+    expect(issueOf(coerce("enum", "Active", members)).code).toBe("KAVO_QUERY_INVALID_VALUE");
+    expect(issueOf(coerce("enum", "vip", members)).code).toBe("KAVO_QUERY_INVALID_VALUE");
   });
 
   it("accepts nothing for an enum column that declares no members", () => {
-    expect(issueOf(coerce("enum", "active")).code).toBe("CRUDO_QUERY_INVALID_VALUE");
+    expect(issueOf(coerce("enum", "active")).code).toBe("KAVO_QUERY_INVALID_VALUE");
   });
 
   it("refuses to compare json columns at all", () => {
-    expect(issueOf(coerce("json", "{}")).code).toBe("CRUDO_QUERY_INVALID_VALUE");
+    expect(issueOf(coerce("json", "{}")).code).toBe("KAVO_QUERY_INVALID_VALUE");
   });
 
   it("coerces null and the literal 'null' to SQL NULL on a nullable column", () => {
@@ -94,8 +94,8 @@ describe("coerceScalar — locale-independent wire coercion (Phase 5)", () => {
   });
 
   it("rejects null on a column that is not nullable", () => {
-    expect(issueOf(coerce("string", null)).code).toBe("CRUDO_QUERY_INVALID_VALUE");
-    expect(issueOf(coerce("string", "null")).code).toBe("CRUDO_QUERY_INVALID_VALUE");
+    expect(issueOf(coerce("string", null)).code).toBe("KAVO_QUERY_INVALID_VALUE");
+    expect(issueOf(coerce("string", "null")).code).toBe("KAVO_QUERY_INVALID_VALUE");
   });
 
   it("passes a value with no column metadata through as a string", () => {
@@ -109,13 +109,13 @@ describe("coerceScalar — locale-independent wire coercion (Phase 5)", () => {
     const issue = issueOf(coerceScalar("abc", "age", column("number", { name: "age" })));
     expect(Object.keys(issue).sort()).toEqual(["code", "detail", "field"]);
     expect(issue.field).toBe("age");
-    expect(issue.code).toBe("CRUDO_QUERY_INVALID_VALUE");
+    expect(issue.code).toBe("KAVO_QUERY_INVALID_VALUE");
   });
 });
 
 describe("isIssue — the parser's success/failure discriminator (Phase 5)", () => {
   it("recognizes an issue object", () => {
-    expect(isIssue({ field: "age", code: "CRUDO_QUERY_INVALID_VALUE", detail: "…" })).toBe(true);
+    expect(isIssue({ field: "age", code: "KAVO_QUERY_INVALID_VALUE", detail: "…" })).toBe(true);
   });
 
   it("treats a coerced SQL NULL as a value, not a failure", () => {

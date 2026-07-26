@@ -24,9 +24,9 @@ export default defineConfig({
   resolve: {
     // Tests exercise workspace sources directly — no stale-dist hazard.
     alias: {
-      "@crudo/core": new URL("./packages/core/src/index.ts", import.meta.url).pathname,
-      "@crudo/typeorm": new URL("./packages/orms/typeorm/src/index.ts", import.meta.url).pathname,
-      "@crudo/nest": new URL("./packages/frameworks/nest/src/index.ts", import.meta.url).pathname,
+      "@kavo/core": new URL("./packages/core/src/index.ts", import.meta.url).pathname,
+      "@kavo/typeorm": new URL("./packages/orms/typeorm/src/index.ts", import.meta.url).pathname,
+      "@kavo/nest": new URL("./packages/frameworks/nest/src/index.ts", import.meta.url).pathname,
     },
   },
   test: {

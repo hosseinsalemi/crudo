@@ -1,5 +1,5 @@
-import type { Filter, FilterBuilder, FilterCondition, FilterExpression, FilterScalar } from "@crudo/core";
-import { assertNever } from "@crudo/core";
+import type { Filter, FilterBuilder, FilterCondition, FilterExpression, FilterScalar } from "@kavo/core";
+import { assertNever } from "@kavo/core";
 import { Brackets, NotBrackets, type WhereExpressionBuilder } from "typeorm";
 import type { SelectQueryBuilder, ObjectLiteral } from "typeorm";
 

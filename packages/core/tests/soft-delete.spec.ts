@@ -6,12 +6,12 @@ import {
   NotDeletedException,
   NotFoundException,
   QueryValidationException,
-  createCrudo,
+  createKavo,
   createOperationRegistry,
   mergeSettings,
   resolveSoftDelete,
-} from "@crudo/core";
-import type { CrudoSettings, EntityConfig } from "@crudo/core";
+} from "@kavo/core";
+import type { KavoSettings, EntityConfig } from "@kavo/core";
 import {
   Account,
   InMemoryAccountAdapter,
@@ -20,7 +20,7 @@ import {
 } from "./support/account-fixture.js";
 import { InMemoryUserAdapter, User, userMetadata } from "./support/user-fixture.js";
 
-function settings(overrides: Parameters<typeof mergeSettings>[1] = {}): CrudoSettings {
+function settings(overrides: Parameters<typeof mergeSettings>[1] = {}): KavoSettings {
   return mergeSettings(BUILT_IN_DEFAULTS, overrides);
 }
 
@@ -28,7 +28,7 @@ type AccountConfig = EntityConfig<Account>;
 
 function makeAccountCrud(config?: AccountConfig, metadata = accountMetadata) {
   const adapter = new InMemoryAccountAdapter();
-  const crud = createCrudo().createCrud(Account, config as never, { adapter, metadata });
+  const crud = createKavo().createCrud(Account, config as never, { adapter, metadata });
   return { crud, adapter };
 }
 
@@ -94,12 +94,12 @@ describe("soft delete lifecycle (Phase 14)", () => {
   });
 
   it("rejects withDeleted on an entity that is not soft-deletable", async () => {
-    const crud = createCrudo().createCrud(User, undefined, {
+    const crud = createKavo().createCrud(User, undefined, {
       adapter: new InMemoryUserAdapter(),
       metadata: userMetadata,
     });
     await expect(crud.findMany({ withDeleted: true })).rejects.toMatchObject({
-      issues: [{ field: "withDeleted", code: "CRUDO_QUERY_UNSUPPORTED_PARAM" }],
+      issues: [{ field: "withDeleted", code: "KAVO_QUERY_UNSUPPORTED_PARAM" }],
     });
   });
 
@@ -123,7 +123,7 @@ describe("soft delete lifecycle (Phase 14)", () => {
   it("purges only an already-deleted row, and only when enabled", async () => {
     const disabled = makeAccountCrud();
     await disabled.crud.createOne({ name: "acme" } as never);
-    await expect(disabled.crud.purgeOne(1)).rejects.toMatchObject({ code: "CRUDO_OPERATION_DISABLED" });
+    await expect(disabled.crud.purgeOne(1)).rejects.toMatchObject({ code: "KAVO_OPERATION_DISABLED" });
 
     const { crud, adapter } = makeAccountCrud({ operations: { purgeOne: true } });
     await crud.createOne({ name: "acme" } as never);
@@ -139,7 +139,7 @@ describe("soft delete lifecycle (Phase 14)", () => {
     await crud.createOne({ name: "acme" } as never);
     await crud.deleteOne(1);
     expect(adapter.rows).toHaveLength(0);
-    await expect(crud.restoreOne(1)).rejects.toMatchObject({ code: "CRUDO_OPERATION_DISABLED" });
+    await expect(crud.restoreOne(1)).rejects.toMatchObject({ code: "KAVO_OPERATION_DISABLED" });
   });
 
   it("applies a per-operation strategy override", async () => {

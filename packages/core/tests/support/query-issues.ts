@@ -1,4 +1,4 @@
-import { QueryValidationException } from "@crudo/core";
+import { QueryValidationException } from "@kavo/core";
 
 /**
  * Run `fn` and return the issues of the `QueryValidationException` it must

@@ -1,7 +1,7 @@
 {
-  "name": "crudo",
+  "name": "kavo",
   "private": true,
-  "description": "Crudo — a production-grade CRUD framework for TypeScript (monorepo root).",
+  "description": "Kavo — a production-grade CRUD framework for TypeScript (monorepo root).",
   "packageManager": "pnpm@9.15.0",
   "engines": {
     "node": ">=20"

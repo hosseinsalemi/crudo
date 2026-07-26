@@ -55,7 +55,7 @@ function readBoundedInt(raw: unknown, param: string, minimum: number): number | 
   if (!Number.isInteger(value) || value < minimum) {
     throw QueryValidationException.single({
       field: param,
-      code: "CRUDO_QUERY_INVALID_VALUE",
+      code: "KAVO_QUERY_INVALID_VALUE",
       detail: `'${param}' must be an integer ≥ ${minimum}, got '${String(raw)}'.`,
     });
   }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { PaginationLimits } from "@crudo/core";
-import { OffsetPaginationStrategy, PagePaginationStrategy, builtInPaginationStrategies } from "@crudo/core";
+import type { PaginationLimits } from "@kavo/core";
+import { OffsetPaginationStrategy, PagePaginationStrategy, builtInPaginationStrategies } from "@kavo/core";
 import { issuesOf } from "./support/query-issues.js";
 
 const limits: PaginationLimits = { defaultLimit: 20, maxLimit: 100 };
@@ -35,12 +35,12 @@ describe("OffsetPaginationStrategy — flat limit/offset (Phase 5)", () => {
   it("rejects a non-numeric limit as a field-level query issue", () => {
     const issues = issuesOf(() => offset.normalize({ limit: "abc" }, limits));
     expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatchObject({ field: "limit", code: "CRUDO_QUERY_INVALID_VALUE" });
+    expect(issues[0]).toMatchObject({ field: "limit", code: "KAVO_QUERY_INVALID_VALUE" });
   });
 
   it("names the offending param, so a bad offset does not report as 'limit'", () => {
     const issues = issuesOf(() => offset.normalize({ offset: "abc" }, limits));
-    expect(issues[0]).toMatchObject({ field: "offset", code: "CRUDO_QUERY_INVALID_VALUE" });
+    expect(issues[0]).toMatchObject({ field: "offset", code: "KAVO_QUERY_INVALID_VALUE" });
   });
 
   it("rejects fractional values on either param", () => {
@@ -56,15 +56,15 @@ describe("OffsetPaginationStrategy — flat limit/offset (Phase 5)", () => {
     expect(offset.normalize({ offset: "0" }, limits).offset).toBe(0);
   });
 
-  it("raises one aggregate CRUDO_QUERY_INVALID carrying the sub-coded issue", () => {
+  it("raises one aggregate KAVO_QUERY_INVALID carrying the sub-coded issue", () => {
     try {
       offset.normalize({ limit: "abc" }, limits);
       expect.unreachable();
     } catch (error) {
       expect(error).toMatchObject({
-        code: "CRUDO_QUERY_INVALID",
+        code: "KAVO_QUERY_INVALID",
         status: 400,
-        issues: [{ code: "CRUDO_QUERY_INVALID_VALUE" }],
+        issues: [{ code: "KAVO_QUERY_INVALID_VALUE" }],
       });
     }
   });
@@ -97,7 +97,7 @@ describe("PagePaginationStrategy — page[number]/page[size] (Phase 5)", () => {
   it("rejects page[number] below 1 — pages are 1-indexed", () => {
     expect(issuesOf(() => page.normalize({ "page[number]": "0" }, limits))[0]).toMatchObject({
       field: "page[number]",
-      code: "CRUDO_QUERY_INVALID_VALUE",
+      code: "KAVO_QUERY_INVALID_VALUE",
     });
   });
 
@@ -105,7 +105,7 @@ describe("PagePaginationStrategy — page[number]/page[size] (Phase 5)", () => {
     for (const size of ["abc", "0", "-2", "2.5"]) {
       expect(issuesOf(() => page.normalize({ "page[size]": size }, limits))[0]).toMatchObject({
         field: "page[size]",
-        code: "CRUDO_QUERY_INVALID_VALUE",
+        code: "KAVO_QUERY_INVALID_VALUE",
       });
     }
   });

@@ -96,7 +96,7 @@ export class DefaultFilterParser<Entity = unknown> implements FilterParser<Entit
       if (depth > maxDepth) {
         issues.push({
           field: "filter",
-          code: "CRUDO_QUERY_LIMIT_EXCEEDED",
+          code: "KAVO_QUERY_LIMIT_EXCEEDED",
           detail: `Filter depth ${depth} exceeds the configured maximum of ${maxDepth}.`,
         });
       }
@@ -131,13 +131,13 @@ export class DefaultFilterParser<Entity = unknown> implements FilterParser<Entit
       }
       issues.push({
         field: "filter",
-        code: "CRUDO_QUERY_INVALID_VALUE",
+        code: "KAVO_QUERY_INVALID_VALUE",
         detail: "JSON filter must be an object.",
       });
     } catch {
       issues.push({
         field: "filter",
-        code: "CRUDO_QUERY_INVALID_VALUE",
+        code: "KAVO_QUERY_INVALID_VALUE",
         detail: "filter is not valid JSON.",
       });
     }
@@ -179,7 +179,7 @@ export class DefaultFilterParser<Entity = unknown> implements FilterParser<Entit
     if (typeof value !== "object" || value === null) {
       issues.push({
         field: `filter[${token}]`,
-        code: "CRUDO_QUERY_INVALID_VALUE",
+        code: "KAVO_QUERY_INVALID_VALUE",
         detail: `'${token}' must carry nested filter groups.`,
       });
       return;
@@ -198,7 +198,7 @@ export class DefaultFilterParser<Entity = unknown> implements FilterParser<Entit
       if (typeof branch !== "object" || branch === null) {
         issues.push({
           field: `filter[${token}]`,
-          code: "CRUDO_QUERY_INVALID_VALUE",
+          code: "KAVO_QUERY_INVALID_VALUE",
           detail: `Each '${token}' branch must be a filter group.`,
         });
         continue;
@@ -225,7 +225,7 @@ export class DefaultFilterParser<Entity = unknown> implements FilterParser<Entit
     if (!(config.allowlists.filterable as readonly string[]).includes(field)) {
       issues.push({
         field,
-        code: "CRUDO_QUERY_INVALID_FIELD",
+        code: "KAVO_QUERY_INVALID_FIELD",
         detail: `Field '${field}' cannot be used for filtering.`,
       });
       return;
@@ -233,7 +233,7 @@ export class DefaultFilterParser<Entity = unknown> implements FilterParser<Entit
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
       issues.push({
         field,
-        code: "CRUDO_QUERY_INVALID_OPERATOR",
+        code: "KAVO_QUERY_INVALID_OPERATOR",
         detail: `filter[${field}] must use the filter[${field}][operator]=value form.`,
       });
       return;
@@ -255,7 +255,7 @@ export class DefaultFilterParser<Entity = unknown> implements FilterParser<Entit
     if (operator === undefined) {
       issues.push({
         field,
-        code: "CRUDO_QUERY_INVALID_OPERATOR",
+        code: "KAVO_QUERY_INVALID_OPERATOR",
         detail: `Unknown filter operator '${token}' on field '${field}'.`,
       });
       return null;
@@ -272,7 +272,7 @@ export class DefaultFilterParser<Entity = unknown> implements FilterParser<Entit
         if (flag !== "true" && flag !== "false") {
           issues.push({
             field,
-            code: "CRUDO_QUERY_INVALID_VALUE",
+            code: "KAVO_QUERY_INVALID_VALUE",
             detail: `'${token}' takes true or false, got '${flag}'.`,
           });
           return null;
@@ -288,7 +288,7 @@ export class DefaultFilterParser<Entity = unknown> implements FilterParser<Entit
         if (parts.length > max) {
           issues.push({
             field,
-            code: "CRUDO_QUERY_LIMIT_EXCEEDED",
+            code: "KAVO_QUERY_LIMIT_EXCEEDED",
             detail: `'${token}' carries ${parts.length} values; the maximum is ${max}.`,
           });
           return null;
@@ -302,7 +302,7 @@ export class DefaultFilterParser<Entity = unknown> implements FilterParser<Entit
         if (parts.length !== 2) {
           issues.push({
             field,
-            code: "CRUDO_QUERY_INVALID_VALUE",
+            code: "KAVO_QUERY_INVALID_VALUE",
             detail: `'between' takes exactly two comma-separated bounds, got ${parts.length}.`,
           });
           return null;
@@ -316,7 +316,7 @@ export class DefaultFilterParser<Entity = unknown> implements FilterParser<Entit
         if (metadata !== undefined && metadata.kind !== "string") {
           issues.push({
             field,
-            code: "CRUDO_QUERY_INVALID_VALUE",
+            code: "KAVO_QUERY_INVALID_VALUE",
             detail: `'${token}' applies to string columns; '${field}' is ${metadata.kind}.`,
           });
           return null;

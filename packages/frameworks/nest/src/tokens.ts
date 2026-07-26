@@ -1,16 +1,16 @@
-import type { ClassRef } from "@crudo/core";
+import type { ClassRef } from "@kavo/core";
 
-/** DI token of the Crudo root instance created by `CrudoModule.forRoot`. */
-export const CRUDO_INSTANCE = Symbol("CRUDO_INSTANCE");
+/** DI token of the Kavo root instance created by `KavoModule.forRoot`. */
+export const KAVO_INSTANCE = Symbol("KAVO_INSTANCE");
 
-/** DI token of the resolved `CrudoModuleOptions`. */
-export const CRUDO_MODULE_OPTIONS = Symbol("CRUDO_MODULE_OPTIONS");
+/** DI token of the resolved `KavoModuleOptions`. */
+export const KAVO_MODULE_OPTIONS = Symbol("KAVO_MODULE_OPTIONS");
 
 /** Reflect metadata key the `@Crud` decorator writes on controllers. */
-export const CRUD_CONTROLLER_METADATA = "crudo:controller";
+export const CRUD_CONTROLLER_METADATA = "kavo:controller";
 
 /** Property the generated route methods read the injected service from. */
-export const CRUD_SERVICE_PROPERTY = "__crudoService";
+export const CRUD_SERVICE_PROPERTY = "__kavoService";
 
 const serviceTokens = new Map<ClassRef, string>();
 
@@ -22,7 +22,7 @@ const serviceTokens = new Map<ClassRef, string>();
 export function getCrudServiceToken(entity: ClassRef): string {
   let token = serviceTokens.get(entity);
   if (token === undefined) {
-    token = `CRUDO_SERVICE_${entity.name}`;
+    token = `KAVO_SERVICE_${entity.name}`;
     serviceTokens.set(entity, token);
   }
   return token;

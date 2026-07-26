@@ -16,7 +16,7 @@ import type { FieldPath } from "../types/field-path.js";
  *
  * The union is kept honest by `OPERATOR_TOKENS` in `default-filter-parser`
  * (every operator must have a wire token) and by the exhaustive switch in
- * `@crudo/typeorm`'s `FilterTranslator` (every operator must translate).
+ * `@kavo/typeorm`'s `FilterTranslator` (every operator must translate).
  */
 export type FilterOperator =
   | "EQ"

@@ -1,8 +1,8 @@
 import "reflect-metadata";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Column, DataSource, DeleteDateColumn, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from "typeorm";
-import type { CrudoInstance, DefaultCrudService } from "@crudo/core";
-import { createTypeOrmCrudo } from "@crudo/typeorm";
+import type { KavoInstance, DefaultCrudService } from "@kavo/core";
+import { createTypeOrmKavo } from "@kavo/typeorm";
 
 @Entity()
 class Blog {
@@ -47,7 +47,7 @@ class Note {
 }
 
 let dataSource: DataSource;
-let crudo: CrudoInstance;
+let kavo: KavoInstance;
 let blogs: DefaultCrudService<Blog>;
 let joinedBlogs: DefaultCrudService<Blog>;
 let articles: DefaultCrudService<Article>;
@@ -60,21 +60,21 @@ beforeAll(async () => {
     synchronize: true,
   });
   await dataSource.initialize();
-  crudo = createTypeOrmCrudo(dataSource);
-  blogs = crudo.createCrud(Blog, {
+  kavo = createTypeOrmKavo(dataSource);
+  blogs = kavo.createCrud(Blog, {
     relations: { edges: { articles: { includable: true } } },
   }) as DefaultCrudService<Blog>;
-  articles = crudo.createCrud(Article, {
+  articles = kavo.createCrud(Article, {
     softDelete: { strategy: "soft" },
     relations: { edges: { blog: { includable: true }, notes: { includable: true } } },
     // Filtering across a relation path is its own allowlist decision,
     // independent of whether the relation may be included.
     allowlists: { filterable: ["id", "title", "blog.name"] },
   } as never) as DefaultCrudService<Article>;
-  crudo.createCrud(Note, { relations: { edges: { article: { includable: true } } } });
+  kavo.createCrud(Note, { relations: { edges: { article: { includable: true } } } });
   // The same entity with the to-many forced to `join`: the case the
   // normative pagination rule exists for.
-  joinedBlogs = createTypeOrmCrudo(dataSource).createCrud(Blog, {
+  joinedBlogs = createTypeOrmKavo(dataSource).createCrud(Blog, {
     relations: { edges: { articles: { includable: true, strategy: "join" } } },
   }) as DefaultCrudService<Blog>;
 });
@@ -91,7 +91,7 @@ beforeEach(async () => {
 
 /** One blog, two articles, one note on the first article. */
 async function seed(): Promise<{ blogId: number; articleId: number }> {
-  const blog = await dataSource.getRepository(Blog).save({ name: "Crudo weekly" });
+  const blog = await dataSource.getRepository(Blog).save({ name: "Kavo weekly" });
   const first = await dataSource.getRepository(Article).save({ title: "Includes", blog });
   await dataSource.getRepository(Article).save({ title: "Soft delete", blog });
   await dataSource.getRepository(Note).save({ body: "typo on line 3", article: first });
@@ -102,7 +102,7 @@ describe("TypeOrmRepositoryAdapter — join loading (Phase 15)", () => {
   it("embeds a to-one relation from the main query", async () => {
     const { blogId } = await seed();
     const list = await articles.findMany({ include: ["blog"], sort: [{ field: "id", direction: "asc" }] });
-    expect(list.items[0]).toMatchObject({ title: "Includes", blog: { id: blogId, name: "Crudo weekly" } });
+    expect(list.items[0]).toMatchObject({ title: "Includes", blog: { id: blogId, name: "Kavo weekly" } });
   });
 
   it("supports include on findOne with identical semantics", async () => {
@@ -115,10 +115,10 @@ describe("TypeOrmRepositoryAdapter — join loading (Phase 15)", () => {
     await seed();
     const list = await articles.findMany({
       include: ["blog"],
-      filter: { kind: "condition", field: "blog.name" as never, operator: "EQ", value: "Crudo weekly" },
+      filter: { kind: "condition", field: "blog.name" as never, operator: "EQ", value: "Kavo weekly" },
     });
     expect(list.items).toHaveLength(2);
-    expect(list.items[0]).toMatchObject({ blog: { name: "Crudo weekly" } });
+    expect(list.items[0]).toMatchObject({ blog: { name: "Kavo weekly" } });
   });
 });
 
@@ -204,7 +204,7 @@ describe("Sparse fieldsets on included nodes (Phase 15)", () => {
     });
     expect(list.items[0]).toEqual({
       id: expect.any(Number),
-      name: "Crudo weekly",
+      name: "Kavo weekly",
       articles: [{ title: "Includes" }, { title: "Soft delete" }],
     });
   });

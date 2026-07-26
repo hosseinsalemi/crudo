@@ -1,4 +1,4 @@
-import type { FieldSelectionInput, QueryContext } from "@crudo/core";
+import type { FieldSelectionInput, QueryContext } from "@kavo/core";
 import { Author } from "../support/blog-fixture.js";
 
 /**

@@ -1,22 +1,22 @@
 import type { DynamicModule, ModuleMetadata, Provider, Type } from "@nestjs/common";
 import { Module } from "@nestjs/common";
 import { APP_FILTER } from "@nestjs/core";
-import type { CrudoInstance } from "@crudo/core";
-import { ConfigurationException, createCrudo } from "@crudo/core";
-import type { CrudoModuleOptions } from "./crudo-options.js";
+import type { KavoInstance } from "@kavo/core";
+import { ConfigurationException, createKavo } from "@kavo/core";
+import type { KavoModuleOptions } from "./kavo-options.js";
 import type { CrudControllerMetadata } from "./crud.decorator.js";
-import { CrudoExceptionFilter } from "./crudo-exception.filter.js";
-import { CRUDO_INSTANCE, CRUDO_MODULE_OPTIONS, CRUD_CONTROLLER_METADATA, getCrudServiceToken } from "./tokens.js";
+import { KavoExceptionFilter } from "./kavo-exception.filter.js";
+import { KAVO_INSTANCE, KAVO_MODULE_OPTIONS, CRUD_CONTROLLER_METADATA, getCrudServiceToken } from "./tokens.js";
 
-export interface CrudoModuleAsyncOptions extends Pick<ModuleMetadata, "imports"> {
-  useFactory: (...args: never[]) => CrudoModuleOptions | Promise<CrudoModuleOptions>;
+export interface KavoModuleAsyncOptions extends Pick<ModuleMetadata, "imports"> {
+  useFactory: (...args: never[]) => KavoModuleOptions | Promise<KavoModuleOptions>;
   inject?: readonly (string | symbol | Type)[];
 }
 
 /**
- * The Crudo dynamic module (Phases 11–12).
+ * The Kavo dynamic module (Phases 11–12).
  *
- * - `forRoot`/`forRootAsync` (global): create the Crudo root instance and
+ * - `forRoot`/`forRootAsync` (global): create the Kavo root instance and
  *   register the problem-details exception filter app-wide.
  * - `forFeature(controllers)`: for each `@Crud`-decorated controller,
  *   provide the entity's `CrudService` under `getCrudServiceToken(Entity)`
@@ -25,43 +25,43 @@ export interface CrudoModuleAsyncOptions extends Pick<ModuleMetadata, "imports">
  *   request scope would only cost throughput.
  */
 @Module({})
-export class CrudoModule {
-  static forRoot(options: CrudoModuleOptions = {}): DynamicModule {
+export class KavoModule {
+  static forRoot(options: KavoModuleOptions = {}): DynamicModule {
     return {
-      module: CrudoModule,
+      module: KavoModule,
       global: true,
       providers: [
-        { provide: CRUDO_MODULE_OPTIONS, useValue: options },
+        { provide: KAVO_MODULE_OPTIONS, useValue: options },
         {
-          provide: CRUDO_INSTANCE,
-          useFactory: (resolved: CrudoModuleOptions): CrudoInstance => createInstance(resolved),
-          inject: [CRUDO_MODULE_OPTIONS],
+          provide: KAVO_INSTANCE,
+          useFactory: (resolved: KavoModuleOptions): KavoInstance => createInstance(resolved),
+          inject: [KAVO_MODULE_OPTIONS],
         },
-        { provide: APP_FILTER, useClass: CrudoExceptionFilter },
+        { provide: APP_FILTER, useClass: KavoExceptionFilter },
       ],
-      exports: [CRUDO_INSTANCE, CRUDO_MODULE_OPTIONS],
+      exports: [KAVO_INSTANCE, KAVO_MODULE_OPTIONS],
     };
   }
 
-  static forRootAsync(options: CrudoModuleAsyncOptions): DynamicModule {
+  static forRootAsync(options: KavoModuleAsyncOptions): DynamicModule {
     return {
-      module: CrudoModule,
+      module: KavoModule,
       global: true,
       imports: [...(options.imports ?? [])],
       providers: [
         {
-          provide: CRUDO_MODULE_OPTIONS,
+          provide: KAVO_MODULE_OPTIONS,
           useFactory: options.useFactory,
           inject: [...(options.inject ?? [])] as never[],
         },
         {
-          provide: CRUDO_INSTANCE,
-          useFactory: (resolved: CrudoModuleOptions): CrudoInstance => createInstance(resolved),
-          inject: [CRUDO_MODULE_OPTIONS],
+          provide: KAVO_INSTANCE,
+          useFactory: (resolved: KavoModuleOptions): KavoInstance => createInstance(resolved),
+          inject: [KAVO_MODULE_OPTIONS],
         },
-        { provide: APP_FILTER, useClass: CrudoExceptionFilter },
+        { provide: APP_FILTER, useClass: KavoExceptionFilter },
       ],
-      exports: [CRUDO_INSTANCE, CRUDO_MODULE_OPTIONS],
+      exports: [KAVO_INSTANCE, KAVO_MODULE_OPTIONS],
     };
   }
 
@@ -73,17 +73,17 @@ export class CrudoModule {
           controller.name,
           "forFeature",
           `${controller.name} is not decorated with @Crud(Entity) — ` +
-            "CrudoModule.forFeature only accepts @Crud controllers",
+            "KavoModule.forFeature only accepts @Crud controllers",
         );
       }
       return {
         provide: getCrudServiceToken(metadata.entity),
-        useFactory: (crudo: CrudoInstance) => crudo.createCrud(metadata.entity, metadata.config),
-        inject: [CRUDO_INSTANCE],
+        useFactory: (kavo: KavoInstance) => kavo.createCrud(metadata.entity, metadata.config),
+        inject: [KAVO_INSTANCE],
       };
     });
     return {
-      module: CrudoModule,
+      module: KavoModule,
       controllers: [...controllers],
       providers,
       exports: providers,
@@ -91,8 +91,8 @@ export class CrudoModule {
   }
 }
 
-function createInstance(options: CrudoModuleOptions): CrudoInstance {
-  return createCrudo({
+function createInstance(options: KavoModuleOptions): KavoInstance {
+  return createKavo({
     ...(options.defaults !== undefined && { defaults: options.defaults }),
     ...(options.infrastructure !== undefined && {
       infrastructure: options.infrastructure,

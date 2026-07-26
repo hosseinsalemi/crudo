@@ -7,10 +7,10 @@ import {
   NotFoundException,
   PersistenceException,
   QueryValidationException,
-  type CrudoInstance,
+  type KavoInstance,
   type DefaultCrudService,
-} from "@crudo/core";
-import { buildEntityMetadata, createTypeOrmCrudo } from "@crudo/typeorm";
+} from "@kavo/core";
+import { buildEntityMetadata, createTypeOrmKavo } from "@kavo/typeorm";
 
 // Explicit column types throughout: the swc test transform emits decorator
 // metadata, but explicit types keep entities transform-agnostic.
@@ -54,7 +54,7 @@ class Book {
 }
 
 let dataSource: DataSource;
-let crudo: CrudoInstance;
+let kavo: KavoInstance;
 let authors: DefaultCrudService<Author>;
 
 beforeAll(async () => {
@@ -65,8 +65,8 @@ beforeAll(async () => {
     synchronize: true,
   });
   await dataSource.initialize();
-  crudo = createTypeOrmCrudo(dataSource);
-  authors = crudo.createCrud(Author) as DefaultCrudService<Author>;
+  kavo = createTypeOrmKavo(dataSource);
+  authors = kavo.createCrud(Author) as DefaultCrudService<Author>;
 });
 
 afterAll(async () => {
@@ -281,7 +281,7 @@ describe("TypeOrmRepositoryAdapter — query translation", () => {
   });
 
   it("filters on relation paths when explicitly allowlisted", async () => {
-    const scoped = crudo.createCrud(Book, {
+    const scoped = kavo.createCrud(Book, {
       allowlists: { filterable: ["title", "author.name" as never] },
     }) as DefaultCrudService<Book>;
     await seed();

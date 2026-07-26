@@ -23,7 +23,7 @@ Argument (may be empty): **$ARGUMENTS**
    why** before going further. Read it in full:
    `gh issue view <n> --json title,body,labels,comments`.
 
-3. **Plan it.** Launch the `crudo-architect` agent with the issue number and its
+3. **Plan it.** Launch the `kavo-architect` agent with the issue number and its
    full text. It is read-only and returns a plan: goal, acceptance criteria,
    affected packages and files, design and the seam it uses, the invariants and
    ADRs in play, public-API impact, an ordered task list, a test plan, and risks.

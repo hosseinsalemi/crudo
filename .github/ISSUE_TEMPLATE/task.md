@@ -19,7 +19,7 @@ labels: ""
 
 ## Affected packages
 
-<!-- @crudo/core | @crudo/typeorm | @crudo/nest | docs -->
+<!-- @kavo/core | @kavo/typeorm | @kavo/nest | docs -->
 
 ## Constraints
 

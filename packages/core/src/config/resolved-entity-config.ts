@@ -1,4 +1,4 @@
-import type { CrudoSettings } from "./settings.js";
+import type { KavoSettings } from "./settings.js";
 import type { FieldPath } from "../types/field-path.js";
 import type { DtoResolver } from "../dto/dto.js";
 import type { OperationId } from "../operations/operation.js";
@@ -24,9 +24,9 @@ export interface ResolvedQueryAllowlists<Entity = unknown> {
 export interface ResolvedEntityConfig<Entity = unknown> {
   readonly entityName: string;
   /** Entity-scope settings (global already merged in). */
-  readonly settings: CrudoSettings;
+  readonly settings: KavoSettings;
   /** Per-operation settings view: entity settings + operation overrides. */
-  settingsFor(operation: OperationId): CrudoSettings;
+  settingsFor(operation: OperationId): KavoSettings;
   readonly allowlists: ResolvedQueryAllowlists<Entity>;
   /**
    * The delete strategy resolved for this scope (Phase 14) — `hard` with

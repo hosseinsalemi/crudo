@@ -1,9 +1,9 @@
 # 08 — Configuration System (Phase 8)
 
-One layered model, one schema (`CrudoSettings`), one precedence chain:
+One layered model, one schema (`KavoSettings`), one precedence chain:
 
 ```
-built-in defaults → global (createCrudo) → entity (createCrud)
+built-in defaults → global (createKavo) → entity (createCrud)
                   → operation (operations.<id>) → per-call (CrudCallOptions)
 ```
 
@@ -64,15 +64,15 @@ pagination strategies, missing infrastructure, non-`@Crud` controllers in
 
 ## 5. Root factory and framework skin
 
-`createCrudo({ defaults, infrastructure, paginationStrategies })` is the
+`createKavo({ defaults, infrastructure, paginationStrategies })` is the
 core entry point; the bare `createCrud(Entity, config?, runtime)` is an
 implicit root instance with built-in defaults — the zero-config path pays
-nothing for any of this. `CrudoModule.forRoot` (doc 10) is a thin skin:
+nothing for any of this. `KavoModule.forRoot` (doc 10) is a thin skin:
 it passes `defaults` through untouched and contributes only its own
 route concerns via the `OperationMetadata` augmentation (ADR-0007).
 
 ## 6. Debug dump
 
-`crudo.describe(entityName)` (backed by `describeResolvedConfig`) returns
+`kavo.describe(entityName)` (backed by `describeResolvedConfig`) returns
 the frozen result for one entity — settings, allowlists, relations, and
 every per-operation view — as a plain printable object.

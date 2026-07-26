@@ -9,14 +9,14 @@ import type {
   OperationId,
   RepositoryAdapter,
   TransactionContext,
-} from "@crudo/core";
+} from "@kavo/core";
 import {
   ConfigurationException,
   DefaultCrudService,
   OperationDisabledException,
   WireQuery,
-  createCrudo,
-} from "@crudo/core";
+  createKavo,
+} from "@kavo/core";
 import { InMemoryUserAdapter, User, userMetadata } from "./support/user-fixture.js";
 
 /**
@@ -139,9 +139,9 @@ class ContextRecordingAdapter implements RepositoryAdapter<User> {
   }
 }
 
-function makeCrud(config?: Parameters<ReturnType<typeof createCrudo>["createCrud"]>[1]) {
+function makeCrud(config?: Parameters<ReturnType<typeof createKavo>["createCrud"]>[1]) {
   const adapter = new ContextRecordingAdapter();
-  const crud = createCrudo().createCrud(User, config as never, {
+  const crud = createKavo().createCrud(User, config as never, {
     adapter,
     metadata: userMetadata,
   }) as DefaultCrudService<User>;
@@ -385,7 +385,7 @@ describe("CrudCallOptions — per-call settings (Phase 8)", () => {
     } catch (error) {
       expect(error).toBeInstanceOf(ConfigurationException);
       expect(error).toMatchObject({
-        code: "CRUDO_CONFIG_INVALID",
+        code: "KAVO_CONFIG_INVALID",
         messageParams: { entity: expect.stringContaining("User"), path: "pagination.defaultLimit" },
       });
     }

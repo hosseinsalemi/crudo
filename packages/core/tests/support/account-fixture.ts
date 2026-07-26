@@ -1,10 +1,10 @@
-import type { CrudContext, EntityId, EntityMetadata, NormalizedQueryContext, RepositoryAdapter } from "@crudo/core";
-import { AlreadyDeletedException, NotDeletedException, NotFoundException } from "@crudo/core";
+import type { CrudContext, EntityId, EntityMetadata, NormalizedQueryContext, RepositoryAdapter } from "@kavo/core";
+import { AlreadyDeletedException, NotDeletedException, NotFoundException } from "@kavo/core";
 
 /**
  * Soft-deletable test entity (Phase 14): a `deletedAt` marker column, plus
  * `softDeleteField` on the metadata — the seam a real ORM fills from its
- * own declaration (`@DeleteDateColumn` in `@crudo/typeorm`).
+ * own declaration (`@DeleteDateColumn` in `@kavo/typeorm`).
  */
 export class Account {
   id = 0;
