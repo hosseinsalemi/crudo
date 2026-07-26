@@ -272,6 +272,94 @@ describe("Pet example app", () => {
     await request(server()).get(`/dogs/${dog.body.id}`).expect(200);
   });
 
+  it("associates tags by id and embeds them via a batched many-to-many include", async () => {
+    const tagA = await request(server()).post("/tags").send({ name: "playful" }).expect(201);
+    const tagB = await request(server()).post("/tags").send({ name: "lazy" }).expect(201);
+    const tagIdA = tagA.body.id as number;
+    const tagIdB = tagB.body.id as number;
+
+    const cat = await request(server())
+      .post("/cats")
+      .send({ name: "Tagged", age: 2, size: "small", indoor: true, livesLeft: 9, tags: [tagIdA, tagIdB] })
+      .expect(201);
+    const catId = cat.body.id as number;
+
+    // Not included until asked (Phase 15): the create response is the plain
+    // CatItemDto projection, and tags stay off a plain GET too.
+    expect(cat.body).not.toHaveProperty("tags");
+    const plain = await request(server()).get(`/cats/${catId}`).expect(200);
+    expect(plain.body).not.toHaveProperty("tags");
+
+    const fetched = await request(server()).get(`/cats/${catId}?include=tags`).expect(200);
+    expect(fetched.body.tags).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: tagIdA, name: "playful" }),
+        expect.objectContaining({ id: tagIdB, name: "lazy" }),
+      ]),
+    );
+    expect(fetched.body.tags).toHaveLength(2);
+
+    // Replacing the tag set on update: this is the case that would fail if
+    // the join table needed the prior relation state preloaded before save.
+    await request(server()).put(`/cats/${catId}`).send({
+      name: "Tagged",
+      age: 2,
+      size: "small",
+      indoor: true,
+      livesLeft: 9,
+      tags: [tagIdB],
+    });
+    const afterUpdate = await request(server()).get(`/cats/${catId}?include=tags`).expect(200);
+    expect(afterUpdate.body.tags).toEqual([expect.objectContaining({ id: tagIdB, name: "lazy" })]);
+
+    // Clearing the set removes every association.
+    await request(server()).put(`/cats/${catId}`).send({
+      name: "Tagged",
+      age: 2,
+      size: "small",
+      indoor: true,
+      livesLeft: 9,
+      tags: [],
+    });
+    const cleared = await request(server()).get(`/cats/${catId}?include=tags`).expect(200);
+    expect(cleared.body.tags).toEqual([]);
+  });
+
+  it("keeps include=tags an opt-in allowlist entry, not a free pass", async () => {
+    // Dogs never declared `tags` includable — same allowlist rule as any
+    // other relation (Phase 15).
+    const response = await request(server()).get("/dogs").query("include=tags").expect(400);
+    expect(response.body.errors.map((e: { code: string }) => e.code)).toEqual(["CRUDO_QUERY_INVALID_FIELD"]);
+  });
+
+  it("counts and slices distinct roots under pagination even when a cat has several tags", async () => {
+    const before = await request(server()).get("/cats").query("limit=1").expect(200);
+    const totalBefore = before.body.total as number;
+
+    const tags = [];
+    for (const name of ["a", "b", "c"]) {
+      tags.push((await request(server()).post("/tags").send({ name }).expect(201)).body.id as number);
+    }
+    const fanOut = await request(server())
+      .post("/cats")
+      .send({ name: "FanOut", age: 1, size: "small", indoor: true, livesLeft: 9, tags })
+      .expect(201);
+
+    const page = await request(server())
+      .get("/cats")
+      .query("include=tags&limit=2&offset=0")
+      .expect(200);
+    // Root count/slice is over distinct cats, never joined (cat × tag) rows —
+    // a fan-out of 3 tags on one cat must not multiply `total` or the page.
+    expect(page.body.total).toBe(totalBefore + 1);
+    expect(page.body.items).toHaveLength(2);
+
+    const fanOutRow = (
+      await request(server()).get(`/cats/${fanOut.body.id}?include=tags`).expect(200)
+    ).body as { tags: unknown[] };
+    expect(fanOutRow.tags).toHaveLength(3);
+  });
+
   it("documents the size enum and the owner pets oneOf in the OpenAPI schema", () => {
     type Schema = {
       type?: string;

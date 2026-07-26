@@ -1,5 +1,6 @@
 import { enumProp } from "@crudo/nest";
 import { PetSizeEnum } from "../pet/pet.entity.js";
+import { TagItemDto } from "../tag/tag.dtos.js";
 
 /**
  * DTO slots for the Cat route (Phase 4). Fields are initialized so the
@@ -19,6 +20,9 @@ export class CreateCatDto {
   // Association by id (Phase 15, ADR-0014): send the owner's id, or an
   // `{ id }` reference. Deep nested writes are deliberately out of scope.
   owner: number | null = null;
+  // Same mechanism, over a to-many edge: an array of tag ids (or `{ id }`
+  // refs) replaces the full set of associated tags.
+  tags: number[] = [];
 }
 
 /** `update` slot — request body for PUT /cats/:id (patch derives from it). */
@@ -29,6 +33,7 @@ export class UpdateCatDto {
   indoor = false;
   livesLeft = 0;
   owner: number | null = null;
+  tags: number[] = [];
 }
 
 /** `item` slot — the detail projection. */
@@ -40,6 +45,9 @@ export class CatItemDto {
   indoor = false;
   livesLeft = 0;
   createdAt: Date = new Date(0);
+  // Documented as an array of tags; the shape is documentation, the include
+  // decides the load — absent from a plain GET (Phase 15).
+  tags: TagItemDto[] = [];
 }
 
 /** `list` slot — a leaner projection for list responses. */

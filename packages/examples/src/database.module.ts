@@ -4,6 +4,7 @@ import { Owner } from "./owner/owner.entity.js";
 import { Pet } from "./pet/pet.entity.js";
 import { Cat } from "./cat/cat.entity.js";
 import { Dog } from "./dog/dog.entity.js";
+import { Tag } from "./tag/tag.entity.js";
 
 export const DATA_SOURCE = Symbol("DATA_SOURCE");
 
@@ -20,7 +21,7 @@ export const DATA_SOURCE = Symbol("DATA_SOURCE");
         const dataSource = new DataSource({
           type: "better-sqlite3",
           database: ":memory:",
-          entities: [Owner, Pet, Cat, Dog],
+          entities: [Owner, Pet, Cat, Dog, Tag],
           synchronize: true,
         });
         return dataSource.initialize();

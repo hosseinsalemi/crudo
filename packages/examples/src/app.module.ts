@@ -6,6 +6,7 @@ import { DATA_SOURCE, DatabaseModule } from "./database.module.js";
 import { OwnerController } from "./owner/owner.controller.js";
 import { CatController } from "./cat/cat.controller.js";
 import { DogController } from "./dog/dog.controller.js";
+import { TagController } from "./tag/tag.controller.js";
 
 /**
  * Reference wiring: the app hands `@crudo/nest` its infrastructure (here
@@ -25,7 +26,7 @@ import { DogController } from "./dog/dog.controller.js";
         },
       }),
     }),
-    CrudoModule.forFeature([OwnerController, CatController, DogController]),
+    CrudoModule.forFeature([OwnerController, CatController, DogController, TagController]),
   ],
 })
 export class AppModule {}
