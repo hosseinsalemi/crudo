@@ -40,7 +40,13 @@ instructions: **$ARGUMENTS**
    messages; cover the error and edge paths, and add a failing-first regression
    test for any bugfix.
 
-4. **Run the gate** and make it pass:
+4. **Format the code**:
+
+   ```bash
+   pnpm prettify
+   ```
+
+5. **Run the gate** and make it pass:
 
    ```bash
    pnpm check
@@ -49,16 +55,16 @@ instructions: **$ARGUMENTS**
    That is build + `depcruise` + the full suite. If it fails, fix it — do not
    report success over a red gate, and do not weaken a test to make it pass.
 
-5. **Update the docs** if you changed behavior an ADR or a
+6. **Update the docs** if you changed behavior an ADR or a
    `packages/docs/architecture/` document governs. Silent divergence is a
    review finding.
 
-6. **Commit** with a Conventional Commits message matching this repo's style
+7. **Commit** with a Conventional Commits message matching this repo's style
    (`feat(core):`, `fix(typeorm):`, `test(nest):`). Reference the issue in the
    body (`Refs #<n>`). Use `/commit` if the work splits cleanly into several
    commits.
 
-7. **Report** what changed, the real `pnpm check` result, and anything in the
+8. **Report** what changed, the real `pnpm check` result, and anything in the
    plan you did **not** do and why. Then tell the user to run `/review`.
 
 If you hit something the plan got wrong, say so and propose the correction

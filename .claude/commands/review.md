@@ -17,7 +17,16 @@ Review this branch. Focus, if given: **$ARGUMENTS**
 1. **Preflight.** If the branch is `main` or the diff above is empty, say so and
    stop — there is nothing to review.
 
-2. **Run the three reviewers in parallel**, in a single message. They are
+2. **Format the code**:
+
+   ```bash
+   pnpm prettify
+   ```
+
+   If this changes any files, commit them (`style: prettify` or similar)
+   before the reviewers run, so they review formatted code.
+
+3. **Run the three reviewers in parallel**, in a single message. They are
    read-only and deliberately non-overlapping:
 
    - `crudo-reviewer` — correctness, engine and registry design invariants,
@@ -26,7 +35,7 @@ Review this branch. Focus, if given: **$ARGUMENTS**
      leakage, barrel and breaking-change audit.
    - `crudo-test-auditor` — coverage gaps, weak tests, misplaced test files.
 
-3. **Consolidate.** Merge their findings into one ranked list and drop the
+4. **Consolidate.** Merge their findings into one ranked list and drop the
    duplicates. Do not just paste three reports.
 
    For each finding keep: the file and line, one sentence on the defect, the
@@ -35,12 +44,12 @@ Review this branch. Focus, if given: **$ARGUMENTS**
    - **Blocking** — must be fixed before the PR merges.
    - **Non-blocking** — worth doing, does not gate the merge.
 
-4. **Verify before you report.** Agents sometimes report findings that do not
+5. **Verify before you report.** Agents sometimes report findings that do not
    hold up. Check the ones that would be expensive to act on against the actual
    code, and drop what you cannot confirm. A short list of real findings beats a
    long list of plausible ones.
 
-5. **State the verdict plainly**: ready to ship, or blocked on N findings. If
+6. **State the verdict plainly**: ready to ship, or blocked on N findings. If
    the branch is clean, say so and list what was actually verified — including
    the `pnpm check` result.
 
