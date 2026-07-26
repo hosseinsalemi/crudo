@@ -278,10 +278,11 @@ describe("@Crud operation control surface", () => {
 
   it("generates routes for custom operations from meta.routes", async () => {
     const activate: OperationHandler<Todo> = {
-      async execute(_input, context) {
-        const service = context.state; // unused; handler works via adapter rows
-        void service;
-        const row = adapter.rows.find((r) => r.id === 1);
+      async execute(input) {
+        // Custom operations addressed by `:id` receive it alongside the
+        // deserialized body — the same id the route's `:id` segment named.
+        const { id } = input as { id: number };
+        const row = adapter.rows.find((r) => r.id === id);
         if (row !== undefined) row.done = true;
         return row ?? null;
       },
@@ -312,6 +313,77 @@ describe("@Crud operation control surface", () => {
     expect(response.body).toMatchObject({ id: 1, done: true });
     // Service-only: no route.
     await request(server()).post("/todos/recalculate").expect(404);
+  });
+
+  it("overrides all five singular standard operations and adds a custom operation, alongside manual-method-wins and a disabled operation (issue #21)", async () => {
+    const seen: string[] = [];
+    const overrideHandler = (id: string): OperationHandler<Todo> => ({
+      async execute() {
+        seen.push(id);
+        return { id: 1, title: id, done: false, priority: 0, deletedAt: null, list: null };
+      },
+    });
+
+    @Crud(Todo, {
+      operations: {
+        createOne: { handler: overrideHandler("createOne") },
+        updateOne: { handler: overrideHandler("updateOne") },
+        patchOne: { handler: overrideHandler("patchOne") },
+        deleteOne: {
+          handler: {
+            async execute() {
+              seen.push("deleteOne");
+              return null;
+            },
+          },
+        },
+        // Disabled alongside a full override set — a control surface that
+        // otherwise touches every id must not confuse the disable path.
+        findMany: false,
+      },
+      customOperations: {
+        summarize: {
+          handler: {
+            async execute() {
+              seen.push("summarize");
+              return null;
+            },
+          },
+          meta: { routes: { method: "POST", path: "summarize" } },
+        },
+      },
+    })
+    @Controller("todos")
+    class FullOverrideController {
+      // Manual-method-wins over the findOne override too: the two
+      // mechanisms are independent and must coexist without conflict.
+      @Get(":id")
+      findOne(): { manual: boolean } {
+        return { manual: true };
+      }
+    }
+
+    await bootstrap(FullOverrideController);
+
+    const created = await request(server()).post("/todos").send({ title: "x" }).expect(201);
+    expect(created.body).toMatchObject({ title: "createOne" });
+
+    const found = await request(server()).get("/todos/1").expect(200);
+    expect(found.body).toEqual({ manual: true });
+
+    const updated = await request(server()).put("/todos/1").send({ title: "y" }).expect(200);
+    expect(updated.body).toMatchObject({ title: "updateOne" });
+
+    const patched = await request(server()).patch("/todos/1").send({ title: "z" }).expect(200);
+    expect(patched.body).toMatchObject({ title: "patchOne" });
+
+    await request(server()).delete("/todos/1").expect(204);
+    await request(server()).post("/todos/summarize").expect(201);
+
+    // Disabled alongside five overrides and a custom op: still no route.
+    await request(server()).get("/todos").expect(404);
+
+    expect(seen).toEqual(["createOne", "updateOne", "patchOne", "deleteOne", "summarize"]);
   });
 });
 

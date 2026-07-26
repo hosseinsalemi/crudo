@@ -23,6 +23,8 @@ export class AddressItemDto {
   street = "";
   city = "";
   postalCode = "";
+  /** Derived by the `findOne` override — never a persisted column. */
+  formattedAddress = "";
 }
 
 /** `list` slot — a leaner projection for list responses. */

@@ -4,7 +4,10 @@ import request from "supertest";
 import type { INestApplication } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { Test } from "@nestjs/testing";
+import type { DataSource } from "typeorm";
 import { AppModule } from "../src/app.module.js";
+import { DATA_SOURCE } from "../src/database.module.js";
+import { Address } from "../src/address/address.entity.js";
 
 /**
  * The Pet example served by the real stack — generated Nest routes →
@@ -377,21 +380,24 @@ describe("Pet example app", () => {
     expect(updateConflict.body.code).toBe("KAVO_CONFLICT");
   });
 
-  it("refuses to delete an address still referenced by an owner (409, not a silent null or cascade)", async () => {
+  it("clears the owning relation before deleting a referenced address (issue #21 deleteOne override)", async () => {
+    // Address's `deleteOne` is overridden (issue #21) to detach the owner's
+    // side of the join column first, rather than leaving the FK constraint
+    // to refuse the delete outright.
     const address = await request(server())
       .post("/addresses")
       .send({ street: "1 Referenced Ln", city: "Bindingtown", postalCode: "60006" })
       .expect(201);
-    await request(server())
+    const owner = await request(server())
       .post("/owners")
       .send({ name: "Tara", email: "tara@x.io", address: address.body.id })
       .expect(201);
 
-    const conflict = await request(server())
-      .delete(`/addresses/${address.body.id}`)
-      .expect(409)
-      .expect("Content-Type", /application\/problem\+json/);
-    expect(conflict.body.code).toBe("KAVO_CONFLICT");
+    await request(server()).delete(`/addresses/${address.body.id}`).expect(204);
+    await request(server()).get(`/addresses/${address.body.id}`).expect(404);
+
+    const detached = await request(server()).get(`/owners/${owner.body.id}?include=address`).expect(200);
+    expect(detached.body.address).toBeNull();
   });
 
   it("documents include=address and fields[address] in the OpenAPI schema", () => {
@@ -600,5 +606,113 @@ describe("Pet example app", () => {
     const pets = ownerItem?.properties?.pets;
     expect(pets?.type).toBe("array");
     expect(pets?.items?.oneOf?.map((variant) => variant.title)).toEqual(["CatItemDto", "DogItemDto"]);
+  });
+});
+
+/**
+ * `Address` overrides all five singular standard operations and adds one
+ * custom operation, entirely through `EntityConfig` (issue #21) — the
+ * example the `add-operation` skill's documented procedure was missing.
+ */
+describe("Address operation overrides (issue #21)", () => {
+  it("normalizes postalCode on create", async () => {
+    const created = await request(server())
+      .post("/addresses")
+      .send({ street: "1 Elm St", city: "Springfield", postalCode: " 10001 " })
+      .expect(201);
+    expect(created.body.postalCode).toBe("10001");
+  });
+
+  it("rejects a malformed postalCode on create as a problem-details 400", async () => {
+    const response = await request(server())
+      .post("/addresses")
+      .send({ street: "1 Elm St", city: "Springfield", postalCode: "abc" })
+      .expect(400)
+      .expect("Content-Type", /application\/problem\+json/);
+    expect(response.body.errors).toEqual([
+      expect.objectContaining({ field: "postalCode", code: "KAVO_QUERY_INVALID_VALUE" }),
+    ]);
+  });
+
+  it("rejects a malformed postalCode on update, leaving the row unchanged", async () => {
+    const created = await request(server())
+      .post("/addresses")
+      .send({ street: "1 Elm St", city: "Springfield", postalCode: "10001" })
+      .expect(201);
+    const id = created.body.id as number;
+
+    await request(server())
+      .put(`/addresses/${id}`)
+      .send({ street: "1 Elm St", city: "Springfield", postalCode: "bad" })
+      .expect(400)
+      .expect("Content-Type", /application\/problem\+json/);
+
+    const unchanged = await request(server()).get(`/addresses/${id}`).expect(200);
+    expect(unchanged.body.postalCode).toBe("10001");
+  });
+
+  it("is partial-field aware on patch: omitting postalCode never triggers validation", async () => {
+    const created = await request(server())
+      .post("/addresses")
+      .send({ street: "1 Elm St", city: "Springfield", postalCode: "10001" })
+      .expect(201);
+    const id = created.body.id as number;
+
+    const patched = await request(server()).patch(`/addresses/${id}`).send({ city: "Shelbyville" }).expect(200);
+    expect(patched.body).toMatchObject({ city: "Shelbyville", postalCode: "10001" });
+  });
+
+  it("rejects a malformed postalCode on patch too, when the field is present", async () => {
+    const created = await request(server())
+      .post("/addresses")
+      .send({ street: "1 Elm St", city: "Springfield", postalCode: "10001" })
+      .expect(201);
+    const id = created.body.id as number;
+
+    await request(server())
+      .patch(`/addresses/${id}`)
+      .send({ postalCode: "nope" })
+      .expect(400)
+      .expect("Content-Type", /application\/problem\+json/);
+  });
+
+  it("augments findOne with a derived formattedAddress field", async () => {
+    const created = await request(server())
+      .post("/addresses")
+      .send({ street: "1 Elm St", city: "Springfield", postalCode: "10001" })
+      .expect(201);
+    const id = created.body.id as number;
+
+    const fetched = await request(server()).get(`/addresses/${id}`).expect(200);
+    expect(fetched.body.formattedAddress).toBe("1 Elm St, Springfield 10001");
+  });
+
+  it("corrects a dirty postalCode via the custom route", async () => {
+    const created = await request(server())
+      .post("/addresses")
+      .send({ street: "1 Elm St", city: "Springfield", postalCode: "10001" })
+      .expect(201);
+    const id = created.body.id as number;
+
+    // Every write path through the API already normalizes on the way in
+    // (createOne/updateOne/patchOne), so the only way to observe the
+    // custom route's own normalization actually doing something is to
+    // seed a dirty value directly, bypassing the controller entirely.
+    const dataSource = app.get<DataSource>(DATA_SOURCE);
+    await dataSource.getRepository(Address).update(id, { postalCode: " 20002 " });
+
+    const response = await request(server()).post(`/addresses/${id}/normalize-postal-code`).expect(201);
+    expect(response.body.postalCode).toBe("20002");
+
+    const fetched = await request(server()).get(`/addresses/${id}`).expect(200);
+    expect(fetched.body.postalCode).toBe("20002");
+  });
+
+  it("404s when normalizing a nonexistent address", async () => {
+    const response = await request(server())
+      .post("/addresses/999999/normalize-postal-code")
+      .expect(404)
+      .expect("Content-Type", /application\/problem\+json/);
+    expect(response.body.code).toBe("KAVO_NOT_FOUND");
   });
 });

@@ -26,6 +26,12 @@ Deliberately lean: no validation stage, no hooks, no policy stage — the
 v6 tradeoff. Cross-cutting behavior lives in the consumer's own code
 around Kavo.
 
+`createOne` and custom operations share one input-resolution branch: the
+deserialized body alone when the request carries no id, or `{ id, body }`
+when it does (a custom operation addressed by `:id` — cardinality `"one"`,
+same as `updateOne`/`patchOne` — needs the id to identify its target, and
+`request.id` is simply absent for `createOne`).
+
 ## 2. `CrudContext` contents
 
 Entity + operation identity, the resolved config view (with per-call
