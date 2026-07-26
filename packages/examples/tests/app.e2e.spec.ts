@@ -4,7 +4,10 @@ import request from "supertest";
 import type { INestApplication } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { Test } from "@nestjs/testing";
+import type { DataSource } from "typeorm";
 import { AppModule } from "../src/app.module.js";
+import { DATA_SOURCE } from "../src/database.module.js";
+import { Address } from "../src/address/address.entity.js";
 
 /**
  * The Pet example served by the real stack — generated Nest routes →
@@ -684,14 +687,32 @@ describe("Address operation overrides (issue #21)", () => {
     expect(fetched.body.formattedAddress).toBe("1 Elm St, Springfield 10001");
   });
 
-  it("reuses the shared normalization logic on the custom normalize-postal-code route", async () => {
+  it("corrects a dirty postalCode via the custom route", async () => {
     const created = await request(server())
       .post("/addresses")
       .send({ street: "1 Elm St", city: "Springfield", postalCode: "10001" })
       .expect(201);
     const id = created.body.id as number;
 
+    // Every write path through the API already normalizes on the way in
+    // (createOne/updateOne/patchOne), so the only way to observe the
+    // custom route's own normalization actually doing something is to
+    // seed a dirty value directly, bypassing the controller entirely.
+    const dataSource = app.get<DataSource>(DATA_SOURCE);
+    await dataSource.getRepository(Address).update(id, { postalCode: " 20002 " });
+
     const response = await request(server()).post(`/addresses/${id}/normalize-postal-code`).expect(201);
-    expect(response.body.postalCode).toBe("10001");
+    expect(response.body.postalCode).toBe("20002");
+
+    const fetched = await request(server()).get(`/addresses/${id}`).expect(200);
+    expect(fetched.body.postalCode).toBe("20002");
+  });
+
+  it("404s when normalizing a nonexistent address", async () => {
+    const response = await request(server())
+      .post("/addresses/999999/normalize-postal-code")
+      .expect(404)
+      .expect("Content-Type", /application\/problem\+json/);
+    expect(response.body.code).toBe("KAVO_NOT_FOUND");
   });
 });
