@@ -1,8 +1,19 @@
 import type { SoftDeletable } from "@crudo/core";
-import { Column, CreateDateColumn, DeleteDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import {
+  Column,
+  CreateDateColumn,
+  DeleteDateColumn,
+  Entity,
+  JoinColumn,
+  OneToMany,
+  OneToOne,
+  PrimaryGeneratedColumn,
+} from "typeorm";
 // Type-only import + string relation target keep the Owner↔Pet cycle off the
 // runtime graph (TypeORM resolves "Pet" by entity name at metadata build).
 import type { Pet } from "../pet/pet.entity.js";
+// Same reasoning for Owner↔Address.
+import type { Address } from "../address/address.entity.js";
 
 /**
  * The relation side of the example: an Owner has many Pets. Explicit
@@ -34,6 +45,13 @@ export class Owner implements SoftDeletable {
 
   @OneToMany("Pet", (pet: Pet) => pet.owner)
   pets!: Pet[];
+
+  // The owning side of the one-to-one: Owner carries the (nullable, unique)
+  // join column. `@JoinColumn` is required explicitly here — unlike
+  // `@ManyToOne`, a one-to-one owning side does not get one implicitly.
+  @OneToOne("Address", (address: Address) => address.owner, { nullable: true })
+  @JoinColumn()
+  address!: Address | null;
 
   @CreateDateColumn()
   createdAt!: Date;

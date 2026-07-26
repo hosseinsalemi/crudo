@@ -229,6 +229,144 @@ describe("Pet example app", () => {
       .expect("Content-Type", /application\/problem\+json/);
   });
 
+  it("runs the full CRUD lifecycle over HTTP for addresses", async () => {
+    const created = await request(server())
+      .post("/addresses")
+      .send({ street: "1 Main St", city: "Springfield", postalCode: "00001" })
+      .expect(201);
+    expect(created.body).toMatchObject({ street: "1 Main St", city: "Springfield", postalCode: "00001" });
+    const id = created.body.id as number;
+
+    await request(server()).get(`/addresses/${id}`).expect(200);
+    await request(server())
+      .put(`/addresses/${id}`)
+      .send({ street: "2 Main St", city: "Shelbyville", postalCode: "00002" })
+      .expect(200);
+    await request(server()).delete(`/addresses/${id}`).expect(204);
+    await request(server()).get(`/addresses/${id}`).expect(404);
+  });
+
+  it("associates an owner with an address by id on create, and embeds it via include (one-to-one join)", async () => {
+    const address = await request(server())
+      .post("/addresses")
+      .send({ street: "10 Elm St", city: "Ogdenville", postalCode: "10001" })
+      .expect(201);
+    const addressId = address.body.id as number;
+
+    const owner = await request(server())
+      .post("/owners")
+      .send({ name: "Nadia", email: "nadia@x.io", address: addressId })
+      .expect(201);
+    const ownerId = owner.body.id as number;
+
+    // Plain read never embeds it — the include decides the load.
+    const plain = await request(server()).get(`/owners/${ownerId}`).expect(200);
+    expect(plain.body).not.toHaveProperty("address");
+
+    const included = await request(server()).get(`/owners/${ownerId}?include=address`).expect(200);
+    expect(included.body.address).toMatchObject({ id: addressId, street: "10 Elm St", city: "Ogdenville" });
+
+    // …and narrowed by a per-node fieldset, same as the to-one `owner` edge on cats.
+    const narrowed = await request(server())
+      .get(`/owners/${ownerId}?include=address&fields[address]=street,city`)
+      .expect(200);
+    expect(narrowed.body.address).toEqual({ street: "10 Elm St", city: "Ogdenville" });
+  });
+
+  it("associates, disassociates, and round-trips a null address on owners", async () => {
+    const noAddress = await request(server()).post("/owners").send({ name: "Otis", email: "otis@x.io" }).expect(201);
+    const id = noAddress.body.id as number;
+    const included = await request(server()).get(`/owners/${id}?include=address`).expect(200);
+    expect(included.body.address).toBeNull();
+
+    const address = await request(server())
+      .post("/addresses")
+      .send({ street: "5 Oak Ave", city: "Capital City", postalCode: "20002" })
+      .expect(201);
+    await request(server())
+      .put(`/owners/${id}`)
+      .send({ name: "Otis", email: "otis@x.io", address: address.body.id })
+      .expect(200);
+    const attached = await request(server()).get(`/owners/${id}?include=address`).expect(200);
+    expect(attached.body.address).toMatchObject({ id: address.body.id as number });
+
+    await request(server()).put(`/owners/${id}`).send({ name: "Otis", email: "otis@x.io", address: null }).expect(200);
+    const detached = await request(server()).get(`/owners/${id}?include=address`).expect(200);
+    expect(detached.body.address).toBeNull();
+  });
+
+  it("embeds addresses on the list route across a mix of populated and null owners", async () => {
+    const address = await request(server())
+      .post("/addresses")
+      .send({ street: "9 Birch Rd", city: "North Haverbrook", postalCode: "30003" })
+      .expect(201);
+    const withAddress = await request(server())
+      .post("/owners")
+      .send({ name: "Priya", email: "priya@x.io", address: address.body.id })
+      .expect(201);
+    const withoutAddress = await request(server())
+      .post("/owners")
+      .send({ name: "Quinn", email: "quinn@x.io" })
+      .expect(201);
+
+    const list = await request(server())
+      .get("/owners")
+      .query(`include=address&filter[or][0][id][eq]=${withAddress.body.id}&filter[or][1][id][eq]=${withoutAddress.body.id}&sort=name`)
+      .expect(200);
+    expect(list.body.items).toEqual([
+      expect.objectContaining({ name: "Priya", address: expect.objectContaining({ id: address.body.id }) }),
+      expect.objectContaining({ name: "Quinn", address: null }),
+    ]);
+  });
+
+  it("does not fan out root rows when paginating a joined to-one include", async () => {
+    for (const [name, email] of [
+      ["Fanout1", "fanout1@x.io"],
+      ["Fanout2", "fanout2@x.io"],
+      ["Fanout3", "fanout3@x.io"],
+    ] as const) {
+      const address = await request(server())
+        .post("/addresses")
+        .send({ street: `${name} St`, city: "Fanoutville", postalCode: "40004" })
+        .expect(201);
+      await request(server()).post("/owners").send({ name, email, address: address.body.id }).expect(201);
+    }
+
+    const withoutInclude = await request(server())
+      .get("/owners")
+      .query("filter[email][like]=%25fanout%25")
+      .expect(200);
+    const withInclude = await request(server())
+      .get("/owners")
+      .query("include=address&filter[email][like]=%25fanout%25&limit=2")
+      .expect(200);
+    expect(withInclude.body.total).toBe(withoutInclude.body.total);
+    expect(withInclude.body.items).toHaveLength(2);
+  });
+
+  it("maps a duplicate address association to a 409 conflict (unique join column)", async () => {
+    const address = await request(server())
+      .post("/addresses")
+      .send({ street: "1 Shared Way", city: "Duplicity", postalCode: "50005" })
+      .expect(201);
+    await request(server())
+      .post("/owners")
+      .send({ name: "First", email: "first@x.io", address: address.body.id })
+      .expect(201);
+    await request(server())
+      .post("/owners")
+      .send({ name: "Second", email: "second@x.io", address: address.body.id })
+      .expect(409)
+      .expect("Content-Type", /application\/problem\+json/);
+  });
+
+  it("documents include=address and fields[address] in the OpenAPI schema", () => {
+    const document = SwaggerModule.createDocument(app, new DocumentBuilder().build());
+    const params = (document.paths["/owners"]?.get?.parameters ?? []) as { name: string; description?: string }[];
+    expect(params.find((param) => param.name === "include")?.description).toContain("address");
+    expect(params.map((param) => param.name)).toContain("fields[address]");
+  });
+
   it("round-trips the nullable startedAt date on owners", async () => {
     const withDate = await request(server())
       .post("/owners")
