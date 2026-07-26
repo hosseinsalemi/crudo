@@ -1,0 +1,74 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: publish to npm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      # npm's OIDC trusted-publishing exchange needs npm >=11.5.1; the
+      # bundled version on some Node builds can lag behind that.
+      - name: Update npm
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Same gate as CI — a release never ships on a red build.
+      - name: Check
+        run: pnpm check
+
+      - name: Verify tag matches package version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION=$(node -p "require('./packages/core/package.json').version")
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match @kavo/core version $PKG_VERSION" >&2
+            exit 1
+          fi
+
+      # `pnpm pack` (not `pnpm publish`) does the packaging: it rewrites
+      # workspace:^ deps to a real semver range in the tarball. Publishing
+      # itself goes through plain `npm publish`, which has stable, GA OIDC
+      # trusted-publishing support — pnpm's own `publish` currently 404s
+      # under GitHub Actions OIDC (pnpm/pnpm#11513). No npm token anywhere:
+      # each package must have a trusted publisher configured on npmjs.com
+      # pointing at this repo + this workflow file.
+      - name: Pack packages
+        run: |
+          mkdir -p /tmp/kavo-tarballs
+          (cd packages/core && pnpm pack --pack-destination /tmp/kavo-tarballs)
+          (cd packages/orms/typeorm && pnpm pack --pack-destination /tmp/kavo-tarballs)
+          (cd packages/frameworks/nest && pnpm pack --pack-destination /tmp/kavo-tarballs)
+
+      # Published in dependency order (core before its dependents) even
+      # though publish-time order has no functional effect on npm — it
+      # mirrors the package graph per ADR-0004 lockstep versioning.
+      - name: Publish @kavo/core
+        run: npm publish /tmp/kavo-tarballs/kavo-core-*.tgz --access public
+
+      - name: Publish @kavo/typeorm
+        run: npm publish /tmp/kavo-tarballs/kavo-typeorm-*.tgz --access public
+
+      - name: Publish @kavo/nest
+        run: npm publish /tmp/kavo-tarballs/kavo-nest-*.tgz --access public
