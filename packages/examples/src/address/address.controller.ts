@@ -1,93 +1,22 @@
-import { Controller } from "@nestjs/common";
-import { Crud } from "@kavo/nest";
-import type { EntityId, IdentifiedWrite, OperationHandler } from "@kavo/core";
-import { NotFoundException } from "@kavo/core";
+import { Controller, Inject } from "@nestjs/common";
+import { Crud, Override, getCrudServiceToken } from "@kavo/nest";
+import type { DefaultCrudService, EntityId } from "@kavo/core";
+import type { DataSource } from "typeorm";
 import { Address } from "./address.entity.js";
 import { CreateAddressDto, UpdateAddressDto, AddressItemDto, AddressListDto } from "./address.dtos.js";
-import { addressRuntime, assertValidPostalCode, clearOwnerAddress, normalizePostalCode } from "./address.runtime.js";
-
-function notFound(id: EntityId): never {
-  throw new NotFoundException({ messageParams: { entity: "Address", id: String(id) } });
-}
-
-/** `createOne` override: normalizes `postalCode` before persisting. */
-const createOne: OperationHandler<Address, Partial<Address>> = {
-  async execute(data, context) {
-    const postalCode = normalizePostalCode(data.postalCode ?? "");
-    assertValidPostalCode(postalCode);
-    return addressRuntime().adapter.create({ ...data, postalCode }, context);
-  },
-};
-
-/** `updateOne` override: PUT sends the whole shape, so `postalCode` is always validated. */
-const updateOne: OperationHandler<Address, IdentifiedWrite<Address>> = {
-  async execute({ id, data }, context) {
-    const patch = { ...data };
-    if (patch.postalCode !== undefined) {
-      patch.postalCode = normalizePostalCode(patch.postalCode);
-      assertValidPostalCode(patch.postalCode);
-    }
-    return addressRuntime().adapter.update(id, patch, context);
-  },
-};
-
-/** `patchOne` override: same validation, but only when the field is actually present. */
-const patchOne: OperationHandler<Address, IdentifiedWrite<Address>> = {
-  async execute({ id, data }, context) {
-    const patch = { ...data };
-    if (patch.postalCode !== undefined) {
-      patch.postalCode = normalizePostalCode(patch.postalCode);
-      assertValidPostalCode(patch.postalCode);
-    }
-    return addressRuntime().adapter.patch(id, patch, context);
-  },
-};
-
-/**
- * `deleteOne` override: `Owner` owns the join column, so the address's
- * inverse relation can't clear it itself — the owner referencing this row
- * is detached before the address is removed.
- */
-const deleteOne: OperationHandler<Address, EntityId> = {
-  async execute(id, context) {
-    const { adapter, dataSource } = addressRuntime();
-    await clearOwnerAddress(dataSource, Number(id));
-    await adapter.delete(id, context);
-    return null;
-  },
-};
-
-/** `findOne` override: augments the response with a derived, unpersisted field. */
-const findOne: OperationHandler<Address, EntityId> = {
-  async execute(id, context) {
-    const { adapter } = addressRuntime();
-    const address = await adapter.findOneById(id, context.query, context);
-    if (address === null) notFound(id);
-    return { ...address, formattedAddress: `${address.street}, ${address.city} ${address.postalCode}` };
-  },
-};
-
-/**
- * Custom operation: `POST /addresses/:id/normalize-postal-code` reuses the
- * same normalization/validation as the `createOne`/`updateOne` overrides,
- * applied to an already-persisted row.
- */
-const normalizePostalCodeOperation: OperationHandler<Address, { id: EntityId }> = {
-  async execute({ id }, context) {
-    const { adapter } = addressRuntime();
-    const existing = await adapter.findOneById(id, null, context);
-    if (existing === null) notFound(id);
-    const postalCode = normalizePostalCode(existing.postalCode);
-    assertValidPostalCode(postalCode);
-    return adapter.update(id, { postalCode }, context);
-  },
-};
+import { DATA_SOURCE } from "../database.module.js";
+import { assertValidPostalCode, clearOwnerAddress, normalizePostalCode } from "./address.runtime.js";
 
 /**
  * `Address` overrides all five singular standard operations and adds one
- * custom operation, all through `EntityConfig` — registry-driven per
- * ADR-0006, with zero special-casing in the engine or route generator
- * (issue #21). Owners still associate an address by id
+ * custom operation, each backed by an `@Override`'d controller method
+ * (issue #23) rather than a config-level `operations.<id>.handler` — every
+ * method injects the entity's own `DefaultCrudService` (`base`) to
+ * delegate to default behavior, and the raw `DataSource` for the one write
+ * that reaches across entities. `@Crud` still generates every route's
+ * method, path, status, params, and Swagger metadata from the registry
+ * (ADR-0006, ADR-0012); only the function backing each route is this
+ * class's own method. Owners still associate an address by id
  * (`{"address": 1}` on `POST /owners` — ADR-0014).
  */
 @Crud(Address, {
@@ -97,19 +26,85 @@ const normalizePostalCodeOperation: OperationHandler<Address, { id: EntityId }> 
     item: AddressItemDto,
     list: AddressListDto,
   },
-  operations: {
-    createOne: { handler: createOne },
-    updateOne: { handler: updateOne },
-    patchOne: { handler: patchOne },
-    deleteOne: { handler: deleteOne },
-    findOne: { handler: findOne },
-  },
   customOperations: {
     normalizePostalCode: {
-      handler: normalizePostalCodeOperation,
+      // Required by `CustomOperationConfig`, but never runs — `@Override`
+      // below supplies the real implementation.
+      handler: {
+        async execute() {
+          throw new Error("normalizePostalCode is implemented via @Override — this registry handler must not run");
+        },
+      },
       meta: { routes: { method: "POST", path: ":id/normalize-postal-code" } },
     },
   },
 })
 @Controller("addresses")
-export class AddressController {}
+export class AddressController {
+  constructor(
+    @Inject(getCrudServiceToken(Address)) private readonly base: DefaultCrudService<Address>,
+    @Inject(DATA_SOURCE) private readonly dataSource: DataSource,
+  ) {}
+
+  /** Normalizes `postalCode` before persisting. */
+  @Override()
+  async createOne(dto: Partial<Address>): Promise<unknown> {
+    const postalCode = normalizePostalCode(dto.postalCode ?? "");
+    assertValidPostalCode(postalCode);
+    return this.base.createOne({ ...dto, postalCode } as never);
+  }
+
+  /** PUT sends the whole shape, so `postalCode` is always validated. */
+  @Override()
+  async updateOne(id: EntityId, dto: Partial<Address>): Promise<unknown> {
+    const patch = { ...dto };
+    if (patch.postalCode !== undefined) {
+      patch.postalCode = normalizePostalCode(patch.postalCode);
+      assertValidPostalCode(patch.postalCode);
+    }
+    return this.base.updateOne(id as never, patch as never);
+  }
+
+  /** Same validation as `updateOne`, but only when the field is actually present. */
+  @Override()
+  async patchOne(id: EntityId, dto: Partial<Address>): Promise<unknown> {
+    const patch = { ...dto };
+    if (patch.postalCode !== undefined) {
+      patch.postalCode = normalizePostalCode(patch.postalCode);
+      assertValidPostalCode(patch.postalCode);
+    }
+    return this.base.patchOne(id as never, patch as never);
+  }
+
+  /**
+   * `Owner` owns the join column (`owner.entity.ts`), so the owner
+   * referencing this row is detached before the address is removed.
+   */
+  @Override()
+  async deleteOne(id: EntityId): Promise<void> {
+    await clearOwnerAddress(this.dataSource, Number(id));
+    await this.base.deleteOne(id as never);
+  }
+
+  /** Augments the response with a derived, unpersisted field. */
+  @Override()
+  async findOne(id: EntityId, query: unknown): Promise<unknown> {
+    const address = await this.base.findOne(id as never, query as never);
+    return { ...address, formattedAddress: `${address.street}, ${address.city} ${address.postalCode}` };
+  }
+
+  /**
+   * `POST /addresses/:id/normalize-postal-code` — reuses the same
+   * normalization/validation as `createOne`/`updateOne`/`patchOne`, applied
+   * to an already-persisted row. The method name differs from the
+   * operation id (it collides with the imported `normalizePostalCode`
+   * helper), so `@Override` is given the id explicitly.
+   */
+  @Override("normalizePostalCode")
+  async normalizePostalCodeRoute(id: EntityId): Promise<unknown> {
+    const existing = await this.base.findOne(id as never);
+    const postalCode = normalizePostalCode(existing.postalCode);
+    assertValidPostalCode(postalCode);
+    return this.base.updateOne(id as never, { postalCode } as never);
+  }
+}

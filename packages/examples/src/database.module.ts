@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Global, Module } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { Owner } from "./owner/owner.entity.js";
 import { Pet } from "./pet/pet.entity.js";
@@ -14,6 +14,11 @@ export const DATA_SOURCE = Symbol("DATA_SOURCE");
  * (and its e2e suite) dependency-free; swap `database` for a file path or
  * a Postgres config without touching anything else.
  */
+// Global so `DATA_SOURCE` is injectable straight into any `@Crud`
+// controller (e.g. `AddressController`'s `@Override`'d methods), not just
+// where `DatabaseModule` is nested (`KavoModule.forRootAsync`'s own
+// `imports`).
+@Global()
 @Module({
   providers: [
     {
