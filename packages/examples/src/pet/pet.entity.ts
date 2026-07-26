@@ -1,7 +1,19 @@
-import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn, TableInheritance } from "typeorm";
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinTable,
+  ManyToMany,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  TableInheritance,
+} from "typeorm";
 // Type-only import + string relation target keep the Owner↔Pet cycle off the
 // runtime graph (TypeORM resolves "Owner" by entity name at metadata build).
 import type { Owner } from "../owner/owner.entity.js";
+// Tag carries no reference back to Pet, so there is no cycle to keep off the
+// runtime graph here — a plain, real import is fine.
+import { Tag } from "../tag/tag.entity.js";
 
 /**
  * The single-table inheritance base. `Pet` is never served directly — you
@@ -39,6 +51,13 @@ export abstract class Pet {
 
   @ManyToOne("Owner", (owner: Owner) => owner.pets, { nullable: true })
   owner!: Owner | null;
+
+  // Owning side of the many-to-many edge: `include=tags` batch-loads through
+  // the join table `@JoinTable()` creates (Phase 15). Unidirectional — `Tag`
+  // has no inverse `pets` field, since nothing browses pets from a tag.
+  @ManyToMany(() => Tag)
+  @JoinTable()
+  tags!: Tag[];
 
   @CreateDateColumn()
   createdAt!: Date;

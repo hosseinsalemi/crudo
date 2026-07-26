@@ -83,6 +83,13 @@ and share `FilterTranslator`'s scheme, so `filter[blog.name][eq]=…`
 alongside `include=blog` reuses the one selecting join instead of adding a
 second, non-selecting one under a duplicate alias.
 
+A many-to-many edge is nothing special here: metadata maps
+`isManyToMany` to cardinality `"many"` exactly like `isOneToMany`, so it
+gets the same `batch` default and the same distinct-roots pagination
+guarantee — the join table never reaches the main query. `Pet.tags` (the
+example app) is what first exercises this path; no adapter or core change
+was needed to support it.
+
 ## 4. Interplay
 
 - **Sparse fieldsets:** keys needed for stitching are always fetched and
