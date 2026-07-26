@@ -311,7 +311,9 @@ describe("Pet example app", () => {
 
     const list = await request(server())
       .get("/owners")
-      .query(`include=address&filter[or][0][id][eq]=${withAddress.body.id}&filter[or][1][id][eq]=${withoutAddress.body.id}&sort=name`)
+      .query(
+        `include=address&filter[or][0][id][eq]=${withAddress.body.id}&filter[or][1][id][eq]=${withoutAddress.body.id}&sort=name`,
+      )
       .expect(200);
     expect(list.body.items).toEqual([
       expect.objectContaining({ name: "Priya", address: expect.objectContaining({ id: address.body.id }) }),
@@ -332,10 +334,7 @@ describe("Pet example app", () => {
       await request(server()).post("/owners").send({ name, email, address: address.body.id }).expect(201);
     }
 
-    const withoutInclude = await request(server())
-      .get("/owners")
-      .query("filter[email][like]=%25fanout%25")
-      .expect(200);
+    const withoutInclude = await request(server()).get("/owners").query("filter[email][like]=%25fanout%25").expect(200);
     const withInclude = await request(server())
       .get("/owners")
       .query("include=address&filter[email][like]=%25fanout%25&limit=2")
