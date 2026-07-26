@@ -5,12 +5,19 @@ import type {
   EntityConfig,
   EntityInput,
   OperationDescriptor,
+  OperationId,
   QueryContext,
   StandardOperationId,
 } from "@kavo/core";
-import { WireQuery, createOperationRegistry } from "@kavo/core";
+import { ConfigurationException, WireQuery, createOperationRegistry } from "@kavo/core";
 import type { CrudHttpMethod, CrudRouteOptions } from "./operation-metadata.js";
-import { CRUD_CONTROLLER_METADATA, CRUD_SERVICE_PROPERTY, getCrudServiceToken } from "./tokens.js";
+import type { OverrideMetadata } from "./override.decorator.js";
+import {
+  CRUD_CONTROLLER_METADATA,
+  CRUD_OVERRIDE_METADATA,
+  CRUD_SERVICE_PROPERTY,
+  getCrudServiceToken,
+} from "./tokens.js";
 import { flattenQuery } from "./flatten-query.js";
 import { applySwaggerMetadata } from "./swagger.js";
 
@@ -48,6 +55,17 @@ const STANDARD_ROUTES: Readonly<
  */
 const BODYLESS_WRITES: ReadonlySet<StandardOperationId> = new Set<StandardOperationId>(["restoreOne", "purgeOne"]);
 
+/**
+ * Nest's own route-argument metadata key (`@nestjs/common/constants`'
+ * `ROUTE_ARGS_METADATA`), inlined rather than deep-imported: the subpath
+ * isn't part of `@nestjs/common`'s declared type exports (no `exports` map
+ * restricts it at runtime, but `tsc`'s Node16 resolution can't see the
+ * `.d.ts` through it), and this exact key is what every `@Param`/`@Query`/
+ * `@Body` decorator reads and writes — stable across Nest's own major
+ * versions, since third-party CRUD libraries already depend on it.
+ */
+const NEST_ROUTE_ARGS_METADATA = "__routeArguments__";
+
 const METHOD_DECORATORS: Record<CrudHttpMethod, (path: string) => MethodDecorator> = {
   GET: Get,
   POST: Post,
@@ -81,8 +99,12 @@ interface ResolvedRoute {
  * the build, but they are still three tables and this file does change.
  *
  * **Manual-method-wins:** a hand-written controller method whose name
- * matches an operation id suppresses that generated route — no conflicts,
- * no config, for the genuine one-off.
+ * matches an operation id suppresses that generated route entirely — no
+ * conflicts, no config, for the genuine one-off. **`@Override(operationId?)`**
+ * is the additive middle path: the decorated method still gets the
+ * registry's route (method, path, status, params, Swagger), only the
+ * function backing it changes — resolved first, ahead of manual-method-wins,
+ * so a decorated method never falls through to plain name-matching.
  *
  * Route generation happens at decoration time (class definition), which is
  * what lets Nest's router see the methods during its normal controller
@@ -125,18 +147,99 @@ export function Crud<
     Inject(getCrudServiceToken(entity))(controller.prototype, CRUD_SERVICE_PROPERTY);
 
     const registry = createOperationRegistry(erasedConfig);
+    const overrides = collectOverrides(controller.prototype, entity.name, registry);
+
     for (const descriptor of registry.all()) {
       if (!descriptor.enabled) continue;
       const route = resolveRoute(descriptor);
-      if (route === null) continue;
-      const methodName = descriptor.id;
-      if (Object.prototype.hasOwnProperty.call(controller.prototype, methodName)) {
-        continue; // manual-method-wins
+      const overrideMethodName = overrides.get(descriptor.id);
+      if (route === null) {
+        if (overrideMethodName !== undefined) {
+          throw new ConfigurationException(
+            entity.name,
+            `override.${descriptor.id}`,
+            `'${overrideMethodName}' is @Override("${descriptor.id}"), but that operation is service-only ` +
+              `(meta.routes.enabled: false) and generates no route to override`,
+          );
+        }
+        continue;
       }
-      defineRoute(controller.prototype, methodName, descriptor, route);
-      applySwaggerMetadata(controller.prototype, methodName, descriptor, route, entity, erasedConfig);
+      if (overrideMethodName === undefined) {
+        const methodName = descriptor.id;
+        if (Object.prototype.hasOwnProperty.call(controller.prototype, methodName)) {
+          continue; // manual-method-wins
+        }
+        defineRoute(controller.prototype, methodName, descriptor, route);
+        applySwaggerMetadata(controller.prototype, methodName, descriptor, route, entity, erasedConfig);
+      } else {
+        assertNoOwnParamMetadata(controller.prototype, overrideMethodName, entity.name, descriptor.id);
+        applyRouteDecorators(controller.prototype, overrideMethodName, descriptor, route);
+        applySwaggerMetadata(controller.prototype, overrideMethodName, descriptor, route, entity, erasedConfig);
+      }
     }
   };
+}
+
+/**
+ * Builds the `operationId -> methodName` map from every `@Override`-decorated
+ * method on the prototype, failing fast at decoration time (ADR-0012's only
+ * moment) on the two ways this can be misconfigured: two methods claiming
+ * the same operation, or an override naming an operation id that the
+ * registry doesn't have enabled — a silent no-op override is a footgun.
+ */
+function collectOverrides(
+  prototype: Record<string, unknown>,
+  entityName: string,
+  registry: { get(id: OperationId): OperationDescriptor<object> | undefined },
+): ReadonlyMap<OperationId, string> {
+  const overrides = new Map<OperationId, string>();
+  for (const methodName of Object.getOwnPropertyNames(prototype)) {
+    if (methodName === "constructor") continue;
+    const metadata = Reflect.getMetadata(CRUD_OVERRIDE_METADATA, prototype, methodName) as OverrideMetadata | undefined;
+    if (metadata === undefined) continue;
+    const existing = overrides.get(metadata.operationId);
+    if (existing !== undefined) {
+      throw new ConfigurationException(
+        entityName,
+        `override.${metadata.operationId}`,
+        `both '${existing}' and '${methodName}' are @Override("${metadata.operationId}") — only one method may override a given operation`,
+      );
+    }
+    overrides.set(metadata.operationId, methodName);
+  }
+  for (const [operationId, methodName] of overrides) {
+    const descriptor = registry.get(operationId);
+    if (descriptor === undefined || !descriptor.enabled) {
+      throw new ConfigurationException(
+        entityName,
+        `override.${operationId}`,
+        `'${methodName}' is @Override("${operationId}"), but '${operationId}' is absent or disabled`,
+      );
+    }
+  }
+  return overrides;
+}
+
+/**
+ * `@Override`'d methods must accept Kavo's own `@Param`/`@Query`/`@Body`
+ * wiring, not their own — Nest's route-arg metadata for a method is one
+ * object keyed by param index, so a method's own decorator would either
+ * collide with or silently shadow the one Kavo applies next.
+ */
+function assertNoOwnParamMetadata(
+  prototype: Record<string, unknown>,
+  methodName: string,
+  entityName: string,
+  operationId: OperationId,
+): void {
+  const existing = Reflect.getMetadata(NEST_ROUTE_ARGS_METADATA, prototype.constructor, methodName);
+  if (existing !== undefined) {
+    throw new ConfigurationException(
+      entityName,
+      `override.${operationId}`,
+      `'${methodName}' must not declare its own @Param/@Query/@Body — @Crud applies the operation's own param wiring`,
+    );
+  }
 }
 
 function resolveRoute(descriptor: OperationDescriptor<object>): ResolvedRoute | null {
@@ -164,8 +267,23 @@ function defineRoute(
     writable: true,
     configurable: true,
   });
-  const propertyDescriptor = Object.getOwnPropertyDescriptor(prototype, methodName) as PropertyDescriptor;
+  applyRouteDecorators(prototype, methodName, descriptor, route);
+}
 
+/**
+ * The Nest wiring a route needs regardless of what backs it: param
+ * decorators, the success status, and the HTTP-verb decorator. Shared
+ * between a freshly generated handler (`defineRoute`) and an `@Override`'d
+ * method already on the prototype — the two paths carry identical route
+ * metadata by construction, not by convention.
+ */
+function applyRouteDecorators(
+  prototype: Record<string, unknown>,
+  methodName: string,
+  descriptor: OperationDescriptor<object>,
+  route: ResolvedRoute,
+): void {
+  const propertyDescriptor = Object.getOwnPropertyDescriptor(prototype, methodName) as PropertyDescriptor;
   applyParamDecorators(prototype, methodName, descriptor, route);
   HttpCode(route.status)(prototype, methodName, propertyDescriptor);
   METHOD_DECORATORS[route.method](route.path)(prototype, methodName, propertyDescriptor);

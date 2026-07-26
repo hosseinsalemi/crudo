@@ -62,6 +62,50 @@ precisely because decoration time has no ORM metadata (ADR-0013):
 matches an operation id suppresses that generated route — detected via
 `hasOwnProperty` on the prototype, no config needed.
 
+**`@Override(operationId?)`** (issue #23) is the additive middle path
+between a config-level `operations.<id>.handler` override and plain
+manual-method-wins: the decorated method still gets the registry's route
+— method, path, status, `@Param`/`@Query`/`@Body`, and Swagger metadata,
+identical to what a generated route would carry — only the function
+backing it is the decorated method itself, not `makeHandler`'s generated
+one. `operationId` defaults to the method's own name, the same inference
+manual-method-wins already uses. Resolution order in the `@Crud` loop is
+override map → manual-method-wins → generate, so a decorated method never
+falls through to plain name-matching.
+
+The mechanism needs no core change: `defineRoute`'s two jobs — installing
+a generated function, then applying Nest's real method/param/status
+decorators to whatever sits at that property — split into an
+`applyRouteDecorators` step shared by both paths. For an override, Kavo
+skips installing a function and applies that same step to the existing,
+hand-written method; Nest dispatches to it directly at request time, with
+no engine or `CrudEngine` involvement in the indirection.
+
+The decorated method typically injects the entity's bound
+`DefaultCrudService` via the existing `getCrudServiceToken` (ordinary
+constructor DI on the controller) to delegate to default behavior
+(`this.base.createOne(dto)`), the same "base" pattern config-level
+overrides get through `context` inside a plain `OperationHandler`.
+
+Because Kavo owns the param wiring, the decorated method must accept
+parameters in the same fixed position a generated route would — reads:
+`(id?, query)`; writes: `(id?, body)` — and must not declare its own
+`@Param`/`@Query`/`@Body`: `@Crud` checks for existing Nest route-argument
+metadata on the method and fails at decoration time (ADR-0012's only
+moment) rather than let the two decorations collide silently. The same
+fail-fast rule covers a duplicate override target (two methods claiming
+one operation id) and an override naming an operation id that is absent
+or disabled in the registry — a silent no-op override is a footgun.
+
+**A read override's `query` parameter is Nest's raw `@Query()` object,
+not a normalized one** — a generated route always wraps it in `WireQuery`
+(via `flattenQuery`, see below) before it reaches `DefaultCrudService`,
+because the engine's query stage parses wire-format strings only through
+that wrapper. An override that forwards `query` straight to
+`this.base.findOne(id, query)` sends it down the already-normalized-input
+path instead, and any wire-format param (`?fields=`, `?include=`, …) 400s.
+Wrap it the same way: `new WireQuery(flattenQuery(query as object))`.
+
 Mechanically, generated methods are defined on the prototype and
 decorated by _calling_ Nest's own decorators (`Post(path)(proto, name,
 descriptor)`, `Param("id")(…)`, …) — identical metadata to hand-written
