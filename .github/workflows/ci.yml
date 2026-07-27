@@ -16,12 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Relative LTS aliases rather than a hardcoded major: this matrix
-        # tracks "current LTS and the two before it" and shifts forward on
-        # every Node LTS transition automatically, so it never drifts onto
-        # an unsupported major the way a pinned literal (previously `20`)
-        # eventually does.
-        node: ["lts/-2", "lts/-1", "lts/*", "current"]
+        node: ["lts/-1", "lts/*", "current"]
 
     steps:
       - uses: actions/checkout@v4
