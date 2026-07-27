@@ -97,21 +97,28 @@ Work moves one issue at a time, on one branch, through slash commands in `.claud
 /issue "rough idea"   →  a plannable GitHub issue (acceptance criteria, affected packages, constraints)
 /implement <n>        →  kavo-architect plans it  →  YOU APPROVE  →  branch created off main  →
                           code + tests written here, in the main thread  →  left uncommitted
-/review               →  pnpm check ‖ kavo-reviewer ‖ kavo-boundary-guard ‖ kavo-test-auditor, consolidated
+/review               →  pnpm check ‖ the reviewer fan-out (see below), consolidated  →  local mode
 /commit               →  working tree split into logical commits
 /pr                   →  pnpm check  →  push  →  PR opened/updated, "Closes #n"
-/review [pr#]         →  kavo-reviewer ‖ kavo-boundary-guard ‖ kavo-test-auditor, run against the open PR
+/review [pr#]         →  same reviewer fan-out, run against the open PR  →  PR mode
 /merge                →  CI + /review verified  →  squash merge  →  branch deleted  →  back on green main
 ```
 
 `/commit` splits the working tree into logical commits at any point. `/review`
-gates a change **before** it's committed when there's uncommitted work, and
-re-runs the same reviewer fan-out **after** it's pushed, against the actual PR
-— use it any time on any open PR, not just the one you just opened.
+gates a change **before** it's committed when there's uncommitted work (local
+mode), and re-runs the same reviewer fan-out **after** it's pushed, against
+the actual PR (PR mode) — use it any time on any open PR, not just the one
+you just opened. The fan-out itself (`kavo-reviewer`, `kavo-boundary-guard`,
+`kavo-test-auditor`, `kavo-security-auditor`, `kavo-docs-auditor`,
+`kavo-perf-auditor`) is defined in `.claude/commands/review.md`, which only
+runs an auditor when the diff touches its area — read it there rather than
+here, so this file doesn't drift when the fan-out changes.
+
+`/list` and `/view <n>` read existing GitHub issues without changing anything; `/publish` bumps and tags a release once `main` is green — neither is part of the per-issue loop above.
 
 Two rules make this work:
 
-- **Planning and review are delegated; implementation is not.** The four agents in `.claude/agents/` are all read-only. Planning benefits from a cold, focused read of the issue, and review benefits from independent fresh eyes — but implementation needs the conversation's full context, so it happens in the main thread.
+- **Planning and review are delegated; implementation is not.** Every agent in `.claude/agents/` — `kavo-architect` plus the six review auditors above — is read-only. Planning benefits from a cold, focused read of the issue, and review benefits from independent fresh eyes — but implementation needs the conversation's full context, so it happens in the main thread.
 - **`pnpm check` is the gate, and it is never worked around.** `/implement`, `/review`, `/pr`, and `/merge` each run it and report the real result. A red gate is not shipped, and a test is never weakened to make it pass.
 
 ## Where to read more
