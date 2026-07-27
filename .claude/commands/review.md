@@ -1,41 +1,76 @@
 ---
-description: Review an open pull request with the full reviewer fan-out
-argument-hint: "[PR number — omit to use the current branch's PR]"
+description: Review a change — uncommitted local work, or a pushed PR — with the full reviewer fan-out
+argument-hint: "[PR number — omit to auto-detect: uncommitted work, else the current branch's open PR]"
 allowed-tools: Bash(git:*), Bash(gh:*), Bash(pnpm:*), Read, Grep, Glob, Agent, Task
 ---
 
 ## Context
 
-- PR: !`gh pr view $ARGUMENTS --json number,title,state,isDraft,baseRefName,headRefName,url,mergeable 2>/dev/null || echo "NO PR"`
-- Current branch: !`git rev-parse --abbrev-ref HEAD`
+- Branch: !`git rev-parse --abbrev-ref HEAD`
 - Working tree: !`git status --short`
+- Committed-on-branch diff: !`git diff main...HEAD --stat`
+- PR: !`gh pr view $ARGUMENTS --json number,title,state,isDraft,baseRefName,headRefName,url,mergeable 2>/dev/null || echo "NO PR"`
 
 ## Your task
 
-Review PR **$ARGUMENTS** (or the current branch's PR if no number is given).
-This reviews a pushed, open pull request — for uncommitted local work, use
-`/verify` instead.
+Review **$ARGUMENTS**. This command covers two modes — pick one before doing
+anything else:
 
-1. **Preflight.** If the context above says `NO PR`, stop and say so — there is
-   nothing to review. If the working tree is dirty, stop and ask the user to
-   commit or stash before you check out anything.
+- **Local mode**: reviews uncommitted work still sitting in the working tree
+  (what `/implement` leaves behind), before it gets committed.
+- **PR mode**: reviews a pushed, open pull request.
 
-2. **Get the PR's code onto disk.** If the PR's `headRefName` is not the
-   currently checked-out branch, run `gh pr checkout <n>` to fetch and switch to
-   it. Do not force-push, rebase, or amend anything on it.
+1. **Pick the mode:**
 
-3. **Diff it against its base**, not blindly against `main` — a PR can target
-   another branch:
+   - If `$ARGUMENTS` is a PR number, or no number was given but the context
+     above shows an open PR for the current branch **and** the working tree is
+     clean with nothing uncommitted beyond what that PR already contains, use
+     **PR mode**.
+   - Otherwise, if there is uncommitted work or a committed-but-unpushed diff
+     on the current branch, use **Local mode**.
+   - If neither holds — clean tree, no PR, nothing on the branch — say so and
+     stop. There is nothing to review.
+
+2. **Get the code in front of you:**
+
+   - **Local mode**: the diff is already on disk. Don't assume
+     `git diff main...HEAD` alone tells you what changed — uncommitted work
+     doesn't show up there; use `git status --short` and the working tree
+     directly.
+   - **PR mode**: if the PR's `headRefName` is not the currently checked-out
+     branch, run `gh pr checkout <n>` to fetch and switch to it. Do not
+     force-push, rebase, or amend anything on it. Diff it against its base, not
+     blindly against `main` — a PR can target another branch:
+
+     ```bash
+     git diff <baseRefName>...<headRefName> --stat
+     ```
+
+3. **Local mode only — format and gate:**
 
    ```bash
-   git diff <baseRefName>...<headRefName> --stat
+   pnpm prettify
    ```
+
+   Leave any resulting changes uncommitted — `/commit` picks them up along
+   with everything else. Do not commit here.
+
+   ```bash
+   pnpm check
+   ```
+
+   That is build + typecheck + `depcruise` + the full test suite. If it fails,
+   **stop** and report the failure output — do not proceed to review a change
+   that doesn't build or pass its tests, and never weaken a test to make it
+   pass.
+
+   (PR mode also gets `pnpm check` coverage, via `kavo-reviewer` below.)
 
 4. **Run the reviewers in parallel**, in a single message. They are
    read-only and deliberately non-overlapping:
 
    - `kavo-reviewer` — correctness, engine and registry design invariants,
-     naming compliance. Also runs `pnpm check`.
+     naming compliance. In PR mode, also runs `pnpm check`.
    - `kavo-boundary-guard` — ADR-0005 core purity, deep imports, ORM/framework
      leakage, barrel and breaking-change audit.
    - `kavo-test-auditor` — coverage gaps, weak tests, misplaced test files.
@@ -56,21 +91,27 @@ This reviews a pushed, open pull request — for uncommitted local work, use
    For each finding keep: the file and line, one sentence on the defect, the
    concrete failure scenario, and the fix. Split it into:
 
-   - **Blocking** — must be fixed before this PR merges.
-   - **Non-blocking** — worth doing, does not gate the merge.
+   - **Blocking** — must be fixed before this gets committed (local mode) or
+     merged (PR mode).
+   - **Non-blocking** — worth doing, does not gate it.
 
 6. **Verify before you report.** Agents sometimes report findings that do not
    hold up. Check the ones that would be expensive to act on against the actual
    code, and drop what you cannot confirm. A short list of real findings beats a
    long list of plausible ones.
 
-7. **State the verdict plainly**: ready to merge (`/merge`), or blocked on N
-   findings. If the PR is clean, say so and list what was actually verified —
+7. **State the verdict plainly**:
+
+   - **Local mode**: ready to commit (`/commit`), or blocked on N findings.
+   - **PR mode**: ready to merge (`/merge`), or blocked on N findings.
+
+   If the change is clean, say so and list what was actually verified —
    including the `pnpm check` result.
 
-8. **Offer, don't post.** If the user wants the findings left on the PR itself,
-   ask first, then post with `gh pr comment <n> --body "..."` or
-   `gh pr review <n> --request-changes --body "..."` — posting to a shared PR
-   needs explicit go-ahead, same as any other public comment.
+8. **PR mode only — offer, don't post.** If the user wants the findings left
+   on the PR itself, ask first, then post with `gh pr comment <n> --body "..."`
+   or `gh pr review <n> --request-changes --body "..."` — posting to a shared
+   PR needs explicit go-ahead, same as any other public comment.
 
-Report only by default. Do not fix anything unless the user asks.
+Report only by default. Do not fix anything unless the user asks — then fix
+the blocking findings and re-run `pnpm check`.

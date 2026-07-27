@@ -71,7 +71,7 @@ after it is extra instructions or corrections to fold in during implementation.
 11. **Do not commit.** Leave the changes in the working tree.
 
 12. **Report** what changed, the real `pnpm check` result, and anything in the
-    plan you did **not** do and why. Then tell the user to run `/verify` or `/pr`.
+    plan you did **not** do and why. Then tell the user to run `/review` or `/pr`.
 
 If you hit something the plan got wrong, say so and propose the correction
 before implementing around it.
