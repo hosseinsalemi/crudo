@@ -50,10 +50,7 @@ errors, operation control, soft delete/restore/purge, and nested relation
 includes — through TypeORM behind generated NestJS routes.
 
 `@kavo/core`, `@kavo/typeorm`, and `@kavo/nest` are published to npm
-(current: `0.1.0`, pre-1.0 — expect breaking changes). Remaining release
-engineering (dual ESM+CJS builds, API-surface gating, changesets
-automation, provenance) is tracked in
-[`packages/docs/roadmap.md`](packages/docs/roadmap.md).
+(current: `0.1.0`, pre-1.0 — expect breaking changes).
 
 ## Development
 

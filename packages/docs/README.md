@@ -3,8 +3,7 @@
 Design documentation for the Kavo framework, maintained alongside the code.
 
 These documents and the [ADRs](adr/) are authoritative. The `(Phase N)` tags
-below are historical provenance from the retired build plan; remaining unbuilt
-work lives in [roadmap.md](roadmap.md).
+below are historical provenance from the retired build plan.
 
 ## Milestone A — Blueprint
 

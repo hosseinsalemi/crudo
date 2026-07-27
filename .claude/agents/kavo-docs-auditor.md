@@ -32,9 +32,6 @@ now does.
   operation, config key, or exception introduces a term; check it either
   reuses an existing glossary term or the glossary gained an entry. A rename
   that leaves the old term in the glossary is a finding (stale synonym).
-- **`packages/docs/roadmap.md`** — the retired v6 phase plan's replacement.
-  If the change closes out a roadmap item, the roadmap should reflect that;
-  if it starts one not yet listed, flag it as a gap, not a blocker.
 - **`CLAUDE.md`'s Conventions section** — normative naming rules. If the
   change establishes a new convention (a new DTO slot shape, a new suffix
   rule), `CLAUDE.md` not being updated is a finding at the same severity as a
