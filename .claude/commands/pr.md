@@ -58,7 +58,7 @@ Push this branch and create or update its PR. Notes: **$ARGUMENTS**
      commits. Only touch the description if `$ARGUMENTS` gives new notes or the
      existing body is now stale (e.g. the testing/review-notes sections no
      longer reflect the latest commits); update it with `gh pr edit <n> --body
-     "..."` in that case. Do not needlessly rewrite an accurate description.
+"..."` in that case. Do not needlessly rewrite an accurate description.
 
 6. **Print the PR URL** and tell the user to run `/review` on it, then `/merge`
    once CI and review are green.
