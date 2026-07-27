@@ -31,16 +31,13 @@ Push this branch and create or update its PR. Notes: **$ARGUMENTS**
    If build, typecheck, `depcruise`, or the tests fail, **stop** and report the
    failure output. A red gate is never pushed, and never worked around.
 
-3. **Confirm the branch was verified.** If `/verify` has not run in this
-   conversation, run it now and resolve anything blocking before continuing.
-
-4. **Push:**
+3. **Push:**
 
    ```bash
    git push -u origin HEAD
    ```
 
-5. **Create the PR, or update it if one already exists** (see the context
+4. **Create the PR, or update it if one already exists** (see the context
    above):
 
    - **No PR yet** — `gh pr create`. Use `--draft` if the user asked for a draft
@@ -60,7 +57,7 @@ Push this branch and create or update its PR. Notes: **$ARGUMENTS**
      longer reflect the latest commits); update it with `gh pr edit <n> --body
 "..."` in that case. Do not needlessly rewrite an accurate description.
 
-6. **Print the PR URL** and tell the user to run `/review` on it, then `/merge`
+5. **Print the PR URL** and tell the user to run `/review` on it or `/merge`
    once CI and review are green.
 
 Do not merge here. `/pr` opens or updates the PR; `/merge` closes the loop.
