@@ -16,12 +16,7 @@ Arguments: **$ARGUMENTS** — the first token is the issue number; anything
 after it is extra instructions or corrections to fold in during implementation.
 
 1. **Preflight.** If no issue number was given, stop and ask for one. If there
-   is no GitHub remote, stop and say so. If the working tree is dirty, stop and
-   ask whether to commit (`/commit`) or stash first — never start new work on
-   top of uncommitted changes. If the session's current directory is inside
-   `.claude/worktrees/`, exit it first (`ExitWorktree` with `keep`) so the new
-   branch is created and implemented in the main checkout — the one the
-   user's editor has open — not in an isolated worktree they won't see.
+   is no GitHub remote, stop and say so.
 
 2. **Read the issue in full**: `gh issue view <n> --json title,body,labels,comments`.
 
@@ -38,9 +33,13 @@ after it is extra instructions or corrections to fold in during implementation.
 
    **Stop here and wait for explicit approval. Do not write any code.**
 
-5. **Create the branch.** Follow the `conventions` skill to derive
-   `<type>` from the issue's label and check out
-   `<type>/<issue-number>-<short-slug>` off an up-to-date `main`.
+5. **Create the branch, in an isolated worktree.** Follow the `conventions`
+   skill to derive `<type>` from the issue's label. Call `EnterWorktree` with
+   `name: "<issue-number>-<short-slug>"` to create a fresh worktree — branched
+   off up-to-date `main` — and switch the session into it, then rename the
+   branch to match the convention: `git branch -m <type>/<issue-number>-<short-slug>`.
+   Implementing in a worktree keeps this work off the branch the user's editor
+   has open.
 
 6. **Implement it yourself**, task by task in the plan's order, folding in any
    extra instructions from `$ARGUMENTS`. You have the full conversation
@@ -73,12 +72,12 @@ after it is extra instructions or corrections to fold in during implementation.
 
 11. **Leave the changes uncommitted** and report what changed, the real
     `pnpm check` result, and anything in the plan you did **not** do and why.
-    Tell the user the diff is sitting uncommitted in their editor (VSCode) for
-    review, and ask them to reply with explicit approval (e.g. "ok") once
-    they've looked it over.
+    Tell the user the diff is sitting uncommitted in the worktree (give its
+    path) for review, and ask them to reply with explicit approval (e.g. "ok")
+    once they've looked it over.
 
     **Stop here and wait.** Do not stage, commit, or push anything yet — the
-    user reviews the live working tree in their editor, not a summary.
+    user reviews the live working tree in the worktree, not a summary.
 
 12. **On explicit approval**, and not before:
 
