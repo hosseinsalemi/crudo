@@ -11,13 +11,17 @@ allowed-tools: Bash(gh:*)
 
 ## Your task
 
-Filter, if given: **$ARGUMENTS** (a label like `status:ready`, `area:core`, or
-`closed` to list closed issues instead — re-run `gh issue list` with the
-appropriate flag rather than filtering the context above by hand).
+Filter, if given: **$ARGUMENTS**. The context above already covers the
+default (open, unfiltered) case — only re-run `gh issue list` if a filter was
+given:
+
+- a label (e.g. `area:core`, `status:ready`) — `gh issue list --label "<label>"`
+- `closed` — `gh issue list --state closed`
 
 If the repo line says `NO REMOTE`, stop and say this repo has no GitHub remote.
 
 Show the issues as a table: number, title, labels, status (`ready` /
-`blocked` / no status label). Group `status:ready` issues first, then
-`status:blocked`, then unlabeled-status issues last. Keep it terse — this is a
-lookup, not a report.
+`blocked` / no status label — most issues will have no status label, since
+labeling one `status:ready` is a manual, deliberate step). Group
+`status:ready` issues first, then `status:blocked`, then unlabeled-status
+issues last. Keep it terse — this is a lookup, not a report.

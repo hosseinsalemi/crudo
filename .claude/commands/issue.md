@@ -37,17 +37,18 @@ or private.
      These must be verifiable, not aspirational.
    - **Affected packages** — `@kavo/core`, `@kavo/typeorm`, `@kavo/nest`,
      docs, or a combination.
-   - **Constraints** — the invariants that must survive: ADR-0005 core purity,
-     registry-driven operations (ADR-0006), the explicit barrel (ADR-0010),
-     decoration-time routes (ADR-0012), and the naming conventions in
-     `CLAUDE.md`. Cite the ADRs that actually apply; skip the ones that do not.
+   - **Constraints** — the invariants that must survive. Check
+     `packages/docs/adr/` for ones this issue touches (core purity, registry-
+     driven operations, the explicit barrel, decoration-time routes, soft
+     delete, and relations are common ones) and cite them by number. Also cite
+     the naming conventions in `CLAUDE.md` if relevant. Cite only what
+     actually applies; skip the rest.
    - **Out of scope** — what this issue deliberately does not cover.
 
 4. **Label it.** Use the existing labels where they fit. See the
-   `conventions` skill for the `type:` set; also apply
-   `area:core|typeorm|nest|docs` and `status:ready` once it is plannable.
-   Create a missing label with `gh label create <name>` only if it fits that
-   scheme.
+   `conventions` skill for the `type:` set, and apply
+   `area:core|typeorm|nest|docs`. Create a missing label with
+   `gh label create <name>` only if it fits that scheme.
 
 5. **Show it before creating anything.** Print the full drafted issue —
    title, labels, and body exactly as they would be submitted — and stop.
