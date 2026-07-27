@@ -83,21 +83,21 @@ after it is extra instructions or corrections to fold in during implementation.
 12. **On explicit approval**, and not before:
 
     a. **Commit** using the `commit` skill's own logic: analyze the changes,
-       group them into cohesive logical commits (config/tooling separate from
-       source, docs separate from implementation), stage each group precisely
-       with explicit pathspecs (never `git add -A`), and commit with a
-       Conventional Commits message per the `conventions` skill. Do not push
-       here, do not amend, and do not add co-author trailers unless recent
-       commits on this branch already use them.
+    group them into cohesive logical commits (config/tooling separate from
+    source, docs separate from implementation), stage each group precisely
+    with explicit pathspecs (never `git add -A`), and commit with a
+    Conventional Commits message per the `conventions` skill. Do not push
+    here, do not amend, and do not add co-author trailers unless recent
+    commits on this branch already use them.
 
     b. **Open the PR** using the `pr` skill's own logic: refuse if the branch
-       is `main`, there's no remote, or there are no commits; re-run
-       `pnpm check` for real and stop if it's red; `git push -u origin HEAD`;
-       then `gh pr create` (or update the existing PR) with what/why, `Closes
-       #<n>`, public-API impact, testing, and review notes.
+    is `main`, there's no remote, or there are no commits; re-run
+    `pnpm check` for real and stop if it's red; `git push -u origin HEAD`;
+    then `gh pr create` (or update the existing PR) with what/why, `Closes
+   #<n>`, public-API impact, testing, and review notes.
 
     c. **Print the PR URL** and tell the user to run `/review` on it or
-       `/merge` once CI and review are green.
+    `/merge` once CI and review are green.
 
 If the user asks for changes instead of approving, revise the working tree
 and return to step 11 — do not commit a diff that wasn't approved as shown.
