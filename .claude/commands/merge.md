@@ -39,7 +39,12 @@ Close the loop on this PR. Argument: **$ARGUMENTS**
    style (`feat(core): …`), with the body summarizing the change and referencing
    the issue.
 
-4. **Return to a clean main:**
+4. **Return to a clean main.** If the session is inside a worktree created by
+   `/implement` (`EnterWorktree`), exit it first — the merge already landed on
+   `origin/main` and the local branch is being deleted remotely, so it's safe
+   to discard: `ExitWorktree` with `action: "remove"`,
+   `discard_changes: true`. This returns the session to the main checkout.
+   Then, from the main checkout:
 
    ```bash
    git checkout main && git pull --ff-only
@@ -47,7 +52,7 @@ Close the loop on this PR. Argument: **$ARGUMENTS**
    ```
 
    Confirm the local branch is gone; delete it with `git branch -d <branch>` if
-   it survived the remote deletion.
+   it survived the remote deletion or the worktree removal.
 
 5. **Verify main is green** after the merge:
 
