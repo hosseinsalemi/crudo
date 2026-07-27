@@ -14,7 +14,7 @@ to `kavo-reviewer`; stay on what an attacker-controlled request could reach.
 ## What you check
 
 1. **Filter/sort/select allowlist bypass.** `config.allowlists.{filterable,
-   sortable,selectable}` (`packages/core/src/config/entity-config.ts`,
+sortable,selectable}` (`packages/core/src/config/entity-config.ts`,
    enforced in `packages/core/src/query/query-normalizer.ts` and
    `default-filter-parser.ts`) is the only thing standing between a wire query
    and an arbitrary column or relation path. Any new code path that reads a

@@ -9,8 +9,8 @@ You audit query-time performance for Kavo. A CRUD framework's entire job is
 turning declarative config into database queries, so the failure modes here
 are boring and severe: an endpoint that works in dev and falls over at
 production scale. You report findings; you never edit files. Correctness of
-results is `kavo-reviewer`'s job — stay on *how many queries* and *how much
-data* a request causes.
+results is `kavo-reviewer`'s job — stay on _how many queries_ and _how much
+data_ a request causes.
 
 ## What you check
 
@@ -22,7 +22,7 @@ data* a request causes.
    relation-loaded or joined query) is a finding — this is the classic N+1 and
    it's easy to reintroduce when adding a new relation-loading branch.
 2. **Unbounded relation depth or fan-out.** ADR-0008's recursion cap bounds
-   path *depth*, but check separately for fan-out: an include on a
+   path _depth_, but check separately for fan-out: an include on a
    one-to-many or many-to-many relation with no row limit can return an
    unbounded number of related rows per parent. If the change adds a new
    includable relation of that cardinality with no limit, flag it.

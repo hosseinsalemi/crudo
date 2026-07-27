@@ -49,17 +49,6 @@ function server(): Parameters<typeof request>[0] {
   return app.getHttpServer() as Parameters<typeof request>[0];
 }
 
-/**
- * What an `@Override`'d read method must do to Nest's raw `@Query()`
- * object before handing it to `DefaultCrudService` — the same wrapping
- * `crud.decorator.ts`'s generated routes apply internally. Skipping this
- * sends wire-format query strings straight into `normalizeInput` instead
- * of `normalizeWire`, and they 400.
- */
-function wireQuery(query: unknown): WireQuery {
-  return new WireQuery(flattenQuery((query ?? {}) as Readonly<Record<string, unknown>>));
-}
-
 describe("@Crud route generation (Phases 11–12)", () => {
   @Crud(Todo)
   @Controller("todos")
@@ -407,8 +396,8 @@ describe("@Crud @Override — controller-method overrides that keep generated ro
       constructor(@Inject(getCrudServiceToken(Todo)) private readonly base: DefaultCrudService<Todo>) {}
 
       @Override()
-      async findOne(id: string, query: unknown): Promise<unknown> {
-        const item = await this.base.findOne(id as never, wireQuery(query) as never);
+      async findOne(id: string, query: WireQuery): Promise<unknown> {
+        const item = await this.base.findOne(id as never, query as never);
         return { ...item, viaOverride: true };
       }
     }
@@ -419,9 +408,85 @@ describe("@Crud @Override — controller-method overrides that keep generated ro
     expect(response.body).toMatchObject({ id: 1, title: "x", viaOverride: true });
 
     // Regression: a wire-format query string must reach the override
-    // normalized, not passed through raw — this is what wireQuery() buys.
+    // normalized, not passed through raw — this is what auto-wiring buys
+    // (issue #25). The override never calls flattenQuery/WireQuery itself.
     const narrowed = await request(server()).get("/todos/1").query("fields=id,title").expect(200);
     expect(Object.keys(narrowed.body).sort()).toEqual(["id", "title", "viaOverride"]);
+  });
+
+  it("passes an overridden findOne a WireQuery instance, not a raw query object (issue #25)", async () => {
+    let received: unknown;
+
+    @Crud(Todo)
+    @Controller("todos")
+    class OverrideFindOneQueryShapeController {
+      constructor(@Inject(getCrudServiceToken(Todo)) private readonly base: DefaultCrudService<Todo>) {}
+
+      @Override()
+      async findOne(id: string, query: WireQuery): Promise<unknown> {
+        received = query;
+        return this.base.findOne(id as never, query as never);
+      }
+    }
+
+    await bootstrap(OverrideFindOneQueryShapeController);
+    await request(server()).post("/todos").send({ title: "x" }).expect(201);
+    await request(server()).get("/todos/1").query("fields=id,title").expect(200);
+
+    expect(received).toBeInstanceOf(WireQuery);
+    expect((received as WireQuery).params).toMatchObject({ fields: "id,title" });
+  });
+
+  it("passes an overridden findMany a WireQuery instance, not a raw query object (issue #25)", async () => {
+    let received: unknown;
+
+    @Crud(Todo)
+    @Controller("todos")
+    class OverrideFindManyQueryShapeController {
+      constructor(@Inject(getCrudServiceToken(Todo)) private readonly base: DefaultCrudService<Todo>) {}
+
+      @Override()
+      async findMany(query: WireQuery): Promise<unknown> {
+        received = query;
+        return this.base.findMany(query as never);
+      }
+    }
+
+    await bootstrap(OverrideFindManyQueryShapeController);
+    await request(server()).get("/todos").query("limit=2&offset=1").expect(200);
+
+    expect(received).toBeInstanceOf(WireQuery);
+    expect((received as WireQuery).params).toMatchObject({ limit: "2", offset: "1" });
+  });
+
+  it("keeps filtering intact when a stale override still manually double-wraps its already-wired query (issue #25 regression)", async () => {
+    @Crud(Todo)
+    @Controller("todos")
+    class StaleDoubleWrapController {
+      constructor(@Inject(getCrudServiceToken(Todo)) private readonly base: DefaultCrudService<Todo>) {}
+
+      // Pre-#25 pattern: `query` is already a WireQuery (via WireQueryPipe),
+      // but this override still calls flattenQuery/WireQuery on it itself.
+      // Without flattenQuery's idempotency guard, this would silently mangle
+      // every key one bracket level too deep and drop the filter entirely.
+      @Override()
+      async findMany(query: WireQuery): Promise<unknown> {
+        const rewrapped = new WireQuery(flattenQuery(query as unknown as Record<string, unknown>));
+        return this.base.findMany(rewrapped as never);
+      }
+    }
+
+    await bootstrap(StaleDoubleWrapController);
+    await request(server()).post("/todos").send({ title: "x" }).expect(201);
+
+    // The fake adapter doesn't evaluate filters — it only records the
+    // normalized query (filter evaluation is @kavo/typeorm's concern) — so
+    // assert on the normalized AST itself: without flattenQuery's idempotency
+    // guard, the mangled `params[filter[...]]` keys would vanish, leaving an
+    // empty filter/sort with no error raised, rather than the AST below.
+    await request(server()).get("/todos?filter[title][eq]=x&sort=-priority").expect(200);
+    expect(adapter.lastQuery?.filter.root).toMatchObject({ kind: "condition", field: "title", operator: "EQ" });
+    expect(adapter.lastQuery?.sort).toEqual([{ field: "priority", direction: "desc" }]);
   });
 
   it("keeps createOne's generated route/param wiring (body alone, 201, no :id)", async () => {
@@ -498,8 +563,8 @@ describe("@Crud @Override — controller-method overrides that keep generated ro
       constructor(@Inject(getCrudServiceToken(Todo)) private readonly base: DefaultCrudService<Todo>) {}
 
       @Override()
-      async findOne(id: string, query: unknown): Promise<unknown> {
-        return this.base.findOne(id as never, wireQuery(query) as never);
+      async findOne(id: string, query: WireQuery): Promise<unknown> {
+        return this.base.findOne(id as never, query as never);
       }
     }
 

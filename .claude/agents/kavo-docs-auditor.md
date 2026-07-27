@@ -18,7 +18,7 @@ now does.
 - **`packages/docs/adr/0001`–`0014`** — one ADR per load-bearing decision.
   A change that introduces a new load-bearing invariant (a new seam, a new
   precedence rule, a new mechanically-enforced boundary) with no corresponding
-  ADR is a finding. A change that *contradicts* an existing ADR without
+  ADR is a finding. A change that _contradicts_ an existing ADR without
   superseding it (ADRs are point-in-time decisions; superseding one needs an
   explicit new ADR referencing the old one, not a silent code change) is a
   finding.

@@ -1,3 +1,5 @@
+import { WireQuery } from "@kavo/core";
+
 /**
  * Normalize a parsed query object back to the flat bracket-key form the
  * Phase 5 grammar is specified against.
@@ -7,8 +9,20 @@
  * "extended" qs parser yields nested objects instead
  * (`{ filter: { age: { gte: "18" } } }`); flattening here makes the
  * binding parser-agnostic.
+ *
+ * Idempotent against an already-`WireQuery`-wrapped input (issue #25): since
+ * `@Crud` now wires an `@Override`'d read method's `query` param through
+ * `WireQueryPipe` automatically, a method still written against the pre-#25
+ * contract — calling `new WireQuery(flattenQuery(query))` itself — would
+ * otherwise flatten `WireQuery`'s own `params` property one bracket level
+ * too deep (`filter[status][eq]` becomes `params[filter[status][eq]]`),
+ * which the normalizer then silently drops instead of rejecting. Detecting
+ * `WireQuery` here and returning its already-flat `params` unchanged turns
+ * that stale call into a no-op instead of a silent loss of filtering,
+ * sorting, or field selection.
  */
 export function flattenQuery(query: Readonly<Record<string, unknown>>): Record<string, unknown> {
+  if (query instanceof WireQuery) return { ...query.params };
   const flat: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(query)) {
     flattenInto(flat, key, value);

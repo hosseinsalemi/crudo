@@ -1,7 +1,6 @@
 import { Controller, Inject } from "@nestjs/common";
-import { Crud, Override, flattenQuery, getCrudServiceToken } from "@kavo/nest";
-import type { DefaultCrudService, EntityId } from "@kavo/core";
-import { WireQuery } from "@kavo/core";
+import { Crud, Override, getCrudServiceToken } from "@kavo/nest";
+import type { DefaultCrudService, EntityId, WireQuery } from "@kavo/core";
 import type { DataSource } from "typeorm";
 import { Address } from "./address.entity.js";
 import { CreateAddressDto, UpdateAddressDto, AddressItemDto, AddressListDto } from "./address.dtos.js";
@@ -89,16 +88,13 @@ export class AddressController {
 
   /**
    * Augments the response with a derived, unpersisted field. `query`
-   * arrives as Nest's raw `@Query()` object — the generated route always
-   * wraps it in `WireQuery` (via `flattenQuery`) before it reaches
-   * `DefaultCrudService`, so a read override must do the same, or wire-
-   * format params like `?fields=` / `?include=` reach the engine
-   * unparsed and 400.
+   * arrives already wired — `@Crud` applies the same `WireQuery`-producing
+   * pipe to an `@Override`'d read method's `query` param as it does to a
+   * generated route's.
    */
   @Override()
-  async findOne(id: EntityId, query: unknown): Promise<unknown> {
-    const wired = new WireQuery(flattenQuery((query ?? {}) as Readonly<Record<string, unknown>>));
-    const address = await this.base.findOne(id as never, wired as never);
+  async findOne(id: EntityId, query: WireQuery): Promise<unknown> {
+    const address = await this.base.findOne(id as never, query as never);
     return { ...address, formattedAddress: `${address.street}, ${address.city} ${address.postalCode}` };
   }
 
