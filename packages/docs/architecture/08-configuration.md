@@ -39,8 +39,8 @@ Implemented in `mergeSettings` (`merge-settings.ts`):
 - Arrays replace wholesale. `undefined` scopes are skipped.
 
 An `EntityConfig` mixes settings keys with structural keys (`dto`,
-`allowlists`, `operations`, `customOperations`); only the settings subset
-participates in the merge.
+`allowlists`, `operations`); only the settings subset participates in
+the merge.
 
 ## 3. Resolution timing and immutability
 

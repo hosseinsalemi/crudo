@@ -44,9 +44,9 @@ const complete: OperationHandler<Todo> = {
 @Crud(Todo, {
   dto: { create: CreateTodoDto, item: TodoItemDto },
   allowlists: { filterable: ["title", "done"], sortable: ["title"] },
-  operations: { deleteOne: false },
-  customOperations: {
-    completeOne: { handler: complete, meta: { routes: { method: "POST", path: ":id/complete" } } },
+  operations: {
+    deleteOne: false,
+    patchOne: { handler: complete, meta: { routes: { method: "POST", path: ":id/complete" } } },
   },
 })
 @Controller("todos")
@@ -78,13 +78,13 @@ class Invoice {
 // A handler for a *structurally compatible* entity is still accepted — that
 // is ordinary structural typing, not a hole: anything valid for `Todo` is
 // valid for a shape `Todo` satisfies.
-@Crud(Todo, { customOperations: { archiveOne: { handler: {} as OperationHandler<{ title: string }> } } })
+@Crud(Todo, { operations: { updateOne: { handler: {} as OperationHandler<{ title: string }> } } })
 @Controller("compatible-handler-todos")
 class CompatibleHandlerController {}
 void CompatibleHandlerController;
 
 // @ts-expect-error — a handler for an unrelated entity does not fit.
-@Crud(Todo, { customOperations: { archiveOne: { handler: {} as OperationHandler<Invoice> } } })
+@Crud(Todo, { operations: { updateOne: { handler: {} as OperationHandler<Invoice> } } })
 @Controller("wrong-entity-todos")
 class WrongEntityController {}
 void WrongEntityController;

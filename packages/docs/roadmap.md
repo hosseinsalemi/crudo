@@ -50,7 +50,7 @@ export class UserModule {}
 
 1. Public API reference: the registration APIs and the fluent/builder surface.
 2. Side-by-side usage examples — zero-config vs. partial vs. fully configured
-   (global + entity + custom operations).
+   (global + entity + overridden operations).
 3. Migration guide from bare `createCrud(Entity)` to a fully configured setup.
 4. **Type-inference acceptance tests** (`expectTypeOf`/tsd) run in CI: include
    paths, DTO slots and envelope fields must infer correctly in the examples
@@ -78,8 +78,9 @@ grown from the existing example app.
 **Domain** (chosen to force the features): a project-management API — `User`,
 `Project`, `Task`, `Comment`, `Tag`. It must exercise nested includes ≥ 2 deep
 (`project.tasks.comments`), sparse fieldsets on includes, relation-path
-filtering, soft delete + restore on `Task`, a custom operation
-(`POST /tasks/:id/complete`), and global config with per-entity overrides.
+filtering, soft delete + restore on `Task`, a fully custom, registry-independent
+route (`POST /tasks/:id/complete`, issue #26), and global config with
+per-entity overrides.
 
 **Deliverables**
 

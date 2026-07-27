@@ -41,8 +41,9 @@ Deep nested writes are **out of scope**, not merely unimplemented.
 - The write surface stays predictable: one request writes one row plus
   its foreign keys. Failure modes are the ones CRUD already has.
 - Multi-entity writes are expressed where their policy is visible — a
-  custom operation (Phase 13) that spells out the order, the matching
-  rule, and the failure behavior for that specific case.
+  hand-written controller method (an `@Override`'d standard operation, or
+  a fully custom route per issue #26) that spells out the order, the
+  matching rule, and the failure behavior for that specific case.
 - ORM caveat, deliberately not papered over: setting a _to-many_ by id
   only persists where the ORM supports it from the non-owning side
   (TypeORM needs `cascade` or the owning side / a join table). Kavo maps

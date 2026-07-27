@@ -64,7 +64,7 @@ const INPUT_SLOTS: Readonly<Partial<Record<StandardOperationId, DtoSlot>>> = {
  * this order as the authoritative one.
  *
  * Every stage boundary is a seam: handlers come from the registry (config
- * and `customOperations` swap them), and the serializer/deserializer,
+ * swaps them via `operations.<id>.handler`), and the serializer/deserializer,
  * pagination strategies, and include resolver are all constructor-injected
  * — `createCrud` supplies the defaults, callers may supply their own.
  */
@@ -192,11 +192,11 @@ export class CrudEngine<Entity extends object> {
           data: deserializer.deserialize(request.body, dto, context),
         };
       default: {
-        // createOne and custom operations: the (deserialized) body — plus
-        // the request id when one is present, so a custom operation
-        // addressed by `:id` (cardinality "one", same as updateOne/patchOne)
-        // can identify its target instead of losing it. createOne never
-        // carries an id, so this falls through to the body alone there.
+        // createOne, and any operation id registered outside the standard
+        // table (ADR-0006's registry stays generic even without a config
+        // surface for adding one): the deserialized body, plus the request
+        // id when one is present. createOne never carries an id, so this
+        // falls through to the body alone there.
         const body = deserializer.deserialize(request.body, dto, context);
         return request.id === null ? body : { id: this.coerceId(request.id), body };
       }

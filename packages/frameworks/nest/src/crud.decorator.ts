@@ -86,17 +86,12 @@ interface ResolvedRoute {
  *
  * The decorator builds the entity's operation registry (the same
  * `createOperationRegistry` the engine uses) and generates one route per
- * **enabled** entry: disabled operations get no route, custom operations
- * get theirs from `meta.routes`, and `meta.routes.enabled: false` keeps an
- * operation service-only.
- *
- * Driving the loop from the registry is what lets a **custom** operation
- * need no change here: it arrives as an entry and carries its own route in
- * `meta.routes`. A new **standard** operation is a different matter — it
- * also needs a default shape in `STANDARD_ROUTES`, a delegation arm in
- * `makeHandler`, and, if it takes no body, an entry in `BODYLESS_WRITES`.
- * Those three tables are keyed by `StandardOperationId`, so a typo fails
- * the build, but they are still three tables and this file does change.
+ * **enabled** entry: disabled operations get no route, and
+ * `meta.routes.enabled: false` keeps an operation service-only. A new
+ * standard operation needs a default shape in `STANDARD_ROUTES`, a
+ * delegation arm in `makeHandler`, and, if it takes no body, an entry in
+ * `BODYLESS_WRITES` — those three tables are keyed by `StandardOperationId`,
+ * so a typo fails the build.
  *
  * **Manual-method-wins:** a hand-written controller method whose name
  * matches an operation id suppresses that generated route entirely — no
@@ -113,7 +108,7 @@ interface ResolvedRoute {
  * the `forFeature` provider, through property injection.
  *
  * The generic parameters are inferred and exist purely to typecheck the
- * call site: allowlist and relation-edge keys, DTO slots and custom-operation
+ * call site: allowlist and relation-edge keys, DTO slots and overridden
  * handlers are all checked against the entity, with no manual generic
  * argument. The chain mirrors `createCrud`'s — `Entity` is inferred from
  * `entity` alone, while each DTO slot stays its own inference site, so
@@ -245,8 +240,9 @@ function assertNoOwnParamMetadata(
 function resolveRoute(descriptor: OperationDescriptor<object>): ResolvedRoute | null {
   const options: CrudRouteOptions = descriptor.meta.routes ?? {};
   if (options.enabled === false) return null; // service-only
-  // Custom ids are absent from the table by design — they carry their own
-  // route in `meta.routes` and fall back to the defaults below.
+  // A non-standard id is absent from the table by design and falls back to
+  // the defaults below — the registry's own genericity (ADR-0006), even
+  // though `EntityConfig` offers no way to register one.
   const standard = STANDARD_ROUTES[descriptor.id as StandardOperationId];
   const method = options.method ?? standard?.method ?? "POST";
   const path = options.path ?? standard?.path ?? descriptor.id;

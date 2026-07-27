@@ -92,7 +92,8 @@ conflict is visible rather than hidden.
 silently stamping rows across several tables is a footgun — invisible in
 the request, hard to reverse correctly, and impossible to reason about
 from the route alone. The documented pattern is an explicit cascade
-written by the caller (a custom operation, Phase 13), which also gets to
+written by the caller (an `@Override`'d operation, or a fully custom
+route per issue #26), which also gets to
 decide ordering and what to do when one leg fails.
 
 **Related rows.** Soft-deleted related rows are excluded from included

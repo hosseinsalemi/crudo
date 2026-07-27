@@ -49,14 +49,15 @@ The decorator builds the entity's operation registry with the same
 | `purgeOne`   | `DELETE /:id/purge`  | 204    |
 
 Disabled entries (config `operations.<id>: false`, or a default-off
-entry) get **no route**. Custom operations read `meta.routes`
-(`method`, `path`, `successStatus`); `meta.routes.enabled: false` keeps
-one service-only. Because generation walks the registry, Phase 14's
-restore/purge appeared by _enabling entries_ — this generator did not
-change. Their enablement is config-declared rather than metadata-driven,
-precisely because decoration time has no ORM metadata (ADR-0013):
-`softDelete: { strategy: "soft" }` adds the restore route,
-`operations: { purgeOne: true }` the purge route.
+entry) get **no route**. Any entry's route shape is overridable through
+its own `meta.routes` (`method`, `path`, `successStatus`);
+`meta.routes.enabled: false` keeps it service-only. Because generation
+walks the registry, Phase 14's restore/purge appeared by _enabling
+entries_ — this generator did not change. Their enablement is
+config-declared rather than metadata-driven, precisely because
+decoration time has no ORM metadata (ADR-0013): `softDelete: { strategy:
+"soft" }` adds the restore route, `operations: { purgeOne: true }` the
+purge route.
 
 **Manual-method-wins:** a hand-written controller method whose name
 matches an operation id suppresses that generated route — detected via
@@ -119,17 +120,18 @@ the rare caller wiring a query param manually outside this fixed position;
 the common case needs neither.
 
 **Fully custom, registry-independent routes** (issue #26) are a separate,
-simpler path that needs no `@Crud` involvement at all. The decoration-time
+simpler path that needs no `@Crud` involvement at all — the only way to
+add an action with no operation identity of its own, since `EntityConfig`
+has no surface for registering a new operation id. The decoration-time
 loop only visits methods two ways: manual-method-wins (name matches a
 registry operation id) and the `@Override` map (name registered via
 `@Override`). A method matching neither — carrying its own native
 `@Get`/`@Post`/etc. decorator and its own `@Param`/`@Query`/`@Body` — is
 never inspected by `@Crud`; it is an ordinary Nest controller method that
-happens to live on a `@Crud`-decorated class. It needs no
-`customOperations` entry, because nothing in the registry ever points at
-it. The only Kavo-specific piece it typically wants is the entity's bound
-service, reachable the same way an `@Override`'d method reaches it —
-ordinary constructor DI via `getCrudServiceToken(Entity)`:
+happens to live on a `@Crud`-decorated class. The only Kavo-specific
+piece it typically wants is the entity's bound service, reachable the
+same way an `@Override`'d method reaches it — ordinary constructor DI via
+`getCrudServiceToken(Entity)`:
 
 ```ts
 @Controller("users")
@@ -150,15 +152,14 @@ handlers use, without any of the registry machinery around it: no
 generated method/path/status from config, no `@Override`-supplied
 Swagger metadata, no automatic param wiring — the method owns all of
 that itself, exactly as it would on a plain Nest controller with no
-`@Crud` in the picture. Reach for `@Override` when the action already
-has (or deserves) an operation identity and should keep getting its
-route/Swagger/param metadata generated from config while only its
-implementation changes; reach for a plain native-decorated method when
-the action has no operation identity of its own and needs none of that
-generated machinery. `packages/examples/src/address/address.controller.ts`
-demonstrates both side by side: `normalizePostalCode` (mutating, wants
-`@Override`'s generated route metadata) and `validatePostalCode`
-(read-only, needs nothing generated).
+`@Crud` in the picture. Reach for `@Override` when the action is one of
+the standard operations and should keep getting its route/Swagger/param
+metadata generated from config while only its implementation changes;
+reach for a plain native-decorated method for anything else — an action
+with no operation identity of its own needs none of that generated
+machinery. `packages/examples/src/address/address.controller.ts`'s
+`normalizePostalCode` and `validatePostalCode` both take the plain
+native-decorated path.
 
 Mechanically, generated methods are defined on the prototype and
 decorated by _calling_ Nest's own decorators (`Post(path)(proto, name,
