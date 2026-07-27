@@ -1,5 +1,5 @@
 ---
-description: Plan an issue, get approval, then implement it on a new branch — does not commit
+description: Plan an issue, get approval, implement it on a new branch, then commit and open a PR once the user approves the diff
 argument-hint: "<issue number> [extra instructions or corrections]"
 allowed-tools: Bash(gh:*), Bash(git:*), Bash(pnpm:*), Read, Edit, Write, Grep, Glob, Agent, Task, Skill
 ---
@@ -18,7 +18,10 @@ after it is extra instructions or corrections to fold in during implementation.
 1. **Preflight.** If no issue number was given, stop and ask for one. If there
    is no GitHub remote, stop and say so. If the working tree is dirty, stop and
    ask whether to commit (`/commit`) or stash first — never start new work on
-   top of uncommitted changes.
+   top of uncommitted changes. If the session's current directory is inside
+   `.claude/worktrees/`, exit it first (`ExitWorktree` with `keep`) so the new
+   branch is created and implemented in the main checkout — the one the
+   user's editor has open — not in an isolated worktree they won't see.
 
 2. **Read the issue in full**: `gh issue view <n> --json title,body,labels,comments`.
 
@@ -68,10 +71,36 @@ after it is extra instructions or corrections to fold in during implementation.
     `packages/docs/architecture/` document governs. Silent divergence is a
     review finding.
 
-11. **Do not commit.** Leave the changes in the working tree.
+11. **Leave the changes uncommitted** and report what changed, the real
+    `pnpm check` result, and anything in the plan you did **not** do and why.
+    Tell the user the diff is sitting uncommitted in their editor (VSCode) for
+    review, and ask them to reply with explicit approval (e.g. "ok") once
+    they've looked it over.
 
-12. **Report** what changed, the real `pnpm check` result, and anything in the
-    plan you did **not** do and why. Then tell the user to run `/review` or `/pr`.
+    **Stop here and wait.** Do not stage, commit, or push anything yet — the
+    user reviews the live working tree in their editor, not a summary.
+
+12. **On explicit approval**, and not before:
+
+    a. **Commit** using the `commit` skill's own logic: analyze the changes,
+       group them into cohesive logical commits (config/tooling separate from
+       source, docs separate from implementation), stage each group precisely
+       with explicit pathspecs (never `git add -A`), and commit with a
+       Conventional Commits message per the `conventions` skill. Do not push
+       here, do not amend, and do not add co-author trailers unless recent
+       commits on this branch already use them.
+
+    b. **Open the PR** using the `pr` skill's own logic: refuse if the branch
+       is `main`, there's no remote, or there are no commits; re-run
+       `pnpm check` for real and stop if it's red; `git push -u origin HEAD`;
+       then `gh pr create` (or update the existing PR) with what/why, `Closes
+       #<n>`, public-API impact, testing, and review notes.
+
+    c. **Print the PR URL** and tell the user to run `/review` on it or
+       `/merge` once CI and review are green.
+
+If the user asks for changes instead of approving, revise the working tree
+and return to step 11 — do not commit a diff that wasn't approved as shown.
 
 If you hit something the plan got wrong, say so and propose the correction
 before implementing around it.
