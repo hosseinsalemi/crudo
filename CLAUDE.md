@@ -96,19 +96,23 @@ Work moves one issue at a time, on one branch, through slash commands in `.claud
 ```
 /issue "rough idea"   →  a plannable GitHub issue (acceptance criteria, affected packages, constraints)
 /plan [n]             →  kavo-architect plans it  →  YOU APPROVE  →  branch created off main
-/implement            →  code + tests written here, in the main thread  →  pnpm check  →  left uncommitted
-/review               →  kavo-reviewer ‖ kavo-boundary-guard ‖ kavo-test-auditor, consolidated
+/implement            →  code + tests written here, in the main thread  →  left uncommitted
+/verify               →  pnpm check  ‖  kavo-reviewer ‖ kavo-boundary-guard ‖ kavo-test-auditor, consolidated
 /commit               →  working tree split into logical commits
-/push                 →  pnpm check  →  push  →  PR opened, "Closes #n"
-/merge                →  CI verified  →  squash merge  →  branch deleted  →  back on green main
+/pr                   →  pnpm check  →  push  →  PR opened/updated, "Closes #n"
+/review [pr#]         →  kavo-reviewer ‖ kavo-boundary-guard ‖ kavo-test-auditor, run against the open PR
+/merge                →  CI + /review verified  →  squash merge  →  branch deleted  →  back on green main
 ```
 
-`/commit` splits the working tree into logical commits at any point.
+`/commit` splits the working tree into logical commits at any point. `/verify`
+gates a change **before** it's committed; `/review` re-runs the same three
+agents **after** it's pushed, against the actual PR — use it any time on any
+open PR, not just the one you just opened.
 
 Two rules make this work:
 
 - **Planning and review are delegated; implementation is not.** The four agents in `.claude/agents/` are all read-only. Planning benefits from a cold, focused read of the issue, and review benefits from independent fresh eyes — but implementation needs the conversation's full context, so it happens in the main thread.
-- **`pnpm check` is the gate, and it is never worked around.** `/implement`, `/push`, and `/merge` each run it and report the real result. A red gate is not shipped, and a test is never weakened to make it pass.
+- **`pnpm check` is the gate, and it is never worked around.** `/implement`, `/verify`, `/pr`, and `/merge` each run it and report the real result. A red gate is not shipped, and a test is never weakened to make it pass.
 
 ## Where to read more
 

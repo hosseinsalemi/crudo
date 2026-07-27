@@ -21,7 +21,7 @@ Close the loop on this PR. Argument: **$ARGUMENTS**
    - any required check is **failing or still running** — wait for it, do not
      merge past it;
    - `mergeable` is false, or there are conflicts with `main`;
-   - `/review` has not been run on this branch, or it left blocking findings
+   - `/review` has not been run on this PR, or it left blocking findings
      unresolved.
 
    If the only problem is that checks are still running, say so and offer to
