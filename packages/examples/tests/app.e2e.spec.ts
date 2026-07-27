@@ -691,9 +691,9 @@ describe("Address operation overrides (issue #21)", () => {
   });
 
   it("wires GET /addresses/:id query params through the same normalization a generated route would", async () => {
-    // Regression: an @Override'd findOne must wrap Nest's raw query object
-    // the same way the generated route does (WireQuery + flattenQuery), or
-    // wire-format params reach the engine unparsed and 400.
+    // Regression: an @Override'd findOne's query param is auto-wired into
+    // WireQuery the same way a generated route's is (issue #25) — the
+    // override itself does no manual flattenQuery/WireQuery wrapping.
     const created = await request(server())
       .post("/addresses")
       .send({ street: "1 Elm St", city: "Springfield", postalCode: "10001" })
