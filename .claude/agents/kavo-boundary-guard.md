@@ -46,16 +46,14 @@ violations in a change. You do not fix them and you do not edit files.
 4. Diff the barrel specifically: `git diff main...HEAD -- packages/core/src/index.ts`.
    For each added export, ask whether it is meant to be public. For each removed
    or renamed one, flag it as breaking.
-5. Check the docs debt: if the change alters behavior governed by an ADR in
-   `packages/docs/adr/`, the ADR or the matching document in
-   `packages/docs/architecture/` should have been updated. A silent divergence
-   is a finding.
+
+ADR/architecture-doc sync is `kavo-docs-auditor`'s job now — don't duplicate it.
 
 ## Output
 
 For each finding: the file and line, the rule broken, why it is a real problem
 rather than a style preference, and the smallest fix. Rank by severity —
-boundary violations and breaking barrel changes first, docs drift last.
+boundary violations first, breaking barrel changes last.
 
 If the change is clean, say so plainly and state what you checked. Do not
 manufacture findings to look useful.
