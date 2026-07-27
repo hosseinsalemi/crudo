@@ -1,4 +1,4 @@
-import { Controller, Inject } from "@nestjs/common";
+import { Controller, Get, Inject, Param } from "@nestjs/common";
 import { Crud, Override, getCrudServiceToken } from "@kavo/nest";
 import type { DefaultCrudService, EntityId, WireQuery } from "@kavo/core";
 import type { DataSource } from "typeorm";
@@ -18,6 +18,12 @@ import { assertValidPostalCode, clearOwnerAddress, normalizePostalCode } from ".
  * (ADR-0006, ADR-0012); only the function backing each route is this
  * class's own method. Owners still associate an address by id
  * (`{"address": 1}` on `POST /owners` — ADR-0014).
+ *
+ * `validatePostalCode` below demonstrates the other custom-route pattern
+ * (issue #26): a plain native Nest method with no `customOperations` entry
+ * at all, for an action that has no operation identity and wants none of
+ * the registry-generated route/Swagger/param machinery `normalizePostalCode`
+ * relies on `@Override` for.
  */
 @Crud(Address, {
   dto: {
@@ -28,8 +34,13 @@ import { assertValidPostalCode, clearOwnerAddress, normalizePostalCode } from ".
   },
   customOperations: {
     normalizePostalCode: {
-      // Required by `CustomOperationConfig`, but never runs — `@Override`
-      // below supplies the real implementation.
+      // `@Override` (below) attaches to an *existing* registry entry — it
+      // doesn't create one — so this entry exists purely to give the
+      // registry an operation id and `meta.routes` to generate the route's
+      // method/path/status/Swagger metadata from. This handler itself
+      // never runs; `@Override` replaces it with `normalizePostalCodeRoute`.
+      // A custom route with no need for that generated machinery needs no
+      // entry at all — see `validatePostalCode` below.
       handler: {
         async execute() {
           throw new Error("normalizePostalCode is implemented via @Override — this registry handler must not run");
@@ -111,5 +122,28 @@ export class AddressController {
     const postalCode = normalizePostalCode(existing.postalCode);
     assertValidPostalCode(postalCode);
     return this.base.updateOne(id as never, { postalCode } as never);
+  }
+
+  /**
+   * `GET /addresses/:id/validate-postal-code` — a fully custom,
+   * registry-independent route (issue #26): a plain native `@Get` with its
+   * own `@Param`, no `customOperations` entry. `@Crud` never inspects this
+   * method — route generation only checks method names against registry
+   * operation ids (manual-method-wins) or `@Override` metadata, and
+   * `validatePostalCode` matches neither. It needs nothing from Kavo beyond
+   * the constructor-injected `base` service, the same `getCrudServiceToken`
+   * DI every `@Override`'d method above already uses. Unlike
+   * `normalizePostalCode`, it's read-only and wants none of `@Override`'s
+   * generated route/Swagger/param wiring, so it has none.
+   */
+  @Get(":id/validate-postal-code")
+  async validatePostalCode(@Param("id") id: EntityId): Promise<{ valid: boolean }> {
+    const existing = await this.base.findOne(id as never);
+    try {
+      assertValidPostalCode(existing.postalCode);
+      return { valid: true };
+    } catch {
+      return { valid: false };
+    }
   }
 }
