@@ -31,7 +31,7 @@ This reviews a pushed, open pull request — for uncommitted local work, use
    git diff <baseRefName>...<headRefName> --stat
    ```
 
-4. **Run the three reviewers in parallel**, in a single message. They are
+4. **Run the reviewers in parallel**, in a single message. They are
    read-only and deliberately non-overlapping:
 
    - `kavo-reviewer` — correctness, engine and registry design invariants,
@@ -39,6 +39,16 @@ This reviews a pushed, open pull request — for uncommitted local work, use
    - `kavo-boundary-guard` — ADR-0005 core purity, deep imports, ORM/framework
      leakage, barrel and breaking-change audit.
    - `kavo-test-auditor` — coverage gaps, weak tests, misplaced test files.
+   - `kavo-security-auditor` — allowlist bypass, mass assignment,
+     `exposeInternals` misuse, DTO/internal-field leakage.
+   - `kavo-docs-auditor` — ADR/architecture-doc drift, undocumented public API,
+     glossary gaps.
+   - `kavo-perf-auditor` — N+1 patterns, unbounded includes, pagination
+     bypass, adapter query-builder inefficiency.
+
+   Only include an auditor if the diff actually touches its area — e.g. skip
+   `kavo-perf-auditor` for a change confined to error-handling code. When in
+   doubt, include it; a clean report costs little.
 
 5. **Consolidate.** Merge their findings into one ranked list and drop
    duplicates. Do not just paste three reports.
