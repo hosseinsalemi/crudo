@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { WireQuery } from "@kavo/core";
 import { flattenQuery } from "@kavo/nest";
 
 /**
@@ -155,5 +156,25 @@ describe("flattenQuery — nesting depth and empty values (Phase 5)", () => {
       limit: 20,
       "filter[done][eq]": true,
     });
+  });
+});
+
+describe("flattenQuery — idempotent against an already-wrapped WireQuery (issue #25)", () => {
+  it("returns a WireQuery's own params unchanged instead of flattening them one level too deep", () => {
+    const params = { "filter[status][eq]": "active", fields: "id,title" };
+    const wired = new WireQuery(params);
+
+    // A stale @Override written before issue #25 that still manually wraps
+    // its (now already-wired) query param must not have its filter/fields
+    // silently mangled into `params[filter[status][eq]]` etc.
+    expect(flattenQuery(wired as unknown as Record<string, unknown>)).toEqual(params);
+  });
+
+  it("does not mutate or alias the WireQuery's params object", () => {
+    const params = { fields: "id,title" };
+    const wired = new WireQuery(params);
+    const flattened = flattenQuery(wired as unknown as Record<string, unknown>);
+    expect(flattened).not.toBe(params);
+    expect(flattened).toEqual(params);
   });
 });

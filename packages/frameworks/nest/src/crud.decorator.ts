@@ -9,7 +9,7 @@ import type {
   QueryContext,
   StandardOperationId,
 } from "@kavo/core";
-import { ConfigurationException, WireQuery, createOperationRegistry } from "@kavo/core";
+import { ConfigurationException, createOperationRegistry } from "@kavo/core";
 import type { CrudHttpMethod, CrudRouteOptions } from "./operation-metadata.js";
 import type { OverrideMetadata } from "./override.decorator.js";
 import {
@@ -18,7 +18,7 @@ import {
   CRUD_SERVICE_PROPERTY,
   getCrudServiceToken,
 } from "./tokens.js";
-import { flattenQuery } from "./flatten-query.js";
+import { WireQueryPipe } from "./wire-query.pipe.js";
 import { applySwaggerMetadata } from "./swagger.js";
 
 /** What `@Crud` records on the controller for `KavoModule.forFeature`. */
@@ -306,7 +306,7 @@ function applyParamDecorators(
     Param("id")(prototype, methodName, index++);
   }
   if (descriptor.kind === "read") {
-    Query()(prototype, methodName, index++);
+    Query(new WireQueryPipe())(prototype, methodName, index++);
   } else if (usesBody(route.method) && !BODYLESS_WRITES.has(descriptor.id as StandardOperationId)) {
     Body()(prototype, methodName, index++);
   }
@@ -335,11 +335,11 @@ function makeHandler(
       };
     case "findMany":
       return async function (this: BoundController, query: unknown) {
-        return this[CRUD_SERVICE_PROPERTY].findMany(wire(query) as never);
+        return this[CRUD_SERVICE_PROPERTY].findMany(query as never);
       };
     case "findOne":
       return async function (this: BoundController, id: unknown, query: unknown) {
-        return this[CRUD_SERVICE_PROPERTY].findOne(id as never, wire(query) as never);
+        return this[CRUD_SERVICE_PROPERTY].findOne(id as never, query as never);
       };
     case "updateOne":
       return async function (this: BoundController, id: unknown, body: unknown) {
@@ -375,8 +375,4 @@ function makeHandler(
         return response.item;
       };
   }
-}
-
-function wire(query: unknown): WireQuery {
-  return new WireQuery(flattenQuery((query ?? {}) as Readonly<Record<string, unknown>>));
 }

@@ -97,23 +97,35 @@ fail-fast rule covers a duplicate override target (two methods claiming
 one operation id) and an override naming an operation id that is absent
 or disabled in the registry — a silent no-op override is a footgun.
 
-**A read override's `query` parameter is Nest's raw `@Query()` object,
-not a normalized one** — a generated route always wraps it in `WireQuery`
-(via `flattenQuery`, see below) before it reaches `DefaultCrudService`,
-because the engine's query stage parses wire-format strings only through
-that wrapper. An override that forwards `query` straight to
-`this.base.findOne(id, query)` sends it down the already-normalized-input
-path instead, and any wire-format param (`?fields=`, `?include=`, …) 400s.
-Wrap it the same way: `new WireQuery(flattenQuery(query as object))`.
+**A read override's `query` parameter arrives already wrapped in
+`WireQuery`** (issue #25) — `applyParamDecorators` is the single call site
+that decides a read operation's `@Query()` decorator, shared by a
+generated route and an `@Override`'d method alike, and it applies
+`Query(new WireQueryPipe())` rather than a bare `Query()`. Nest's pipe
+runs before either a generated handler or a hand-written override method
+body executes, so both receive the identical normalized value — an
+override does not need to (and should not) call `flattenQuery`/`WireQuery`
+itself:
+
+```ts
+@Override()
+async findOne(id: EntityId, query: WireQuery) {
+  return this.base.findOne(id, query);
+}
+```
+
+`flattenQuery`/`WireQuery` stay exported from `@kavo/nest`/`@kavo/core` for
+the rare caller wiring a query param manually outside this fixed position;
+the common case needs neither.
 
 Mechanically, generated methods are defined on the prototype and
 decorated by _calling_ Nest's own decorators (`Post(path)(proto, name,
 descriptor)`, `Param("id")(…)`, …) — identical metadata to hand-written
 syntax, so guards, interceptors, versioning, and prefixes compose
 normally. The service arrives by property injection under a private key;
-route handlers wrap `req.query` in core's `WireQuery` (after
-`flattenQuery` normalizes qs-extended nested objects back to flat
-bracket keys, making the binding query-parser-agnostic).
+`WireQueryPipe` (internal to `@kavo/nest`) wraps `req.query` in core's
+`WireQuery`, after `flattenQuery` normalizes qs-extended nested objects
+back to flat bracket keys, making the binding query-parser-agnostic.
 
 ## 3. Exception mapping
 
