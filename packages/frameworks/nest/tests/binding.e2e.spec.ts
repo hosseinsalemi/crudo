@@ -277,46 +277,7 @@ describe("@Crud operation control surface", () => {
     await request(server()).post("/todos").send({ title: "x" }).expect(201);
   });
 
-  it("generates routes for custom operations from meta.routes", async () => {
-    const activate: OperationHandler<Todo> = {
-      async execute(input) {
-        // Custom operations addressed by `:id` receive it alongside the
-        // deserialized body — the same id the route's `:id` segment named.
-        const { id } = input as { id: number };
-        const row = adapter.rows.find((r) => r.id === id);
-        if (row !== undefined) row.done = true;
-        return row ?? null;
-      },
-    };
-
-    @Crud(Todo, {
-      customOperations: {
-        activate: {
-          handler: activate,
-          meta: { routes: { method: "POST", path: ":id/activate" } },
-        },
-        recalculate: {
-          handler: {
-            async execute() {
-              return null;
-            },
-          },
-          meta: { routes: { enabled: false } }, // service-only
-        },
-      },
-    })
-    @Controller("todos")
-    class CustomController {}
-
-    await bootstrap(CustomController);
-    await request(server()).post("/todos").send({ title: "x" }).expect(201);
-    const response = await request(server()).post("/todos/1/activate").expect(201);
-    expect(response.body).toMatchObject({ id: 1, done: true });
-    // Service-only: no route.
-    await request(server()).post("/todos/recalculate").expect(404);
-  });
-
-  it("overrides all five singular standard operations and adds a custom operation, alongside manual-method-wins and a disabled operation (issue #21)", async () => {
+  it("overrides all five singular standard operations, alongside manual-method-wins and a disabled operation (issue #21)", async () => {
     const seen: string[] = [];
     const overrideHandler = (id: string): OperationHandler<Todo> => ({
       async execute() {
@@ -341,17 +302,6 @@ describe("@Crud operation control surface", () => {
         // Disabled alongside a full override set — a control surface that
         // otherwise touches every id must not confuse the disable path.
         findMany: false,
-      },
-      customOperations: {
-        summarize: {
-          handler: {
-            async execute() {
-              seen.push("summarize");
-              return null;
-            },
-          },
-          meta: { routes: { method: "POST", path: "summarize" } },
-        },
       },
     })
     @Controller("todos")
@@ -379,12 +329,11 @@ describe("@Crud operation control surface", () => {
     expect(patched.body).toMatchObject({ title: "patchOne" });
 
     await request(server()).delete("/todos/1").expect(204);
-    await request(server()).post("/todos/summarize").expect(201);
 
-    // Disabled alongside five overrides and a custom op: still no route.
+    // Disabled alongside five overrides: still no route.
     await request(server()).get("/todos").expect(404);
 
-    expect(seen).toEqual(["createOne", "updateOne", "patchOne", "deleteOne", "summarize"]);
+    expect(seen).toEqual(["createOne", "updateOne", "patchOne", "deleteOne"]);
   });
 });
 
@@ -526,23 +475,15 @@ describe("@Crud @Override — controller-method overrides that keep generated ro
     expect(response.body).toMatchObject({ id: 1, title: "LOUD" });
   });
 
-  it("keeps a custom operation's own meta.routes shape (id-bearing route)", async () => {
+  it("keeps an overridden operation's own custom meta.routes shape (id-bearing route)", async () => {
     @Crud(Todo, {
-      customOperations: {
-        activate: {
-          // Never runs — @Override supplies the implementation instead.
-          handler: {
-            async execute() {
-              throw new Error("the registry handler must not run when @Override supplies the method");
-            },
-          },
-          meta: { routes: { method: "POST", path: ":id/activate" } },
-        },
+      operations: {
+        updateOne: { meta: { routes: { method: "POST", path: ":id/activate" } } },
       },
     })
     @Controller("todos")
-    class OverrideCustomController {
-      @Override("activate")
+    class OverrideCustomRouteController {
+      @Override("updateOne")
       async activate(id: string): Promise<unknown> {
         const row = adapter.rows.find((candidate) => candidate.id === Number(id));
         if (row !== undefined) row.done = true;
@@ -550,9 +491,9 @@ describe("@Crud @Override — controller-method overrides that keep generated ro
       }
     }
 
-    await bootstrap(OverrideCustomController);
+    await bootstrap(OverrideCustomRouteController);
     await request(server()).post("/todos").send({ title: "x" }).expect(201);
-    const response = await request(server()).post("/todos/1/activate").expect(201);
+    const response = await request(server()).post("/todos/1/activate").expect(200);
     expect(response.body).toMatchObject({ id: 1, done: true });
   });
 
@@ -654,20 +595,13 @@ describe("@Crud @Override — controller-method overrides that keep generated ro
     let error: unknown;
     try {
       @Crud(Todo, {
-        customOperations: {
-          recalc: {
-            handler: {
-              async execute() {
-                return null;
-              },
-            },
-            meta: { routes: { enabled: false } },
-          },
+        operations: {
+          deleteOne: { meta: { routes: { enabled: false } } },
         },
       })
       @Controller("todos")
       class ServiceOnlyOverrideController {
-        @Override("recalc")
+        @Override("deleteOne")
         recalc(): void {}
       }
       void ServiceOnlyOverrideController;
@@ -675,7 +609,7 @@ describe("@Crud @Override — controller-method overrides that keep generated ro
       error = caught;
     }
     expect(error).toBeInstanceOf(ConfigurationException);
-    expect(error).toMatchObject({ code: "KAVO_CONFIG_INVALID", messageParams: { path: "override.recalc" } });
+    expect(error).toMatchObject({ code: "KAVO_CONFIG_INVALID", messageParams: { path: "override.deleteOne" } });
   });
 
   it("throws at decoration time when the overridden method declares its own @Param/@Body", () => {
@@ -705,18 +639,15 @@ describe("KavoExceptionFilter — non-Kavo handler failures (Phase 6)", () => {
     },
   };
 
-  @Crud(Todo, {
-    customOperations: {
-      explode: { handler: exploding, meta: { routes: { method: "POST", path: "explode" } } },
-    },
-  })
+  @Crud(Todo, { operations: { createOne: { handler: exploding } } })
   @Controller("todos")
   class ExplodingController {}
 
   it("answers with a problem-details document at the catalog status", async () => {
     await bootstrap(ExplodingController);
     const response = await request(server())
-      .post("/todos/explode")
+      .post("/todos")
+      .send({ title: "x" })
       .expect(500)
       .expect("Content-Type", /application\/problem\+json/);
     expect(response.body).toMatchObject({
@@ -729,19 +660,19 @@ describe("KavoExceptionFilter — non-Kavo handler failures (Phase 6)", () => {
 
   it("keeps the driver detail out of the body while exposeInternals is off", async () => {
     await bootstrap(ExplodingController);
-    const response = await request(server()).post("/todos/explode").expect(500);
+    const response = await request(server()).post("/todos").send({ title: "x" }).expect(500);
     expect(JSON.stringify(response.body)).not.toContain("shard-7");
   });
 
   it("leaks the cause only when exposeInternals is turned on", async () => {
     await bootstrap(ExplodingController, { defaults: { errors: { exposeInternals: true } } });
-    const response = await request(server()).post("/todos/explode").expect(500);
+    const response = await request(server()).post("/todos").send({ title: "x" }).expect(500);
     expect(response.body.detail).toContain("shard-7");
   });
 
   it("reports the occurrence as a correlation URN", async () => {
     await bootstrap(ExplodingController);
-    const response = await request(server()).post("/todos/explode").expect(500);
+    const response = await request(server()).post("/todos").send({ title: "x" }).expect(500);
     expect(response.body.instance).toMatch(/^urn:kavo:request:/);
   });
 });

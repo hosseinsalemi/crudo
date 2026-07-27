@@ -52,7 +52,7 @@ export type {
   PaginationStrategyName,
 } from "./config/settings.js";
 export type { GlobalConfig } from "./config/global-config.js";
-export type { CustomOperationConfig, EntityConfig, OperationConfig, QueryAllowlists } from "./config/entity-config.js";
+export type { EntityConfig, OperationConfig, QueryAllowlists } from "./config/entity-config.js";
 export type { ResolvedEntityConfig, ResolvedQueryAllowlists } from "./config/resolved-entity-config.js";
 
 // ── Operations ────────────────────────────────────────────────────────

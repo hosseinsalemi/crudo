@@ -296,19 +296,19 @@ describe("CrudCallOptions — principal (Phase 7)", () => {
   it("surfaces the caller's principal on the context, unchanged", async () => {
     const seen: CrudContext<User>[] = [];
     const { crud } = makeCrud({
-      customOperations: {
-        whoami: {
+      operations: {
+        findMany: {
           handler: {
             async execute(_input: unknown, context: CrudContext<User>) {
               seen.push(context);
-              return null;
+              return { entities: [], total: 0 };
             },
           },
         },
       },
     } as never);
     const principal = { sub: "user-1", roles: ["admin"] };
-    await crud.engine.execute({ operation: "whoami", id: null, body: {}, query: null, options: { principal } });
+    await crud.engine.execute({ operation: "findMany", id: null, body: null, query: null, options: { principal } });
     expect(seen[0]?.principal).toBe(principal);
   });
 

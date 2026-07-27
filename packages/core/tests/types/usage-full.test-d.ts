@@ -5,7 +5,7 @@ import { Author } from "../support/blog-fixture.js";
 
 /**
  * Usage example 3 of 3: **fully configured** — global defaults, all six DTO
- * slots, allowlists, relation edges and a custom operation.
+ * slots, allowlists, relation edges and an overridden handler.
  *
  * Two things this pins that the other two files cannot: registering a
  * `create` DTO restores full strictness on the write path (the counterweight
@@ -35,10 +35,6 @@ class AuthorListDto {
   id = 0;
 }
 
-class PromoteResultDto {
-  promoted = false;
-}
-
 const kavo = createKavo({
   defaults: { pagination: { defaultLimit: 20, maxLimit: 100 } },
 });
@@ -61,8 +57,8 @@ const authors = kavo.createCrud(Author, {
   },
   allowlists: { filterable: ["name"], sortable: ["name"], selectable: ["id", "name"] },
   relations: { edges: { posts: { includable: true } } },
-  customOperations: {
-    promoteOne: { output: PromoteResultDto, handler: promote },
+  operations: {
+    findMany: { handler: promote },
   },
 });
 
@@ -93,5 +89,5 @@ void authors.createOne({ name: "Ada", bio: "x" });
 // @ts-expect-error — an allowlist entry has to name a real field.
 void kavo.createCrud(Author, { allowlists: { filterable: ["nmae"] } });
 
-// Custom operations dispatch through the engine, one pipeline either way.
-void authors.engine.execute({ operation: "promoteOne", id: 1, body: null, query: null, options: null });
+// Overridden and default operations dispatch through the engine, one pipeline either way.
+void authors.engine.execute({ operation: "findMany", id: null, body: null, query: null, options: null });

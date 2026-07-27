@@ -124,57 +124,6 @@ describe("CrudEngine pipeline (Phase 7)", () => {
     expect(found).toMatchObject({ id: 42, name: "override" });
   });
 
-  it("dispatches custom operations with their own DTOs", async () => {
-    class ActivateResultDto {
-      id = 0;
-      status = "";
-    }
-    const { crud } = makeCrud({
-      customOperations: {
-        activate: {
-          output: ActivateResultDto,
-          handler: {
-            async execute() {
-              return Object.assign(new User(), { id: 7, status: "active" });
-            },
-          },
-        },
-      },
-    } as never);
-    const response = await crud.engine.execute({
-      operation: "activate",
-      id: null,
-      body: {},
-      query: null,
-      options: null,
-    });
-    expect(response.item).toEqual({ id: 7, status: "active" });
-  });
-
-  it("forwards the request id to a custom operation alongside its body, when the route carries one", async () => {
-    const seen: unknown[] = [];
-    const { crud } = makeCrud({
-      customOperations: {
-        activate: {
-          handler: {
-            async execute(input: unknown) {
-              seen.push(input);
-              return null;
-            },
-          },
-        },
-      },
-    } as never);
-
-    await crud.engine.execute({ operation: "activate", id: 7, body: { name: "go" }, query: null, options: null });
-    expect(seen).toEqual([{ id: 7, body: { name: "go" } }]);
-
-    // An id-less custom operation still receives the plain body, unchanged.
-    seen.length = 0;
-    await crud.engine.execute({ operation: "activate", id: null, body: { name: "go" }, query: null, options: null });
-    expect(seen).toEqual([{ name: "go" }]);
-  });
-
   it("maps NotFound into a problem-details document", async () => {
     const { crud } = makeCrud();
     try {

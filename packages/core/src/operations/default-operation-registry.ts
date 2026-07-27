@@ -97,12 +97,10 @@ const unboundHandler = (id: OperationId): OperationHandler<unknown> => ({
 
 /**
  * Build one entity's operation registry from its config (Phase 7; the
- * Phase 13 control surface configures exactly this):
- *
- * - standard entries first, honoring `operations.<id>: false` (disable),
- *   `operations.<id>: true` / `{ enabled: true }` (enable), and
- *   `operations.<id>.handler` (override — default scaffolding stays);
- * - then `customOperations`, each with its own DTOs and `meta`.
+ * Phase 13 control surface configures exactly this): standard entries,
+ * honoring `operations.<id>: false` (disable), `operations.<id>: true` /
+ * `{ enabled: true }` (enable), and `operations.<id>.handler` (override —
+ * default scaffolding stays).
  *
  * Phase 14's soft-delete operations default from the config alone, never
  * from ORM metadata: `restoreOne` turns on when the entity config
@@ -139,26 +137,6 @@ export function createOperationRegistry<Entity extends object>(
       input: null,
       output: null,
       meta: settings?.meta ?? {},
-    });
-  }
-
-  for (const [id, custom] of Object.entries(config?.customOperations ?? {})) {
-    if (registry.has(id)) {
-      throw new ConfigurationException(
-        "unknown",
-        `customOperations.${id}`,
-        `'${id}' collides with a standard operation id`,
-      );
-    }
-    registry.register({
-      id,
-      kind: "write",
-      cardinality: "one",
-      enabled: true,
-      handler: custom.handler,
-      input: custom.input ?? null,
-      output: custom.output ?? null,
-      meta: custom.meta ?? {},
     });
   }
   return registry;

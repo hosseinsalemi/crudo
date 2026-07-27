@@ -45,7 +45,6 @@ const PUBLIC_SURFACE: readonly string[] = [
   "KavoInstance",
   "KavoOptions",
   "KavoSettings",
-  "CustomOperationConfig",
   "DeepPartial",
   "DefaultCrudContextState",
   "DefaultCrudService",

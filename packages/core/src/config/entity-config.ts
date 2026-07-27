@@ -2,7 +2,7 @@ import type { KavoSettings } from "./settings.js";
 import type { DeepPartial } from "../types/utility.js";
 import type { FieldPath } from "../types/field-path.js";
 import type { QueryContext } from "../query/query-context.js";
-import type { DtoClass, OperationDtoMap } from "../dto/dto.js";
+import type { OperationDtoMap } from "../dto/dto.js";
 import type { EntityInput } from "../types/utility.js";
 import type { OperationHandler, OperationMetadata } from "../operations/operation-handler.js";
 import type { StandardOperationId } from "../operations/operation.js";
@@ -40,20 +40,6 @@ export interface OperationConfig<Entity = unknown> extends DeepPartial<KavoSetti
 }
 
 /**
- * A developer-defined operation (Phase 13). Unlike an override, a custom
- * operation declares its own input/output DTOs — its shape isn't
- * guaranteed CRUD-like. Route generation (including the `http: false`
- * service-only mode) is expressed through `meta` by `@kavo/nest`'s
- * `OperationMetadata` augmentation.
- */
-export interface CustomOperationConfig<Entity = unknown> {
-  readonly input?: DtoClass;
-  readonly output?: DtoClass;
-  readonly handler: OperationHandler<Entity>;
-  readonly meta?: OperationMetadata;
-}
-
-/**
  * Raw entity-scope configuration — the second argument to `createCrud`.
  * Settings keys (inherited from `DeepPartial<KavoSettings>`) override
  * global scope for this entity.
@@ -74,6 +60,4 @@ export interface EntityConfig<
    * enables one that is off by default (`purgeOne`, `restoreOne`).
    */
   readonly operations?: Partial<Record<StandardOperationId, OperationConfig<Entity> | boolean>>;
-  /** New operations, dispatched through the same registry (Phase 13). */
-  readonly customOperations?: Readonly<Record<string, CustomOperationConfig<Entity>>>;
 }

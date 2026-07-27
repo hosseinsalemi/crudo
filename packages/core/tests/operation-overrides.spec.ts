@@ -186,7 +186,7 @@ describe("EntityConfig.operations — overriding every singular standard operati
     expect(adapter.calls.delete).toBe(0);
   });
 
-  it("overrides all five singular standard operations and adds a custom operation on one entity", async () => {
+  it("overrides all five singular standard operations on one entity", async () => {
     const calls: string[] = [];
     const overrideHandler = (id: string) => ({
       async execute() {
@@ -210,16 +210,6 @@ describe("EntityConfig.operations — overriding every singular standard operati
           },
         },
       },
-      customOperations: {
-        reindex: {
-          handler: {
-            async execute() {
-              calls.push("reindex");
-              return null;
-            },
-          },
-        },
-      },
     });
 
     await crud.createOne(ADA as never);
@@ -227,9 +217,8 @@ describe("EntityConfig.operations — overriding every singular standard operati
     await crud.updateOne(1, {} as never);
     await crud.patchOne(1, {} as never);
     await crud.deleteOne(1);
-    await crud.engine.execute({ operation: "reindex", id: null, body: {}, query: null, options: null });
 
-    expect(calls).toEqual(["createOne", "findOne", "updateOne", "patchOne", "deleteOne", "reindex"]);
+    expect(calls).toEqual(["createOne", "findOne", "updateOne", "patchOne", "deleteOne"]);
     // None of the overridden built-ins ever touched the adapter — the
     // registry dispatched straight to the replacement handlers (ADR-0006).
     expect(adapter.calls).toMatchObject({ create: 0, findOneById: 0, update: 0, patch: 0, delete: 0 });

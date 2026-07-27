@@ -16,8 +16,7 @@ docs** — there is no validation subsystem attached to them.
 | `item`   | Any single-resource response          | Entity, subject to field selection                               |
 | `list`   | Element type in `ListResultDto.items` | Same as `item`'s resolved type                                   |
 
-Restore (Phase 14) and custom operations (Phase 13) reuse `item`/`list`;
-no additional slots exist.
+Restore (Phase 14) reuses `item`/`list`; no additional slots exist.
 
 ## 2. Resolution algorithm
 

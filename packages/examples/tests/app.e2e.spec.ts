@@ -732,4 +732,43 @@ describe("Address operation overrides (issue #21)", () => {
       .expect("Content-Type", /application\/problem\+json/);
     expect(response.body.code).toBe("KAVO_NOT_FOUND");
   });
+
+  it("validates a clean postalCode via the fully custom route, without mutating it", async () => {
+    const created = await request(server())
+      .post("/addresses")
+      .send({ street: "1 Elm St", city: "Springfield", postalCode: "10001" })
+      .expect(201);
+    const id = created.body.id as number;
+
+    const response = await request(server()).get(`/addresses/${id}/validate-postal-code`).expect(200);
+    expect(response.body).toEqual({ valid: true });
+  });
+
+  it("reports an invalid postalCode via the fully custom route, without correcting it", async () => {
+    const created = await request(server())
+      .post("/addresses")
+      .send({ street: "1 Elm St", city: "Springfield", postalCode: "10001" })
+      .expect(201);
+    const id = created.body.id as number;
+
+    // As with the normalize-postal-code test above, every write path
+    // already normalizes on the way in, so a dirty value has to be seeded
+    // directly to observe this read-only route doing anything.
+    const dataSource = app.get<DataSource>(DATA_SOURCE);
+    await dataSource.getRepository(Address).update(id, { postalCode: "bad" });
+
+    const response = await request(server()).get(`/addresses/${id}/validate-postal-code`).expect(200);
+    expect(response.body).toEqual({ valid: false });
+
+    const fetched = await request(server()).get(`/addresses/${id}`).expect(200);
+    expect(fetched.body.postalCode).toBe("bad");
+  });
+
+  it("404s when validating a nonexistent address", async () => {
+    const response = await request(server())
+      .get("/addresses/999999/validate-postal-code")
+      .expect(404)
+      .expect("Content-Type", /application\/problem\+json/);
+    expect(response.body.code).toBe("KAVO_NOT_FOUND");
+  });
 });
