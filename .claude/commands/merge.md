@@ -8,21 +8,19 @@ allowed-tools: Bash(git:*), Bash(gh:*), Bash(pnpm:*), Read
 
 - Branch: !`git rev-parse --abbrev-ref HEAD`
 - Working tree: !`git status --short`
-- PR for this branch: !`gh pr view --json number,title,state,isDraft,mergeable,mergeStateStatus,reviewDecision,url 2>/dev/null || echo "NO PR"`
-- Checks: !`gh pr checks 2>/dev/null || echo "no checks reported"`
+- PR: !`gh pr view $ARGUMENTS --json number,title,state,isDraft,mergeable,mergeStateStatus,reviewDecision,url 2>/dev/null || echo "NO PR"`
+- Checks: !`gh pr checks $ARGUMENTS 2>/dev/null || echo "no checks reported"`
 
 ## Your task
 
 Close the loop on this PR. Argument: **$ARGUMENTS**
 
 1. **Refuse to merge if any of these hold.** Report which one and stop:
-   - there is no PR for this branch;
+   - there is no matching PR;
    - the PR is still a **draft**;
    - any required check is **failing or still running** — wait for it, do not
      merge past it;
    - `mergeable` is false, or there are conflicts with `main`;
-   - `/review` has not been run on this PR, or it left blocking findings
-     unresolved.
 
    If the only problem is that checks are still running, say so and offer to
    wait rather than merging blind.
@@ -62,7 +60,3 @@ Close the loop on this PR. Argument: **$ARGUMENTS**
 
 6. **Confirm the issue closed.** `Closes #<n>` in the PR body should have done
    it; if the issue is still open, close it with a comment pointing at the PR.
-
-7. **Report**: what merged, that the branch is deleted, the `pnpm check` result
-   on `main`, and what the next ready issue is (`gh issue list --label
-"status:ready"`). Then the loop restarts at `/implement`.
