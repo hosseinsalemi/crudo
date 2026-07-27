@@ -2,29 +2,14 @@ import { enumProp } from "@kavo/nest";
 import { PetSizeEnum } from "../pet/pet.entity.js";
 
 /**
- * DTO slots for the Dog route (Phase 4). See `cat.dtos.ts` for the rationale
- * behind plain initialized-field classes and the absent `species` slot.
+ * `DogController` no longer registers a `dto` block — every slot resolves
+ * entity-derived (see `dog.controller.ts`). `DogItemDto` survives here only
+ * because `owner.dtos.ts` needs a concrete class for the `Dog` half of its
+ * polymorphic `pets` union; it is unrelated to the `/dogs` route's own
+ * request/response shape.
  */
 
-/** `create` slot — request body for POST /dogs. */
-export class CreateDogDto {
-  name = "";
-  age = 0;
-  size = enumProp(Object.values(PetSizeEnum), { example: PetSizeEnum.Medium });
-  breed = "";
-  goodBoy = true;
-}
-
-/** `update` slot — request body for PUT /dogs/:id (patch derives from it). */
-export class UpdateDogDto {
-  name = "";
-  age = 0;
-  size = enumProp(Object.values(PetSizeEnum), { example: PetSizeEnum.Medium });
-  breed = "";
-  goodBoy = false;
-}
-
-/** `item` slot — the detail projection. */
+/** Used by `owner.dtos.ts`'s `pets` oneOf — not by the `/dogs` route itself. */
 export class DogItemDto {
   id = 0;
   name = "";
@@ -33,11 +18,4 @@ export class DogItemDto {
   breed = "";
   goodBoy = false;
   createdAt: Date = new Date(0);
-}
-
-/** `list` slot — a leaner projection for list responses. */
-export class DogListDto {
-  id = 0;
-  name = "";
-  breed = "";
 }

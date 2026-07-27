@@ -453,6 +453,27 @@ describe("Pet example app", () => {
     await request(server()).get(`/dogs/${dog.body.id}`).expect(200);
   });
 
+  it("falls back to entity-derived DTOs on /dogs, which declares no `dto` block", async () => {
+    const created = await request(server())
+      .post("/dogs")
+      .send({ name: "Fido", age: 3, breed: "Beagle", goodBoy: true, id: 4242 })
+      .expect(201);
+    // Entity-derived write projection: every non-generated column is
+    // writable, so no hand-picked `create` DTO is trimming the request —
+    // but the generated `id` primary column still can't be client-set.
+    expect(created.body).toMatchObject({ name: "Fido", age: 3, breed: "Beagle", goodBoy: true });
+    expect(created.body.id).not.toBe(4242);
+
+    // Entity-derived read projection: every scalar column serializes,
+    // unlike the curated `CatItemDto`/`CatListDto` pair — there is no
+    // leaner `list` shape distinct from `item` once both fall back.
+    expect(created.body).toHaveProperty("createdAt");
+    const list = await request(server()).get("/dogs").query("limit=50").expect(200);
+    const fido = list.body.items.find((item: { id: number }) => item.id === created.body.id);
+    expect(fido).toHaveProperty("createdAt");
+    expect(fido).toMatchObject({ name: "Fido", breed: "Beagle" });
+  });
+
   it("associates tags by id and embeds them via a batched many-to-many include", async () => {
     const tagA = await request(server()).post("/tags").send({ name: "playful" }).expect(201);
     const tagB = await request(server()).post("/tags").send({ name: "lazy" }).expect(201);
