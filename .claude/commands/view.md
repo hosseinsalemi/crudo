@@ -13,8 +13,8 @@ allowed-tools: Bash(gh:*)
 Issue number: **$ARGUMENTS**
 
 If the repo line says `NO REMOTE`, stop and say this repo has no GitHub
-remote. If no issue number was given, stop and ask for one — do not guess
-which issue is meant.
+remote. If no issue number was given, or `$ARGUMENTS` isn't a number, stop and
+ask for one — do not guess which issue is meant.
 
 Run `gh issue view $ARGUMENTS` and show the result: title, state, labels, and
 the full body (context, acceptance criteria, affected packages, constraints,
