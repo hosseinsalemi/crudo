@@ -43,10 +43,11 @@ or private.
      `CLAUDE.md`. Cite the ADRs that actually apply; skip the ones that do not.
    - **Out of scope** — what this issue deliberately does not cover.
 
-4. **Label it.** Use the existing labels where they fit. The scheme is
-   `type:feat|fix|chore|test|docs`, `area:core|typeorm|nest|docs`, and
-   `status:ready` once it is plannable. Create a missing label with
-   `gh label create <name>` only if it fits that scheme.
+4. **Label it.** Use the existing labels where they fit. See the
+   `conventions` skill for the `type:` set; also apply
+   `area:core|typeorm|nest|docs` and `status:ready` once it is plannable.
+   Create a missing label with `gh label create <name>` only if it fits that
+   scheme.
 
 5. **Show it before creating anything.** Print the full drafted issue —
    title, labels, and body exactly as they would be submitted — and stop.

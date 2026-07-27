@@ -25,7 +25,7 @@ You are creating one or more well-scoped git commits from the current working ch
 
 3. **Stage precisely** for each group using explicit pathspecs: `git reset` first to clear the index, then `git add <specific files>` for the group. Do NOT use `git add -A` / `git add .`. Verify with `git status --short` before committing.
 
-4. **Commit** each group with a Conventional Commits message matching the style of recent commits in this repo (`feat:`, `fix:`, `refactor:`, `docs:`, `chore:`, `test:`, `build:`). Subject line under ~72 chars, imperative mood. Add a short body only when the "why" isn't obvious.
+4. **Commit** each group with a Conventional Commits message — see the `conventions` skill for the type vocabulary and format.
 
 5. Repeat until the working tree is clean (or only intentionally-excluded files remain).
 

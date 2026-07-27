@@ -95,8 +95,8 @@ Work moves one issue at a time, on one branch, through slash commands in `.claud
 
 ```
 /issue "rough idea"   →  a plannable GitHub issue (acceptance criteria, affected packages, constraints)
-/plan [n]             →  kavo-architect plans it  →  YOU APPROVE  →  branch created off main
-/implement            →  code + tests written here, in the main thread  →  left uncommitted
+/implement <n>        →  kavo-architect plans it  →  YOU APPROVE  →  branch created off main  →
+                          code + tests written here, in the main thread  →  left uncommitted
 /verify               →  pnpm check  ‖  kavo-reviewer ‖ kavo-boundary-guard ‖ kavo-test-auditor, consolidated
 /commit               →  working tree split into logical commits
 /pr                   →  pnpm check  →  push  →  PR opened/updated, "Closes #n"
