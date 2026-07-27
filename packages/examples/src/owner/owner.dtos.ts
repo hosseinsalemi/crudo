@@ -1,12 +1,28 @@
-import { oneOfArray } from "@kavo/nest";
+import { enumProp, oneOfArray } from "@kavo/nest";
 import { CatItemDto } from "../cat/cat.dtos.js";
-import { DogItemDto } from "../dog/dog.dtos.js";
 import { AddressItemDto } from "../address/address.dtos.js";
+import { PetSizeEnum } from "../pet/pet.entity.js";
 
 /**
  * DTO slots for the Owner route (Phase 4). See `cat.dtos.ts` for the
  * rationale behind plain initialized-field classes.
  */
+
+/**
+ * Used only for `OwnerItemDto.pets`'s polymorphic union below — `DogController`
+ * registers no `dto` block of its own (every `/dogs` slot resolves
+ * entity-derived), so this is the one place `Dog`'s item shape needs a
+ * concrete DTO class.
+ */
+export class DogItemDto {
+  id = 0;
+  name = "";
+  age = 0;
+  size = enumProp(Object.values(PetSizeEnum), { example: PetSizeEnum.Medium });
+  breed = "";
+  goodBoy = false;
+  createdAt: Date = new Date(0);
+}
 
 /** `create` slot — request body for POST /owners. */
 export class CreateOwnerDto {
