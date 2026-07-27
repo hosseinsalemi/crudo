@@ -13,7 +13,7 @@ code, or a second serialization path.
 ## Decide it's actually new
 
 Check `ERROR_CATALOG` (`packages/core/src/errors/error-catalog.ts`) and the
-hierarchy first — a new failure mode for an *existing* code (e.g. another
+hierarchy first — a new failure mode for an _existing_ code (e.g. another
 reason a request is malformed) is usually a `QueryValidationException` issue,
 not a new class. Only add a leaf when the failure needs its own HTTP status,
 its own payload shape, or callers need to `instanceof`/catch it distinctly.
@@ -41,7 +41,7 @@ its own payload shape, or callers need to `instanceof`/catch it distinctly.
    backfills whatever's missing. Don't hand-roll that at the throw site.
 5. **Adapter mapping, if it originates from `@kavo/typeorm`** — add the
    translation in the adapter's own table (`mapDriverError`, doc 09 §5)
-   *inside the adapter package*. Core never gains ORM-specific knowledge to
+   _inside the adapter package_. Core never gains ORM-specific knowledge to
    recognize a driver error; whatever the adapter doesn't recognize already
    falls through to `PersistenceException` with the original as `cause`.
 6. **`exposeInternals`** — if the new exception can carry adapter/driver

@@ -10,15 +10,15 @@ issue's label, its branch prefix, and the Conventional Commit prefix used for
 work on it:
 
 | Type       | Meaning                                | Issue label     |
-| ---------- | --------------------------------------- | ---------------- |
-| `feat`     | New capability                          | `type:feat`      |
-| `fix`      | Bug fix                                 | `type:fix`       |
-| `chore`    | Tooling, deps, housekeeping             | `type:chore`     |
-| `test`     | Test coverage work                      | `type:test`      |
-| `docs`     | Documentation                           | `type:docs`      |
-| `refactor` | Code restructuring, no behavior change  | `type:refactor`  |
-| `perf`     | Performance improvements                | `type:perf`      |
-| `ci`       | CI/build pipeline changes               | `type:ci`        |
+| ---------- | -------------------------------------- | --------------- |
+| `feat`     | New capability                         | `type:feat`     |
+| `fix`      | Bug fix                                | `type:fix`      |
+| `chore`    | Tooling, deps, housekeeping            | `type:chore`    |
+| `test`     | Test coverage work                     | `type:test`     |
+| `docs`     | Documentation                          | `type:docs`     |
+| `refactor` | Code restructuring, no behavior change | `type:refactor` |
+| `perf`     | Performance improvements               | `type:perf`     |
+| `ci`       | CI/build pipeline changes              | `type:ci`       |
 
 ## Creating a branch from an issue
 
