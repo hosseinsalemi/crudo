@@ -29,7 +29,7 @@ request time. `onModuleInit` runs after Nest's own controller
 instantiation but well before the first request, which is the only
 timing the generated methods need. `forFeature` still exists, now only
 for the narrower case of a class that constructor-injects
-`getCrudServiceToken(Entity)` itself — that resolution *does* need a
+`getCrudServiceToken(Entity)` itself — that resolution _does_ need a
 real DI provider, since it happens at instantiation time. Called with no
 arguments, `forFeature()` provides that token for every `@Crud`-decorated
 class the process has seen so far (read from the same decoration-time
