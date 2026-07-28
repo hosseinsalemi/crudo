@@ -19,6 +19,11 @@ import { AddressController } from "./address/address.controller.js";
     KavoModule.forRootAsync({
       imports: [DatabaseModule],
       inject: [DATA_SOURCE] as never[],
+      // AddressController constructor-injects its own service
+      // (getCrudServiceToken), which needs a real DI provider —
+      // provideServices supplies one for every @Crud entity registered so
+      // far, with no separate call or list to keep in sync.
+      provideServices: true,
       useFactory: (dataSource: DataSource) => ({
         infrastructure: createTypeOrmInfrastructure(dataSource),
         defaults: {
@@ -27,7 +32,7 @@ import { AddressController } from "./address/address.controller.js";
         },
       }),
     }),
-    KavoModule.forFeature([OwnerController, CatController, DogController, TagController, AddressController]),
   ],
+  controllers: [OwnerController, CatController, DogController, TagController, AddressController],
 })
 export class AppModule {}

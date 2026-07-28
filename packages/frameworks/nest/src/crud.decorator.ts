@@ -1,4 +1,4 @@
-import { Body, Delete, Get, HttpCode, Inject, Param, Patch, Post, Put, Query } from "@nestjs/common";
+import { Body, Delete, Get, HttpCode, Param, Patch, Post, Put, Query } from "@nestjs/common";
 import type {
   ClassRef,
   DefaultCrudService,
@@ -12,12 +12,7 @@ import type {
 import { ConfigurationException, createOperationRegistry } from "@kavo/core";
 import type { CrudHttpMethod, CrudRouteOptions } from "./operation-metadata.js";
 import type { OverrideMetadata } from "./override.decorator.js";
-import {
-  CRUD_CONTROLLER_METADATA,
-  CRUD_OVERRIDE_METADATA,
-  CRUD_SERVICE_PROPERTY,
-  getCrudServiceToken,
-} from "./tokens.js";
+import { CRUD_CONTROLLER_METADATA, CRUD_OVERRIDE_METADATA, CRUD_SERVICE_PROPERTY } from "./tokens.js";
 import { WireQueryPipe } from "./wire-query.pipe.js";
 import { applySwaggerMetadata } from "./swagger.js";
 
@@ -25,6 +20,26 @@ import { applySwaggerMetadata } from "./swagger.js";
 export interface CrudControllerMetadata {
   readonly entity: ClassRef;
   readonly config?: EntityConfig<object>;
+}
+
+/**
+ * Every `@Crud`-decorated class, in decoration order — populated as a side
+ * effect of the decorator running at class-definition time (import time),
+ * which is always before any `KavoModule.forRoot`/`forRootAsync` call
+ * (nested inside `@Module({...})`, which only runs after every controller
+ * file it imports has finished evaluating). `KavoModule.forFeature()`
+ * called with no arguments reads this to build one DI provider per
+ * registered entity with no explicit list — the process-wide scope is why
+ * this stays internal rather than something a normal app reaches for
+ * directly, and why `@kavo/nest`'s own tests, which decorate many
+ * differently-configured classes against the same entity in one file,
+ * always pass `forFeature` an explicit array instead.
+ */
+const registeredCrudControllers = new Map<Function, CrudControllerMetadata>();
+
+/** @internal used by `KavoModule.forFeature()`'s no-argument form. */
+export function getRegisteredCrudControllers(): ReadonlyMap<Function, CrudControllerMetadata> {
+  return registeredCrudControllers;
 }
 
 /**
@@ -104,8 +119,11 @@ interface ResolvedRoute {
  * Route generation happens at decoration time (class definition), which is
  * what lets Nest's router see the methods during its normal controller
  * scan — Nest maps routes before any module lifecycle hook runs, so this
- * is the only moment that works. The service instance arrives later, via
- * the `forFeature` provider, through property injection.
+ * is the only moment that works. The service instance arrives later:
+ * `KavoModule`'s discovery binder finds every `@Crud`-decorated controller
+ * at `onModuleInit` (via `@nestjs/core`'s `DiscoveryService`, so no explicit
+ * registration list is needed) and assigns `this[CRUD_SERVICE_PROPERTY]`
+ * directly — no DI provider or constructor injection involved.
  *
  * The generic parameters are inferred and exist purely to typecheck the
  * call site: allowlist and relation-edge keys, DTO slots and overridden
@@ -132,14 +150,9 @@ export function Crud<
       prototype: Record<string, unknown>;
     };
     const erasedConfig = config as EntityConfig<object> | undefined;
-    Reflect.defineMetadata(
-      CRUD_CONTROLLER_METADATA,
-      { entity, config: erasedConfig } satisfies CrudControllerMetadata,
-      target,
-    );
-    // Property injection: generated methods reach the bound service via
-    // `this[CRUD_SERVICE_PROPERTY]` without touching the constructor.
-    Inject(getCrudServiceToken(entity))(controller.prototype, CRUD_SERVICE_PROPERTY);
+    const metadata: CrudControllerMetadata = { entity, config: erasedConfig };
+    Reflect.defineMetadata(CRUD_CONTROLLER_METADATA, metadata, target);
+    registeredCrudControllers.set(target, metadata);
 
     const registry = createOperationRegistry(erasedConfig);
     const overrides = collectOverrides(controller.prototype, entity.name, registry);

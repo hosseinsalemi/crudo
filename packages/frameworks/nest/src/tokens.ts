@@ -1,4 +1,4 @@
-import type { ClassRef } from "@kavo/core";
+import type { ClassRef, DefaultCrudService } from "@kavo/core";
 
 /** DI token of the Kavo root instance created by `KavoModule.forRoot`. */
 export const KAVO_INSTANCE = Symbol("KAVO_INSTANCE");
@@ -29,4 +29,14 @@ export function getCrudServiceToken(entity: ClassRef): string {
     serviceTokens.set(entity, token);
   }
   return token;
+}
+
+/**
+ * Reads the `CrudService` `KavoModule`'s discovery binder already bound onto
+ * a `@Crud`-decorated controller instance — the typed way for the
+ * controller's own methods (an `@Override`, or a fully custom native route)
+ * to reach it, with no separate constructor injection needed.
+ */
+export function boundCrudService<Entity extends object>(controller: object): DefaultCrudService<Entity> {
+  return (controller as Record<string, unknown>)[CRUD_SERVICE_PROPERTY] as DefaultCrudService<Entity>;
 }
