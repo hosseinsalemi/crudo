@@ -23,7 +23,6 @@ async function bootstrap(): Promise<void> {
   SwaggerModule.setup("docs", app, document);
 
   await app.listen(3000);
-  console.log("Kavo pet example: http://localhost:3000 — /cats /dogs /owners (docs at /docs)");
 }
 
 void bootstrap();
