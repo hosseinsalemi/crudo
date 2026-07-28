@@ -17,14 +17,46 @@ boundary) — infrastructure arrives through DI.
 - **`KavoModule.forRoot(options)`** (global): creates the Kavo root
   instance (`createKavo` skin — `defaults` passes through untouched),
   registers the problem-details exception filter app-wide (`APP_FILTER`),
-  and exposes `KAVO_INSTANCE`. **`forRootAsync`** resolves the options
-  via `useFactory`/`inject` — the checkpoint app uses it to wait for the
-  `DataSource` before building `createTypeOrmInfrastructure(dataSource)`.
-- **`KavoModule.forFeature(controllers)`**: for each `@Crud`-decorated
-  controller, registers the controller and provides the entity's service
-  under `getCrudServiceToken(Entity)` (factory:
-  `kavo.createCrud(entity, config)` — bootstrap happens here, once).
-  A non-`@Crud` class fails fast with a `ConfigurationException`.
+  exposes `KAVO_INSTANCE`, and registers `KavoCrudBinder`. **`forRootAsync`**
+  resolves the options via `useFactory`/`inject` — the checkpoint app uses
+  it to wait for the `DataSource` before building
+  `createTypeOrmInfrastructure(dataSource)`.
+- **`KavoCrudBinder`** (`onModuleInit`, internal): uses `@nestjs/core`'s
+  `DiscoveryService` to find every `@Crud`-decorated controller already in
+  the app's module graph and assigns `kavo.createCrud(entity, config)`
+  directly onto `this[CRUD_SERVICE_PROPERTY]` — bootstrap happens here,
+  once per controller. This is what makes a plain Nest `controllers:` array
+  (in `AppModule` or anywhere else) sufficient on its own; no explicit
+  per-entity registration is needed for the generated route methods, which
+  only read that property at request time, well after `onModuleInit`.
+- **`KavoModule.forFeature(controllers)`**: registers the controllers
+  (redundant if they're already in some module's `controllers:` array) and
+  additionally provides the entity's service under
+  `getCrudServiceToken(Entity)` as a real DI provider. Reach for this only
+  when some class needs to constructor-inject that token itself — a
+  resolution that happens at instantiation time, before `onModuleInit` has
+  run, so it can't rely on the binder. A non-`@Crud` class fails fast with
+  a `ConfigurationException`. Inside a `@Crud`-decorated class itself,
+  prefer `boundCrudService(this)` over constructor injection — the binder
+  has already bound it by the time any request arrives.
+- **`KavoModule.forFeature()`** (no arguments): the same DI-provider half
+  of `forFeature`, but for every `@Crud`-decorated class the process has
+  seen so far, read from the decoration-time registry `@Crud` itself
+  populates — no controller list, and no `controllers:` field in the
+  returned module (the caller already put them in an ordinary Nest
+  `controllers:` array). This is what lets a normal app get constructor
+  injection everywhere with one stable call that needs no updates as
+  controllers are added or removed. Fails fast if two different
+  controllers registered the same entity — the provider token is
+  per-entity, so which config would win is otherwise silently ambiguous.
+  Scoped to the whole process rather than one app's module graph, which is
+  exactly why `@kavo/nest`'s own tests — many differently-configured
+  `@Crud(Todo, ...)` classes declared across one file's test modules —
+  always pass `forFeature` an explicit array instead.
+- **`{ provideServices: true }`** on `forRoot`/`forRootAsync` folds the
+  no-argument `forFeature()` in directly — the same providers, merged into
+  the same call — so a normal app states its Kavo config once instead of
+  importing both `forRootAsync({...})` and a separate `forFeature()`.
 
 **Singleton services, deliberately:** the engine threads every
 per-request concern (principal, transaction, query, correlation id,
@@ -82,9 +114,8 @@ skips installing a function and applies that same step to the existing,
 hand-written method; Nest dispatches to it directly at request time, with
 no engine or `CrudEngine` involvement in the indirection.
 
-The decorated method typically injects the entity's bound
-`DefaultCrudService` via the existing `getCrudServiceToken` (ordinary
-constructor DI on the controller) to delegate to default behavior
+The decorated method typically delegates to default behavior via the
+entity's bound `DefaultCrudService`, reachable as `boundCrudService(this)`
 (`this.base.createOne(dto)`), the same "base" pattern config-level
 overrides get through `context` inside a plain `OperationHandler`.
 
@@ -130,14 +161,17 @@ registry operation id) and the `@Override` map (name registered via
 never inspected by `@Crud`; it is an ordinary Nest controller method that
 happens to live on a `@Crud`-decorated class. The only Kavo-specific
 piece it typically wants is the entity's bound service, reachable the
-same way an `@Override`'d method reaches it — ordinary constructor DI via
-`getCrudServiceToken(Entity)`:
+same way an `@Override`'d method reaches it — `boundCrudService(this)`,
+which reads the property `KavoCrudBinder` already bound at
+`onModuleInit`:
 
 ```ts
 @Controller("users")
 @Crud(User)
 export class UserController {
-  constructor(@Inject(getCrudServiceToken(User)) private readonly base: DefaultCrudService<User>) {}
+  private get base(): DefaultCrudService<User> {
+    return boundCrudService<User>(this);
+  }
 
   @Get(":id/summary")
   async summary(@Param("id") id: string): Promise<unknown> {

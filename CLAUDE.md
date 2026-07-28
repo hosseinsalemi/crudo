@@ -74,7 +74,7 @@ Standard operations delegate to the typed `DefaultCrudService` surface; custom o
 
 ### Wiring an app
 
-See `packages/examples/src/app.module.ts`: `KavoModule.forRootAsync({ useFactory: () => ({ infrastructure: createTypeOrmInfrastructure(dataSource), defaults: {...} }) })` supplies the global scope, and `KavoModule.forFeature([...Controllers])` registers the `@Crud` controllers. The app is what hands Nest its infrastructure — the packages never import each other.
+See `packages/examples/src/app.module.ts`: `KavoModule.forRootAsync({ provideServices: true, useFactory: () => ({ infrastructure: createTypeOrmInfrastructure(dataSource), defaults: {...} }) })` is the app's only Kavo import — the `@Crud` controllers just go in `AppModule`'s own `controllers: [...]` array. `KavoModule`'s discovery binder (`DiscoveryService`, `onModuleInit`) finds them there and binds each entity's service, no registration needed; `provideServices: true` additionally provides `getCrudServiceToken(Entity)` as a real DI provider for every `@Crud`-decorated class the process has seen, which `AddressController` needs for its constructor-injected `base` (a fully custom route wants it typed as an ordinary constructor param). That's the same thing the standalone no-arg `KavoModule.forFeature()` does, folded into one call; `forFeature([...])` with an explicit array also still exists. Both no-arg forms are process-wide, so `@kavo/nest`'s own tests (many differently-configured `@Crud` classes over one entity in one file) always pass `forFeature` an explicit array instead. The app is what hands Nest its infrastructure — the packages never import each other.
 
 ## Conventions (normative)
 

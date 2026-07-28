@@ -18,9 +18,24 @@ it builds the operation registry from the entity config with the same
 unbound), defines one method per enabled entry on the prototype, and
 applies Nest's real decorators programmatically (`Post(path)(proto,
 name, descriptor)`, `Param("id")(…)`, `HttpCode(…)`). The service
-instance arrives later through DI: `forFeature` provides it under
-`getCrudServiceToken(Entity)` and the generated methods reach it via
-property injection.
+instance arrives later, but not through DI: `KavoModule`'s
+`KavoCrudBinder` (`onModuleInit`, via `@nestjs/core`'s
+`DiscoveryService`) finds every `@Crud`-decorated controller already in
+the app's module graph — however it got there, an ordinary Nest
+`controllers:` array is enough — and assigns
+`kavo.createCrud(entity, config)` directly onto
+`this[CRUD_SERVICE_PROPERTY]`, which the generated methods read at
+request time. `onModuleInit` runs after Nest's own controller
+instantiation but well before the first request, which is the only
+timing the generated methods need. `forFeature` still exists, now only
+for the narrower case of a class that constructor-injects
+`getCrudServiceToken(Entity)` itself — that resolution *does* need a
+real DI provider, since it happens at instantiation time. Called with no
+arguments, `forFeature()` provides that token for every `@Crud`-decorated
+class the process has seen so far (read from the same decoration-time
+registry `KavoCrudBinder`'s metadata lookups already rely on), so a normal
+app states its controller list exactly once, in an ordinary `controllers:`
+array.
 
 ## Consequences
 
@@ -28,9 +43,9 @@ property injection.
   monkey-patching, and guards/interceptors/versioning/prefixes compose
   exactly as with hand-written methods.
 - The entity config is stated on the controller (`@Crud(Entity, config)`)
-  and read back by `forFeature` from decorator metadata — one source of
-  truth for both route generation and service bootstrap; the two can't
-  drift.
+  and read back from the same decorator metadata by both route
+  generation and `KavoCrudBinder`'s service bootstrap — one source of
+  truth; the two can't drift.
 - Manual-method-wins is a one-line `hasOwnProperty` check at decoration
   time.
 - Limitation: decoration time has no ORM metadata, so Swagger docs can't
