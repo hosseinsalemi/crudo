@@ -83,6 +83,31 @@ and share `FilterTranslator`'s scheme, so `filter[blog.name][eq]=…`
 alongside `include=blog` reuses the one selecting join instead of adding a
 second, non-selecting one under a duplicate alias.
 
+**Eager loading for detail views.** `strategy: "join"` is not restricted to
+to-one edges — forcing it onto a to-many edge folds that relation into the
+main query too, so `findOne`/`findOneById` resolves in a single round trip
+instead of the main query plus one batch query per relation level. This is
+the pattern for a detail endpoint over a relation with modest cardinality
+(an owner's pets, a blog's articles), where the extra joined rows are cheap
+and a second query is pure overhead:
+
+```ts
+joinedBlogs = kavo.createCrud(Blog, {
+  relations: { edges: { articles: { includable: true, strategy: "join" } } },
+});
+```
+
+It is opt-in per edge, never the default — `auto` still resolves a to-many
+to `batch`, and a list endpoint over the same relation should keep it that
+way: joining a large to-many into a paginated main query is correct (the
+skip/take-on-distinct-roots fallback above holds) but wastes bandwidth on
+rows the batch strategy would fetch once per page instead of once per root.
+Because `strategy` is entity-wide config, not per-operation, giving a detail
+route eager loading while a list route keeps batching means two `createCrud`
+registrations of the same entity — one per route, each with its own
+strategy — exactly as `blogs` and `joinedBlogs` do in
+`packages/orms/typeorm/tests/includes.spec.ts`.
+
 A many-to-many edge is nothing special here: metadata maps
 `isManyToMany` to cardinality `"many"` exactly like `isOneToMany`, so it
 gets the same `batch` default and the same distinct-roots pagination
