@@ -91,6 +91,20 @@ decoration time has no ORM metadata (ADR-0013): `softDelete: { strategy:
 "soft" }` adds the restore route, `operations: { purgeOne: true }` the
 purge route.
 
+**Global `defaults.operations.<id>` (issue #38, ADR-0015) is not seen
+here.** `KavoModule.forRootAsync`'s `defaults` resolves only once its
+factory runs, which is always _after_ `@Crud` has already decorated
+every controller and generated its routes (ADR-0012) — there is no
+value to read yet at the moment this table's decision is made. A route
+an entity doesn't disable itself therefore still generates, even under
+a global `operations.<id>: false`. The bound service _does_ see the
+global default (it's resolved through `createKavo`'s `createCrud`,
+which runs at `onModuleInit`), so calling that route always answers
+`405` with `code: "KAVO_OPERATION_DISABLED"` — never a silent success,
+and never a bare `404` that would suggest the route was never mapped.
+An app that wants the route itself gone still states so per entity,
+exactly as before.
+
 **Manual-method-wins:** a hand-written controller method whose name
 matches an operation id suppresses that generated route — detected via
 `hasOwnProperty` on the prototype, no config needed.
