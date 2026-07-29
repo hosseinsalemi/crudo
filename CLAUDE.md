@@ -14,11 +14,12 @@ Kavo was originally built from a phased plan (`kavo-phases-v6.md`), now retired.
 
 ```bash
 pnpm install
-pnpm check        # the full gate: build + typecheck + depcruise + test (run before considering work done)
+pnpm check        # the full gate: build + typecheck + depcruise + lint + test (run before considering work done)
 pnpm build        # tsc -b (project references across the workspace — src only)
 pnpm typecheck    # tsc --noEmit over each package's tests/ (tsconfig.tests.json)
 pnpm test         # vitest run (whole monorepo)
 pnpm depcruise    # enforce package-boundary rules (.dependency-cruiser.cjs)
+pnpm lint         # oxlint over packages/*/src and packages/*/tests
 pnpm prettify     # prettier --write . (printWidth 120)
 ```
 
