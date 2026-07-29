@@ -1,5 +1,6 @@
 import type { KavoSettings } from "./settings.js";
 import { ConfigurationException } from "../errors/exceptions.js";
+import { STANDARD_OPERATIONS } from "../operations/default-operation-registry.js";
 
 /**
  * Bootstrap validation (Phase 8). Fails fast with an error naming the
@@ -88,5 +89,17 @@ export function validateSettings(entityName: string, settings: KavoSettings): vo
         `expected "auto", "soft", or "hard", got ${JSON.stringify(strategy)}`,
       );
     }
+  }
+
+  for (const [id, value] of Object.entries(settings.operations)) {
+    const path = `operations.${id}`;
+    if (!(id in STANDARD_OPERATIONS)) {
+      throw new ConfigurationException(
+        entityName,
+        path,
+        `unknown operation id ${JSON.stringify(id)} — expected one of ${Object.keys(STANDARD_OPERATIONS).join(", ")}`,
+      );
+    }
+    bool(path, value);
   }
 }

@@ -260,6 +260,35 @@ describe("@Crud operation control surface", () => {
     await request(server()).delete("/todos/1").expect(404);
   });
 
+  it("a global operations default guards the route rather than removing it (issue #38, ADR-0015)", async () => {
+    // Decoration runs before KavoModule.forRoot(Async)'s options are known
+    // (ADR-0012), so a global `defaults.operations.deleteOne: false` can't
+    // retract the already-generated DELETE route. It reaches the bound
+    // service instead: the route still exists, but calling it always
+    // answers with a 405 problem-details document, never a 2xx or a bare 404.
+    @Crud(Todo)
+    @Controller("todos")
+    class GloballyGuardedController {}
+
+    await bootstrap(GloballyGuardedController, { defaults: { operations: { deleteOne: false } } });
+    await request(server()).post("/todos").send({ title: "x" }).expect(201);
+    const response = await request(server())
+      .delete("/todos/1")
+      .expect(405)
+      .expect("Content-Type", /application\/problem\+json/);
+    expect(response.body).toMatchObject({ code: "KAVO_OPERATION_DISABLED" });
+  });
+
+  it("an entity-level override still wins over a global operations default", async () => {
+    @Crud(Todo, { operations: { deleteOne: true } })
+    @Controller("todos")
+    class ReenabledController {}
+
+    await bootstrap(ReenabledController, { defaults: { operations: { deleteOne: false } } });
+    await request(server()).post("/todos").send({ title: "x" }).expect(201);
+    await request(server()).delete("/todos/1").expect(204);
+  });
+
   it("manual-method-wins: a hand-written method suppresses generation", async () => {
     @Crud(Todo)
     @Controller("todos")

@@ -205,6 +205,28 @@ describe("validateSettings — soft delete (Phase 14 keys, Phase 8 rules)", () =
   });
 });
 
+describe("validateSettings — global operations default (issue #38)", () => {
+  it("rejects an unknown operation id", () => {
+    const error = rejectionOf({ operations: { notAnOperation: false } });
+    expect(error.code).toBe("KAVO_CONFIG_INVALID");
+    expect(error.messageParams).toMatchObject({ entity: "User", path: "operations.notAnOperation" });
+  });
+
+  it("rejects a non-boolean value for a known operation id", () => {
+    for (const value of ["off", 1, null]) {
+      expectRejected({ operations: { deleteOne: value } }, "operations.deleteOne", value);
+    }
+  });
+
+  it("accepts a boolean map over known operation ids", () => {
+    expect(() => accept({ operations: { deleteOne: false, patchOne: false, restoreOne: true } })).not.toThrow();
+  });
+
+  it("accepts an empty map — the zero-config default", () => {
+    expect(() => accept({ operations: {} })).not.toThrow();
+  });
+});
+
 describe("validateSettings — the base of the precedence chain", () => {
   it("accepts the built-in defaults unchanged", () => {
     // Everything merges onto these, so a schema change that leaves them

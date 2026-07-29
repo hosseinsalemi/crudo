@@ -110,6 +110,7 @@ export function createKavo(options: KavoOptions = {}): KavoInstance {
       const registry = createOperationRegistry<Entity>(
         config as EntityConfig<Entity> | undefined,
         builtInHandlers(adapter as unknown as RepositoryAdapter<Entity>),
+        resolved.settings.operations,
       );
       requireSoftDeletable(resolved, registry);
 

@@ -33,4 +33,8 @@ export const BUILT_IN_DEFAULTS: KavoSettings = Object.freeze({
     field: "deletedAt",
     strategy: "auto" as const,
   }),
+  // Unset: today's `STANDARD_OPERATIONS` enabled-by-default behavior (and
+  // ADR-0013's soft-delete-driven `restoreOne` auto-enable) is unchanged
+  // for apps that don't set a global default.
+  operations: Object.freeze({}),
 });
