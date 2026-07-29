@@ -70,20 +70,19 @@ anything else:
    read-only and deliberately non-overlapping:
 
    - `kavo-reviewer` — correctness, engine and registry design invariants,
-     naming compliance. In PR mode, also runs `pnpm check`.
-   - `kavo-boundary-guard` — ADR-0005 core purity, deep imports, ORM/framework
-     leakage, barrel and breaking-change audit.
+     package boundaries and public-API/barrel compliance, ADR/architecture-doc
+     sync, and naming compliance. In PR mode, also runs `pnpm check`. Always
+     include this one.
    - `kavo-test-auditor` — coverage gaps, weak tests, misplaced test files.
    - `kavo-security-auditor` — allowlist bypass, mass assignment,
      `exposeInternals` misuse, DTO/internal-field leakage.
-   - `kavo-docs-auditor` — ADR/architecture-doc drift, undocumented public API,
-     glossary gaps.
    - `kavo-perf-auditor` — N+1 patterns, unbounded includes, pagination
      bypass, adapter query-builder inefficiency.
 
-   Only include an auditor if the diff actually touches its area — e.g. skip
-   `kavo-perf-auditor` for a change confined to error-handling code. When in
-   doubt, include it; a clean report costs little.
+   Only include `kavo-security-auditor` / `kavo-perf-auditor` if the diff
+   actually touches their area — e.g. skip `kavo-perf-auditor` for a change
+   confined to error-handling code. When in doubt, include it; a clean report
+   costs little.
 
 5. **Consolidate.** Merge their findings into one ranked list and drop
    duplicates. Do not just paste three reports.
