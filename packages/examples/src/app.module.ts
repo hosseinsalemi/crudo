@@ -37,6 +37,10 @@ export class AppModule {
             defaults: {
               pagination: { defaultLimit: 20, maxLimit: 100 },
               errors: { exposeInternals: false },
+              // App-wide default (issue #38): off unless an entity opts back
+              // in via its own `operations.restoreOne`. `OwnerController`
+              // does exactly that.
+              operations: { restoreOne: false },
             },
           }),
         }),

@@ -14,7 +14,11 @@ import { CreateOwnerDto, UpdateOwnerDto, OwnerItemDto, OwnerListDto } from "./ow
  * `PATCH /owners/:id/restore` on the router — route generation runs before
  * any ORM metadata exists, so the config, not the entity, is what it can
  * read (ADR-0013). `purgeOne` is off by default everywhere; asked for by
- * name it adds `DELETE /owners/:id/purge`.
+ * name it adds `DELETE /owners/:id/purge`. `restoreOne: true` here is
+ * explicit rather than relying on the soft-delete auto-enable, because
+ * `AppModule` sets a global `defaults.operations.restoreOne: false`
+ * (issue #38) — this entity opts back in, which is the whole point of the
+ * precedence chain: entity config always wins over the global default.
  */
 @Crud(Owner, {
   dto: {
@@ -31,6 +35,7 @@ import { CreateOwnerDto, UpdateOwnerDto, OwnerItemDto, OwnerListDto } from "./ow
   relations: { edges: { pets: { includable: true }, address: { includable: true } } },
   operations: {
     purgeOne: true,
+    restoreOne: true,
   },
 })
 @Controller("owners")
