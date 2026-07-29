@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsc -b",
     "start": "node dist/main.js",
-    "start:postgres": "PGHOST=localhost PGPORT=5432 PGUSER=postgres PGPASSWORD=kavo PGDATABASE=kavo node dist/main.js"
+    "start:postgres": "node dist/main-postgres.js"
   },
   "dependencies": {
     "@kavo/core": "workspace:*",
