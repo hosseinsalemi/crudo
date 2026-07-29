@@ -77,7 +77,7 @@ An ADR that nothing points to is dead weight:
 
 ## Before you call it done
 
-Run the `kavo-docs-auditor` review pass (or fold it into `/review`, which
-runs it automatically for a branch touching engine/config/registry/public-API
-behavior) — it specifically checks for new invariants introduced without a
-governing ADR.
+Run the `kavo-reviewer` review pass (or fold it into `/review`, which runs it
+automatically for a branch touching engine/config/registry/public-API
+behavior) — its docs-sync check specifically checks for new invariants
+introduced without a governing ADR.
