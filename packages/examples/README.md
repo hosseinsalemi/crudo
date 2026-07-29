@@ -2,15 +2,47 @@
 
 The checkpoint app: a small Pet domain served over HTTP by the real stack
 — `@Crud(...)`-generated NestJS routes → CRUD engine → `@kavo/typeorm` →
-in-memory SQLite — with filtering, sorting, pagination, DTO projections
+a real database — with filtering, sorting, pagination, DTO projections
 (`item` vs. leaner `list`), layered config, Swagger docs, and RFC 9457
 problem-details errors. `Cat` and `Dog` are single-table-inheritance
 subtypes of `Pet`; `Owner` is the relation side, and is soft-deletable.
+
+The entities, DTOs, and controllers are entirely database-agnostic through
+`@kavo/typeorm` — only `database.module.ts` picks a driver, so the same app
+runs against either database below unchanged.
+
+## SQLite (default)
+
+No setup required — an in-memory database is created fresh on every run.
 
 ```bash
 pnpm build && pnpm --filter @kavo/examples start
 # → http://localhost:3000/cats   (Swagger at /docs)
 ```
+
+## Postgres
+
+Set `PGHOST` (and friends) to point the same app at a real Postgres
+instance instead. Start one locally with a single container:
+
+```bash
+docker run --rm -e POSTGRES_PASSWORD=kavo -e POSTGRES_DB=kavo -p 5432:5432 postgres:18-alpine
+pnpm build && pnpm --filter @kavo/examples start:postgres
+# → http://localhost:3000/cats   (Swagger at /docs)
+```
+
+| Env var      | Default                          |
+| ------------ | -------------------------------- |
+| `PGHOST`     | (unset → SQLite; set → Postgres) |
+| `PGPORT`     | `5432`                           |
+| `PGUSER`     | `postgres`                       |
+| `PGPASSWORD` | `kavo`                           |
+| `PGDATABASE` | `kavo`                           |
+
+The e2e suite (`tests/app-postgres.e2e.spec.ts`) needs none of this set up
+by hand — it self-provisions a Postgres container via Testcontainers, so
+`pnpm check`/`pnpm test` exercises both databases with no manual step. This
+does require a running Docker daemon wherever those commands run.
 
 Try it:
 
@@ -32,8 +64,11 @@ POST   /cats                     {"name":"Kit","age":1,"owner":1}   # associate 
 ```
 
 The e2e suite in `tests/` is the executable form of the milestone
-checkpoints. This app grows into the Phase 17 reference application
-(`User`, `Project`, `Task`, `Comment`, `Tag`).
+checkpoints. `crud-e2e.suite.ts` holds the shared assertions; `app.e2e.spec.ts`
+and `app-postgres.e2e.spec.ts` each boot the app against their own database
+and run the same suite against it — one behavioral spec, two drivers. This
+app grows into the Phase 17 reference application (`User`, `Project`, `Task`,
+`Comment`, `Tag`).
 
 The app consumes only public package APIs — if it ever needs a deep
 import, that is an API-surface bug in the package, not the app.
