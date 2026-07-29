@@ -1,4 +1,5 @@
 import type { RelationLoadStrategy } from "../relations/relation-descriptor.js";
+import type { StandardOperationId } from "../operations/operation.js";
 
 /**
  * The complete, canonical settings schema — one schema for every scope.
@@ -82,4 +83,12 @@ export interface KavoSettings {
   readonly errors: ErrorSettings;
   readonly relations: RelationSettings;
   readonly softDelete: SoftDeleteSettings | false;
+  /**
+   * Global operation enablement, keyed by standard operation id — booleans
+   * only, unlike the richer per-entity `EntityConfig.operations` (which also
+   * carries `handler`/`meta` and is entity-typed). An id absent here defers
+   * to the built-in default (and, for `restoreOne`, ADR-0013's soft-delete
+   * auto-enable); an entity's own `operations.<id>` always wins over this.
+   */
+  readonly operations: Readonly<Partial<Record<StandardOperationId, boolean>>>;
 }

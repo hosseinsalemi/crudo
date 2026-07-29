@@ -12,7 +12,19 @@ import { DefaultDtoResolver } from "../dto/default-dto-resolver.js";
 import { DefaultRelationRegistry } from "../relations/default-relation-registry.js";
 import { resolveSoftDelete } from "../persistence/soft-delete.js";
 
-/** Top-level settings keys — the subset of an `EntityConfig` that merges. */
+/**
+ * Top-level settings keys — the subset of an `EntityConfig` that merges.
+ * `operations` is deliberately excluded: `EntityConfig.operations` is a
+ * structurally different (richer, per-entity-typed) shape than
+ * `KavoSettings.operations`'s global boolean map, so picking it here would
+ * feed entity-scope `handler`/`meta` entries through the boolean-shaped
+ * merge. `createOperationRegistry` resolves entity/operation-scope
+ * `operations` directly from `EntityConfig`; the global boolean default
+ * still reaches `entitySettings.operations` for free below, via
+ * `mergeSettings(BUILT_IN_DEFAULTS, globalDefaults, …)` — `globalDefaults`
+ * is a `KavoSettings`-shaped `DeepPartial`, so its `operations` key merges
+ * normally even though `pickSettings` never reads it off `entityConfig`.
+ */
 const SETTINGS_KEYS = [
   "pagination",
   "query",

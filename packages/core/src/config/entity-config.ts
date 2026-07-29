@@ -25,7 +25,7 @@ export interface QueryAllowlists<Entity = unknown> {
  * Settings keys override entity scope for this operation only; `false` in
  * the parent `operations` record disables the operation outright.
  */
-export interface OperationConfig<Entity = unknown> extends DeepPartial<KavoSettings> {
+export interface OperationConfig<Entity = unknown> extends Omit<DeepPartial<KavoSettings>, "operations"> {
   /**
    * Turn the operation on or off explicitly, overriding its default. The
    * long form of the `false` / `true` shorthands in the parent
@@ -52,7 +52,7 @@ export interface EntityConfig<
   QueryDto = QueryContext<Entity>,
   ItemDto = Entity,
   ListDto = ItemDto,
-> extends DeepPartial<KavoSettings> {
+> extends Omit<DeepPartial<KavoSettings>, "operations"> {
   readonly dto?: OperationDtoMap<Entity, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto>;
   readonly allowlists?: QueryAllowlists<Entity>;
   /**

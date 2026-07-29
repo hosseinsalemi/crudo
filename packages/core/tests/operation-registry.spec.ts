@@ -235,3 +235,60 @@ describe("createOperationRegistry — Phase 13 control surface", () => {
     expect(registry.get("findMany")?.meta).toBe(meta);
   });
 });
+
+describe("createOperationRegistry — global operations default (issue #38)", () => {
+  it("disables an always-on operation globally when the entity doesn't override it", () => {
+    const registry = createOperationRegistry<User>(undefined, standardHandlers, { deleteOne: false, patchOne: false });
+    expect(registry.get("deleteOne")?.enabled).toBe(false);
+    expect(registry.get("patchOne")?.enabled).toBe(false);
+    // Everything the global default didn't mention keeps its own default.
+    expect(registry.get("createOne")?.enabled).toBe(true);
+  });
+
+  it("lets an entity boolean shorthand override a global disable", () => {
+    const registry = createOperationRegistry<User>(
+      { operations: { deleteOne: true } } as UserConfig,
+      standardHandlers,
+      { deleteOne: false },
+    );
+    expect(registry.get("deleteOne")?.enabled).toBe(true);
+  });
+
+  it("lets an entity long-form `{ enabled }` override a global disable", () => {
+    const registry = createOperationRegistry<User>(
+      { operations: { deleteOne: { enabled: true } } } as UserConfig,
+      standardHandlers,
+      { deleteOne: false },
+    );
+    expect(registry.get("deleteOne")?.enabled).toBe(true);
+  });
+
+  it("global enable composes with an entity that already declares soft delete", () => {
+    const registry = createOperationRegistry<User>(
+      { softDelete: { strategy: "soft", field: "deletedAt" } } as UserConfig,
+      standardHandlers,
+      { restoreOne: true },
+    );
+    expect(registry.get("restoreOne")?.enabled).toBe(true);
+  });
+
+  it("global disable wins over the soft-delete auto-enable of restoreOne", () => {
+    const registry = createOperationRegistry<User>(
+      { softDelete: { strategy: "soft", field: "deletedAt" } } as UserConfig,
+      standardHandlers,
+      { restoreOne: false },
+    );
+    expect(registry.get("restoreOne")?.enabled).toBe(false);
+  });
+
+  it("reproduces today's STANDARD_OPERATIONS behavior byte-for-byte when unset", () => {
+    const withUndefined = createOperationRegistry<User>(undefined, standardHandlers, undefined);
+    const withEmpty = createOperationRegistry<User>(undefined, standardHandlers, {});
+    const withoutArg = createOperationRegistry<User>(undefined, standardHandlers);
+    expect(ids(withUndefined)).toEqual(Object.keys(STANDARD_OPERATIONS));
+    for (const id of Object.keys(STANDARD_OPERATIONS) as StandardOperationId[]) {
+      expect(withUndefined.get(id)?.enabled).toBe(withoutArg.get(id)?.enabled);
+      expect(withEmpty.get(id)?.enabled).toBe(withoutArg.get(id)?.enabled);
+    }
+  });
+});

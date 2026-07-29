@@ -91,3 +91,15 @@ void kavo.createCrud(Author, { allowlists: { filterable: ["nmae"] } });
 
 // Overridden and default operations dispatch through the engine, one pipeline either way.
 void authors.engine.execute({ operation: "findMany", id: null, body: null, query: null, options: null });
+
+// A global default may set the (boolean-only) operations map...
+createKavo({ defaults: { operations: { deleteOne: false, restoreOne: true } } });
+
+// @ts-expect-error — but not the richer per-entity shape (handler/meta):
+// `KavoSettings.operations` is boolean-only global state (issue #38).
+createKavo({ defaults: { operations: { deleteOne: { handler: promote } } } });
+
+// @ts-expect-error — nesting `operations` inside an `OperationConfig` is a
+// type error now that `OperationConfig` no longer inherits `operations`
+// from `DeepPartial<KavoSettings>` (issue #38).
+kavo.createCrud(Author, { operations: { findMany: { operations: {} } } });

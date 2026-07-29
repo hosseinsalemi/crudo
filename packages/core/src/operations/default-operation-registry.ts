@@ -115,10 +115,17 @@ const unboundHandler = (id: OperationId): OperationHandler<unknown> => ({
  * `handlers` binds the built-in behaviors; when omitted the entries carry
  * throwing placeholders — that mode exists for consumers that only need
  * the table (`@kavo/nest` route generation), never for execution.
+ *
+ * `globalOperations` is the resolved `KavoSettings.operations` boolean map
+ * (issue #38's global default): it fills `byDefault` for an id the entity
+ * config doesn't mention at all, sitting between the unconditional/soft-delete
+ * default and the entity's own `operations.<id>` — which always wins when
+ * present, boolean shorthand or long form alike.
  */
 export function createOperationRegistry<Entity extends object>(
   config: EntityConfig<Entity> | undefined,
   handlers?: StandardHandlerFactory<Entity>,
+  globalOperations?: Readonly<Partial<Record<StandardOperationId, boolean>>>,
 ): OperationRegistry<Entity> {
   const registry = new DefaultOperationRegistry<Entity>();
   const operations = config?.operations ?? {};
@@ -128,11 +135,12 @@ export function createOperationRegistry<Entity extends object>(
     const operationConfig = operations[id];
     const settings = typeof operationConfig === "object" ? operationConfig : undefined;
     const byDefault = shape.enabled || (id === "restoreOne" && softDeleteDeclared);
+    const defaultForEntity = globalOperations?.[id] ?? byDefault;
     registry.register({
       id,
       kind: shape.kind,
       cardinality: shape.cardinality,
-      enabled: typeof operationConfig === "boolean" ? operationConfig : (settings?.enabled ?? byDefault),
+      enabled: typeof operationConfig === "boolean" ? operationConfig : (settings?.enabled ?? defaultForEntity),
       handler: settings?.handler ?? handlers?.(id) ?? (unboundHandler(id) as unknown as OperationHandler<Entity>),
       input: null,
       output: null,
