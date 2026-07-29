@@ -4,7 +4,9 @@ export type RelationCardinality = "one" | "many";
 
 /**
  * How an included relation is loaded (Phase 15):
- * - `join`  — single query with joins; correct default for to-one.
+ * - `join`  — single query with joins; correct default for to-one. Forcing
+ *   it onto a to-many edge is also the eager-loading pattern for detail
+ *   views (`findOne`/`findOneById`) — see architecture doc 12, section 3.
  * - `batch` — per-level `WHERE parentId IN (…)` queries stitched in
  *   memory; correct default for to-many (avoids row explosion and the
  *   joined-pagination trap).

@@ -1,8 +1,22 @@
 import "reflect-metadata";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Column, DataSource, DeleteDateColumn, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import type { Logger } from "typeorm";
 import type { KavoInstance, DefaultCrudService } from "@kavo/core";
 import { createTypeOrmKavo } from "@kavo/typeorm";
+
+/** Counts SELECT statements so a test can assert "exactly one query fired". */
+class QueryCountingLogger implements Logger {
+  count = 0;
+  logQuery(): void {
+    this.count += 1;
+  }
+  logQueryError(): void {}
+  logQuerySlow(): void {}
+  logSchemaBuild(): void {}
+  logMigration(): void {}
+  log(): void {}
+}
 
 @Entity()
 class Blog {
@@ -51,6 +65,7 @@ let kavo: KavoInstance;
 let blogs: DefaultCrudService<Blog>;
 let joinedBlogs: DefaultCrudService<Blog>;
 let articles: DefaultCrudService<Article>;
+const queryLogger = new QueryCountingLogger();
 
 beforeAll(async () => {
   dataSource = new DataSource({
@@ -58,6 +73,8 @@ beforeAll(async () => {
     database: ":memory:",
     entities: [Blog, Article, Note],
     synchronize: true,
+    logging: "all",
+    logger: queryLogger,
   });
   await dataSource.initialize();
   kavo = createTypeOrmKavo(dataSource);
@@ -169,6 +186,22 @@ describe("Pagination correctness with a joined to-many (Phase 15, normative)", (
     expect(page.items).toHaveLength(1);
     expect(page.total).toBe(2);
     expect((page.items[0] as { articles: unknown[] }).articles).toHaveLength(2);
+  });
+});
+
+describe("Single-query eager loading for detail views (Phase 15)", () => {
+  it("findOne with a joined to-many fires exactly one query", async () => {
+    const { blogId } = await seed();
+    const before = queryLogger.count;
+    await joinedBlogs.findOne(blogId, { include: ["articles"] } as never);
+    expect(queryLogger.count - before).toBe(1);
+  });
+
+  it("findOne with the same to-many left batched fires more than one query", async () => {
+    const { blogId } = await seed();
+    const before = queryLogger.count;
+    await blogs.findOne(blogId, { include: ["articles"] } as never);
+    expect(queryLogger.count - before).toBeGreaterThan(1);
   });
 });
 
