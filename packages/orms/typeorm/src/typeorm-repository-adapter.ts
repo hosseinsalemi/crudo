@@ -341,7 +341,11 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
         });
       }
       if (field === this.deleteDateColumn) {
-        await this.repository.softDelete(id);
+        // softRemove over the already-loaded row (not softDelete(id)): it
+        // goes through the same subject-persist path as `save`, so
+        // @DeleteDateColumn entities get their soft-remove lifecycle hooks,
+        // matching restore's `recover` counterpart below.
+        await this.repository.softRemove(existing);
       } else {
         await this.repository.update(id, { [field]: new Date() } as never);
       }
@@ -362,15 +366,15 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
         });
       }
       if (field === this.deleteDateColumn) {
-        await this.repository.restore(id);
-      } else {
-        await this.repository.update(id, { [field]: null } as never);
+        // recover returns the same row with the column cleared in memory
+        // and in the database, so no re-read is needed afterward.
+        return await this.repository.recover(existing);
       }
-      // Re-read rather than mutate the in-memory copy: the row is live
-      // again, and the response must reflect what the database holds.
-      const restored = await this.byId(id, context, false).getOne();
-      if (restored === null) throw this.notFound(id, context);
-      return restored;
+      // A plain marker column is a single-field write with no relation
+      // involvement: mutate the already-loaded row instead of re-reading it.
+      await this.repository.update(id, { [field]: null } as never);
+      existing[field as keyof Entity] = null as never;
+      return existing;
     } catch (error) {
       throw mapDriverError(error, errorContext(context));
     }
