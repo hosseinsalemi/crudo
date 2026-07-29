@@ -18,12 +18,12 @@
     "start": "pnpm --filter @kavo/examples start"
   },
   "devDependencies": {
-    "@swc/core": "^1.7.26",
+    "@swc/core": "^1.15.47",
     "@types/node": "^22.0.0",
-    "dependency-cruiser": "^16.10.0",
+    "dependency-cruiser": "^18.1.0",
     "prettier": "^3.9.6",
     "typescript": "^5.5.4",
     "unplugin-swc": "^1.5.1",
-    "vitest": "^3.0.5"
+    "vitest": "^4.1.10"
   }
 }
