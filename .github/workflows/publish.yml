@@ -13,6 +13,8 @@ jobs:
   publish:
     name: publish to npm
     runs-on: ubuntu-latest
+    env:
+      TARBALL_DIR: /tmp/kavo-tarballs
     steps:
       - uses: actions/checkout@v7
 
@@ -56,22 +58,22 @@ jobs:
       # pointing at this repo + this workflow file.
       - name: Pack packages
         run: |
-          mkdir -p /tmp/kavo-tarballs
-          (cd packages/core && pnpm pack --pack-destination /tmp/kavo-tarballs)
-          (cd packages/orms/typeorm && pnpm pack --pack-destination /tmp/kavo-tarballs)
-          (cd packages/frameworks/nest && pnpm pack --pack-destination /tmp/kavo-tarballs)
+          mkdir -p $TARBALL_DIR
+          (cd packages/core && pnpm pack --pack-destination $TARBALL_DIR)
+          (cd packages/orms/typeorm && pnpm pack --pack-destination $TARBALL_DIR)
+          (cd packages/frameworks/nest && pnpm pack --pack-destination $TARBALL_DIR)
 
       # Published in dependency order (core before its dependents) even
       # though publish-time order has no functional effect on npm — it
       # mirrors the package graph per ADR-0004 lockstep versioning.
       - name: Publish @kavo/core
-        run: npm publish /tmp/kavo-tarballs/kavo-core-*.tgz --access public
+        run: npm publish $TARBALL_DIR/kavo-core-*.tgz --access public
 
       - name: Publish @kavo/typeorm
-        run: npm publish /tmp/kavo-tarballs/kavo-typeorm-*.tgz --access public
+        run: npm publish $TARBALL_DIR/kavo-typeorm-*.tgz --access public
 
       - name: Publish @kavo/nest
-        run: npm publish /tmp/kavo-tarballs/kavo-nest-*.tgz --access public
+        run: npm publish $TARBALL_DIR/kavo-nest-*.tgz --access public
 
       # Only runs once every publish above succeeded. Attaches the exact
       # published tarballs as release assets and lets GitHub generate the
@@ -81,6 +83,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
-            /tmp/kavo-tarballs/*.tgz \
+            $TARBALL_DIR/*.tgz \
             --title "$GITHUB_REF_NAME" \
             --generate-notes
