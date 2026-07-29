@@ -43,6 +43,13 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
   private readonly deleteDateColumn: string | null;
   /** Kept for batch loading, which re-enters through the DataSource. */
   private readonly entity: ClassRef<Entity>;
+  /**
+   * Relation property names, so `mergeAndSave` can tell a plain-column
+   * patch/update (one `UPDATE`, no preload needed) from one that touches a
+   * relation (join-table rows need `save`'s subject diffing against the
+   * currently-persisted relation state).
+   */
+  private readonly relationProperties: ReadonlySet<string>;
 
   constructor(
     private readonly dataSource: DataSource,
@@ -54,6 +61,7 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
     this.idField = metadata.primaryColumns[0]!.propertyName;
     this.deleteDateColumn = metadata.deleteDateColumn?.propertyName ?? null;
     this.entity = entity;
+    this.relationProperties = new Set(metadata.relations.map((relation) => relation.propertyName));
   }
 
   // ── Reads (QueryBuilder API) ────────────────────────────────────────
@@ -288,6 +296,14 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
    * update and patch share one load-merge-save primitive: the *shape* of
    * `data` differs (full body vs. sparse) because the DTO layer differs,
    * not the persistence mechanics.
+   *
+   * A plain-column write goes through `repository.update` — one `UPDATE`,
+   * no preload — since `repository.save` always issues its own pre-flight
+   * SELECT to diff the subject against the database, which would double
+   * the read already done here. A write that touches a relation still
+   * needs `save`: join-table rows are persisted by diffing against the
+   * *currently loaded* relation state on `existing`, which is exactly what
+   * the extra preload would otherwise fetch.
    */
   private async mergeAndSave(id: EntityId, data: Partial<Entity>, context: CrudContext<Entity>): Promise<Entity> {
     try {
@@ -296,7 +312,12 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
       const existing = await this.byId(id, context, false).getOne();
       if (existing === null) throw this.notFound(id, context);
       this.repository.merge(existing, data as never);
-      return await this.repository.save(existing);
+      const touchesRelation = Object.keys(data).some((key) => this.relationProperties.has(key));
+      if (touchesRelation) {
+        return await this.repository.save(existing);
+      }
+      await this.repository.update(id, data as never);
+      return existing;
     } catch (error) {
       throw mapDriverError(error, errorContext(context));
     }
