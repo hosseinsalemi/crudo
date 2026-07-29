@@ -66,14 +66,40 @@ jobs:
       # Published in dependency order (core before its dependents) even
       # though publish-time order has no functional effect on npm — it
       # mirrors the package graph per ADR-0004 lockstep versioning.
+      #
+      # Each publish is skipped if that exact name@version is already on
+      # the registry, so re-running the job after a partial failure (one
+      # package published, a later one failing) doesn't die re-publishing
+      # what already succeeded — npm publish itself is not idempotent.
       - name: Publish @kavo/core
-        run: npm publish $TARBALL_DIR/kavo-core-*.tgz --access public
+        run: |
+          NAME=$(node -p "require('./packages/core/package.json').name")
+          VERSION=$(node -p "require('./packages/core/package.json').version")
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "$NAME@$VERSION already published, skipping"
+          else
+            npm publish $TARBALL_DIR/kavo-core-*.tgz --access public
+          fi
 
       - name: Publish @kavo/typeorm
-        run: npm publish $TARBALL_DIR/kavo-typeorm-*.tgz --access public
+        run: |
+          NAME=$(node -p "require('./packages/orms/typeorm/package.json').name")
+          VERSION=$(node -p "require('./packages/orms/typeorm/package.json').version")
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "$NAME@$VERSION already published, skipping"
+          else
+            npm publish $TARBALL_DIR/kavo-typeorm-*.tgz --access public
+          fi
 
       - name: Publish @kavo/nest
-        run: npm publish $TARBALL_DIR/kavo-nest-*.tgz --access public
+        run: |
+          NAME=$(node -p "require('./packages/frameworks/nest/package.json').name")
+          VERSION=$(node -p "require('./packages/frameworks/nest/package.json').version")
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "$NAME@$VERSION already published, skipping"
+          else
+            npm publish $TARBALL_DIR/kavo-nest-*.tgz --access public
+          fi
 
       # Only runs once every publish above succeeded. Attaches the exact
       # published tarballs as release assets and lets GitHub generate the
