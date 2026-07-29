@@ -12,15 +12,17 @@
     "depcruise": "depcruise packages --config .dependency-cruiser.cjs",
     "test": "vitest run",
     "typecheck": "tsc -p packages/core/tsconfig.tests.json && tsc -p packages/orms/typeorm/tsconfig.tests.json && tsc -p packages/frameworks/nest/tsconfig.tests.json && tsc -p packages/examples/tsconfig.tests.json",
+    "lint": "oxlint packages",
     "prettify": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "pnpm run build && pnpm run typecheck && pnpm run depcruise && pnpm run test",
+    "check": "pnpm run build && pnpm run typecheck && pnpm run depcruise && pnpm run lint && pnpm run test",
     "start": "pnpm --filter @kavo/examples start"
   },
   "devDependencies": {
     "@swc/core": "^1.15.47",
     "@types/node": "^22.0.0",
     "dependency-cruiser": "^18.1.0",
+    "oxlint": "^1.76.0",
     "prettier": "^3.9.6",
     "typescript": "^5.5.4",
     "unplugin-swc": "^1.5.1",

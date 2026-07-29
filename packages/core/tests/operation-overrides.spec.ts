@@ -70,7 +70,7 @@ class CountingUserAdapter implements RepositoryAdapter<User> {
     await this.inner.delete(id);
   }
 
-  async restore(id: EntityId, _context: CrudContext<User>): Promise<User> {
+  async restore(_id: EntityId, _context: CrudContext<User>): Promise<User> {
     this.calls.restore++;
     return this.inner.restore();
   }
