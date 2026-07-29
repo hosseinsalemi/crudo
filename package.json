@@ -14,7 +14,8 @@
     "typecheck": "tsc -p packages/core/tsconfig.tests.json && tsc -p packages/orms/typeorm/tsconfig.tests.json && tsc -p packages/frameworks/nest/tsconfig.tests.json && tsc -p packages/examples/tsconfig.tests.json",
     "prettify": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "pnpm run build && pnpm run typecheck && pnpm run depcruise && pnpm run test"
+    "check": "pnpm run build && pnpm run typecheck && pnpm run depcruise && pnpm run test",
+    "start": "pnpm --filter @kavo/examples start"
   },
   "devDependencies": {
     "@swc/core": "^1.7.26",
