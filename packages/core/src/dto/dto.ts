@@ -57,6 +57,6 @@ export interface OperationDtoMap<
  * on the resolved config — never per request. Restore and custom
  * operations reuse `item`/`list`; there are no additional slots.
  */
-export interface DtoResolver<Entity = unknown> {
+export interface DtoResolver<_Entity = unknown> {
   resolve(slot: DtoSlot, operation: OperationId): DtoClass | null;
 }

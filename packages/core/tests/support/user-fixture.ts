@@ -58,7 +58,7 @@ export class InMemoryUserAdapter implements RepositoryAdapter<User> {
     return this.rows.slice(offset, offset + limit);
   }
 
-  async count(query: NormalizedQueryContext<User>): Promise<number> {
+  async count(_query: NormalizedQueryContext<User>): Promise<number> {
     return this.rows.length;
   }
 
