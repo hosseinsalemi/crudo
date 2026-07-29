@@ -3,13 +3,22 @@ import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module.js";
 
+// Matches the `docker run` command in packages/examples/README.md.
+const POSTGRES_OPTIONS = {
+  host: "localhost",
+  port: 5432,
+  username: "postgres",
+  password: "kavo",
+  database: "kavo",
+};
+
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule.forRoot());
+  const app = await NestFactory.create(AppModule.forRoot(POSTGRES_OPTIONS));
 
   const document = SwaggerModule.createDocument(
     app,
     new DocumentBuilder()
-      .setTitle("Kavo — Pet example")
+      .setTitle("Kavo — Pet example (Postgres)")
       .setDescription(
         "Cats, dogs, and owners: full CRUD over HTTP with filtering, " +
           "sorting, pagination, layered config, and RFC 9457 problem-details " +

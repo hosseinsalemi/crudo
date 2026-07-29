@@ -7,7 +7,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc -b",
-    "start": "node dist/main.js"
+    "start": "node dist/main.js",
+    "start:postgres": "node dist/main-postgres.js"
   },
   "dependencies": {
     "@kavo/core": "workspace:*",
@@ -18,12 +19,14 @@
     "@nestjs/platform-express": "^11.0.0",
     "@nestjs/swagger": "^11.0.0",
     "better-sqlite3": "^12.0.0",
+    "pg": "^8.13.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "typeorm": "^0.3.20"
   },
   "devDependencies": {
     "@nestjs/testing": "^11.0.0",
+    "@testcontainers/postgresql": "^10.13.0",
     "@types/supertest": "^6.0.2",
     "supertest": "^7.0.0"
   }

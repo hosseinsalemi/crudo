@@ -40,7 +40,13 @@ export class Owner implements SoftDeletable {
   email!: string;
 
   // A nullable, client-writable date column (unlike the generated createdAt).
-  @Column("datetime", { nullable: true })
+  // `type: Date` (the constructor, not a string token) rather than a fixed
+  // "datetime"/"timestamp" string: unlike the other columns here, sqlite and
+  // postgres share no common string token for a datetime column, and the
+  // nullable `Date | null` property type defeats emitDecoratorMetadata's own
+  // inference (it emits `Object` for a union). Each driver's `normalizeType`
+  // maps the `Date` constructor to its own native column type.
+  @Column({ type: Date, nullable: true })
   startedAt!: Date | null;
 
   @OneToMany("Pet", (pet: Pet) => pet.owner)
