@@ -40,8 +40,8 @@ KavoModule.forRootAsync({
 
 ```ts
 interface KavoModuleOptions {
-  infrastructure?: CrudInfrastructure;        // e.g. createTypeOrmInfrastructure(dataSource)
-  defaults?: DeepPartial<KavoSettings>;       // passed through untouched to createKavo
+  infrastructure?: CrudInfrastructure; // e.g. createTypeOrmInfrastructure(dataSource)
+  defaults?: DeepPartial<KavoSettings>; // passed through untouched to createKavo
   paginationStrategies?: readonly PaginationStrategy[];
 }
 ```
@@ -56,18 +56,18 @@ the same object is `createKavo(options).createCrud(Entity, config?)`.
 
 ## Built-in defaults (`BUILT_IN_DEFAULTS`, `core/src/config/defaults.ts`)
 
-| Key                                     | Default                  | Notes                                                                 |
-| ---------------------------------------- | ------------------------ | ---------------------------------------------------------------------- |
-| `pagination.defaultLimit` / `maxLimit`   | 20 / 100                 | `defaultLimit ≤ maxLimit` enforced                                     |
-| `pagination.strategy`                    | `"offset"`               | `"page"` built in; custom via `paginationStrategies`                   |
-| `pagination.count`                       | `true`                   | `false` skips the count query; envelope reports `total: null`          |
-| `query.maxFilterDepth` / `maxInValues`   | 3 / 100                  |                                                                        |
-| `errors.exposeInternals`                 | `false`                  | leak driver detail into responses                                      |
-| `relations.maxIncludeDepth` / `maxIncludedNodes` | 2 / 10           | include depth budget and total node cap                                |
-| `relations.edges.<name>`                 | `{}`                     | per-relation `includable` / `defaultInclude` / `maxDepth` / `strategy` |
-| `softDelete.field` / `strategy`          | `"deletedAt"` / `"auto"` | `auto` = soft when the entity has the marker field; `false` disables   |
-| `operations.<id>`                        | `{}` (unset)             | global operation-enablement default (issue #38); see caveat below      |
-| `bulk.mode` / `maxBatchSize`             | `"atomic"` / 500         | reserved (bulk is not built)                                           |
+| Key                                              | Default                  | Notes                                                                  |
+| ------------------------------------------------ | ------------------------ | ---------------------------------------------------------------------- |
+| `pagination.defaultLimit` / `maxLimit`           | 20 / 100                 | `defaultLimit ≤ maxLimit` enforced                                     |
+| `pagination.strategy`                            | `"offset"`               | `"page"` built in; custom via `paginationStrategies`                   |
+| `pagination.count`                               | `true`                   | `false` skips the count query; envelope reports `total: null`          |
+| `query.maxFilterDepth` / `maxInValues`           | 3 / 100                  |                                                                        |
+| `errors.exposeInternals`                         | `false`                  | leak driver detail into responses                                      |
+| `relations.maxIncludeDepth` / `maxIncludedNodes` | 2 / 10                   | include depth budget and total node cap                                |
+| `relations.edges.<name>`                         | `{}`                     | per-relation `includable` / `defaultInclude` / `maxDepth` / `strategy` |
+| `softDelete.field` / `strategy`                  | `"deletedAt"` / `"auto"` | `auto` = soft when the entity has the marker field; `false` disables   |
+| `operations.<id>`                                | `{}` (unset)             | global operation-enablement default (issue #38); see caveat below      |
+| `bulk.mode` / `maxBatchSize`                     | `"atomic"` / 500         | reserved (bulk is not built)                                           |
 
 Setting any of these under `defaults` in `createKavo`/`KavoModule.forRoot`
 applies it app-wide; an entity's own `@Crud(Entity, config)` (or
@@ -78,13 +78,13 @@ applies it app-wide; an entity's own `@Crud(Entity, config)` (or
 At global scope, `operations` is a plain boolean map
 (`Partial<Record<StandardOperationId, boolean>>`) and merges like any other
 key. But **route generation in `@kavo/nest` never sees it**: `@Crud` builds
-routes at class-decoration time, which always runs *before*
+routes at class-decoration time, which always runs _before_
 `KavoModule.forRootAsync`'s factory resolves `defaults` — there is nothing to
 read yet. So:
 
 - A route an entity doesn't disable itself **still generates**, even under a
   global `operations.<id>: false`.
-- The bound *service* does see the global default (resolved through
+- The bound _service_ does see the global default (resolved through
   `createKavo`'s `createCrud` at `onModuleInit`), so calling that route
   answers `405 KAVO_OPERATION_DISABLED` — never a silent success, never a
   bare 404.
@@ -103,5 +103,5 @@ plain printable object. Useful for confirming what actually won the
 precedence chain without re-deriving it by hand.
 
 Full detail: `packages/docs/architecture/08-configuration.md`; the
-`add-config-key` skill covers adding a *new* key to this schema rather than
+`add-config-key` skill covers adding a _new_ key to this schema rather than
 using the existing ones.

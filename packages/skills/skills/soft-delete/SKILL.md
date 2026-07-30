@@ -26,12 +26,12 @@ every read excludes stamped rows.
 
 ## Strategy resolution (`resolveSoftDelete`)
 
-| Settings                                 | Result                                          |
-| ------------------------------------------ | -------------------------------------------------- |
-| `softDelete: false`                       | `hard`                                             |
-| `softDelete.strategy: "hard"`             | `hard`                                             |
-| `softDelete.strategy: "soft"`             | `soft` — no marker field on the entity is a config error |
-| `softDelete.strategy: "auto"` (default)   | `soft` when a marker field exists, else `hard`      |
+| Settings                                | Result                                                   |
+| --------------------------------------- | -------------------------------------------------------- |
+| `softDelete: false`                     | `hard`                                                   |
+| `softDelete.strategy: "hard"`           | `hard`                                                   |
+| `softDelete.strategy: "soft"`           | `soft` — no marker field on the entity is a config error |
+| `softDelete.strategy: "auto"` (default) | `soft` when a marker field exists, else `hard`           |
 
 The marker field is the configured `softDelete.field` (default
 `"deletedAt"`) if the entity has that column, otherwise whatever the ORM
@@ -49,9 +49,9 @@ call can narrow it:
 
 ## Operations
 
-| Operation    | Behavior                                                                                                          |
-| ------------ | -------------------------------------------------------------------------------------------------------------------- |
-| `deleteOne`  | Hard or soft per the resolved strategy. Soft-deleting an already-deleted row → 409 `KAVO_ALREADY_DELETED`.           |
+| Operation    | Behavior                                                                                                               |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `deleteOne`  | Hard or soft per the resolved strategy. Soft-deleting an already-deleted row → 409 `KAVO_ALREADY_DELETED`.             |
 | `restoreOne` | Clears the marker, returns the revived row in the `item` slot (no new DTO shape). A live row → 409 `KAVO_NOT_DELETED`. |
 | `purgeOne`   | Permanently removes an already-soft-deleted row. A live row → 409 `KAVO_NOT_DELETED`. Under `hard` it's just a delete. |
 
@@ -90,7 +90,7 @@ itself.
 
 - **Unique constraints.** A soft-deleted row still occupies its unique
   indexes — re-creating "the same" row raises a unique violation (mapped to
-  409, same as any conflict; the value genuinely *is* taken). Kavo does not
+  409, same as any conflict; the value genuinely _is_ taken). Kavo does not
   rewrite indexes for you. Standard fix: a partial/filtered unique index
   over live rows only —
   `CREATE UNIQUE INDEX owner_email_live ON owner (email) WHERE deleted_at IS NULL;`

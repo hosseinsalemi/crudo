@@ -25,15 +25,15 @@ Full detail: `packages/docs/architecture/10-nestjs-integration.md`.
 ## Generated routes
 
 | Operation    | Route                | Status |
-| ------------ | --------------------- | ------ |
-| `createOne`  | `POST /`              | 201    |
-| `findMany`   | `GET /`               | 200    |
-| `findOne`    | `GET /:id`            | 200    |
-| `updateOne`  | `PUT /:id`            | 200    |
-| `patchOne`   | `PATCH /:id`          | 200    |
-| `deleteOne`  | `DELETE /:id`         | 204    |
-| `restoreOne` | `PATCH /:id/restore`  | 200    |
-| `purgeOne`   | `DELETE /:id/purge`   | 204    |
+| ------------ | -------------------- | ------ |
+| `createOne`  | `POST /`             | 201    |
+| `findMany`   | `GET /`              | 200    |
+| `findOne`    | `GET /:id`           | 200    |
+| `updateOne`  | `PUT /:id`           | 200    |
+| `patchOne`   | `PATCH /:id`         | 200    |
+| `deleteOne`  | `DELETE /:id`        | 204    |
+| `restoreOne` | `PATCH /:id/restore` | 200    |
+| `purgeOne`   | `DELETE /:id/purge`  | 204    |
 
 `restoreOne`/`purgeOne` are off by default and turned on by config
 (`softDelete: { strategy: "soft" }` enables restore; `operations: { purgeOne: true }`
@@ -93,7 +93,7 @@ skips coercion, not security.
   from the `query` DTO or entity metadata at bootstrap) — relation paths
   need an explicit `filterable`/`sortable` entry naming the dot-path
   (`profile.city`), or `include`'s own `allowlists.selectable` on the
-  *target* entity for `fields[<path>]`.
+  _target_ entity for `fields[<path>]`.
 - Relation-path **filters** restrict root rows via a non-selecting join —
   they never load or filter the included collection itself.
 - Full request-side grammar (operators, sort syntax, pagination, fieldsets,
@@ -120,12 +120,12 @@ Inclusion is its own allowlist, resolved per-edge under `relations.edges`:
 Per-edge options (`relations.edges.<name>`), each defaulting from the table
 below if omitted:
 
-| Key              | Default                          | Meaning                                                                 |
-| ----------------- | --------------------------------- | ------------------------------------------------------------------------ |
-| `includable`      | `false`                          | naming the edge at all is what opts it in; omitted = not includable      |
-| `defaultInclude`  | `false`                          | `true` includes it even without an explicit `include=` param             |
-| `maxDepth`        | inherits `relations.maxIncludeDepth` | replaces the depth budget for this edge's own subtree                |
-| `strategy`        | `"auto"`                         | `"join"` (`leftJoinAndSelect`) or `"batch"` (one query per level, stitched in memory); `auto` picks `join` for to-one, `batch` for to-many |
+| Key              | Default                              | Meaning                                                                                                                                    |
+| ---------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `includable`     | `false`                              | naming the edge at all is what opts it in; omitted = not includable                                                                        |
+| `defaultInclude` | `false`                              | `true` includes it even without an explicit `include=` param                                                                               |
+| `maxDepth`       | inherits `relations.maxIncludeDepth` | replaces the depth budget for this edge's own subtree                                                                                      |
+| `strategy`       | `"auto"`                             | `"join"` (`leftJoinAndSelect`) or `"batch"` (one query per level, stitched in memory); `auto` picks `join` for to-one, `batch` for to-many |
 
 - An edge name that doesn't exist on the entity is a bootstrap
   `ConfigurationException` — a typo can't silently permit nothing.
@@ -169,6 +169,7 @@ Three escalating options, from least to most custom:
 
    A read override's `query` arrives pre-wrapped in `WireQuery` — don't call
    `flattenQuery`/`WireQuery` yourself.
+
 3. **Manual-method-wins** — a hand-written method whose name matches an
    operation id (no `@Override`) suppresses the generated route entirely,
    detected via `hasOwnProperty` on the prototype. No config needed, but you
@@ -205,6 +206,6 @@ export class UserController {
 See `packages/examples/src/address/address.controller.ts` for a worked
 example (`normalizePostalCode`, `validatePostalCode`).
 
-**Rule of thumb:** reach for `@Override` when the action *is* one of the
+**Rule of thumb:** reach for `@Override` when the action _is_ one of the
 standard operations and should keep its generated route/Swagger/param
 metadata; reach for a plain native-decorated method for anything else.

@@ -11,24 +11,24 @@ normalized in `core/src/query/` (`DefaultFilterParser`, `QueryNormalizer`,
 `PaginationStrategy`). This doc is end-user-safe — hand it to an API
 consumer as-is. Full source: `packages/docs/architecture/05-query-grammar.md`
 (operators/grammar) and `packages/docs/architecture/12-relations-and-includes.md`
-(includes). What an entity *allows* through these params is configured via
+(includes). What an entity _allows_ through these params is configured via
 `allowlists`/`relations` on `@Crud` — see the `crud-decorator` skill.
 
 ## Filtering — `filter[field][operator]=value`
 
 | AST operator  | Wire token   | Example                                            |
-| ------------- | ------------ | --------------------------------------------------- |
-| `EQ`          | `eq`         | `filter[status][eq]=active`                          |
-| `NE`          | `ne`         | `filter[status][ne]=banned`                          |
-| `GT` / `GTE`  | `gt` / `gte` | `filter[age][gte]=18`                                |
-| `LT` / `LTE`  | `lt` / `lte` | `filter[age][lt]=65`                                 |
-| `IN`          | `in`         | `filter[status][in]=active,pending`                  |
-| `NOT_IN`      | `notIn`      | `filter[role][notIn]=bot,test`                       |
-| `LIKE`        | `like`       | `filter[name][like]=%25john%25`                      |
-| `ILIKE`       | `ilike`      | `filter[name][ilike]=%25john%25`                     |
-| `BETWEEN`     | `between`    | `filter[createdAt][between]=2026-01-01,2026-06-01`   |
-| `IS_NULL`     | `isNull`     | `filter[deletedAt][isNull]=true`                     |
-| `IS_NOT_NULL` | `isNotNull`  | `filter[deletedAt][isNotNull]=true`                  |
+| ------------- | ------------ | -------------------------------------------------- |
+| `EQ`          | `eq`         | `filter[status][eq]=active`                        |
+| `NE`          | `ne`         | `filter[status][ne]=banned`                        |
+| `GT` / `GTE`  | `gt` / `gte` | `filter[age][gte]=18`                              |
+| `LT` / `LTE`  | `lt` / `lte` | `filter[age][lt]=65`                               |
+| `IN`          | `in`         | `filter[status][in]=active,pending`                |
+| `NOT_IN`      | `notIn`      | `filter[role][notIn]=bot,test`                     |
+| `LIKE`        | `like`       | `filter[name][like]=%25john%25`                    |
+| `ILIKE`       | `ilike`      | `filter[name][ilike]=%25john%25`                   |
+| `BETWEEN`     | `between`    | `filter[createdAt][between]=2026-01-01,2026-06-01` |
+| `IS_NULL`     | `isNull`     | `filter[deletedAt][isNull]=true`                   |
+| `IS_NOT_NULL` | `isNotNull`  | `filter[deletedAt][isNotNull]=true`                |
 
 Logical operators: `AND` (implicit), `OR`, `NOT` — wire tokens `and`, `or`,
 `not`. Wire tokens are camelCase and **exact-case matched**, no aliases

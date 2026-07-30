@@ -1,21 +1,21 @@
 # Kavo developer skills (Claude Code)
 
 Eight [Claude Code skills](https://docs.claude.com/en/docs/claude-code/skills)
-documenting how to *use* the `@kavo/*` packages in your own app — as opposed
+documenting how to _use_ the `@kavo/*` packages in your own app — as opposed
 to this repo's own `.claude/skills/`, which covers contributing to Kavo
 itself. Point Claude Code at one of these and it has the config shapes,
 routes, and grammar memorized instead of guessing from source.
 
-| Skill               | Covers                                                                 |
-| ------------------- | ------------------------------------------------------------------------ |
-| `quick-start`        | New project from scratch — install, minimal entity, zero-config `@Crud` |
-| `crud-decorator`     | `@Crud(Entity, config?)` — routes, `EntityConfig`, allowlists, relations, overrides |
-| `global-config`      | `KavoSettings` precedence chain, `KavoModule.forRoot`/`createKavo` wiring |
-| `query-grammar`      | The `filter`/`sort`/`fields`/pagination/`include` wire grammar          |
-| `dto-slots`          | The six optional DTO slots and entity-derived defaults                  |
-| `error-handling`     | Exception hierarchy, `KAVO_*` codes, the problem-details wire shape     |
-| `soft-delete`        | Soft delete / restore / purge strategy and semantics                    |
-| `graphql-binding`    | `@kavo/graphql` and its Nest binding                                    |
+| Skill             | Covers                                                                              |
+| ----------------- | ----------------------------------------------------------------------------------- |
+| `quick-start`     | New project from scratch — install, minimal entity, zero-config `@Crud`             |
+| `crud-decorator`  | `@Crud(Entity, config?)` — routes, `EntityConfig`, allowlists, relations, overrides |
+| `global-config`   | `KavoSettings` precedence chain, `KavoModule.forRoot`/`createKavo` wiring           |
+| `query-grammar`   | The `filter`/`sort`/`fields`/pagination/`include` wire grammar                      |
+| `dto-slots`       | The six optional DTO slots and entity-derived defaults                              |
+| `error-handling`  | Exception hierarchy, `KAVO_*` codes, the problem-details wire shape                 |
+| `soft-delete`     | Soft delete / restore / purge strategy and semantics                                |
+| `graphql-binding` | `@kavo/graphql` and its Nest binding                                                |
 
 ## Install
 

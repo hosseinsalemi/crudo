@@ -24,9 +24,9 @@ import { createCrudGraphQLSchema } from "@kavo/graphql";
 
 const schema = createCrudGraphQLSchema({
   name: "Owner",
-  service: ownerService,             // whatever createCrud(Owner, ...) returned
-  itemType: OwnerType,                // hand-written GraphQLObjectType
-  createInputType: CreateOwnerInput,  // optional — omit to skip the mutation
+  service: ownerService, // whatever createCrud(Owner, ...) returned
+  itemType: OwnerType, // hand-written GraphQLObjectType
+  createInputType: CreateOwnerInput, // optional — omit to skip the mutation
   updateInputType: UpdateOwnerInput,
   patchInputType: PatchOwnerInput,
   deleteOne: true,
@@ -35,21 +35,21 @@ const schema = createCrudGraphQLSchema({
 });
 ```
 
-| Field                                        | Enabled by         |
-| ---------------------------------------------- | -------------------- |
-| `Query.owner(id)`                              | always               |
-| `Query.owners(limit, offset, sort, filter)`    | always               |
-| `Mutation.createOwner`                         | `createInputType`    |
-| `Mutation.updateOwner`                         | `updateInputType`    |
-| `Mutation.patchOwner`                          | `patchInputType`     |
-| `Mutation.deleteOwner: Boolean`                | `deleteOne: true`    |
-| `Mutation.restoreOwner: Owner`                 | `restoreOne: true`   |
-| `Mutation.purgeOwner: Boolean`                 | `purgeOne: true`     |
+| Field                                       | Enabled by         |
+| ------------------------------------------- | ------------------ |
+| `Query.owner(id)`                           | always             |
+| `Query.owners(limit, offset, sort, filter)` | always             |
+| `Mutation.createOwner`                      | `createInputType`  |
+| `Mutation.updateOwner`                      | `updateInputType`  |
+| `Mutation.patchOwner`                       | `patchInputType`   |
+| `Mutation.deleteOwner: Boolean`             | `deleteOne: true`  |
+| `Mutation.restoreOwner: Owner`              | `restoreOne: true` |
+| `Mutation.purgeOwner: Boolean`              | `purgeOne: true`   |
 
 **These flags do not cross-check REST's `@Crud` config.** Setting
 `restoreOne: true` here for an entity whose `@Crud` config disables
 `restoreOne` still adds the field to the schema — it throws
-`OperationDisabledException` at *resolve* time instead, same as calling the
+`OperationDisabledException` at _resolve_ time instead, same as calling the
 REST route would. Keeping the two declarations in sync is your job today.
 
 ### Filter and sort args on `Query.<entity>s`
@@ -105,7 +105,9 @@ Two ways to mount it, pick one per app/path — never both:
    ```ts
    @Controller("graphql")
    export class GraphQLController extends BaseCrudGraphQLController {
-     constructor(moduleRef: ModuleRef) { super(moduleRef); } // must be declared
+     constructor(moduleRef: ModuleRef) {
+       super(moduleRef);
+     } // must be declared
      @Post()
      @HttpCode(200) // GraphQL-over-HTTP convention: 200 even for mutations
      handle(@Body() body: { query: string; variables?: Record<string, unknown> }) {

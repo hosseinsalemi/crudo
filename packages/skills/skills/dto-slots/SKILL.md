@@ -16,13 +16,13 @@ pipe/guard, e.g. Nest's `ValidationPipe`). Full detail:
 ## The six slots
 
 | Slot     | Verb / context                        | Default when omitted                                             |
-| -------- | -------------------------------------- | ------------------------------------------------------------------ |
-| `create` | `POST` body                            | Entity minus generated + relation fields                          |
-| `update` | `PUT` body                             | Same default as `create`                                          |
-| `patch`  | `PATCH` body                           | `Partial<update>` if `update` registered, else `Partial<Entity>`   |
-| `query`  | `GET` list input                       | Generic `QueryContext<Entity>`                                    |
-| `item`   | Any single-resource response           | Entity, subject to field selection                                |
-| `list`   | Element type in `ListResultDto.items`  | Same as `item`'s resolved type                                    |
+| -------- | ------------------------------------- | ---------------------------------------------------------------- |
+| `create` | `POST` body                           | Entity minus generated + relation fields                         |
+| `update` | `PUT` body                            | Same default as `create`                                         |
+| `patch`  | `PATCH` body                          | `Partial<update>` if `update` registered, else `Partial<Entity>` |
+| `query`  | `GET` list input                      | Generic `QueryContext<Entity>`                                   |
+| `item`   | Any single-resource response          | Entity, subject to field selection                               |
+| `list`   | Element type in `ListResultDto.items` | Same as `item`'s resolved type                                   |
 
 `restoreOne` reuses the `item` slot — there is no seventh slot for it.
 Naming convention (CLAUDE.md): request bodies are `<Verb><Entity>Dto`
