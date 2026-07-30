@@ -88,6 +88,42 @@ describe("resolveEntityConfig — bootstrap", () => {
     // Unconfigured lists still derive.
     expect(config.allowlists.sortable).toContain("email");
   });
+
+  it("resolves { exclude } to every own column except the ones named", () => {
+    const config = resolveEntityConfig(userMetadata, { allowlists: { filterable: { exclude: ["email"] } } }, undefined);
+    expect(config.allowlists.filterable).toEqual(["id", "name", "age", "status", "createdAt"]);
+    // Unconfigured lists still derive in full.
+    expect(config.allowlists.sortable).toContain("email");
+  });
+
+  it("never lets { exclude } surface a column outside own columns", () => {
+    // A name that isn't an own column is a no-op to exclude — the result
+    // stays a subset of own columns, never an arbitrary string added in.
+    const notAColumn = "notAColumn" as unknown as keyof User;
+    const config = resolveEntityConfig(
+      userMetadata,
+      { allowlists: { filterable: { exclude: [notAColumn] } } },
+      undefined,
+    );
+    expect(config.allowlists.filterable).toEqual(["id", "name", "email", "age", "status", "createdAt"]);
+  });
+
+  it("resolves { exclude } independently for sortable and selectable too", () => {
+    const config = resolveEntityConfig(
+      userMetadata,
+      {
+        allowlists: {
+          sortable: { exclude: ["status"] },
+          selectable: { exclude: ["age", "status"] },
+        },
+      },
+      undefined,
+    );
+    expect(config.allowlists.sortable).toEqual(["id", "name", "email", "age", "createdAt"]);
+    expect(config.allowlists.selectable).toEqual(["id", "name", "email", "createdAt"]);
+    // Unconfigured filterable still derives in full.
+    expect(config.allowlists.filterable).toContain("status");
+  });
 });
 
 describe("User fixture sanity", () => {

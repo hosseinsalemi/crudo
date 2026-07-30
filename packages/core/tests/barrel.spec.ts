@@ -132,6 +132,7 @@ const PUBLIC_SURFACE: readonly string[] = [
   "ProblemDetailsOptions",
   "QueryAllowlists",
   "QueryContext",
+  "QueryFieldSelector",
   "QueryIssueDto",
   "QueryNormalizer",
   "QuerySettings",

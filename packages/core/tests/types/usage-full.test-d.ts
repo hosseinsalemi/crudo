@@ -89,6 +89,19 @@ void authors.createOne({ name: "Ada", bio: "x" });
 // @ts-expect-error — an allowlist entry has to name a real field.
 void kavo.createCrud(Author, { allowlists: { filterable: ["nmae"] } });
 
+// `{ exclude }` is accepted wherever an explicit array is, and still
+// type-checks each excluded path against the entity.
+void kavo.createCrud(Author, { allowlists: { filterable: { exclude: ["name"] } } });
+
+// @ts-expect-error — `{ exclude }` names have to be real fields too.
+void kavo.createCrud(Author, { allowlists: { sortable: { exclude: ["nmae"] } } });
+
+// `{ exclude }` on `selectable` type-checks the same way.
+void kavo.createCrud(Author, { allowlists: { selectable: { exclude: ["name"] } } });
+
+// @ts-expect-error — including `selectable`.
+void kavo.createCrud(Author, { allowlists: { selectable: { exclude: ["nmae"] } } });
+
 // Overridden and default operations dispatch through the engine, one pipeline either way.
 void authors.engine.execute({ operation: "findMany", id: null, body: null, query: null, options: null });
 
