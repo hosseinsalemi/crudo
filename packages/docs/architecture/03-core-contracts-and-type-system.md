@@ -189,9 +189,9 @@ Enforced by dependency-cruiser (`core-imports-nothing`), not convention.
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Service       | `CrudService`, `CrudCallOptions`, `IdentifiedInput`                                                                                                                    |
 | Persistence   | `EntityReader`, `EntityWriter`, `RepositoryAdapter`                                                                                                                    |
-| Transactions  | `TransactionManager`, `TransactionContext`, `TransactionOptions` — not implemented, see below |
+| Transactions  | `TransactionManager`, `TransactionContext`, `TransactionOptions` — not implemented, see below                                                                          |
 | Query         | `Filter*`, `FilterExpression`, `Sort`, `Pagination`, `PaginationStrategy`, `FieldSelection`, `QueryContext`, `NormalizedQueryContext`, `FilterParser`, `FilterBuilder` |
-| DTO           | `Dto`, `DtoClass`, `OperationDtoMap`, `DtoResolver`, `ListResultDto`, `ListMetaDto`, `BulkResultDto` (bulk reserved) |
+| DTO           | `Dto`, `DtoClass`, `OperationDtoMap`, `DtoResolver`, `ListResultDto`, `ListMetaDto`, `BulkResultDto` (bulk reserved)                                                   |
 | Errors        | `CrudException`, `KavoErrorCode`, `ErrorHandler`, `ProblemDetailsDto`                                                                                                  |
 | Config        | `KavoSettings` (+ per-area settings), `GlobalConfig`, `EntityConfig`, `OperationConfig`, `ResolvedEntityConfig`                                                        |
 | Operations    | `OperationId`, `OperationHandler`, `OperationMetadata`, `OperationDescriptor`, `OperationRegistry`                                                                     |

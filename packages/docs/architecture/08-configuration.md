@@ -11,18 +11,18 @@ built-in defaults → global (createKavo) → entity (createCrud)
 
 `BUILT_IN_DEFAULTS` (`core/src/config/defaults.ts`):
 
-| Key                                              | Default                  | Notes                                                                          |
-| ------------------------------------------------ | ------------------------ | ------------------------------------------------------------------------------ |
-| `pagination.defaultLimit` / `maxLimit`           | 20 / 100                 | `defaultLimit ≤ maxLimit` enforced                                             |
-| `pagination.strategy`                            | `"offset"`               | `"page"` built in; custom via `paginationStrategies`                           |
-| `pagination.count`                               | `true`                   | `false` skips the count query; envelope reports `total: null`                  |
-| `query.maxFilterDepth` / `maxInValues`           | 3 / 100                  |                                                                                |
-| `errors.exposeInternals`                         | `false`                  | leak driver detail into responses                                              |
-| `relations.maxIncludeDepth` / `maxIncludedNodes` | 2 / 10                   | include depth budget and total node cap                                        |
-| `relations.edges.<name>`                         | `{}`                     | per-relation `includable` / `defaultInclude` / `maxDepth` / `strategy`         |
-| `softDelete.field` / `strategy`                  | `"deletedAt"` / `"auto"` | `auto` = soft when the entity has the marker field, `false` disables           |
-| `operations.<id>`                                | `{}` (unset)             | global operation-enablement default (issue #38); see below                     |
-| `bulk.mode` / `maxBatchSize`                     | `"atomic"` / 500         | reserved (bulk is not built)                                                   |
+| Key                                              | Default                  | Notes                                                                  |
+| ------------------------------------------------ | ------------------------ | ---------------------------------------------------------------------- |
+| `pagination.defaultLimit` / `maxLimit`           | 20 / 100                 | `defaultLimit ≤ maxLimit` enforced                                     |
+| `pagination.strategy`                            | `"offset"`               | `"page"` built in; custom via `paginationStrategies`                   |
+| `pagination.count`                               | `true`                   | `false` skips the count query; envelope reports `total: null`          |
+| `query.maxFilterDepth` / `maxInValues`           | 3 / 100                  |                                                                        |
+| `errors.exposeInternals`                         | `false`                  | leak driver detail into responses                                      |
+| `relations.maxIncludeDepth` / `maxIncludedNodes` | 2 / 10                   | include depth budget and total node cap                                |
+| `relations.edges.<name>`                         | `{}`                     | per-relation `includable` / `defaultInclude` / `maxDepth` / `strategy` |
+| `softDelete.field` / `strategy`                  | `"deletedAt"` / `"auto"` | `auto` = soft when the entity has the marker field, `false` disables   |
+| `operations.<id>`                                | `{}` (unset)             | global operation-enablement default (issue #38); see below             |
+| `bulk.mode` / `maxBatchSize`                     | `"atomic"` / 500         | reserved (bulk is not built)                                           |
 
 **Schema extensibility rule:** new features add keys to this schema —
 they never add a second config mechanism. The reserved keys above are
