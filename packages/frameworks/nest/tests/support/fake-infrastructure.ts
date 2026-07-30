@@ -24,8 +24,22 @@ export class Todo {
   list: TodoList | null = null;
 }
 
-/** The other side of the relation — never routed, only included. */
+/**
+ * The other side of the relation — never routed, only included. Its own
+ * `list` relation (deliberately reusing the name `Todo.list` uses) reaches
+ * a third entity, so tests can exercise a two-level include tree — e.g.
+ * `relations.maxIncludeDepth`/`maxIncludedNodes` budgets, which a
+ * single-level relation can never exceed once a positive integer is the
+ * smallest legal setting.
+ */
 export class TodoList {
+  id = 0;
+  name = "";
+  list: TodoTag | null = null;
+}
+
+/** Third entity in the relation chain — never routed, only included. */
+export class TodoTag {
   id = 0;
   name = "";
 }
@@ -56,6 +70,25 @@ export const todoMetadata: EntityMetadata<Todo> = {
 export const todoListMetadata: EntityMetadata<TodoList> = {
   entity: TodoList,
   name: "TodoList",
+  idField: "id",
+  fields: [
+    { name: "id", kind: "number", nullable: false, generated: true },
+    { name: "name", kind: "string", nullable: false, generated: false },
+  ],
+  relations: [
+    {
+      name: "list",
+      target: () => TodoTag,
+      cardinality: "one",
+      includable: false,
+      strategy: "auto",
+    },
+  ],
+};
+
+export const todoTagMetadata: EntityMetadata<TodoTag> = {
+  entity: TodoTag,
+  name: "TodoTag",
   idField: "id",
   fields: [
     { name: "id", kind: "number", nullable: false, generated: true },
@@ -185,6 +218,9 @@ export function fakeInfrastructure(adapter: InMemoryTodoAdapter): CrudInfrastruc
     metadataFor<Entity extends object>(entity: ClassRef<Entity>) {
       if ((entity as ClassRef) === TodoList) {
         return todoListMetadata as unknown as EntityMetadata<Entity>;
+      }
+      if ((entity as ClassRef) === TodoTag) {
+        return todoTagMetadata as unknown as EntityMetadata<Entity>;
       }
       if ((entity as ClassRef) !== Todo) {
         throw new Error(`no metadata for ${entity.name}`);
