@@ -20,13 +20,17 @@ kavo/
    ├─ frameworks/
    │  └─ nest/                # @kavo/nest
    │     └─ src/index.ts
+   ├─ protocols/
+   │  └─ graphql/             # @kavo/graphql
+   │     └─ src/index.ts
    ├─ examples/               # reference application
    └─ docs/                   # this documentation
 ```
 
-The `orms/` and `frameworks/` parent folders keep the door open for future
-adapters (Prisma, Express, …) without implying any get built — v6 ships
-exactly three packages.
+The `orms/`, `frameworks/`, and `protocols/` parent folders keep the door
+open for future adapters (Prisma, …), host framework bindings
+(Express, Fastify, Next.js, …), and wire protocols (gRPC, …) without
+implying any get built ahead of real work landing (ADR-0002, ADR-0016).
 
 ## 2. Responsibility statements
 
@@ -41,10 +45,18 @@ exactly three packages.
 - **`@kavo/nest`** exists to bind Kavo to NestJS (module, decorator,
   route generation, exception filter, Swagger). It can't depend on TypeORM
   or `@kavo/typeorm` — it sees persistence only as an injected
-  `RepositoryAdapter`.
+  `RepositoryAdapter`. It may depend on a `protocols/*` package
+  (`@kavo/graphql`) to offer that protocol's glue as an add-on — see
+  ADR-0016 — but never another `frameworks/*` package.
+- **`@kavo/graphql`** (`packages/protocols/graphql`, ADR-0016) exists to
+  build a `GraphQLSchema` over a `createCrud` service — host-framework-
+  agnostic, same constraint as an ORM adapter: it depends on `@kavo/core`
+  and the `graphql` peer only, never `@kavo/nest` or any other framework
+  package. See `packages/docs/architecture/13-graphql-binding.md`.
 
-Every package earns its place: core is the hub, and the two edges each
-adapt exactly one external technology. Nothing else qualifies in v6.
+Every package earns its place: core is the hub, and every other package
+adapts exactly one external technology or protocol — an ORM, a host
+framework, or a wire protocol.
 
 ## 3. Dependency rules — mechanically enforced
 
@@ -57,7 +69,10 @@ Two independent enforcement layers:
    forbids: core importing anything, adapter↔framework imports in either
    direction, cross-package deep imports past a barrel, and runtime import
    cycles (type-only cycles are exempt — core's contracts are mutually
-   referential by design and erase at compile time).
+   referential by design and erase at compile time). One exception to
+   "no cross-edge imports": a `frameworks/*` package may depend on a
+   `protocols/*` package (`@kavo/nest` → `@kavo/graphql`), never the
+   reverse — ADR-0016.
 
    Two properties of that rule set are load-bearing and easy to lose:
 
@@ -123,11 +138,12 @@ publish order) are future work.
 
 ## 8. Dependency classification (decided now, executed later)
 
-| Package         | `dependencies` | `peerDependencies`                                              |
-| --------------- | -------------- | --------------------------------------------------------------- |
-| `@kavo/core`    | — (none, ever) | —                                                               |
-| `@kavo/typeorm` | `@kavo/core`   | `typeorm`                                                       |
-| `@kavo/nest`    | `@kavo/core`   | `@nestjs/common`, `@nestjs/core` (+ `@nestjs/swagger` optional) |
+| Package         | `dependencies`                | `peerDependencies`                                                         |
+| --------------- | ----------------------------- | -------------------------------------------------------------------------- |
+| `@kavo/core`    | — (none, ever)                | —                                                                          |
+| `@kavo/typeorm` | `@kavo/core`                  | `typeorm`                                                                  |
+| `@kavo/graphql` | `@kavo/core`                  | `graphql`                                                                  |
+| `@kavo/nest`    | `@kavo/core`, `@kavo/graphql` | `@nestjs/common`, `@nestjs/core`, `graphql` (+ `@nestjs/swagger` optional) |
 
 Peers, not dependencies, because the consumer's app owns the TypeORM/Nest
 instance — a second copy via a nested dependency would fracture

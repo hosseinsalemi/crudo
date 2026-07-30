@@ -27,6 +27,7 @@ export default defineConfig({
       "@kavo/core": new URL("./packages/core/src/index.ts", import.meta.url).pathname,
       "@kavo/typeorm": new URL("./packages/orms/typeorm/src/index.ts", import.meta.url).pathname,
       "@kavo/nest": new URL("./packages/frameworks/nest/src/index.ts", import.meta.url).pathname,
+      "@kavo/graphql": new URL("./packages/protocols/graphql/src/index.ts", import.meta.url).pathname,
     },
   },
   test: {

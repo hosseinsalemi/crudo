@@ -7,6 +7,7 @@ import type { KavoModuleOptions } from "./kavo-options.js";
 import type { CrudControllerMetadata } from "./crud.decorator.js";
 import { getRegisteredCrudControllers } from "./crud.decorator.js";
 import { KavoExceptionFilter } from "./kavo-exception.filter.js";
+import { createDefaultGraphQLController, DEFAULT_GRAPHQL_PATH } from "./graphql/default-graphql.controller.js";
 import {
   KAVO_INSTANCE,
   KAVO_MODULE_OPTIONS,
@@ -14,6 +15,15 @@ import {
   CRUD_SERVICE_PROPERTY,
   getCrudServiceToken,
 } from "./tokens.js";
+
+/** `graphql: true` mounts the default controller at `POST /graphql`; `{ path }` mounts it at `POST <path>` instead. */
+export type KavoGraphQLOption = boolean | { readonly path?: string };
+
+function graphqlPathFrom(option: KavoGraphQLOption | undefined): string | undefined {
+  if (option === undefined || option === false) return undefined;
+  if (option === true) return DEFAULT_GRAPHQL_PATH;
+  return option.path ?? DEFAULT_GRAPHQL_PATH;
+}
 
 export interface KavoModuleAsyncOptions extends Pick<ModuleMetadata, "imports"> {
   useFactory: (...args: never[]) => KavoModuleOptions | Promise<KavoModuleOptions>;
@@ -28,6 +38,17 @@ export interface KavoModuleAsyncOptions extends Pick<ModuleMetadata, "imports"> 
    * in one file.
    */
   provideServices?: boolean;
+  /**
+   * Mounts a default GraphQL controller — every `@Crud` entity that also
+   * called `registerCrudGraphQLTypes` (`@kavo/graphql`), merged onto one
+   * schema, with no controller of your own to write. `true` mounts it at
+   * `POST /graphql`; `{ path: "api/graphql" }` mounts it there instead.
+   * Implies `provideServices` (the merged schema's resolvers need every
+   * entity's service as a DI provider to look up via `ModuleRef`, the same
+   * requirement `BaseCrudGraphQLController` always has) even if
+   * `provideServices` itself is left unset.
+   */
+  graphql?: KavoGraphQLOption;
 }
 
 /**
@@ -66,13 +87,17 @@ export interface KavoModuleAsyncOptions extends Pick<ModuleMetadata, "imports"> 
  */
 @Module({})
 export class KavoModule {
-  static forRoot(options: KavoModuleOptions & { provideServices?: boolean } = {}): DynamicModule {
-    const { provideServices, ...kavoOptions } = options;
-    const serviceProviders = provideServices === true ? providersFromRegistry() : [];
+  static forRoot(
+    options: KavoModuleOptions & { provideServices?: boolean; graphql?: KavoGraphQLOption } = {},
+  ): DynamicModule {
+    const { provideServices, graphql, ...kavoOptions } = options;
+    const graphqlPath = graphqlPathFrom(graphql);
+    const serviceProviders = provideServices === true || graphqlPath !== undefined ? providersFromRegistry() : [];
     return {
       module: KavoModule,
       global: true,
       imports: [DiscoveryModule],
+      controllers: graphqlPath !== undefined ? [createDefaultGraphQLController(graphqlPath)] : [],
       providers: [
         { provide: KAVO_MODULE_OPTIONS, useValue: kavoOptions },
         {
@@ -89,11 +114,14 @@ export class KavoModule {
   }
 
   static forRootAsync(options: KavoModuleAsyncOptions): DynamicModule {
-    const serviceProviders = options.provideServices === true ? providersFromRegistry() : [];
+    const graphqlPath = graphqlPathFrom(options.graphql);
+    const serviceProviders =
+      options.provideServices === true || graphqlPath !== undefined ? providersFromRegistry() : [];
     return {
       module: KavoModule,
       global: true,
       imports: [DiscoveryModule, ...(options.imports ?? [])],
+      controllers: graphqlPath !== undefined ? [createDefaultGraphQLController(graphqlPath)] : [],
       providers: [
         {
           provide: KAVO_MODULE_OPTIONS,

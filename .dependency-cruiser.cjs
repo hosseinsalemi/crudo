@@ -42,12 +42,27 @@ module.exports = {
       name: "nest-only-imports-core",
       severity: "error",
       comment:
-        "@kavo/nest may depend on @kavo/core and the @nestjs/* peers — " +
-        "never on an ORM adapter (ADR-0002). Adapters reach Nest's container " +
-        "via DI, not via imports. Package-specifier form matched too, per the " +
-        "note on typeorm-only-imports-core.",
+        "@kavo/nest may depend on @kavo/core, the @nestjs/* peers, and " +
+        "@kavo/graphql (its optional GraphQL glue, `BaseCrudGraphQLController`)" +
+        " — never on an ORM adapter (ADR-0002). Adapters reach Nest's " +
+        "container via DI, not via imports. The graphql-only-imports-core " +
+        "rule keeps this one-directional: @kavo/graphql never imports " +
+        "@kavo/nest back (ADR-0016). Package-specifier form matched too, " +
+        "per the note on typeorm-only-imports-core.",
       from: { path: "^packages/frameworks/nest/src" },
       to: { path: "^(packages/orms|@kavo/typeorm)" },
+    },
+    {
+      name: "graphql-only-imports-core",
+      severity: "error",
+      comment:
+        "@kavo/graphql may depend on @kavo/core and the graphql peer — " +
+        "never on an ORM adapter or a framework binding (ADR-0016, which " +
+        "makes @kavo/graphql a protocols/* package: host-framework-agnostic, " +
+        "same constraint as an ORM adapter). Package-specifier form matched " +
+        "too, per the note on typeorm-only-imports-core.",
+      from: { path: "^packages/protocols/graphql/src" },
+      to: { path: "^(packages/orms|packages/frameworks|@kavo/(typeorm|nest))" },
     },
     {
       name: "no-cross-package-deep-imports-core",
@@ -58,15 +73,15 @@ module.exports = {
         "another package's src are not API — matched as a relative path and " +
         "as a `@kavo/core/...` subpath. `packages/examples` is in scope: it " +
         "is the reference app, so an illegal import there teaches one.",
-      from: { path: "^packages/(orms|frameworks|examples)" },
+      from: { path: "^packages/(orms|frameworks|protocols|examples)" },
       to: { path: "^(packages/core/src/.+|@kavo/core/.+)" },
     },
     {
       name: "no-cross-package-deep-imports-adapters",
       severity: "error",
-      comment: "Same rule for adapter/framework package internals.",
+      comment: "Same rule for adapter/framework/protocol package internals.",
       from: { path: "^packages/core" },
-      to: { path: "^packages/(orms|frameworks)/[^/]+/src/.+" },
+      to: { path: "^packages/(orms|frameworks|protocols)/[^/]+/src/.+" },
     },
     {
       name: "tests-no-other-package-internals",
@@ -80,9 +95,11 @@ module.exports = {
         "`tests/` used to be excluded from cruising entirely. The `$1` " +
         "back-reference is the package root captured from `from`, so " +
         "same-package imports stay legal.",
-      from: { path: "^(packages/core|packages/examples|packages/orms/[^/]+|packages/frameworks/[^/]+)/tests/" },
+      from: {
+        path: "^(packages/core|packages/examples|packages/orms/[^/]+|packages/frameworks/[^/]+|packages/protocols/[^/]+)/tests/",
+      },
       to: {
-        path: "^(packages/core|packages/examples|packages/orms/[^/]+|packages/frameworks/[^/]+)/(src|tests)/",
+        path: "^(packages/core|packages/examples|packages/orms/[^/]+|packages/frameworks/[^/]+|packages/protocols/[^/]+)/(src|tests)/",
         pathNot: "^$1/",
       },
     },
@@ -96,7 +113,7 @@ module.exports = {
         "core's tests may use the barrel and vitest; this keeps the part that " +
         "still matters — no adapter, no framework — enforced for them too.",
       from: { path: "^packages/core/tests" },
-      to: { path: "^(@kavo/(typeorm|nest)|packages/(orms|frameworks))" },
+      to: { path: "^(@kavo/(typeorm|nest|graphql)|packages/(orms|frameworks|protocols))" },
     },
     {
       name: "no-circular",

@@ -43,6 +43,21 @@ export function getRegisteredCrudControllers(): ReadonlyMap<Function, CrudContro
 }
 
 /**
+ * Every `@Crud`-decorated entity the process has seen, in decoration
+ * order — the public, read-only counterpart of the registry above. Meant
+ * for a second binding (e.g. a GraphQL schema) that wants to mirror
+ * whatever entities are already exposed over REST without a hand-kept
+ * list of its own. Same process-wide scope and caveats as
+ * `KavoModule.forFeature()`'s no-arg form: if two controllers register the
+ * same entity, both appear here — this function does not dedupe or throw,
+ * since unlike `forFeature` it never has to pick one config to bind a DI
+ * token to.
+ */
+export function getCrudEntities(): readonly CrudControllerMetadata[] {
+  return Array.from(registeredCrudControllers.values());
+}
+
+/**
  * The default route shape of each standard operation. `Partial`
  * because the disabled batch operations have no route yet; keyed by the
  * union so a misspelled id cannot sit here unread.
