@@ -6,9 +6,10 @@ description: Fastest path to a working Kavo API in a brand-new project — npm i
 # Quick start — new project, SQLite + Nest + TypeORM only
 
 The fastest working slice: one entity, one controller, zero DTOs, an
-on-disk SQLite file. No Postgres, no GraphQL, no Swagger, no bulk — add
-those later from the other skills (`crud-decorator`, `global-config`,
-`dto-slots`, `graphql-binding`) once this runs.
+on-disk SQLite file. No Postgres, no GraphQL, no bulk — add those later
+from the other skills (`crud-decorator`, `global-config`, `dto-slots`,
+`graphql-binding`) once this runs. Swagger docs are one optional step,
+covered at the end (§9).
 
 ## 1. Create the project
 
@@ -198,6 +199,40 @@ curl localhost:3000/cats
 curl "localhost:3000/cats?filter[age][gte]=1&sort=-age"
 ```
 
+## 9. Add Swagger/OpenAPI docs (optional)
+
+One extra install, no `@Crud` config needed — every generated route
+documents itself automatically once `@nestjs/swagger` is present:
+
+```bash
+npm install @nestjs/swagger
+```
+
+```ts
+// src/main.ts
+import "reflect-metadata";
+import { NestFactory } from "@nestjs/core";
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import { AppModule } from "./app.module.js";
+
+async function bootstrap(): Promise<void> {
+  const app = await NestFactory.create(AppModule);
+
+  const document = SwaggerModule.createDocument(
+    app,
+    new DocumentBuilder().setTitle("My Kavo API").setVersion("1.0.0").build(),
+  );
+  SwaggerModule.setup("docs", app, document); // → GET /docs
+
+  await app.listen(3000);
+}
+
+void bootstrap();
+```
+
+Full detail (what gets documented automatically vs. what still needs a
+hand-written `@ApiQuery()`/`@ApiOperation()`) is in the `swagger` skill.
+
 ## Where to go next
 
 - More than one entity, or entities that relate to each other → add each
@@ -207,5 +242,5 @@ curl "localhost:3000/cats?filter[age][gte]=1&sort=-age"
 - App-wide defaults (pagination limits, disabling an operation everywhere)
   → `global-config`.
 - Soft delete / restore / purge → `soft-delete`.
-- Swagger docs, GraphQL → install the optional peers
-  (`@nestjs/swagger`, `graphql`) and see `graphql-binding`.
+- OpenAPI docs → `swagger`. GraphQL → install the optional `graphql` peer
+  and see `graphql-binding`.

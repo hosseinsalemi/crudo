@@ -1,6 +1,6 @@
 # Kavo developer skills (Claude Code)
 
-Eight [Claude Code skills](https://docs.claude.com/en/docs/claude-code/skills)
+Nine [Claude Code skills](https://docs.claude.com/en/docs/claude-code/skills)
 documenting how to _use_ the `@kavo/*` packages in your own app — as opposed
 to this repo's own `.claude/skills/`, which covers contributing to Kavo
 itself. Point Claude Code at one of these and it has the config shapes,
@@ -16,6 +16,7 @@ routes, and grammar memorized instead of guessing from source.
 | `error-handling`  | Exception hierarchy, `KAVO_*` codes, the problem-details wire shape                 |
 | `soft-delete`     | Soft delete / restore / purge strategy and semantics                                |
 | `graphql-binding` | `@kavo/graphql` and its Nest binding                                                |
+| `swagger`         | Optional `@nestjs/swagger` integration — what's auto-documented vs. manual          |
 
 ## Install
 

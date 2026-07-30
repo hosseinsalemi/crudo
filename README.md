@@ -44,10 +44,10 @@ TypeORM app wired up with all three packages.
 
 ## Claude Code skills
 
-If you use Claude Code, [`packages/skills`](packages/skills) has eight
+If you use Claude Code, [`packages/skills`](packages/skills) has nine
 ready-made skills covering `@Crud()`, global config, the query grammar,
-DTOs, errors, soft delete, and GraphQL — published as a plugin via this
-repo's own marketplace:
+DTOs, errors, soft delete, Swagger, and GraphQL — published as a plugin via
+this repo's own marketplace:
 
 ```
 /plugin marketplace add kavo-labs/kavo
