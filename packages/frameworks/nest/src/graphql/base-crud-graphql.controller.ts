@@ -1,9 +1,9 @@
 import type { OnModuleInit } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
-import { resolveCrudGraphQLSchema } from "@kavo/graphql";
-import { graphql, type ExecutionResult, type GraphQLSchema } from "graphql";
+import type { ExecutionResult, GraphQLSchema } from "graphql";
 import { getCrudEntities } from "../crud.decorator.js";
 import { getCrudServiceToken } from "../tokens.js";
+import { loadGraphQL } from "./load-graphql.js";
 
 /**
  * Nest-side half of the `@kavo/graphql` glue: discovers every `@Crud`
@@ -17,6 +17,15 @@ import { getCrudServiceToken } from "../tokens.js";
  * + `getCrudServiceToken`). A future `@kavo/express`/`@kavo/fastify` binding
  * would supply its own version of just those two things and reuse the same
  * `resolveCrudGraphQLSchema` call.
+ *
+ * `@kavo/graphql` and `graphql` are both loaded lazily, via `loadGraphQL()`
+ * — not imported at the top of this file — so that `@kavo/nest`'s
+ * always-loaded module graph never requires either to be installed. Only
+ * `import type` appears above (erased at compile time, ADR-n/a but see
+ * `load-graphql.ts`'s own doc comment for the full reasoning); the runtime
+ * import happens the first time `onModuleInit`/`execute` actually runs,
+ * which only happens for an app that opted in by extending this class or
+ * setting `KavoModule`'s `graphql` option.
  *
  * `@kavo/graphql` itself stays framework-agnostic — it never imports
  * `@kavo/nest` (`graphql-only-imports-core` in `.dependency-cruiser.cjs`,
@@ -50,14 +59,16 @@ export abstract class BaseCrudGraphQLController implements OnModuleInit {
 
   constructor(protected readonly moduleRef: ModuleRef) {}
 
-  onModuleInit(): void {
+  async onModuleInit(): Promise<void> {
+    const { resolveCrudGraphQLSchema } = await loadGraphQL();
     this.schema = resolveCrudGraphQLSchema(getCrudEntities(), (entity) =>
       this.moduleRef.get(getCrudServiceToken(entity), { strict: false }),
     );
   }
 
   /** Runs one query/mutation against the merged schema — call this from the concrete controller's route. */
-  protected execute(source: string, variableValues?: Record<string, unknown>): Promise<ExecutionResult> {
+  protected async execute(source: string, variableValues?: Record<string, unknown>): Promise<ExecutionResult> {
+    const { graphql } = await loadGraphQL();
     return graphql({ schema: this.schema, source, variableValues });
   }
 }
