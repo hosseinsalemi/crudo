@@ -12,12 +12,13 @@
  * augments core's `OperationMetadata` with its `routes` key (ADR-0007).
  * `@nestjs/*` are peerDependencies; `@nestjs/swagger` is optional.
  */
-export { Crud, type CrudControllerMetadata } from "./crud.decorator.js";
+export { Crud, getCrudEntities, type CrudControllerMetadata } from "./crud.decorator.js";
 export { Override, type OverrideMetadata } from "./override.decorator.js";
-export { KavoModule, type KavoModuleAsyncOptions } from "./kavo.module.js";
+export { KavoModule, type KavoModuleAsyncOptions, type KavoGraphQLOption } from "./kavo.module.js";
 export type { KavoModuleOptions } from "./kavo-options.js";
 export { KavoExceptionFilter } from "./kavo-exception.filter.js";
 export { flattenQuery } from "./flatten-query.js";
 export { enumProp, oneOfArray, type SchemaHint } from "./schema-hints.js";
 export { KAVO_INSTANCE, KAVO_MODULE_OPTIONS, getCrudServiceToken, boundCrudService } from "./tokens.js";
+export { BaseCrudGraphQLController } from "./graphql/base-crud-graphql.controller.js";
 export type { CrudHttpMethod, CrudRouteOptions } from "./operation-metadata.js";
