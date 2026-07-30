@@ -11,7 +11,7 @@
     "clean": "tsc -b --clean",
     "depcruise": "depcruise packages --config .dependency-cruiser.cjs",
     "test": "vitest run",
-    "typecheck": "tsc -p packages/core/tsconfig.tests.json && tsc -p packages/orms/typeorm/tsconfig.tests.json && tsc -p packages/frameworks/nest/tsconfig.tests.json && tsc -p packages/examples/tsconfig.tests.json",
+    "typecheck": "tsc -p packages/core/tsconfig.tests.json && tsc -p packages/orms/typeorm/tsconfig.tests.json && tsc -p packages/frameworks/nest/tsconfig.tests.json && tsc -p packages/protocols/graphql/tsconfig.tests.json && tsc -p packages/examples/tsconfig.tests.json",
     "lint": "oxlint packages",
     "prettify": "prettier --write .",
     "format:check": "prettier --check .",

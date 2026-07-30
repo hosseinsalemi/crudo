@@ -4,6 +4,7 @@
     { "path": "packages/core" },
     { "path": "packages/orms/typeorm" },
     { "path": "packages/frameworks/nest" },
+    { "path": "packages/protocols/graphql" },
     { "path": "packages/examples" }
   ]
 }
