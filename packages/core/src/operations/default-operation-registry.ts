@@ -4,7 +4,7 @@ import type { OperationHandler } from "./operation-handler.js";
 import type { EntityConfig } from "../config/entity-config.js";
 import { ConfigurationException } from "../errors/exceptions.js";
 
-/** Map-backed operation registry (Phase 7), insertion-ordered. */
+/** Map-backed operation registry, insertion-ordered. */
 export class DefaultOperationRegistry<Entity = unknown> implements OperationRegistry<Entity> {
   private readonly entries = new Map<OperationId, OperationDescriptor<Entity>>();
 
@@ -55,7 +55,7 @@ interface StandardOperationShape {
   /** Whether the operation is on unless config says otherwise. */
   readonly enabled: boolean;
   /**
-   * Operates on soft-deleted rows (Phase 14), so it only makes sense on a
+   * Operates on soft-deleted rows, so it only makes sense on a
    * soft-deletable entity. `restoreOne` switches on when the config
    * declares soft delete; `purgeOne` stays off until asked for by name.
    */
@@ -68,7 +68,7 @@ interface StandardOperationShape {
  * and `@kavo/nest` route generation walks the same registry.
  *
  * `enabled` here is the *unconditional* default;
- * `restoreOne`/`purgeOne` layer the Phase 14 soft-delete rule on top (see
+ * `restoreOne`/`purgeOne` layer the soft-delete rule on top (see
  * {@link createOperationRegistry}).
  */
 export const STANDARD_OPERATIONS: Readonly<Record<StandardOperationId, StandardOperationShape>> = Object.freeze({
@@ -96,13 +96,13 @@ const unboundHandler = (id: OperationId): OperationHandler<unknown> => ({
 });
 
 /**
- * Build one entity's operation registry from its config (Phase 7; the
- * Phase 13 control surface configures exactly this): standard entries,
+ * Build one entity's operation registry from its config (the
+ * control surface configures exactly this): standard entries,
  * honoring `operations.<id>: false` (disable), `operations.<id>: true` /
  * `{ enabled: true }` (enable), and `operations.<id>.handler` (override —
  * default scaffolding stays).
  *
- * Phase 14's soft-delete operations default from the config alone, never
+ * The soft-delete operations default from the config alone, never
  * from ORM metadata: `restoreOne` turns on when the entity config
  * declares soft delete (`softDelete.strategy: "soft"` or an explicit
  * `softDelete.field`), `purgeOne` only when named outright. Route

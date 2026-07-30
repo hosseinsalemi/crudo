@@ -1,12 +1,12 @@
 # ADR-0013 — Soft-delete operations are enabled from config, not ORM metadata
 
-**Status:** accepted (Phase 14)
+**Status:** accepted
 
 ## Context
 
 Soft delete resolves per entity: an entity carrying a delete-marker
 column (`@DeleteDateColumn`, or a column named by `softDelete.field`) is
-soft-deletable, everything else is hard-deleted (Phase 14). That decision
+soft-deletable, everything else is hard-deleted. That decision
 needs entity metadata, which exists only at bootstrap.
 
 Route generation, however, runs at **class-decoration time**, where no
@@ -16,7 +16,7 @@ registry entry, from a registry built by the same
 and `purgeOne` depended on metadata, the two registry builds would
 disagree: the engine would enable an operation the router never mapped.
 Making `@kavo/nest` read TypeORM metadata to close the gap is exactly
-the boundary Phase 2 forbids.
+the boundary ADR-0002 forbids.
 
 ## Decision
 
@@ -47,12 +47,12 @@ exclude deleted rows; only the extra routes wait on the declaration.
 - Both registry builds reach the same answer from the same input; the
   route table and the service surface cannot drift.
 - `@kavo/nest` needs no ORM knowledge, and the generator itself needed
-  no change for Phase 14 — restore/purge appeared by enabling entries.
+  no change to support soft delete — restore/purge appeared by enabling entries.
 - Cost: zero-config soft delete is not _entirely_ zero-config. An entity
   gets soft deletes and exclusion for free, but its restore route takes
   one line (`softDelete: { strategy: "soft" }`). Stating it is also the
   honest signal that un-deleting is now part of the entity's public API.
-- If a later phase moves route generation behind a bootstrap-time
-  registration (a Phase 16 DX option), this rule can relax to pure
+- If a later change moves route generation behind a bootstrap-time
+  registration (a DX option), this rule can relax to pure
   metadata detection without changing any config that exists today —
   declaring soft delete stays valid either way.

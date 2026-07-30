@@ -23,9 +23,9 @@ let cached: SwaggerModule | null | undefined;
 
 /**
  * `@nestjs/swagger` is an *optional* peer: when it is installed, generated
- * routes are documented (operation ids, the `:id` param, the Phase 5 query
+ * routes are documented (operation ids, the `:id` param, the query
  * params on list routes, registered DTO classes as body schemas, and the
- * problem-details error responses from the Phase 6 catalog); when it is
+ * problem-details error responses from the error catalog); when it is
  * not, this whole module is a no-op — Kavo never forces the dependency.
  */
 function loadSwagger(): SwaggerModule | null {
@@ -245,7 +245,7 @@ function successBodyFor(
   }
 }
 
-/** The Phase 4 list envelope, wrapping the resolved list-element schema. */
+/** The list envelope, wrapping the resolved list-element schema. */
 function listEnvelopeSchema(
   element: { type: "object"; properties: Record<string, object> } | null,
   title: string,
@@ -326,7 +326,7 @@ function schemaForHint(hint: SchemaHint): object {
   }
 }
 
-/** Relation names this entity's config opens to `include=` (Phase 15). */
+/** Relation names this entity's config opens to `include=`. */
 function includableRelations(config: EntityConfig<object> | undefined): readonly string[] {
   const edges = (config as { relations?: { edges?: Record<string, { includable?: boolean }> } } | undefined)?.relations
     ?.edges;

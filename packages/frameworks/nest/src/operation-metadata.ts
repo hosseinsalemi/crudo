@@ -14,7 +14,7 @@ export interface CrudRouteOptions {
   readonly path?: string;
   /**
    * `false` = service-only: the operation stays callable in code, but no
-   * route is generated (Phase 13's `http: false`).
+   * route is generated (`http: false`).
    */
   readonly enabled?: boolean;
   /** Success status override (defaults: 201 create, 204 delete, 200 else). */

@@ -1,4 +1,4 @@
-# 05 — Query Model, Filter Engine & Query String Grammar (Phase 5)
+# 05 — Query Model, Filter Engine & Query String Grammar
 
 This is the standalone grammar reference — it is written to serve as
 end-user documentation verbatim. The implementation lives in
@@ -94,12 +94,12 @@ fields:     root: [id, name, email]
   pass `FieldSelectionInput`, whose three spellings mirror these wire forms
   and collapse to the same normalized selection (doc 03).
 - **Soft delete:** `withDeleted=true` includes soft-deleted rows, which
-  are otherwise excluded from every read (Phase 14, doc 11). On an entity
+  are otherwise excluded from every read (doc 11). On an entity
   that is not soft-deletable it is rejected with
   `KAVO_QUERY_UNSUPPORTED_PARAM`, not ignored; a non-boolean value is a
   field-level 400.
 - **Includes:** `include=posts.comments,profile` — comma-separated
-  dot-paths, merged into one validated tree (Phase 15, doc 12). A
+  dot-paths, merged into one validated tree (doc 12). A
   relation that is not on the entity's inclusion allowlist is a 400, never
   a silent omission.
 
@@ -112,7 +112,7 @@ fields:     root: [id, name, email]
   (`KAVO_QUERY_INVALID_FIELD`), never a silent drop. Programmatic
   callers (`findMany({ filter })`) pass through the **same** allowlist
   and limit checks — typed input skips coercion, not security.
-- **Limits** (configurable per scope, Phase 8): `query.maxFilterDepth`
+- **Limits** (configurable per scope, doc 8): `query.maxFilterDepth`
   (default 3) on the built AST, `query.maxInValues` (default 100) on
   `in`/`notIn` arrays, `pagination.maxLimit` (default 100) on page size.
 - **Type coercion:** raw wire strings coerce against column metadata
@@ -121,9 +121,9 @@ fields:     root: [id, name, email]
   Failures are field-level 400 issues, never a silent `NaN` or
   `Invalid Date`. Coercion consults the **root** entity's column metadata
   only: a relation-path value (`filter[profile.city][eq]=…`) has no entry
-  in that map and passes through as a string. Phase 15 wired the target
-  entity's config into include resolution and fieldset validation, but not
-  into filter-value coercion.
+  in that map and passes through as a string. Include resolution and
+  fieldset validation wire in the target entity's config (doc 12), but
+  filter-value coercion does not.
 - **One exception, all issues:** every violation across filter, sort,
   fields, and pagination is collected into a single
   `QueryValidationException`, so a client fixes its request in one round

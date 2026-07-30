@@ -42,16 +42,6 @@ pnpm add @nestjs/swagger
 [`packages/examples`](packages/examples) for a full, runnable NestJS +
 TypeORM app wired up with all three packages.
 
-## Status
-
-**Milestones A–C: complete.** The full CRUD surface runs end-to-end —
-filtering, sorting, pagination, layered configuration, problem-details
-errors, operation control, soft delete/restore/purge, and nested relation
-includes — through TypeORM behind generated NestJS routes.
-
-`@kavo/core`, `@kavo/typeorm`, and `@kavo/nest` are published to npm
-(current: `0.1.0`, pre-1.0 — expect breaking changes).
-
 ## Development
 
 ```bash

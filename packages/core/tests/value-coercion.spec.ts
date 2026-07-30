@@ -26,7 +26,7 @@ function issueOf(result: ReturnType<typeof coerceScalar>): QueryIssueDto {
   return result;
 }
 
-describe("coerceScalar — locale-independent wire coercion (Phase 5)", () => {
+describe("coerceScalar — locale-independent wire coercion", () => {
   it("returns string columns as text, stringifying non-string wire values", () => {
     expect(coerce("string", "john")).toBe("john");
     expect(coerce("string", 42)).toBe("42");
@@ -113,7 +113,7 @@ describe("coerceScalar — locale-independent wire coercion (Phase 5)", () => {
   });
 });
 
-describe("isIssue — the parser's success/failure discriminator (Phase 5)", () => {
+describe("isIssue — the parser's success/failure discriminator", () => {
   it("recognizes an issue object", () => {
     expect(isIssue({ field: "age", code: "KAVO_QUERY_INVALID_VALUE", detail: "…" })).toBe(true);
   });
@@ -131,7 +131,7 @@ describe("isIssue — the parser's success/failure discriminator (Phase 5)", () 
   });
 });
 
-describe("parseBracketKey — bracketed wire keys (Phase 5)", () => {
+describe("parseBracketKey — bracketed wire keys", () => {
   it("splits a key into its path segments", () => {
     expect(parseBracketKey("filter[age][gte]", "filter")).toEqual(["age", "gte"]);
     expect(parseBracketKey("filter[or][0][role][eq]", "filter")).toEqual(["or", "0", "role", "eq"]);
@@ -166,7 +166,7 @@ describe("parseBracketKey — bracketed wire keys (Phase 5)", () => {
   });
 });
 
-describe("FieldSelection — sparse fieldsets (Phase 5)", () => {
+describe("FieldSelection — sparse fieldsets", () => {
   const config = resolveEntityConfig(userMetadata, undefined, undefined);
 
   /** Records what the normalizer hands relation resolution, nothing more. */

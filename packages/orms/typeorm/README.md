@@ -8,5 +8,5 @@ not implemented — see the `@remarks` on that interface in `@kavo/core`.
 **May depend on:** `@kavo/core`, `typeorm` (peer). **Never on:**
 `@kavo/nest` or any framework.
 
-Scaffold only in Milestone A — architecture lands in Phase 9,
-implementation in Phase 10.
+Fully implemented: CRUD, filtering/sorting/pagination, soft delete, and
+relation includes all run through this adapter.

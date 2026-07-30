@@ -58,11 +58,11 @@ GET    /cats?include=owner&fields[owner]=id,name
 POST   /cats                     {"name":"Kit","age":1,"owner":1}   # associate by id
 ```
 
-The e2e suite in `tests/` is the executable form of the milestone
-checkpoints. `crud-e2e.suite.ts` holds the shared assertions; `app.e2e.spec.ts`
+The e2e suite in `tests/` is the executable form of the behavior spec.
+`crud-e2e.suite.ts` holds the shared assertions; `app.e2e.spec.ts`
 and `app-postgres.e2e.spec.ts` each boot the app against their own database
 and run the same suite against it — one behavioral spec, two drivers. This
-app grows into the Phase 17 reference application (`User`, `Project`, `Task`,
+app grows into a fuller reference application (`User`, `Project`, `Task`,
 `Comment`, `Tag`).
 
 The app consumes only public package APIs — if it ever needs a deep

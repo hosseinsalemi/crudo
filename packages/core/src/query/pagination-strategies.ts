@@ -2,7 +2,7 @@ import type { Pagination, PaginationLimits, PaginationStrategy } from "./paginat
 import { QueryValidationException } from "../errors/exceptions.js";
 
 /**
- * The default strategy (Phase 5): flat `limit`/`offset` wire params —
+ * The default strategy: flat `limit`/`offset` wire params —
  * the exact field names the `ListResultDto` envelope reports back, so a
  * request and its response read symmetrically.
  *

@@ -8,8 +8,6 @@ A production-grade CRUD framework for TypeScript: define an entity once (via Typ
 
 The authoritative sources are `packages/docs/` (architecture notes and ADRs) and the **Conventions** section below, which is normative — naming deviations are review findings. Consult the governing ADR before changing behavior it covers, rather than inventing behavior.
 
-Kavo was originally built from a phased plan (`kavo-phases-v6.md`), now retired. `Phase N` references survive in code comments and docs as historical provenance.
-
 ## Commands
 
 ```bash

@@ -12,13 +12,13 @@ export type Dto = object;
 /** A registerable DTO class. DTO classes are plain, no-argument shapes. */
 export type DtoClass<Shape extends Dto = Dto> = new () => Shape;
 
-/** The six DTO positions, one per REST verb/context (Phase 4). */
+/** The six DTO positions, one per REST verb/context. */
 export type DtoSlot = "create" | "update" | "patch" | "query" | "item" | "list";
 
 /**
  * Per-entity DTO registration — the `dto` key of `createCrud`'s config.
  * Every slot is independently optional; an omitted slot falls back to its
- * entity-derived default (derivation rules in Phase 4):
+ * entity-derived default (derivation rules below):
  *
  * | Slot     | Default when omitted                              |
  * | -------- | ------------------------------------------------- |

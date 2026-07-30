@@ -26,8 +26,8 @@ at all): the value that would disable the route simply does not exist
 when the route is generated.
 
 The alternative — deferring `@kavo/nest` route generation to a
-bootstrap-time phase that has seen `forRootAsync`'s options — is the
-"Phase 16 DX option" ADR-0012 already reserves as a possible future
+bootstrap-time step that has seen `forRootAsync`'s options — is a
+DX option ADR-0012 already reserves as a possible future
 change. Chasing it here would turn a config-schema addition into a
 routing-architecture rewrite for a case (global operation-enablement
 defaults) that doesn't need the route removed, only the request refused.
@@ -66,7 +66,7 @@ nothing about entity-level disabling changes.
   for what each can see, the same discipline ADR-0013 established for
   soft-delete operations — this ADR generalizes that pattern to an
   arbitrary global boolean rather than adding a second special case.
-- If a future phase moves `@kavo/nest` route generation behind a
+- If a future change moves `@kavo/nest` route generation behind a
   bootstrap-time registration (ADR-0012's reserved option), this gap
   closes for free — nothing about the config shape here needs to change,
   only where `createOperationRegistry` is called from.

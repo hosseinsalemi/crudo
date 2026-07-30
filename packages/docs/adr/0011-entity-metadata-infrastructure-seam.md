@@ -1,13 +1,13 @@
 # ADR-0011 — Entity-metadata & infrastructure seam
 
-**Status:** accepted (Milestone B, Phases 4–10)
+**Status:** accepted
 
 ## Context
 
 Core needs to know entity shape at runtime — which columns exist, their
 types, which are generated, which properties are relations — to derive
-DTO defaults (Phase 4), default the query allowlists, and coerce wire
-values against column types (Phase 5). That knowledge lives in ORM
+DTO defaults, default the query allowlists, and coerce wire
+values against column types. That knowledge lives in ORM
 metadata, and core must not import an ORM (ADR-0001, ADR-0005).
 
 ## Decision

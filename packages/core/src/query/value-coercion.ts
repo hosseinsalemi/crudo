@@ -4,7 +4,7 @@ import type { QueryIssueDto } from "../errors/problem-details.js";
 import { assertNever } from "../types/assert-never.js";
 
 /**
- * Locale-independent wire-value coercion (Phase 5): raw query-string
+ * Locale-independent wire-value coercion: raw query-string
  * values become typed AST values against entity column metadata, or
  * produce a field-level issue — never a silent `NaN`/`Invalid Date`.
  *
@@ -24,7 +24,7 @@ export function coerceScalar(
   // metadata: the parser indexes the root entity's columns only, so their
   // values pass through as strings and the database compares them. Wiring
   // target-entity metadata through the relation registry would close the
-  // gap — Phase 15 shipped without doing it, so this is still open.
+  // gap — that was never done, so this is still open.
   if (metadata === undefined) return String(raw);
 
   if (raw === null || raw === "null") {

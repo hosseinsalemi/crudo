@@ -20,7 +20,7 @@ export interface IdentifiedWrite<Entity> {
 }
 
 /**
- * The built-in CRUD behaviors (Phase 7) — plain registry entries, nothing
+ * The built-in CRUD behaviors — plain registry entries, nothing
  * special-cased. Each handler is one adapter call plus the "missing vs.
  * error" decision, which is the engine layer's to make: adapters return
  * `null`, handlers turn that into `NotFoundException`.
@@ -78,7 +78,7 @@ export function builtInHandlers<Entity extends object>(
     deleteOne: {
       async execute(id: EntityId, context: CrudContext<Entity>) {
         // Hard or soft per `context.config.softDelete` — the strategy is
-        // resolved at config time and applied by the adapter (Phase 14),
+        // resolved at config time and applied by the adapter,
         // so there is no branch here.
         await adapter.delete(id, context);
         return null;
@@ -87,7 +87,7 @@ export function builtInHandlers<Entity extends object>(
     restoreOne: {
       async execute(id: EntityId, context: CrudContext<Entity>) {
         // Restore returns the revived row: it reuses the `item` DTO slot,
-        // so no new DTO shape enters the system (Phase 14).
+        // so no new DTO shape enters the system.
         return adapter.restore(id, context);
       },
     },

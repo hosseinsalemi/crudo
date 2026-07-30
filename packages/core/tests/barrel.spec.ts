@@ -6,7 +6,7 @@ import * as barrel from "@kavo/core";
  * The public surface of `@kavo/core`, as a manifest.
  *
  * ADR-0010 makes the barrel a deliberate explicit named list so the public
- * surface "changes only on purpose", and the Phase 18 api-extractor gate
+ * surface "changes only on purpose", and a future api-extractor gate
  * will diff against it. Until that gate exists nothing detects an export
  * added or removed by accident — a stray `export` in an unrelated commit
  * is invisible in review once the diff is long enough.

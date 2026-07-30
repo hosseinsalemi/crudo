@@ -1,6 +1,6 @@
 # ADR-0001 — Clean architecture: core owns all contracts
 
-**Status:** accepted (Phase 1)
+**Status:** accepted
 
 ## Context
 
@@ -19,7 +19,7 @@ mechanically enforced (dependency-cruiser + project references).
 
 - The adapter seam is real: `@kavo/typeorm` is replaceable by
   construction, even though no second adapter ships in v6.
-- Core contracts must be designed before edge implementations exist
-  (Milestone A precedes B) — accepted cost of a stable surface.
+- Core contracts must be designed before edge implementations exist —
+  accepted cost of a stable surface.
 - A contract change is a core change with lockstep releases (ADR-0004),
   never a silent edge divergence.

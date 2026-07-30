@@ -20,7 +20,7 @@ import {
 
 /**
  * The shipped catalog, pinned. Codes are API surface — renaming, restatusing
- * or dropping one is a breaking change (Phase 6; Phase 18 semver policy), so
+ * or dropping one is a breaking change under semver policy, so
  * it should cost a deliberate edit here.
  *
  * `KAVO_BULK_FAILED` is absent on purpose: bulk was dropped, so the code is
@@ -56,7 +56,7 @@ function codesUsedInSource(): string[] {
   return [...codes].sort();
 }
 
-describe("ERROR_CATALOG completeness (Phase 6)", () => {
+describe("ERROR_CATALOG completeness", () => {
   it("catalogs every error code core's source actually uses", () => {
     // `KavoErrorCode` is an open template type, so the compiler cannot
     // close this gap: a new code with no catalog entry would render a title
@@ -87,7 +87,7 @@ describe("ERROR_CATALOG completeness (Phase 6)", () => {
   });
 });
 
-describe("renderMessage — message key + params (Phase 6)", () => {
+describe("renderMessage — message key + params", () => {
   it("interpolates every {param} placeholder from the params bag", () => {
     expect(renderMessage("KAVO_NOT_FOUND", { entity: "User", id: "7" })).toBe("User with id '7' was not found.");
   });
@@ -114,7 +114,7 @@ describe("renderMessage — message key + params (Phase 6)", () => {
   });
 });
 
-describe("exception hierarchy (Phase 6)", () => {
+describe("exception hierarchy", () => {
   const leaves = [
     { exception: new NotFoundException(), code: "KAVO_NOT_FOUND", status: 404 },
     { exception: new ConflictException(), code: "KAVO_CONFLICT", status: 409 },
@@ -207,7 +207,7 @@ describe("exception hierarchy (Phase 6)", () => {
   });
 });
 
-describe("toProblemDetails — RFC 9457 document (Phase 6, ADR-0009)", () => {
+describe("toProblemDetails — RFC 9457 document (ADR-0009)", () => {
   it("produces type, title, status, detail, and the code extension", () => {
     const exception = new NotFoundException({ messageParams: { entity: "User", id: 7 } });
     expect(toProblemDetails(exception)).toEqual({
@@ -265,7 +265,7 @@ describe("toProblemDetails — RFC 9457 document (Phase 6, ADR-0009)", () => {
   });
 });
 
-describe("DefaultErrorHandler — engine boundary mapping (Phase 6)", () => {
+describe("DefaultErrorHandler — engine boundary mapping", () => {
   const handler = new DefaultErrorHandler();
 
   it("passes a Kavo exception through with its code, status, and payload intact", () => {

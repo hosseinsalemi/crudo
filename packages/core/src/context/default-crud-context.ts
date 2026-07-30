@@ -41,7 +41,7 @@ export interface CrudContextInit<Entity> {
 }
 
 /**
- * Build the per-request context (Phase 7). The correlation id is generated
+ * Build the per-request context. The correlation id is generated
  * here when the caller (e.g. a framework layer forwarding an upstream
  * request id) doesn't supply one.
  */

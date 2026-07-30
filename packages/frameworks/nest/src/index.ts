@@ -1,5 +1,5 @@
 /**
- * @kavo/nest — NestJS binding for Kavo (Phases 11–12).
+ * @kavo/nest — NestJS binding for Kavo.
  *
  * `@Crud(Entity)` generates routes from the entity's operation registry;
  * `KavoModule.forRoot`/`forRootAsync` host the Kavo root instance, the RFC

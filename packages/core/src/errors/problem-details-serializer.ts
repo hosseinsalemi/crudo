@@ -21,7 +21,7 @@ export interface ProblemDetailsOptions {
 
 /**
  * Serialize a Kavo exception into the RFC 9457 problem-details document
- * (Phase 6). This is the default wire shape; a consumer wanting a
+ * This is the default wire shape; a consumer wanting a
  * different one swaps this serializer, never the exception hierarchy.
  */
 export function toProblemDetails(exception: CrudException, options: ProblemDetailsOptions = {}): ProblemDetailsDto {

@@ -3,7 +3,7 @@ import { ConfigurationException } from "../errors/exceptions.js";
 import { STANDARD_OPERATIONS } from "../operations/default-operation-registry.js";
 
 /**
- * Bootstrap validation (Phase 8). Fails fast with an error naming the
+ * Bootstrap validation. Fails fast with an error naming the
  * entity, the key path, and the offending value — config errors surface at
  * startup, never as mysterious runtime behavior.
  */

@@ -18,7 +18,7 @@ function rejectionOf(override: unknown): ConfigurationException {
   throw new Error("expected ConfigurationException");
 }
 
-/** Phase 8's error bar: every config error names entity, key path, and offending value. */
+/** The error bar: every config error names entity, key path, and offending value. */
 function expectRejected(override: unknown, path: string, offending: unknown): void {
   const error = rejectionOf(override);
   expect(error.code).toBe("KAVO_CONFIG_INVALID");
@@ -33,7 +33,7 @@ function accept(override: unknown): void {
 /** Values no positive-integer setting may take. */
 const NOT_POSITIVE_INTEGERS = [0, -1, 1.5, "20", null, true];
 
-describe("validateSettings — pagination (Phase 8)", () => {
+describe("validateSettings — pagination", () => {
   it("rejects a defaultLimit that is not a positive integer", () => {
     for (const value of NOT_POSITIVE_INTEGERS) {
       expectRejected({ pagination: { defaultLimit: value } }, "pagination.defaultLimit", value);
@@ -68,7 +68,7 @@ describe("validateSettings — pagination (Phase 8)", () => {
   });
 });
 
-describe("validateSettings — query limits (Phase 8)", () => {
+describe("validateSettings — query limits", () => {
   it("rejects a maxFilterDepth that is not a positive integer", () => {
     for (const value of NOT_POSITIVE_INTEGERS) {
       expectRejected({ query: { maxFilterDepth: value } }, "query.maxFilterDepth", value);
@@ -86,7 +86,7 @@ describe("validateSettings — query limits (Phase 8)", () => {
   });
 });
 
-describe("validateSettings — errors (Phase 8)", () => {
+describe("validateSettings — errors", () => {
   it("rejects a non-boolean exposeInternals", () => {
     for (const value of ["false", 0, null]) {
       expectRejected({ errors: { exposeInternals: value } }, "errors.exposeInternals", value);
@@ -99,7 +99,7 @@ describe("validateSettings — errors (Phase 8)", () => {
   });
 });
 
-describe("validateSettings — relation limits (Phase 15 keys, Phase 8 rules)", () => {
+describe("validateSettings — relation limits", () => {
   it("rejects a maxIncludeDepth that is not a positive integer", () => {
     for (const value of NOT_POSITIVE_INTEGERS) {
       expectRejected({ relations: { maxIncludeDepth: value } }, "relations.maxIncludeDepth", value);
@@ -117,7 +117,7 @@ describe("validateSettings — relation limits (Phase 15 keys, Phase 8 rules)", 
   });
 });
 
-describe("validateSettings — relation edges (Phase 15 keys, Phase 8 rules)", () => {
+describe("validateSettings — relation edges", () => {
   it("rejects an edge that is not an object, naming the relation", () => {
     for (const value of [true, 5, "posts", null]) {
       expectRejected({ relations: { edges: { posts: value } } }, "relations.edges.posts", value);
@@ -179,7 +179,7 @@ describe("validateSettings — relation edges (Phase 15 keys, Phase 8 rules)", (
   });
 });
 
-describe("validateSettings — soft delete (Phase 14 keys, Phase 8 rules)", () => {
+describe("validateSettings — soft delete", () => {
   it("rejects a softDelete that names no delete-marker field", () => {
     for (const softDelete of [true, 1, "deletedAt", { field: "" }, { field: 5 }]) {
       const error = rejectionOf({ softDelete });

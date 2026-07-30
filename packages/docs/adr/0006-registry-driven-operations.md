@@ -1,6 +1,6 @@
 # ADR-0006 — Registry-driven operation dispatch
 
-**Status:** accepted (Phase 1; mechanics Phase 7, control surface Phase 14)
+**Status:** accepted
 
 ## Context
 
@@ -18,7 +18,7 @@ generates routes by reading the registry, never from a verb list.
 
 ## Consequences
 
-- One mechanism, several behaviors (the DRY constraint from Phase 1);
+- One mechanism, several behaviors (the same DRY constraint underlying ADR-0001);
   later features (restore/purge) get routes by adding entries, with zero
   changes to the generator.
 - Built-ins pay one table lookup of indirection — negligible.

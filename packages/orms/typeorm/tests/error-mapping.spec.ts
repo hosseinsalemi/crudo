@@ -61,7 +61,7 @@ const retryableFailures: readonly (readonly [string, DriverPayload])[] = [
   ["SQLite busy", { code: "SQLITE_BUSY" }],
 ];
 
-describe("mapDriverError — unique violations (Phase 9 table)", () => {
+describe("mapDriverError — unique violations", () => {
   it.each(uniqueViolations)("maps a %s to a 409 conflict", (_name, driver) => {
     const error = queryFailed(driver);
     const mapped = mapDriverError(error, context);
@@ -78,7 +78,7 @@ describe("mapDriverError — unique violations (Phase 9 table)", () => {
   });
 
   it("maps a unique violation held by a soft-deleted row to a plain conflict", () => {
-    // Phase 14 note in `error-mapping.ts`: a soft-deleted row keeps its
+    // Per the note in `error-mapping.ts`: a soft-deleted row keeps its
     // unique index entries, and the honest answer is "the value is taken" —
     // no soft-delete-aware code. The integration path is covered by
     // soft-delete.spec.ts; this pins the mapping itself.
@@ -91,7 +91,7 @@ describe("mapDriverError — unique violations (Phase 9 table)", () => {
   });
 });
 
-describe("mapDriverError — foreign-key violations (Phase 9 table)", () => {
+describe("mapDriverError — foreign-key violations", () => {
   it.each(foreignKeyViolations)("maps a %s to a 409 conflict", (_name, driver) => {
     const mapped = mapDriverError(queryFailed(driver), context);
     expect(mapped).toBeInstanceOf(ConflictException);
@@ -110,7 +110,7 @@ describe("mapDriverError — foreign-key violations (Phase 9 table)", () => {
   });
 });
 
-describe("mapDriverError — serialization failures and deadlocks (Phase 9 table)", () => {
+describe("mapDriverError — serialization failures and deadlocks", () => {
   it.each(retryableFailures)("maps a %s to a retryable transaction failure", (_name, driver) => {
     const mapped = mapDriverError(queryFailed(driver), context);
     expect(mapped).toBeInstanceOf(TransactionException);
@@ -119,7 +119,7 @@ describe("mapDriverError — serialization failures and deadlocks (Phase 9 table
   });
 });
 
-describe("mapDriverError — the fallback row (Phase 6/9)", () => {
+describe("mapDriverError — the fallback row", () => {
   it("maps an unrecognized driver code to a persistence failure", () => {
     const mapped = mapDriverError(queryFailed({ code: "42P01" }), context);
     expect(mapped).toBeInstanceOf(PersistenceException);
@@ -152,7 +152,7 @@ describe("mapDriverError — the fallback row (Phase 6/9)", () => {
   });
 });
 
-describe("mapDriverError — cause and context propagation (Phase 6)", () => {
+describe("mapDriverError — cause and context propagation", () => {
   const everyRow = [
     ...uniqueViolations,
     ...foreignKeyViolations,
@@ -174,7 +174,7 @@ describe("mapDriverError — cause and context propagation (Phase 6)", () => {
   });
 });
 
-describe("mapDriverError — Kavo exceptions pass through (Phase 9)", () => {
+describe("mapDriverError — Kavo exceptions pass through", () => {
   it("returns an already-mapped exception by identity, not a copy", () => {
     // The adapter raises `NotFoundException` itself (affected === 0); a
     // second trip through the table must not restate it as a 500.

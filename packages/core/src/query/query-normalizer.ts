@@ -15,7 +15,7 @@ import { builtInPaginationStrategies } from "./pagination-strategies.js";
 import { parseBracketKey } from "./bracket-notation.js";
 
 /**
- * The Phase 5 normalization pipeline: raw query string → validated →
+ * The normalization pipeline: raw query string → validated →
  * `NormalizedQueryContext`. Both entry points — wire params from the
  * framework layer and programmatic `QueryContext` input — funnel into the
  * same normalized shape, so the engine and adapters only ever see one
@@ -156,7 +156,7 @@ export class QueryNormalizer<Entity = unknown> {
 
   /**
    * Hand the parsed paths and per-relation fieldsets to the resolver,
-   * which owns every relation rule (Phase 15). Without a resolver there is
+   * which owns every relation rule. Without a resolver there is
    * no relation graph to validate against, so an `include` is rejected
    * rather than quietly dropped.
    */
@@ -231,7 +231,7 @@ function parseIncludePaths(raw: unknown, issues: QueryIssueDto[]): readonly stri
 }
 
 /**
- * `withDeleted` (Phase 14): opt out of the default exclusion of
+ * `withDeleted`: opt out of the default exclusion of
  * soft-deleted rows. Asking for it on an entity that resolves to a hard
  * delete strategy is rejected rather than silently ignored — a client
  * that thinks it is seeing deleted rows should be told it is not.

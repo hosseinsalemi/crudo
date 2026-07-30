@@ -1,4 +1,4 @@
-# 07 — CRUD Engine (Phase 7)
+# 07 — CRUD Engine
 
 `CrudEngine` (`core/src/engine/crud-engine.ts`) is the authoritative
 request lifecycle. Both entry surfaces — the programmatic
@@ -14,7 +14,7 @@ CrudRequest
  → Query Resolution       reads only: WireQuery → normalizeWire, QueryContext → normalizeInput
  → Context Assembly       CrudContext: identity, config view, principal, transaction ⟨reserved⟩,
                           normalized query, correlationId, typed state bag
- → DTO Resolution         descriptor.input/output else Phase 4 slot default
+ → DTO Resolution         descriptor.input/output else the doc-4 slot default
  → Deserialization        writes only: body → allowed-key projection
  → Handler Execution      OperationHandler from the registry (built-in, overridden, or custom)
  → Response Mapping       item / ListResultDto envelope / void

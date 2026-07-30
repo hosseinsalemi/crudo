@@ -4,10 +4,10 @@ import type { NormalizedQueryContext } from "../query/query-context.js";
 
 /**
  * The read half of a repository adapter. Adapters receive only validated,
- * normalized queries — allowlists and limits were enforced upstream
- * (Phase 5), so a reader translates, it never re-validates.
+ * normalized queries — allowlists and limits were enforced upstream,
+ * so a reader translates, it never re-validates.
  *
- * Soft-delete exclusion (Phase 14) and include loading (Phase 15) are the
+ * Soft-delete exclusion and include loading are the
  * reader's concern, driven by `query.withDeleted` / `query.include`:
  * soft-deleted rows are excluded from every read unless `withDeleted` is
  * set, and `findOneById` follows the same rule even though it filters by

@@ -141,7 +141,7 @@ export function registerCrudE2eSuite(getApp: () => INestApplication): void {
       ]);
     });
 
-    it("embeds relations both ways: a joined owner and batched pets (Phase 15)", async () => {
+    it("embeds relations both ways: a joined owner and batched pets", async () => {
       const owner = await request(server()).post("/owners").send({ name: "Rae", email: "rae@x.io" }).expect(201);
       const ownerId = owner.body.id as number;
       await request(server())
@@ -182,7 +182,7 @@ export function registerCrudE2eSuite(getApp: () => INestApplication): void {
       expect(params.map((param) => param.name)).toContain("fields[owner]");
     });
 
-    it("soft-deletes, restores, and purges owners (Phase 14)", async () => {
+    it("soft-deletes, restores, and purges owners", async () => {
       const created = await request(server()).post("/owners").send({ name: "Rose", email: "rose@x.io" }).expect(201);
       const id = created.body.id as number;
 
@@ -489,7 +489,7 @@ export function registerCrudE2eSuite(getApp: () => INestApplication): void {
         .expect(201);
       const catId = cat.body.id as number;
 
-      // Not included until asked (Phase 15): the create response is the plain
+      // Not included until asked: the create response is the plain
       // CatItemDto projection, and tags stay off a plain GET too.
       expect(cat.body).not.toHaveProperty("tags");
       const plain = await request(server()).get(`/cats/${catId}`).expect(200);
@@ -567,7 +567,7 @@ export function registerCrudE2eSuite(getApp: () => INestApplication): void {
 
     it("keeps include=tags an opt-in allowlist entry, not a free pass", async () => {
       // Dogs never declared `tags` includable — same allowlist rule as any
-      // other relation (Phase 15).
+      // other relation.
       const response = await request(server()).get("/dogs").query("include=tags").expect(400);
       expect(response.body.errors.map((e: { code: string }) => e.code)).toEqual(["KAVO_QUERY_INVALID_FIELD"]);
     });

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BUILT_IN_DEFAULTS, ConfigurationException, mergeSettings, resolveEntityConfig } from "@kavo/core";
 import { User, userMetadata } from "./support/user-fixture.js";
 
-describe("mergeSettings (Phase 8 merge algebra)", () => {
+describe("mergeSettings — merge algebra", () => {
   it("replaces scalars key-by-key, nearer scope wins", () => {
     const merged = mergeSettings(
       BUILT_IN_DEFAULTS,
@@ -32,7 +32,7 @@ describe("mergeSettings (Phase 8 merge algebra)", () => {
   });
 });
 
-describe("resolveEntityConfig (Phase 8 bootstrap)", () => {
+describe("resolveEntityConfig — bootstrap", () => {
   it("resolves the zero-config path on built-in defaults", () => {
     const config = resolveEntityConfig(userMetadata, undefined, undefined);
     expect(config.entityName).toBe("User");

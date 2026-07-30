@@ -7,8 +7,8 @@ import type { StandardOperationId } from "../operations/operation.js";
  * These interfaces describe *resolved* (complete) settings. Input scopes —
  * global (`createKavo`), entity (`createCrud`), operation, and per-call —
  * all accept `DeepPartial<KavoSettings>` of this same shape; there is
- * never a second config mechanism (Phase 8 schema-extensibility rule).
- * Later feature phases add keys here, reserved in the schema now.
+ * never a second config mechanism (schema-extensibility rule).
+ * Later features add keys here, reserved in the schema now.
  */
 
 /** Built-in pagination strategy names; open for custom strategies. */
@@ -35,7 +35,7 @@ export interface ErrorSettings {
 }
 
 /**
- * Per-relation configuration (Phase 15) — the config half of a
+ * Per-relation configuration — the config half of a
  * `RelationDescriptor`. ORM metadata supplies shape (name, target,
  * cardinality); this supplies *permission*, which metadata can never know.
  */
@@ -49,7 +49,7 @@ export interface RelationEdgeSettings {
   readonly strategy?: RelationLoadStrategy;
 }
 
-/** Relation inclusion limits and the per-relation allowlist (Phase 15). */
+/** Relation inclusion limits and the per-relation allowlist. */
 export interface RelationSettings {
   readonly maxIncludeDepth: number;
   readonly maxIncludedNodes: number;
@@ -61,7 +61,7 @@ export interface RelationSettings {
 }
 
 /**
- * How the delete strategy is chosen (Phase 14). `auto` — the default —
+ * How the delete strategy is chosen. `auto` — the default —
  * resolves per entity: soft when it carries the delete-marker field, hard
  * otherwise, so entities that aren't soft-deletable cost nothing. `soft`
  * and `hard` state the strategy outright; `soft` on an entity without a
@@ -69,7 +69,7 @@ export interface RelationSettings {
  */
 export type SoftDeleteMode = "auto" | "soft" | "hard";
 
-/** Soft delete (Phase 14). `false` at any scope disables it entirely. */
+/** Soft delete. `false` at any scope disables it entirely. */
 export interface SoftDeleteSettings {
   /** Delete-marker field name (`deletedAt: Date | null` convention). */
   readonly field: string;

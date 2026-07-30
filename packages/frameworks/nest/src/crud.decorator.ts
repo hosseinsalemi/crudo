@@ -43,7 +43,7 @@ export function getRegisteredCrudControllers(): ReadonlyMap<Function, CrudContro
 }
 
 /**
- * The default route shape of each standard operation (Phase 11). `Partial`
+ * The default route shape of each standard operation. `Partial`
  * because the disabled batch operations have no route yet; keyed by the
  * union so a misspelled id cannot sit here unread.
  */
@@ -56,7 +56,7 @@ const STANDARD_ROUTES: Readonly<
   updateOne: { method: "PUT", path: ":id", status: 200 },
   patchOne: { method: "PATCH", path: ":id", status: 200 },
   deleteOne: { method: "DELETE", path: ":id", status: 204 },
-  // Soft delete (Phase 14). These entries enable from config alone
+  // Soft delete. These entries enable from config alone
   // (ADR-0013), and the generator needed no change to pick them up — the
   // registry is the source of truth.
   restoreOne: { method: "PATCH", path: ":id/restore", status: 200 },
@@ -64,8 +64,8 @@ const STANDARD_ROUTES: Readonly<
 };
 
 /**
- * Write operations that target a row by id and take no request body
- * (Phase 14). Without this, `PATCH /:id/restore` would be given a `@Body`
+ * Write operations that target a row by id and take no request body.
+ * Without this, `PATCH /:id/restore` would be given a `@Body`
  * parameter that is always empty.
  */
 const BODYLESS_WRITES: ReadonlySet<StandardOperationId> = new Set<StandardOperationId>(["restoreOne", "purgeOne"]);
@@ -97,7 +97,7 @@ interface ResolvedRoute {
 }
 
 /**
- * `@Crud(UserEntity)` — registry-driven route generation (Phases 11–12).
+ * `@Crud(UserEntity)` — registry-driven route generation.
  *
  * The decorator builds the entity's operation registry (the same
  * `createOperationRegistry` the engine uses) and generates one route per

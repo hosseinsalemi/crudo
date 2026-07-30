@@ -29,7 +29,7 @@ its own payload shape, or callers need to `instanceof`/catch it distinctly.
 2. **The catalog entry** — `ERROR_CATALOG` gets one row: a stable
    `KAVO_SNAKE_CASE` code, HTTP status, title, and an English message
    template with `{param}` placeholders. **Codes are public API surface** —
-   once shipped, renaming one is a breaking change (Phase 18 semver policy).
+   once shipped, renaming one is a breaking change.
    Pick the name you're willing to keep.
 3. **Payload extensions, if any** — follow the existing pattern rather than
    inventing a shape: issue-level detail lives in `errors[]` (query

@@ -15,7 +15,7 @@ interface Projection {
 }
 
 /**
- * Default response mapping (Phase 4). Serialization order is normative:
+ * Default response mapping. Serialization order is normative:
  * **DTO mapping first, then field selection** — selection can only narrow
  * what the resolved DTO exposes.
  *
@@ -25,7 +25,7 @@ interface Projection {
  *    adapter metadata.
  *
  * Relation properties are emitted **only** for nodes on the request's
- * include tree (Phase 15), each projected through its own target entity's
+ * include tree, each projected through its own target entity's
  * DTO — a relation never widens what its target exposes. That is also why
  * a relation key on a registered DTO stays absent until it is included:
  * the DTO documents the shape, the include decides the load.
@@ -124,14 +124,14 @@ export class DefaultSerializer<Entity = unknown> implements Serializer<Entity> {
 }
 
 /**
- * Default request-body mapping (Phase 4). Picks the keys the operation's
+ * Default request-body mapping. Picks the keys the operation's
  * input shape allows and silently drops everything else — with no
  * validation subsystem in v6, stripping unknown and non-writable keys
  * (generated columns) is the safe default: a client cannot write `id` or
  * `createdAt` by including them in a body.
  *
- * Relation properties are writable **by association only** (Phase 15,
- * ADR-0014): a scalar id, an `{ id }` reference, or an array of either.
+ * Relation properties are writable **by association only** (ADR-0014):
+ * a scalar id, an `{ id }` reference, or an array of either.
  * A nested object carrying more than the id is narrowed to the id, because
  * a deep nested write is not something this layer should do by accident.
  */

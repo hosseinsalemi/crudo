@@ -13,7 +13,7 @@ import type { IncludePath } from "../types/include-path.js";
  * Deliberately split from {@link NormalizedQueryContext}: input is for
  * humans (sparse, forgiving), the normalized form is for the engine and
  * adapters (complete, validated, one canonical shape). The normalization
- * pipeline (Phase 5) is the only path between them.
+ * pipeline is the only path between them.
  */
 export interface QueryContext<Entity = unknown> {
   readonly filter?: FilterExpression<Entity> | null;
@@ -23,14 +23,14 @@ export interface QueryContext<Entity = unknown> {
   /** Sparse fieldsets; a bare array is sugar for root-only selection. */
   readonly fields?: FieldSelectionInput<Entity>;
   /**
-   * Relation include paths (`['profile', 'posts.comments']`) — Phase 15.
+   * Relation include paths (`['profile', 'posts.comments']`).
    *
    * Spell-checked against the entity's relation graph. With the default
    * `Entity = unknown` this degrades to `readonly string[]`, so untyped
    * callers are unaffected.
    */
   readonly include?: readonly IncludePath<Entity>[];
-  /** Include soft-deleted rows — Phase 14. */
+  /** Include soft-deleted rows. */
   readonly withDeleted?: boolean;
 }
 

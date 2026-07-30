@@ -42,8 +42,7 @@ sortable,selectable}` (`packages/core/src/config/entity-config.ts`,
    TypeORM eager relations or `select: false` columns that ends up serialized
    anyway is a finding.
 5. **Include-path depth and target-entity leakage.** ADR-0008's recursion cap
-   and the per-relation allowlist (Phase 15, `packages/core/src/config/settings.ts`,
-   `packages/core/src/relations/`) exist to stop an attacker walking an
+   and the per-relation allowlist exist to stop an attacker walking an
    unbounded relation graph or reaching an entity with no `@Crud` exposure at
    all. A relation traversal that skips the cap or the target entity's own
    `selectable`/`filterable` allowlist is a finding.

@@ -2,7 +2,7 @@ import type { CrudContext } from "../context/crud-context.js";
 
 /**
  * Opaque, module-augmentable metadata bag carried by every operation
- * registry entry. Core's only contract: store it, merge it per Phase 8
+ * registry entry. Core's only contract: store it, merge it per the standard
  * precedence (global routes → entity → operation), and hand it to the
  * framework layer.
  *
@@ -29,8 +29,8 @@ export interface OperationMetadata {}
 
 /**
  * The single execution contract every operation flows through — built-in
- * CRUD, overridden, and custom operations alike (Phase 13: one mechanism,
- * three behaviors). Handlers run inside the Phase 7 pipeline and receive
+ * CRUD, overridden, and custom operations alike (one mechanism,
+ * three behaviors). Handlers run inside the pipeline and receive
  * the fully-resolved per-request context.
  */
 export interface OperationHandler<Entity = unknown, Input = unknown, Output = unknown> {

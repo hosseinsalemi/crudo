@@ -75,14 +75,14 @@ async function newTicket(reference = "T-1"): Promise<number> {
   return (created as Ticket).id;
 }
 
-describe("@DeleteDateColumn detection (Phase 14)", () => {
+describe("@DeleteDateColumn detection", () => {
   it("surfaces the declared delete column on the metadata seam", () => {
     expect(buildEntityMetadata(dataSource, Ticket).softDeleteField).toBe("deletedAt");
     expect(buildEntityMetadata(dataSource, Invoice).softDeleteField).toBeNull();
   });
 });
 
-describe("TypeOrmRepositoryAdapter — soft delete (Phase 14)", () => {
+describe("TypeOrmRepositoryAdapter — soft delete", () => {
   it("stamps the marker column and hides the row from every read", async () => {
     const id = await newTicket();
     await tickets.deleteOne(id);
@@ -147,7 +147,7 @@ describe("TypeOrmRepositoryAdapter — soft delete (Phase 14)", () => {
   });
 });
 
-describe("TypeOrmRepositoryAdapter — configured marker column (Phase 14)", () => {
+describe("TypeOrmRepositoryAdapter — configured marker column", () => {
   it("soft-deletes, excludes, and restores over an ordinary column", async () => {
     const created = await invoices.createOne({ number: "INV-1" } as never);
     const id = (created as Invoice).id;

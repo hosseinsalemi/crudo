@@ -3,7 +3,7 @@ import type { ClassRef } from "../types/utility.js";
 export type RelationCardinality = "one" | "many";
 
 /**
- * How an included relation is loaded (Phase 15):
+ * How an included relation is loaded:
  * - `join`  — single query with joins; correct default for to-one. Forcing
  *   it onto a to-many edge is also the eager-loading pattern for detail
  *   views (`findOne`/`findOneById`) — see architecture doc 12, section 3.
@@ -26,7 +26,7 @@ export interface RelationDescriptor {
   /**
    * Whether clients may `include=` this relation. Defaults to `false` —
    * inclusion is an opt-in allowlist, consistent with the filter/sort
-   * posture (Phase 5).
+   * posture.
    */
   readonly includable: boolean;
   /** Included even when the client doesn't ask. */

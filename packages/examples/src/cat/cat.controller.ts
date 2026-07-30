@@ -23,7 +23,7 @@ import { CreateCatDto, UpdateCatDto, CatItemDto, CatListDto } from "./cat.dtos.j
   pagination: { defaultLimit: 10, maxLimit: 50 },
   // The to-one side of the owner edge joins; `tags` is a to-many (many-to-
   // many) and batches. `fields[owner]=id,name` / `fields[tags]=id,name`
-  // narrow each embedded relation (Phase 15).
+  // narrow each embedded relation.
   relations: { edges: { owner: { includable: true }, tags: { includable: true } } },
   operations: {
     patchOne: false,

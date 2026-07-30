@@ -71,7 +71,7 @@ export type ScalarKeys<T> = {
  * Every key is optional because only ORM metadata knows which columns are
  * generated, defaulted or nullable, and the type system cannot see it — the
  * precise runtime derivation (dropping generated columns and relation
- * properties) is metadata-driven and specified in Phase 4. Requiring every
+ * properties) is metadata-driven. Requiring every
  * key made the zero-config write path unusable: `createCrud(User)` then
  * demanded `id` and every relation in the body. Registering a `create` DTO
  * restores full strictness, which is what a configured setup does.

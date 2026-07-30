@@ -4,7 +4,7 @@ import { AddressItemDto } from "../address/address.dtos.js";
 import { PetSizeEnum } from "../pet/pet.entity.js";
 
 /**
- * DTO slots for the Owner route (Phase 4). See `cat.dtos.ts` for the
+ * DTO slots for the Owner route. See `cat.dtos.ts` for the
  * rationale behind plain initialized-field classes.
  */
 

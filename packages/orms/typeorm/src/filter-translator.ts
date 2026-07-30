@@ -4,7 +4,7 @@ import { Brackets, NotBrackets, type WhereExpressionBuilder } from "typeorm";
 import type { SelectQueryBuilder, ObjectLiteral } from "typeorm";
 
 /**
- * Filter AST → TypeORM `QueryBuilder` translation (Phases 9–10).
+ * Filter AST → TypeORM `QueryBuilder` translation.
  *
  * Groups become `Brackets`/`NotBrackets`, so precedence is explicit
  * parentheses, never operator-order luck. Parameters are numbered
@@ -30,7 +30,7 @@ export class FilterTranslator<Entity extends ObjectLiteral> implements FilterBui
   /**
    * Record a join someone else already added under this alias scheme, so
    * `columnRef` reuses it instead of adding a duplicate. Include joins
-   * (Phase 15) select their relation; filters only restrict, so the
+   * select their relation; filters only restrict, so the
    * selecting join must win and this is how it is claimed.
    */
   registerJoin(alias: string): void {
@@ -122,7 +122,7 @@ export class FilterTranslator<Entity extends ObjectLiteral> implements FilterBui
         return;
       }
       case "LIKE":
-        // `\` is the documented literal-escape for `%`/`_` (Phase 5).
+        // `\` is the documented literal-escape for `%`/`_`.
         where.where(`${column} LIKE :${parameter} ESCAPE '\\'`, {
           [parameter]: value,
         });

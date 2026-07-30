@@ -3,7 +3,7 @@ import { PetSizeEnum } from "../pet/pet.entity.js";
 import { TagItemDto } from "../tag/tag.dtos.js";
 
 /**
- * DTO slots for the Cat route (Phase 4). Fields are initialized so the
+ * DTO slots for the Cat route. Fields are initialized so the
  * classes carry their shape at runtime — that is what lets the default
  * serializer project responses (and Swagger document them) with no
  * decorator machinery. The `species` discriminator is deliberately absent
@@ -17,7 +17,7 @@ export class CreateCatDto {
   size = enumProp(Object.values(PetSizeEnum), { example: PetSizeEnum.Medium });
   indoor = false;
   livesLeft = 9;
-  // Association by id (Phase 15, ADR-0014): send the owner's id, or an
+  // Association by id (ADR-0014): send the owner's id, or an
   // `{ id }` reference. Deep nested writes are deliberately out of scope.
   owner: number | null = null;
   // Same mechanism, over a to-many edge: an array of tag ids (or `{ id }`
@@ -46,7 +46,7 @@ export class CatItemDto {
   livesLeft = 0;
   createdAt: Date = new Date(0);
   // Documented as an array of tags; the shape is documentation, the include
-  // decides the load — absent from a plain GET (Phase 15).
+  // decides the load — absent from a plain GET.
   tags: TagItemDto[] = [];
 }
 

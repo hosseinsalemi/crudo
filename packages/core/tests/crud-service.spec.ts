@@ -150,14 +150,14 @@ function makeCrud(config?: Parameters<ReturnType<typeof createKavo>["createCrud"
 
 const ADA = { name: "Ada", email: "ada@example.com", age: 36 };
 
-describe("DefaultCrudService — typed dispatch (Phase 7)", () => {
+describe("DefaultCrudService — typed dispatch", () => {
   it("dispatches one operation id per method and forwards the same call options", async () => {
     for (const { operation, call } of CALLS) {
       const { service, engine } = recorded();
       const options = {};
       await call(service, options);
       expect(sole(engine).operation).toBe(operation);
-      // Per-call scope is the last link of the precedence chain (Phase 8):
+      // Per-call scope is the last link of the precedence chain:
       // it must arrive unmerged, exactly as the caller wrote it.
       expect(sole(engine).options).toBe(options);
     }
@@ -244,7 +244,7 @@ describe("DefaultCrudService — typed dispatch (Phase 7)", () => {
   });
 });
 
-describe("DefaultCrudService — the engine escape hatch (Phase 13)", () => {
+describe("DefaultCrudService — the engine escape hatch", () => {
   it("exposes the very engine the typed methods dispatch through", () => {
     const { service, engine } = recorded();
     expect(service.engine).toBe(engine as unknown as CrudEngine<User>);
@@ -292,7 +292,7 @@ describe("DefaultCrudService — the engine escape hatch (Phase 13)", () => {
   });
 });
 
-describe("CrudCallOptions — principal (Phase 7)", () => {
+describe("CrudCallOptions — principal", () => {
   it("surfaces the caller's principal on the context, unchanged", async () => {
     const seen: CrudContext<User>[] = [];
     const { crud } = makeCrud({
@@ -328,7 +328,7 @@ describe("CrudCallOptions — principal (Phase 7)", () => {
   });
 });
 
-describe("CrudCallOptions — transaction (Phase 7, doc 07 §2)", () => {
+describe("CrudCallOptions — transaction (doc 07 §2)", () => {
   it("hands the adapter the transaction context byte-identical", async () => {
     const { crud, adapter } = makeCrud();
     // `handle` is the adapter's native object; core must never read into it.
@@ -355,7 +355,7 @@ describe("CrudCallOptions — transaction (Phase 7, doc 07 §2)", () => {
   });
 });
 
-describe("CrudCallOptions — per-call settings (Phase 8)", () => {
+describe("CrudCallOptions — per-call settings", () => {
   it("applies the override to that call only", async () => {
     const { crud } = makeCrud();
     await crud.createOne(ADA as never);
@@ -392,7 +392,7 @@ describe("CrudCallOptions — per-call settings (Phase 8)", () => {
   });
 });
 
-describe("DefaultCrudService — query paths (Phase 5)", () => {
+describe("DefaultCrudService — query paths", () => {
   it("normalizes a typed QueryContext without coercing its values", async () => {
     const { crud, adapter } = makeCrud();
     await crud.findMany({

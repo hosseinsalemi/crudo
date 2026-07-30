@@ -4,7 +4,7 @@ import type { RepositoryAdapter } from "../persistence/repository-adapter.js";
 
 /**
  * ORM-independent description of one entity column's type, used for wire
- * value coercion (Phase 5) and DTO default derivation (Phase 4). `json`
+ * value coercion and DTO default derivation. `json`
  * covers embedded/serialized objects; coercion leaves them untouched.
  */
 export type FieldKind = "string" | "number" | "boolean" | "date" | "enum" | "json";
@@ -42,7 +42,7 @@ export interface EntityMetadata<Entity = unknown> {
   /**
    * The delete-marker column the ORM itself declares (`@DeleteDateColumn`
    * in `@kavo/typeorm`), or `null`/absent when it declares none. This is
-   * the detection half of Phase 14's strategy resolution; explicit
+   * the detection half of the soft-delete strategy resolution; explicit
    * `softDelete.field` configuration wins over it.
    */
   readonly softDeleteField?: string | null;

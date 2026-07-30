@@ -2,7 +2,7 @@ import type { KavoErrorCode } from "./crud-exception.js";
 
 /**
  * One catalog entry: everything stable about an error code. Codes are API
- * surface — renaming one is a breaking change (Phase 18 semver policy).
+ * surface — renaming one is a breaking change (semver policy).
  * The full human-facing table lives in
  * packages/docs/architecture/06-error-handling.md and is generated from
  * this object, so code and docs cannot drift.
@@ -21,8 +21,8 @@ export interface ErrorCatalogEntry {
 }
 
 /**
- * The complete error catalog. Later phases only add entries — the codes
- * here are API surface, and the soft-delete leaves (Phase 14) slotted
+ * The complete error catalog. Later changes only add entries — the codes
+ * here are API surface, and the soft-delete leaves slotted
  * into the hierarchy reserved for them without renumbering anything.
  */
 export const ERROR_CATALOG = {

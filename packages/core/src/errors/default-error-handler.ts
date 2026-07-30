@@ -2,8 +2,8 @@ import type { ErrorContext, ErrorHandler, CrudException } from "./crud-exception
 import { KavoException, PersistenceException } from "./exceptions.js";
 
 /**
- * The engine-boundary error mapper (Phase 6). Adapter-specific errors were
- * already translated by the adapter's own mapping table (Phase 9) into
+ * The engine-boundary error mapper. Adapter-specific errors were
+ * already translated by the adapter's own mapping table into
  * Kavo exceptions; whatever still arrives untranslated becomes a
  * `PersistenceException` with the original as `cause` — never swallowed.
  *

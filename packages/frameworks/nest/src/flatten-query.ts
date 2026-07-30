@@ -2,7 +2,7 @@ import { WireQuery } from "@kavo/core";
 
 /**
  * Normalize a parsed query object back to the flat bracket-key form the
- * Phase 5 grammar is specified against.
+ * query grammar is specified against.
  *
  * Express 5 (Nest 11's default) uses the "simple" query parser, which
  * already yields flat keys (`"filter[age][gte]": "18"`). Express 4 / the

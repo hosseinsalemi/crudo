@@ -1,4 +1,4 @@
-# 04 — Optional DTO System (Phase 4)
+# 04 — Optional DTO System
 
 Every REST verb has an independent, optional data contract. Zero config
 means entity-derived defaults; registering a class narrows exactly one
@@ -16,7 +16,7 @@ docs** — there is no validation subsystem attached to them.
 | `item`   | Any single-resource response          | Entity, subject to field selection                               |
 | `list`   | Element type in `ListResultDto.items` | Same as `item`'s resolved type                                   |
 
-Restore (Phase 14) reuses `item`/`list`; no additional slots exist.
+Restore reuses `item`/`list`; no additional slots exist.
 
 ## 2. Resolution algorithm
 
@@ -72,7 +72,7 @@ narrow what the resolved DTO exposes — selection never widens a
 projection. Implemented in `DefaultSerializer.serializeItem`:
 projection ∩ selection, applied to every item and list element.
 
-## 6. Included relations (Phase 15)
+## 6. Included relations
 
 When a response embeds an included relation, the node's shape resolves
 from the **target entity's own registered `item`/`list` DTOs** when that

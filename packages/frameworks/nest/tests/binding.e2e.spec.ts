@@ -49,7 +49,7 @@ function server(): Parameters<typeof request>[0] {
   return app.getHttpServer() as Parameters<typeof request>[0];
 }
 
-describe("@Crud route generation (Phases 11–12)", () => {
+describe("@Crud route generation", () => {
   @Crud(Todo)
   @Controller("todos")
   class TodoController {}
@@ -158,7 +158,7 @@ describe("@Crud route generation (Phases 11–12)", () => {
   });
 });
 
-describe("@Crud page pagination over the wire (Phase 5)", () => {
+describe("@Crud page pagination over the wire", () => {
   @Crud(Todo, { pagination: { strategy: "page", defaultLimit: 2, maxLimit: 3 } })
   @Controller("todos")
   class PagedController {}
@@ -213,7 +213,7 @@ describe("@Crud page pagination over the wire (Phase 5)", () => {
   });
 });
 
-describe("@Crud query-parser agnosticism (Phases 11–12)", () => {
+describe("@Crud query-parser agnosticism", () => {
   @Crud(Todo)
   @Controller("todos")
   class TodoController {}
@@ -661,7 +661,7 @@ describe("@Crud @Override — controller-method overrides that keep generated ro
   });
 });
 
-describe("KavoExceptionFilter — non-Kavo handler failures (Phase 6)", () => {
+describe("KavoExceptionFilter — non-Kavo handler failures", () => {
   const exploding: OperationHandler<Todo> = {
     async execute() {
       throw new Error("connection to shard-7 refused");
@@ -706,7 +706,7 @@ describe("KavoExceptionFilter — non-Kavo handler failures (Phase 6)", () => {
   });
 });
 
-describe("@Crud soft-delete routes (Phase 14)", () => {
+describe("@Crud soft-delete routes", () => {
   @Crud(Todo, {
     softDelete: { strategy: "soft" },
     operations: { purgeOne: true },
@@ -768,7 +768,7 @@ describe("@Crud soft-delete routes (Phase 14)", () => {
   });
 });
 
-describe("@Crud relation includes (Phase 15)", () => {
+describe("@Crud relation includes", () => {
   @Crud(Todo, { relations: { edges: { list: { includable: true } } } })
   @Controller("todos")
   class IncludingController {}

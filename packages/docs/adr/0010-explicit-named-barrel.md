@@ -1,6 +1,6 @@
 # ADR-0010 — Explicit named barrel in `@kavo/core`
 
-**Status:** accepted (Phase 3)
+**Status:** accepted
 
 ## Context
 
@@ -18,7 +18,7 @@ are not API).
 ## Consequences
 
 - The public surface changes only by editing one reviewed file — the
-  natural input for the Phase 18 api-extractor gate.
+  natural input for a future api-extractor gate.
 - Module augmentation (`OperationMetadata`, ADR-0007) has a single stable
   module id to target.
 - Adding an export is a two-step (file + barrel) — deliberate friction.

@@ -23,7 +23,7 @@ import { Tag } from "../tag/tag.entity.js";
  *
  * The `owner` relation is opened for inclusion on the Cat route
  * (`include=owner`) — inclusion is opt-in per relation, so a relation the
- * config never names stays invisible (Phase 15).
+ * config never names stays invisible.
  */
 /** Enum column shared by every Pet subtype. */
 export enum PetSizeEnum {
@@ -53,7 +53,7 @@ export abstract class Pet {
   owner!: Owner | null;
 
   // Owning side of the many-to-many edge: `include=tags` batch-loads through
-  // the join table `@JoinTable()` creates (Phase 15). Unidirectional — `Tag`
+  // the join table `@JoinTable()` creates. Unidirectional — `Tag`
   // has no inverse `pets` field, since nothing browses pets from a tag.
   @ManyToMany(() => Tag)
   @JoinTable()

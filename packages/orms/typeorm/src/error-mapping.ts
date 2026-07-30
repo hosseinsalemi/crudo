@@ -3,7 +3,7 @@ import { ConflictException, KavoException, PersistenceException, TransactionExce
 import { QueryFailedError } from "typeorm";
 
 /**
- * The Phase 9 error-mapping table: driver error → Kavo exception.
+ * The error-mapping table: driver error → Kavo exception.
  *
  * | Driver condition                  | Exception                          |
  * | --------------------------------- | ---------------------------------- |
@@ -16,7 +16,7 @@ import { QueryFailedError } from "typeorm";
  * Unknown drivers fall through to `PersistenceException` — the original
  * error always travels as `cause`, never swallowed.
  *
- * **Soft delete and unique indexes (Phase 14).** A soft-deleted row still
+ * **Soft delete and unique indexes.** A soft-deleted row still
  * occupies its unique indexes, so re-creating "the same" row after a soft
  * delete raises a unique violation — mapped here to a 409 like any other
  * conflict, which is the honest answer: the value *is* taken. Kavo never

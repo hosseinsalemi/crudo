@@ -31,8 +31,8 @@ export interface KavoModuleAsyncOptions extends Pick<ModuleMetadata, "imports"> 
 }
 
 /**
- * The Kavo dynamic module (Phases 11–12; auto-discovery per issue feedback
- * on the checkpoint app's wiring).
+ * The Kavo dynamic module (auto-discovery per issue feedback on the
+ * checkpoint app's wiring).
  *
  * - `forRoot`/`forRootAsync` (global): create the Kavo root instance,
  *   register the problem-details exception filter app-wide, and register

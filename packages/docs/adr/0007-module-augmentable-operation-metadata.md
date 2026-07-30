@@ -1,6 +1,6 @@
 # ADR-0007 — Module-augmentable `OperationMetadata`
 
-**Status:** accepted (Phase 3; consumed in Phases 11/14)
+**Status:** accepted
 
 ## Context
 
@@ -14,7 +14,7 @@ configuration, but core must stay route-ignorant. Alternatives: a typed
 Every registry entry carries `meta: OperationMetadata` — an empty
 interface in core, typed via TypeScript declaration merging by whoever
 consumes it. `@kavo/nest` augments it with a `routes` key. Core's whole
-contract: store it, merge it per Phase 8 precedence, hand it over.
+contract: store it, merge it per the configuration precedence chain (doc 8), hand it over.
 
 ## Consequences
 

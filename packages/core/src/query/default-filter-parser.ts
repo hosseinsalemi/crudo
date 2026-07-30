@@ -9,7 +9,7 @@ import { coerceScalar, isIssue } from "./value-coercion.js";
 import { parseBracketKey } from "./bracket-notation.js";
 
 /**
- * The Phase 5 single-source-of-truth operator table, declared AST → wire so
+ * The single-source-of-truth operator table, declared AST → wire so
  * `satisfies Record<FilterOperator, string>` makes it *total*: adding a
  * member to `FilterOperator` fails the build here until its wire token
  * exists. Declared the other way round the table would only prove its
@@ -46,7 +46,7 @@ const WIRE_OPERATORS: Readonly<Record<string, FilterOperator>> = Object.freeze(
 const LOGICAL_TOKENS = new Set(["and", "or", "not"]);
 
 /**
- * Parses the Phase 5 filter grammar — bracket notation
+ * Parses the filter grammar — bracket notation
  * (`filter[age][gte]=18`, `filter[or][0][role][eq]=admin`) and the
  * JSON escape hatch (`filter={"or":[…]}`) — into the filter AST. Both
  * forms produce the identical AST; when both appear they AND together.

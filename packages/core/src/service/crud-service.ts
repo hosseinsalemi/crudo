@@ -36,12 +36,12 @@ export interface CrudService<
 
   patchOne(id: Id, data: PatchDto, options?: CrudCallOptions): Promise<ItemDto>;
 
-  /** Hard or soft per the resolved delete strategy (Phase 14). */
+  /** Hard or soft per the resolved delete strategy. */
   deleteOne(id: Id, options?: CrudCallOptions): Promise<void>;
 
   /**
    * Un-deletes a soft-deleted row. Reuses the `item` DTO slot — no
-   * dedicated restore shape (Phase 4). Enabled when the entity config
+   * dedicated restore shape. Enabled when the entity config
    * declares soft delete.
    */
   restoreOne(id: Id, options?: CrudCallOptions): Promise<ItemDto>;

@@ -1,4 +1,4 @@
-# 02 — Monorepo & Package Design (Phase 2)
+# 02 — Monorepo & Package Design
 
 ## 1. Structure
 
@@ -15,12 +15,12 @@ kavo/
    │  │       relations,context,serialization,persistence,service}/
    │  └─ src/index.ts         # explicit named barrel
    ├─ orms/
-   │  └─ typeorm/             # @kavo/typeorm (scaffold until Phase 10)
+   │  └─ typeorm/             # @kavo/typeorm
    │     └─ src/index.ts
    ├─ frameworks/
-   │  └─ nest/                # @kavo/nest (scaffold until Phase 12)
+   │  └─ nest/                # @kavo/nest
    │     └─ src/index.ts
-   ├─ examples/               # Phase 17 reference application (empty)
+   ├─ examples/               # reference application
    └─ docs/                   # this documentation
 ```
 
@@ -76,18 +76,18 @@ Two independent enforcement layers:
 
 ## 4. Workspace tooling: pnpm + plain scripts (ADR-0003)
 
-pnpm workspaces (assumed by the phase plan) with **plain root scripts**, no
+pnpm workspaces with **plain root scripts**, no
 task runner. The entire build graph is three packages whose ordering is
 already fully expressed by TS project references — `tsc -b` performs
 incremental, dependency-ordered, cached builds natively. A task runner
 (turborepo/nx) would add a second place where the graph is declared, a
 cache layer duplicating `.tsbuildinfo`, and config to keep honest, while
 buying nothing at this scale. Revisit only if the workspace gains many
-packages or expensive non-tsc pipelines (Phase 17's e2e suite is the
+packages or expensive non-tsc pipelines (a future e2e suite is the
 natural checkpoint).
 
 Root scripts: `build` (`tsc -b`), `clean`, `depcruise`, and `check`
-(build + boundaries) — `pnpm check` is the Milestone A verification gate.
+(build + boundaries) — `pnpm check` is the verification gate.
 
 ## 5. Public vs. internal API surface
 
@@ -100,8 +100,8 @@ Each package's `exports` map exposes **only the barrel**:
 No subpath exports; deep imports are not API and Node will refuse them at
 runtime once published. Core's barrel is an explicit named list
 (ADR-0010) so the public surface only changes on purpose — it is the
-input to the Phase 18 api-extractor gate. Milestone A ships ESM only;
-dual ESM+CJS output is Phase 18's deliverable.
+input to a future api-extractor gate. The current build ships ESM only;
+dual ESM+CJS output is a future deliverable.
 
 ## 6. Build strategy
 
@@ -119,9 +119,9 @@ change almost always touches an edge package, and a single version answers
 "which adapter works with which core" permanently. Cost: occasional no-op
 version bumps for an untouched package — accepted as trivially cheap next
 to cross-package version-matrix support. Release mechanics (changesets,
-publish order) are Phase 18.
+publish order) are future work.
 
-## 8. Dependency classification (decided now, executed in Phase 18)
+## 8. Dependency classification (decided now, executed later)
 
 | Package         | `dependencies` | `peerDependencies`                                              |
 | --------------- | -------------- | --------------------------------------------------------------- |

@@ -2,8 +2,8 @@ import type { DtoClass } from "../dto/dto.js";
 import type { CrudContext } from "../context/crud-context.js";
 
 /**
- * Maps persistence-layer entities to response DTOs. Order is normative
- * (Phase 4): DTO mapping first, then field selection — the serializer
+ * Maps persistence-layer entities to response DTOs. Order is normative:
+ * DTO mapping first, then field selection — the serializer
  * applies the selection carried on `context.query`.
  */
 export interface Serializer<Entity = unknown> {

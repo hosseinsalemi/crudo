@@ -46,7 +46,7 @@ function ids(registry: { all(): readonly OperationDescriptor<User>[] }): string[
   return registry.all().map((entry) => entry.id);
 }
 
-describe("DefaultOperationRegistry — the operation table (Phase 7, ADR-0006)", () => {
+describe("DefaultOperationRegistry — the operation table (ADR-0006)", () => {
   it("registers, looks up, and reports membership by id", () => {
     const registry = new DefaultOperationRegistry<User>();
     expect(registry.has("activate")).toBe(false);
@@ -111,7 +111,7 @@ describe("DefaultOperationRegistry — the operation table (Phase 7, ADR-0006)",
   });
 });
 
-describe("STANDARD_OPERATIONS — the default table (Phases 7, 14)", () => {
+describe("STANDARD_OPERATIONS — the default table", () => {
   it("names one entry per standard operation, cardinality spelled out", () => {
     expect(Object.keys(STANDARD_OPERATIONS)).toEqual([
       "createOne",
@@ -151,13 +151,13 @@ describe("STANDARD_OPERATIONS — the default table (Phases 7, 14)", () => {
   });
 });
 
-describe("createOperationRegistry — default entries (Phase 7)", () => {
+describe("createOperationRegistry — default entries", () => {
   it("registers the whole standard table, in table order", () => {
     const registry = createOperationRegistry<User>(undefined, standardHandlers);
     expect(ids(registry)).toEqual(Object.keys(STANDARD_OPERATIONS));
   });
 
-  it("binds the built-in handler and leaves both DTO slots to the Phase 4 defaults", async () => {
+  it("binds the built-in handler and leaves both DTO slots to the defaults", async () => {
     const registry = createOperationRegistry<User>(undefined, standardHandlers);
     const entry = registry.get("findOne");
     expect(entry).toMatchObject({ kind: "read", cardinality: "one", enabled: true, input: null, output: null });
@@ -185,7 +185,7 @@ describe("createOperationRegistry — inspection-only mode (ADR-0012)", () => {
   });
 });
 
-describe("createOperationRegistry — Phase 13 control surface", () => {
+describe("createOperationRegistry — the control surface", () => {
   it("disables an operation with the `false` shorthand, keeping its entry", () => {
     const registry = createOperationRegistry<User>({ operations: { patchOne: false } } as UserConfig, standardHandlers);
     expect(ids(registry)).toEqual(Object.keys(STANDARD_OPERATIONS));

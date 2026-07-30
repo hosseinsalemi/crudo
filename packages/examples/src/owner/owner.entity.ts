@@ -21,7 +21,7 @@ import type { Address } from "../address/address.entity.js";
  *
  * Owners are soft-deletable: `@DeleteDateColumn` is all the ORM needs to
  * say so, and `@kavo/typeorm` surfaces it as the delete-marker field, so
- * `DELETE /owners/:id` stamps the row instead of removing it (Phase 14).
+ * `DELETE /owners/:id` stamps the row instead of removing it.
  *
  * Caveat worth seeing in a reference app: a soft-deleted owner still
  * occupies the unique `email` index, so re-creating one after deleting it

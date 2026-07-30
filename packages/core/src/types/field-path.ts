@@ -21,7 +21,7 @@ export type Prev = [never, 0, 1, 2, 3, 4, 5];
 type PathInto<T, Depth extends 0 | FieldPathDepth> =
   // `any` / `unknown` (untyped entities, index-signature bags): degrade to
   // `string` — every path is *syntactically* accepted and the runtime
-  // allowlist (Phase 5) remains the actual gate.
+  // allowlist remains the actual gate.
   IsAny<T> extends true
     ? string
     : IsUnknown<T> extends true
@@ -59,6 +59,6 @@ type PathInto<T, Depth extends 0 | FieldPathDepth> =
  * relation reads the same as a to-one).
  *
  * This is a *typing* aid, not a security boundary — the runtime allowlist
- * (Phase 5) decides what a request may actually filter, sort, or select on.
+ * decides what a request may actually filter, sort, or select on.
  */
 export type FieldPath<Entity, MaxDepth extends FieldPathDepth = 3> = PathInto<Entity, MaxDepth>;

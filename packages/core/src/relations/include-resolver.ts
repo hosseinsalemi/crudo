@@ -10,8 +10,8 @@ export interface IncludeRequest {
 }
 
 /**
- * Turns parsed `include=` dot-paths into a validated {@link IncludeTree}
- * (Phase 15): every edge is checked against the relation registry (unknown
+ * Turns parsed `include=` dot-paths into a validated {@link IncludeTree}:
+ * every edge is checked against the relation registry (unknown
  * or non-includable → `QueryValidationException`, never silently dropped),
  * depth and node-count limits are enforced, per-node sparse fieldsets are
  * attached, and `auto` strategies are resolved. Depth is the cycle guard —

@@ -12,7 +12,7 @@ function makeCrud(config?: Parameters<ReturnType<typeof createKavo>["createCrud"
   return { crud, adapter, kavo };
 }
 
-describe("CrudEngine pipeline (Phase 7)", () => {
+describe("CrudEngine pipeline", () => {
   it("runs createOne → findOne → updateOne → patchOne → deleteOne", async () => {
     const { crud } = makeCrud();
     const created = await crud.createOne({

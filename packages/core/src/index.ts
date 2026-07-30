@@ -3,7 +3,7 @@
  *
  * This barrel is an **explicit named list**, kept deliberately (no
  * `export *`): the public surface should only ever change on purpose, the
- * future api-extractor gate (Phase 18) diffs against it, and module
+ * future api-extractor gate diffs against it, and module
  * augmentation of `OperationMetadata` needs a stable module to target.
  */
 

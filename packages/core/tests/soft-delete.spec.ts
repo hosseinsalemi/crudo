@@ -32,7 +32,7 @@ function makeAccountCrud(config?: AccountConfig, metadata = accountMetadata) {
   return { crud, adapter };
 }
 
-describe("delete strategy resolution (Phase 14)", () => {
+describe("delete strategy resolution", () => {
   it("defaults to soft for an entity carrying the marker field", () => {
     expect(resolveSoftDelete(accountMetadata, settings())).toEqual({
       strategy: "soft",
@@ -70,7 +70,7 @@ describe("delete strategy resolution (Phase 14)", () => {
   });
 });
 
-describe("soft delete lifecycle (Phase 14)", () => {
+describe("soft delete lifecycle", () => {
   it("marks the row instead of removing it, and hides it from reads", async () => {
     const { crud, adapter } = makeAccountCrud();
     await crud.createOne({ name: "acme" } as never);
@@ -152,7 +152,7 @@ describe("soft delete lifecycle (Phase 14)", () => {
   });
 });
 
-describe("soft-delete operation enablement (Phase 14, ADR-0013)", () => {
+describe("soft-delete operation enablement (ADR-0013)", () => {
   it("keeps restoreOne and purgeOne off by default", () => {
     const registry = createOperationRegistry<Account>(undefined);
     expect(registry.get("restoreOne")?.enabled).toBe(false);

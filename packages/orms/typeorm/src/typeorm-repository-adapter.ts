@@ -14,17 +14,17 @@ import { FilterTranslator } from "./filter-translator.js";
 import { mapDriverError } from "./error-mapping.js";
 
 /**
- * `RepositoryAdapter` over a TypeORM `Repository` (Phases 9–10, plus
- * Phase 14 soft delete): CRUD with hard *or* soft delete, restore, purge,
- * filtering, sorting, pagination, optional counting.
+ * `RepositoryAdapter` over a TypeORM `Repository`: CRUD with hard *or*
+ * soft delete, restore, purge, filtering, sorting, pagination, optional
+ * counting.
  *
- * API split, as decided in Phase 9: the **QueryBuilder API** serves every
+ * API split: the **QueryBuilder API** serves every
  * read — it is the only surface that can express the translated filter
  * AST, relation-path joins, and skip/take — while the **Repository API**
  * serves writes, where entity hydration and column defaults matter and no
  * dynamic SQL is needed.
  *
- * Relation includes (Phase 15) load two ways, per the strategy core
+ * Relation includes load two ways, per the strategy core
  * resolved: to-one nodes join into the main query, to-many nodes take one
  * extra batched query per level. The engine's transaction handle
  * (`context.transaction`) is the remaining attachment seam.
@@ -110,7 +110,7 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
     try {
       // A dedicated count query — never getManyAndCount: the engine only
       // calls this when `query.count` is true, so `total: null` costs
-      // zero queries (Phase 9 count strategy).
+      // zero queries.
       // No includes: counting distinct roots never needs their relations.
       return await this.buildQuery(query, context, { sorted: false, includes: false }).getCount();
     } catch (error) {
@@ -145,7 +145,7 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
     return qb;
   }
 
-  // ── Relation includes (Phase 15) ────────────────────────────────────
+  // ── Relation includes ───────────────────────────────────────────────
 
   /**
    * Join every `join`-strategy node of the tree into one query. Aliases are
@@ -176,7 +176,7 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
     const alias = `${parentAlias}__${node.relation.name}`;
     // Soft-deleted related rows are excluded from includes — spelled out
     // rather than left to TypeORM's default, because a root `withDeleted`
-    // must not silently widen the relation too (Phase 14).
+    // must not silently widen the relation too.
     const live = node.softDelete.strategy === "soft" ? `${alias}.${node.softDelete.field} IS NULL` : undefined;
     qb.leftJoinAndSelect(`${parentAlias}.${node.relation.name}`, alias, live);
     translator?.registerJoin(alias);
@@ -230,7 +230,7 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
     await this.loadBatches(relatedRows(parents, node.relation.name), node.relation.target(), node.children);
   }
 
-  // ── Soft delete (Phase 14) ──────────────────────────────────────────
+  // ── Soft delete ──────────────────────────────────────────────────────
 
   /**
    * Exclude soft-deleted rows unless the caller opted in with

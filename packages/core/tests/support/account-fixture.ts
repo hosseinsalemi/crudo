@@ -2,7 +2,7 @@ import type { CrudContext, EntityId, EntityMetadata, NormalizedQueryContext, Rep
 import { AlreadyDeletedException, NotDeletedException, NotFoundException } from "@kavo/core";
 
 /**
- * Soft-deletable test entity (Phase 14): a `deletedAt` marker column, plus
+ * Soft-deletable test entity: a `deletedAt` marker column, plus
  * `softDeleteField` on the metadata — the seam a real ORM fills from its
  * own declaration (`@DeleteDateColumn` in `@kavo/typeorm`).
  */

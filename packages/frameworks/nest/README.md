@@ -8,5 +8,5 @@ problem-details exception filter, and Swagger integration.
 `@kavo/typeorm` or any ORM — adapters enter Nest's DI container as
 providers; this package programs against `RepositoryAdapter` only.
 
-Scaffold only in Milestone A — architecture lands in Phase 11,
-implementation in Phase 12.
+Fully implemented: route generation, the exception filter, and Swagger
+integration all run through this package.

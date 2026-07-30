@@ -1,6 +1,6 @@
 # ADR-0004 — Lockstep versioning
 
-**Status:** accepted (Phase 2; release mechanics in Phase 18)
+**Status:** accepted
 
 ## Context
 
@@ -18,6 +18,6 @@ ranges between them pin the same version line.
 - "Kavo 0.4" fully identifies a consumer's setup; cross-package bugs are
   reproducible from one number.
 - Occasional no-op bumps of untouched packages — trivially cheap in an
-  automated pipeline (Phase 18 changesets).
+  automated pipeline (changesets).
 - A core-breaking change cannot ship before dependents catch up, because
   they ship in the same release.

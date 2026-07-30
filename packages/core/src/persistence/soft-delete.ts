@@ -3,7 +3,7 @@ import type { EntityMetadata } from "../metadata/entity-metadata.js";
 import { ConfigurationException } from "../errors/exceptions.js";
 
 /**
- * How a delete is carried out for one entity (Phase 14):
+ * How a delete is carried out for one entity:
  * - `hard` — the row is removed (the default when nothing is soft-deletable);
  * - `soft` — the delete-marker field is stamped and the row stays.
  */
@@ -44,7 +44,7 @@ export const HARD_DELETE: ResolvedSoftDelete = Object.freeze({
 });
 
 /**
- * Resolve the delete strategy for one settings scope (Phase 14):
+ * Resolve the delete strategy for one settings scope:
  *
  * - `softDelete: false` or `softDelete.strategy: "hard"` → always hard;
  * - `softDelete.strategy: "soft"` → soft, and a missing marker field is a

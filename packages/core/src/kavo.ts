@@ -23,7 +23,7 @@ import { describeResolvedConfig, resolveEntityConfig } from "./config/resolve-en
 import { STANDARD_OPERATIONS } from "./operations/default-operation-registry.js";
 
 /**
- * Root-factory options (Phase 8). `GlobalConfig.defaults` is the
+ * Root-factory options. `GlobalConfig.defaults` is the
  * framework-scope link of the precedence chain; `infrastructure` is how an
  * ORM package plugs in (`createTypeOrmInfrastructure(dataSource)`) without
  * core ever importing it.
@@ -61,18 +61,18 @@ export interface KavoInstance {
     runtime?: CrudRuntime<Entity>,
   ): DefaultCrudService<Entity, EntityId, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto>;
 
-  /** Phase 8 debug dump: resolved configuration for one registered entity. */
+  /** Debug dump: resolved configuration for one registered entity. */
   describe(entityName: string): Record<string, unknown> | undefined;
 }
 
 /**
- * Create a Kavo root instance (Phase 8's `createKavo`). The zero-config
+ * Create a Kavo root instance (`createKavo`). The zero-config
  * path is `createKavo({ infrastructure }).createCrud(Entity)` — built-in
  * defaults, derived DTOs and allowlists, standard operations.
  */
 export function createKavo(options: KavoOptions = {}): KavoInstance {
   const registered = new Map<string, Record<string, unknown>>();
-  // The cross-entity view nested includes resolve against (Phase 15).
+  // The cross-entity view nested includes resolve against.
   // Entities that never go through `createCrud` are derived from
   // infrastructure metadata on demand, so a relation can point at one.
   const catalog = new DefaultEntityCatalog(
@@ -168,7 +168,7 @@ function requireSoftDeletable<Entity extends object>(
 }
 
 /**
- * The bare zero-config path (Phase 8): `createCrud(Entity, config?,
+ * The bare zero-config path: `createCrud(Entity, config?,
  * runtime)` — an implicit root instance with built-in defaults. At the
  * core level the runtime (adapter + metadata) must be explicit, because
  * core has no ORM to derive them from; `@kavo/typeorm`'s

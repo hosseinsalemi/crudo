@@ -7,7 +7,7 @@ import type { EntityWriter } from "./entity-writer.js";
  * writes. Split into {@link EntityReader} / {@link EntityWriter} so
  * read-only consumers (and read-only decorators) can depend on half the
  * surface. Adapters are named for what they adapt:
- * `TypeOrmRepositoryAdapter` (`@kavo/typeorm`, Phases 9–10).
+ * `TypeOrmRepositoryAdapter` (`@kavo/typeorm`).
  */
 export interface RepositoryAdapter<Entity = unknown, Id extends EntityId = EntityId>
   extends EntityReader<Entity, Id>, EntityWriter<Entity, Id> {}

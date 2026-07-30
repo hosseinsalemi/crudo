@@ -4,8 +4,8 @@ Framework- and ORM-independent contracts and type system for Kavo.
 
 **Zero runtime dependencies** — this package must not depend on NestJS or
 TypeORM, directly or transitively (enforced by `.dependency-cruiser.cjs`).
-In Milestone A it contains types only; runtime code (engine, config
-resolution, query parsing) lands in Milestone B.
+It currently contains types only; runtime code (engine, config
+resolution, query parsing) is layered in separately.
 
 ## Layout
 

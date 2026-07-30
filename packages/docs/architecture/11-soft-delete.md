@@ -1,4 +1,4 @@
-# 11 — Soft Delete, Restore & Purge (Phase 14)
+# 11 — Soft Delete, Restore & Purge
 
 Deleting a row can mean two things. Kavo resolves which one **per
 entity, at bootstrap**, and every layer downstream reads that one answer
@@ -30,7 +30,7 @@ The marker field is the configured `softDelete.field` when the entity has
 such a column, otherwise the one the ORM declares
 (`EntityMetadata.softDeleteField` — `@DeleteDateColumn` in
 `@kavo/typeorm`). Explicit configuration wins over detection; an entity
-with neither costs nothing, which is the phase's constraint.
+with neither costs nothing.
 
 Resolution runs at every settings scope, so an operation or a single call
 may narrow it (`operations: { deleteOne: { softDelete: { strategy: "hard" } } }`),
@@ -97,13 +97,13 @@ route per issue #26), which also gets to
 decide ordering and what to do when one leg fails.
 
 **Related rows.** Soft-deleted related rows are excluded from included
-relations (Phase 15) by the same rule that governs root reads — the
+relations by the same rule that governs root reads — the
 adapter spells the child predicate out per join rather than leaving it to
 the ORM's default. See doc 12 §4.
 
 ## 5. What is not here
 
-Bulk (`restoreMany`, `deleteMany`, …) is the optional half of Phase 14
+Bulk (`restoreMany`, `deleteMany`, …) is the optional half of soft delete
 and is not built: those registry entries stay disabled, and calling one
 raises `OperationDisabledException`. The single-item surface is complete
 without it — `BulkResultDto` and the `*Many` contracts remain reserved.

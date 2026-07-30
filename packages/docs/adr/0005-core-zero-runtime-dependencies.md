@@ -1,6 +1,6 @@
 # ADR-0005 — Zero runtime dependencies in `@kavo/core`
 
-**Status:** accepted (Phases 1–3)
+**Status:** accepted
 
 ## Context
 
@@ -19,7 +19,7 @@ rule, not by convention.
 ## Consequences
 
 - Framework/ORM independence is structural, not aspirational.
-- Occasional small reimplementations (e.g. a deep-merge in Phase 8) —
+- Occasional small reimplementations (e.g. a deep-merge for config resolution) —
   accepted; they're tiny and fully owned.
 - `sideEffects: false` + types-heavy design keeps core tree-shakable for
   consumers importing only contracts.

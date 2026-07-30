@@ -1,10 +1,10 @@
-# 09 — TypeORM Adapter (Phases 9–10)
+# 09 — TypeORM Adapter
 
 `@kavo/typeorm` implements `RepositoryAdapter` (= `EntityReader` +
 `EntityWriter`) over a TypeORM `DataSource` and feeds core's metadata
-seam. Skeleton scope: CRUD with hard delete, filtering (incl. `NOT` and
-relation paths), sorting, pagination, optional counting; Phases 14–15 added
-soft delete/restore/purge (§3) and relation loading (§6). `typeorm` is a
+seam. Core scope: CRUD with hard delete, filtering (incl. `NOT` and
+relation paths), sorting, pagination, optional counting, soft
+delete/restore/purge (§3), and relation loading (§6). `typeorm` is a
 peerDependency; `@kavo/core` never imports it.
 
 ## 1. The metadata seam
@@ -46,7 +46,7 @@ filterable when explicitly allowlisted.
   one load-merge-save primitive — the _shape_ of the payload differs at
   the DTO layer (full body vs. sparse), not the persistence mechanics.
 
-**Soft delete** (Phase 14, doc 11) rides on both halves.
+**Soft delete** (doc 11) rides on both halves.
 `buildEntityMetadata` reports `@DeleteDateColumn` as
 `EntityMetadata.softDeleteField`; reads scope themselves to live rows —
 `.withDeleted()` for a declared delete column, an explicit
@@ -75,15 +75,15 @@ dedicated query built from the same filter (sorting stripped) — never
 | serialization/deadlock (`40001`·`40P01` / 1213 / `SQLITE_BUSY`)              | `TransactionException` (`retryable: true`) |
 | anything else                                                                | `PersistenceException` with `cause`        |
 
-## 6. Attachment points for later phases
+## 6. Attachment points for later work
 
 Two of the three have since landed and are documented above rather than
 here:
 
-- **Soft delete (Phase 14, doc 11):** built. The strategy branch lives in
+- **Soft delete (doc 11):** built. The strategy branch lives in
   `delete`/`restore`/`purge` reading `context.config.softDelete`, and query
   methods add the `IS NULL` predicate driven by `query.withDeleted` (§3).
-- **Includes (Phase 15, doc 12):** built. `buildQuery` joins to-one nodes
+- **Includes (doc 12):** built. `buildQuery` joins to-one nodes
   from the validated `IncludeTree` and `loadBatches` issues one extra query
   per to-many level, stitched by id; the deterministic alias scheme is what
   lets an include join and a relation-path filter share one join (§2).

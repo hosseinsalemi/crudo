@@ -7,7 +7,7 @@ const limits: PaginationLimits = { defaultLimit: 20, maxLimit: 100 };
 const offset = new OffsetPaginationStrategy();
 const page = new PagePaginationStrategy();
 
-describe("OffsetPaginationStrategy — flat limit/offset (Phase 5)", () => {
+describe("OffsetPaginationStrategy — flat limit/offset", () => {
   it("falls back to defaultLimit and offset 0 when nothing is sent", () => {
     expect(offset.normalize({}, limits)).toEqual({ limit: 20, offset: 0 });
   });
@@ -70,7 +70,7 @@ describe("OffsetPaginationStrategy — flat limit/offset (Phase 5)", () => {
   });
 });
 
-describe("PagePaginationStrategy — page[number]/page[size] (Phase 5)", () => {
+describe("PagePaginationStrategy — page[number]/page[size]", () => {
   it("normalizes 1-indexed pages to the internal limit/offset form", () => {
     expect(page.normalize({ "page[number]": "3", "page[size]": "10" }, limits)).toEqual({ limit: 10, offset: 20 });
   });
@@ -120,7 +120,7 @@ describe("PagePaginationStrategy — page[number]/page[size] (Phase 5)", () => {
   });
 });
 
-describe("builtInPaginationStrategies (Phase 5)", () => {
+describe("builtInPaginationStrategies", () => {
   it("ships exactly the two built-ins, keyed by strategy name", () => {
     const strategies = builtInPaginationStrategies();
     expect([...strategies.keys()].sort()).toEqual(["offset", "page"]);

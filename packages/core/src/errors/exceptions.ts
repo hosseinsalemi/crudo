@@ -11,7 +11,7 @@ export interface KavoExceptionOptions {
 }
 
 /**
- * Base class of the exception hierarchy (Phase 6). Every leaf binds one
+ * Base class of the exception hierarchy. Every leaf binds one
  * catalog code; status, title, and the English `detail` template all come
  * from the catalog, so an exception cannot disagree with it.
  *
@@ -47,7 +47,7 @@ export abstract class KavoException extends Error implements CrudException {
 }
 
 /**
- * Bad filter/sort/fields/pagination input (Phase 5 grammar violations).
+ * Bad filter/sort/fields/pagination input (query grammar violations).
  * Carries field-level issues that serialize into the problem-details
  * `errors[]` extension. The exception's own code is the generic
  * `KAVO_QUERY_INVALID`; each issue carries its precise sub-code.
@@ -94,7 +94,7 @@ export class TransactionException extends KavoException {
   }
 }
 
-/** Soft-deleting a row that is already soft-deleted (Phase 14) → 409. */
+/** Soft-deleting a row that is already soft-deleted → 409. */
 export class AlreadyDeletedException extends KavoException {
   constructor(options: KavoExceptionOptions = {}) {
     super("KAVO_ALREADY_DELETED", options);
@@ -102,7 +102,7 @@ export class AlreadyDeletedException extends KavoException {
 }
 
 /**
- * Restoring — or purging — a row that is not deleted (Phase 14) → 409.
+ * Restoring — or purging — a row that is not deleted → 409.
  * Both operations act on soft-deleted rows only; a live row is a state
  * conflict, not a missing one.
  */
@@ -112,7 +112,7 @@ export class NotDeletedException extends KavoException {
   }
 }
 
-/** Calling an operation whose registry entry is disabled (Phase 13). */
+/** Calling an operation whose registry entry is disabled. */
 export class OperationDisabledException extends KavoException {
   constructor(options: KavoExceptionOptions = {}) {
     super("KAVO_OPERATION_DISABLED", options);
@@ -122,7 +122,7 @@ export class OperationDisabledException extends KavoException {
 /**
  * Bootstrap-time configuration error. Never a wire response — it fires
  * before the app serves traffic, and it must name the entity, the key
- * path, and the offending value (Phase 8 error quality bar).
+ * path, and the offending value (error quality bar).
  */
 export class ConfigurationException extends KavoException {
   constructor(entity: string, path: string, problem: string) {

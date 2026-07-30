@@ -11,7 +11,7 @@ import { AlreadyDeletedException, NotDeletedException, NotFoundException } from 
 
 /**
  * Test entity for binding tests — no ORM anywhere near this package. The
- * `deletedAt` marker makes it soft-deletable (Phase 14), which is what the
+ * `deletedAt` marker makes it soft-deletable, which is what the
  * restore/purge route tests need.
  */
 export class Todo {
@@ -103,7 +103,7 @@ export class InMemoryTodoAdapter implements RepositoryAdapter<Todo> {
 
   async create(data: Partial<Todo>): Promise<Todo> {
     const row = { ...new Todo(), ...data, id: this.nextId++ };
-    // A relation arrives as an `{ id }` reference (Phase 15); a real
+    // A relation arrives as an `{ id }` reference; a real
     // adapter would resolve it, and this fake keeps it as-is so the
     // binding tests can see what deserialization produced.
     this.rows.push(row);
@@ -137,7 +137,7 @@ export class InMemoryTodoAdapter implements RepositoryAdapter<Todo> {
   /**
    * Soft delete, driven by the strategy the engine resolved rather than by
    * this fake's own opinion — `deletedAt` is a plain property here, which
-   * is exactly what a marker column is (Phase 14).
+   * is exactly what a marker column is.
    */
   async restore(id: EntityId, context: CrudContext<Todo>): Promise<Todo> {
     const row = await this.require(id);

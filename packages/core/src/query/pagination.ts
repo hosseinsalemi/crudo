@@ -11,7 +11,7 @@ export interface Pagination {
   readonly offset: number;
 }
 
-/** Limits a strategy must respect, sourced from resolved config (Phase 8). */
+/** Limits a strategy must respect, sourced from resolved config. */
 export interface PaginationLimits {
   readonly defaultLimit: number;
   readonly maxLimit: number;
@@ -19,7 +19,7 @@ export interface PaginationLimits {
 
 /**
  * Pluggable translation from wire pagination params to {@link Pagination}.
- * Built-ins (Phase 5): `offset` (flat `limit`/`offset`, the default) and
+ * Built-ins: `offset` (flat `limit`/`offset`, the default) and
  * `page` (`page[number]`/`page[size]`, 1-indexed). A strategy may publish
  * extra response data through `ListMetaDto` (e.g. a cursor) — the envelope
  * contract itself never changes per strategy.
@@ -29,7 +29,7 @@ export interface PaginationStrategy {
   readonly name: string;
   /**
    * Normalize raw wire params. Missing params fall back to `defaultLimit`;
-   * out-of-range values are clamped or rejected per the Phase 5 grammar.
+   * out-of-range values are clamped or rejected per the query grammar.
    */
   normalize(rawParams: Readonly<Record<string, unknown>>, limits: PaginationLimits): Pagination;
 }

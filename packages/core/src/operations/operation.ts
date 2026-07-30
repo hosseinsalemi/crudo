@@ -9,13 +9,13 @@ export type StandardOperationId =
   "createOne" | "findOne" | "findMany" | "updateOne" | "patchOne" | "deleteOne" | "restoreOne" | "purgeOne";
 
 /**
- * Any operation id — standard or custom (Phase 13). The `string & {}`
+ * Any operation id — standard or custom. The `string & {}`
  * branch keeps literal-union completions for the standard ids while
  * admitting arbitrary custom names.
  */
 export type OperationId = StandardOperationId | (string & {});
 
-/** Read/write classification, used for lifecycle branching (Phase 7). */
+/** Read/write classification, used for lifecycle branching. */
 export type OperationKind = "read" | "write";
 
 /** Whether an operation targets one entity or a batch. */

@@ -25,6 +25,6 @@ export interface ProblemDetailsDto {
   readonly instance?: string;
   /** Kavo extension: the stable catalog code. */
   readonly code: KavoErrorCode;
-  /** Kavo extension: field-level query issues (400s from Phase 5). */
+  /** Kavo extension: field-level query issues (400s from query validation). */
   readonly errors?: readonly QueryIssueDto[];
 }

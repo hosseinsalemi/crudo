@@ -1,7 +1,7 @@
-# 06 — Error Handling (Phase 6)
+# 06 — Error Handling
 
 One exception hierarchy in `core/src/errors/`, one stable code catalog,
-one wire shape (RFC 9457 problem details, ADR-0009). Later phases add
+one wire shape (RFC 9457 problem details, ADR-0009). Later work adds
 leaves; nothing existing changes.
 
 ## 1. Hierarchy
@@ -14,7 +14,7 @@ KavoException (abstract; implements the CrudException contract)
 ├─ AlreadyDeletedException      soft delete of a deleted row → 409
 ├─ NotDeletedException          restore/purge of a live row → 409
 ├─ OperationDisabledException
-├─ BulkOperationException       carries items[] (Phase 14, reserved)
+├─ BulkOperationException       carries items[] (reserved)
 ├─ PersistenceException
 ├─ TransactionException         carries retryable: boolean
 └─ ConfigurationException       bootstrap-only, never a wire response
@@ -27,8 +27,8 @@ with it. Downstream layers program against the `CrudException` shape;
 
 ## 2. Error-code catalog
 
-Codes are API surface — renaming one is a breaking change (Phase 18
-semver policy). Source of truth: `ERROR_CATALOG` in
+Codes are API surface — renaming one is a breaking change (semver
+policy). Source of truth: `ERROR_CATALOG` in
 `core/src/errors/error-catalog.ts`.
 
 | Code                           | HTTP | Fires when                                                                         | Payload extensions                |

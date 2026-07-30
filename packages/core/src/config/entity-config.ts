@@ -8,7 +8,7 @@ import type { OperationHandler, OperationMetadata } from "../operations/operatio
 import type { StandardOperationId } from "../operations/operation.js";
 
 /**
- * Security allowlists (Phase 5): what a request may filter, sort, and
+ * Security allowlists: what a request may filter, sort, and
  * select on — including relation paths. Anything outside an allowlist is
  * rejected with a 400 (`QueryValidationException`), never silently
  * dropped. When omitted, the allowlists derive from the `query` DTO or
@@ -21,7 +21,7 @@ export interface QueryAllowlists<Entity = unknown> {
 }
 
 /**
- * Per-operation configuration (control surface lands in Phase 13).
+ * Per-operation configuration.
  * Settings keys override entity scope for this operation only; `false` in
  * the parent `operations` record disables the operation outright.
  */

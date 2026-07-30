@@ -1,6 +1,6 @@
 # ADR-0014 — Write-side relations: associate by id, no deep nested writes
 
-**Status:** accepted (Phase 15)
+**Status:** accepted
 
 ## Context
 

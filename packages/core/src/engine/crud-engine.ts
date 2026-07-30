@@ -22,7 +22,7 @@ import type { FindManyResult } from "./built-in-handlers.js";
 /**
  * Marker wrapping *raw wire params* (`filter[age][gte]=18` as flat keys).
  * The framework layer (`@kavo/nest`) hands the engine one of these so the
- * full Phase 5 parse-and-coerce pipeline runs; programmatic callers pass a
+ * full parse-and-coerce pipeline runs; programmatic callers pass a
  * typed `QueryContext` instead, which normalizes without coercion.
  */
 export class WireQuery {
@@ -52,7 +52,7 @@ const INPUT_SLOTS: Readonly<Partial<Record<StandardOperationId, DtoSlot>>> = {
 };
 
 /**
- * The request pipeline (Phase 7, Template Method over one lifecycle):
+ * The request pipeline (Template Method over one lifecycle):
  *
  * operation resolution → config resolution → query resolution (reads) →
  * context assembly → DTO resolution → deserialization → handler

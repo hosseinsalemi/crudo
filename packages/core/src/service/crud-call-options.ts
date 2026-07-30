@@ -3,7 +3,7 @@ import type { DeepPartial } from "../types/utility.js";
 import type { TransactionContext } from "../persistence/transaction-manager.js";
 
 /**
- * Per-call scope — the last link of the precedence chain (Phase 8).
+ * Per-call scope — the last link of the precedence chain.
  * Overrides are parameters for this one call; configuration is immutable
  * after bootstrap and there is no runtime mutation API.
  */

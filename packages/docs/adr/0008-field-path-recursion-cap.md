@@ -1,6 +1,6 @@
 # ADR-0008 — `FieldPath` recursion cap (default 3, max 5)
 
-**Status:** accepted (Phase 3)
+**Status:** accepted
 
 ## Context
 

@@ -1,10 +1,10 @@
-# 03 — Core Contracts & Type System (Phase 3)
+# 03 — Core Contracts & Type System
 
 All contracts live in `packages/core/src` and are exported through the
-explicit barrel. **Types only** — no classes, no implementations; the
-first runtime code lands in Milestone B. Contracts whose implementations
-land in Milestone C (relations, transactions, bulk, operation control) are
-declared now so later phases never mutate `@kavo/core` types.
+explicit barrel. **Types only** — no classes, no implementations; runtime
+code is layered in separately. Contracts whose implementations land later
+(relations, transactions, bulk, operation control) are declared now so
+later work never needs to mutate `@kavo/core` types.
 
 ## 1. Generic parameters
 
@@ -26,7 +26,7 @@ manual arguments; registering a DTO class narrows exactly one slot and
 everything downstream (envelope, service returns) follows.
 
 The chain `TEntity → TUpdateDto → TPatchDto` and `TItemDto → TListDto`
-mirrors the Phase 4 runtime resolution rules, so static defaults and
+mirrors the runtime DTO resolution rules (doc 4), so static defaults and
 runtime derivation never disagree about _which slot follows which_.
 
 ### `EntityInput` — the write-shape default
@@ -49,7 +49,7 @@ the entity's **scalar** properties, **all optional**.
   Requiring every key made the zero-config write path unusable:
   `createCrud(User).createOne({ name })` demanded `id` and every relation.
 - The looseness is the _static_ default only. The runtime derivation
-  (Phase 4) still drops generated columns, and registering a `create` DTO
+  (doc 4) still drops generated columns, and registering a `create` DTO
   restores full strictness — which is what a configured setup does.
 
 The generic parameters are also inferred by `@Crud(Entity, config)`, whose
@@ -79,8 +79,8 @@ relation paths are spell-checked at compile time.
   relation (`posts.comments`) reads identically to a to-one.
 - **`Date`, `bigint`, primitives** are leaves — no recursion into their
   methods.
-- `FieldPath` is a _typing aid_, not a security boundary: the Phase 5
-  allowlists decide what a request may actually do.
+- `FieldPath` is a _typing aid_, not a security boundary: the runtime
+  allowlists (doc 5) decide what a request may actually do.
 
 ### `IncludePath` — the relation-only sibling
 
@@ -136,13 +136,13 @@ the same allowlist validation.
 ## 3. Module augmentation of `OperationMetadata`
 
 `OperationMetadata` is an intentionally empty interface on every
-operation registry entry. Core stores it, merges it per Phase 8
-precedence, and hands it to the framework layer — it never reads it. A
-consumer types its keys via declaration merging; `@kavo/nest` declares a
-`routes` key:
+operation registry entry. Core stores it, merges it per the configuration
+precedence chain (doc 8), and hands it to the framework layer — it never
+reads it. A consumer types its keys via declaration merging; `@kavo/nest`
+declares a `routes` key:
 
 ```ts
-// packages/frameworks/nest/src/operation-metadata.ts (Phase 11)
+// packages/frameworks/nest/src/operation-metadata.ts
 declare module "@kavo/core" {
   interface OperationMetadata {
     routes?: {
@@ -185,26 +185,27 @@ Enforced by dependency-cruiser (`core-imports-nothing`), not convention.
 
 ## 5. Contract inventory
 
-| Area          | Contracts                                                                                                                                                              | Implemented in                     |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| Service       | `CrudService`, `CrudCallOptions`, `IdentifiedInput`                                                                                                                    | Phase 7                            |
-| Persistence   | `EntityReader`, `EntityWriter`, `RepositoryAdapter`                                                                                                                    | Phases 9–10                        |
-| Transactions  | `TransactionManager`, `TransactionContext`, `TransactionOptions`                                                                                                       | Not implemented — see below        |
-| Query         | `Filter*`, `FilterExpression`, `Sort`, `Pagination`, `PaginationStrategy`, `FieldSelection`, `QueryContext`, `NormalizedQueryContext`, `FilterParser`, `FilterBuilder` | Phase 5 (parse), Phase 10 (build)  |
-| DTO           | `Dto`, `DtoClass`, `OperationDtoMap`, `DtoResolver`, `ListResultDto`, `ListMetaDto`, `BulkResultDto`                                                                   | Phase 4 (bulk reserved)            |
-| Errors        | `CrudException`, `KavoErrorCode`, `ErrorHandler`, `ProblemDetailsDto`                                                                                                  | Phase 6                            |
-| Config        | `KavoSettings` (+ per-area settings), `GlobalConfig`, `EntityConfig`, `OperationConfig`, `ResolvedEntityConfig`                                                        | Phase 8 (operations Phase 13)      |
-| Operations    | `OperationId`, `OperationHandler`, `OperationMetadata`, `OperationDescriptor`, `OperationRegistry`                                                                     | Phase 7 (control surface Phase 13) |
-| Relations     | `RelationDescriptor`, `RelationRegistry`, `IncludeTree`, `IncludeNode`, `IncludeResolver`, `EntityCatalog`                                                             | Phase 15                           |
-| Context       | `CrudContext`, `CrudContextState`, `StateKey`, `CrudRequest`, `CrudResponse`                                                                                           | Phase 7                            |
-| Serialization | `Serializer`, `Deserializer`                                                                                                                                           | Phase 7                            |
+| Area          | Contracts                                                                                                                                                              |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Service       | `CrudService`, `CrudCallOptions`, `IdentifiedInput`                                                                                                                    |
+| Persistence   | `EntityReader`, `EntityWriter`, `RepositoryAdapter`                                                                                                                    |
+| Transactions  | `TransactionManager`, `TransactionContext`, `TransactionOptions` — not implemented, see below |
+| Query         | `Filter*`, `FilterExpression`, `Sort`, `Pagination`, `PaginationStrategy`, `FieldSelection`, `QueryContext`, `NormalizedQueryContext`, `FilterParser`, `FilterBuilder` |
+| DTO           | `Dto`, `DtoClass`, `OperationDtoMap`, `DtoResolver`, `ListResultDto`, `ListMetaDto`, `BulkResultDto` (bulk reserved) |
+| Errors        | `CrudException`, `KavoErrorCode`, `ErrorHandler`, `ProblemDetailsDto`                                                                                                  |
+| Config        | `KavoSettings` (+ per-area settings), `GlobalConfig`, `EntityConfig`, `OperationConfig`, `ResolvedEntityConfig`                                                        |
+| Operations    | `OperationId`, `OperationHandler`, `OperationMetadata`, `OperationDescriptor`, `OperationRegistry`                                                                     |
+| Relations     | `RelationDescriptor`, `RelationRegistry`, `IncludeTree`, `IncludeNode`, `IncludeResolver`, `EntityCatalog`                                                             |
+| Context       | `CrudContext`, `CrudContextState`, `StateKey`, `CrudRequest`, `CrudResponse`                                                                                           |
+| Serialization | `Serializer`, `Deserializer`                                                                                                                                           |
 
 `TransactionManager` / `TransactionOptions` / `TransactionPropagation` are
 declared but **intentionally unimplemented**, and no adapter provides them.
-v6 has no transaction phase: the only consumer of multi-write atomicity is
-bulk `atomic` mode, whose binder is the adapter-level `runInTransaction`
-hook, and bulk was dropped from this build. They stay because Phase 3 fixes
-core's type system once and later phases never mutate it — the `@remarks` at
-`core/src/persistence/transaction-manager.ts` is the definition-site record.
+This build has no transaction support: the only consumer of multi-write
+atomicity is bulk `atomic` mode, whose binder is the adapter-level
+`runInTransaction` hook, and bulk was dropped from this build. They stay
+because this doc fixes core's type system once and later work never mutates
+it — the `@remarks` at `core/src/persistence/transaction-manager.ts` is the
+definition-site record.
 `TransactionContext` is the exception: it is live, threaded through
 `CrudContext` and `CrudCallOptions` as an opaque adapter handle.

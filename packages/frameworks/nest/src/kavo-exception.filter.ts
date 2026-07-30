@@ -11,8 +11,8 @@ interface ProblemResponse {
 }
 
 /**
- * The one boundary between Kavo's exception hierarchy and HTTP
- * (Phase 11): every `KavoException` becomes its RFC 9457 problem-details
+ * The one boundary between Kavo's exception hierarchy and HTTP:
+ * every `KavoException` becomes its RFC 9457 problem-details
  * document with the status from the error catalog. Kavo exceptions never
  * extend Nest's — this filter is the mapping, not inheritance.
  *

@@ -1,9 +1,9 @@
-# 01 — System Architecture (Phase 1)
+# 01 — System Architecture
 
 Kavo lets a developer define an entity once (via TypeORM) and get the full
 CRUD surface — `createOne` … `purgeOne`, the `*Many` batch variants
 (contracted and registered, but disabled: bulk is the optional half of
-Phase 14 and this build dropped it) — with filtering, sorting,
+soft delete and this build dropped it) — with filtering, sorting,
 pagination, nested includes, field selection, optional per-operation
 DTOs, serialization, transactions, and error handling, configurable at
 global, entity, operation, and per-call scope.
@@ -87,7 +87,7 @@ references — an illegal import fails CI, not code review.
 ORM independence inside core is a structural discipline even though only
 TypeORM is built — it is what keeps the core clean.
 
-## 4. Request lifecycle (first pass — authoritative version in Phase 7)
+## 4. Request lifecycle (first pass — authoritative version in doc 7)
 
 ```
 Request
@@ -95,7 +95,7 @@ Request
  → Config Resolution        frozen ResolvedEntityConfig (bootstrap-merged)
  → DTO Resolution           explicit DTO, else entity-derived default
  → Deserialization
- → Query Resolution         GET only: query → filter AST (+ IncludeTree, Phase 15)
+ → Query Resolution         GET only: query → filter AST (+ IncludeTree, doc 12)
  → Repository Adapter call  transactional via the adapter-level hook ⟨reserved⟩
  → Response Mapping         result → item or ListResultDto envelope
  → Field Selection + Serialization
@@ -105,9 +105,9 @@ Request
 Deliberately lean: no validation stage, no hook/event stages, no policy
 stage. Cross-cutting behavior lives in the consumer's own controller/
 service code around Kavo — the v6 tradeoff, chosen for simplicity. Every
-stage boundary is a seam with a plain default in it until its phase lands
-— seams, not TODOs — which is what makes Milestone B shippable without
-stubbing Milestones C–D as hacks.
+stage boundary is a seam with a plain default in it until the feature
+behind it lands — seams, not TODOs — which is what makes the walking
+skeleton shippable without stubbing later features as hacks.
 
 ## 5. Module responsibilities (inside `@kavo/core`)
 
@@ -119,7 +119,7 @@ stubbing Milestones C–D as hacks.
 | `errors/`        | `CrudException`, stable error codes, problem-details shape                                                   |
 | `config/`        | Settings schema, scope inputs, frozen resolved config                                                        |
 | `operations/`    | Operation ids, handler contract, dispatch registry                                                           |
-| `relations/`     | Relation descriptors/registry, include tree/resolver (Phase 15 contracts)                                    |
+| `relations/`     | Relation descriptors/registry, include tree/resolver                                                        |
 | `context/`       | `CrudContext` + transport-agnostic request/response envelopes                                                |
 | `serialization/` | `Serializer` / `Deserializer`                                                                                |
 | `persistence/`   | Reader/writer/adapter contracts, transaction manager                                                         |
@@ -136,7 +136,7 @@ pattern; classes that merely resemble one are not in the table.
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Template Method**           | `CrudEngine.execute`/`run` (`core/src/engine/crud-engine.ts`)                                                                                                                                                                                                                                                             | —                                                                                                                         | One fixed stage order with swappable stage internals beats a free-form middleware chain: ordering bugs become impossible, and the pipeline stays inspectable. Variability comes from injected collaborators, not subclass overrides — `run` is `private` and nothing extends `CrudEngine`. |
 | **Strategy**                  | `PaginationStrategy` (`core/src/query/pagination-strategies.ts`), `Serializer`/`Deserializer` (`core/src/serialization/`), `ErrorHandler` (`core/src/errors/default-error-handler.ts`), `OperationHandler` (`core/src/engine/built-in-handlers.ts`), `IncludeResolver` (`core/src/relations/default-include-resolver.ts`) | —                                                                                                                         | Open/Closed: new behavior = new implementation of a core contract, never an engine edit. Each is a core-declared interface with a `Default*`/built-in implementation, injected through `CrudEngineDependencies`.                                                                           |
-| **Registry (dispatch table)** | `DefaultOperationRegistry` + `createOperationRegistry` (`core/src/operations/default-operation-registry.ts`)                                                                                                                                                                                                              | [0006](../adr/0006-registry-driven-operations.md), [0007](../adr/0007-module-augmentable-operation-metadata.md)           | One mechanism for built-in and overridden operations (Phase 13's "one mechanism, several behaviors"); route generation reads the same table, so features get routes for free.                                                                                                              |
+| **Registry (dispatch table)** | `DefaultOperationRegistry` + `createOperationRegistry` (`core/src/operations/default-operation-registry.ts`)                                                                                                                                                                                                              | [0006](../adr/0006-registry-driven-operations.md), [0007](../adr/0007-module-augmentable-operation-metadata.md)           | One mechanism, several behaviors, for built-in and overridden operations; route generation reads the same table, so features get routes for free.                                                                                                              |
 | **Composition Root**          | `createKavo`/`createCrud` (`core/src/kavo.ts`); framework-layer roots in `nest/src/kavo.module.ts` and `typeorm/src/infrastructure.ts`                                                                                                                                                                                    | —                                                                                                                         | Every `new` in the object graph happens once at bootstrap, so resolution order is a single readable function and the result can be frozen; no service locator, and no per-request construction.                                                                                            |
 | **Adapter**                   | `TypeOrmRepositoryAdapter` (`typeorm/src/typeorm-repository-adapter.ts`) against core's `RepositoryAdapter`; `CrudInfrastructure` (`metadataFor` + `adapterFor`) supplies adapter _and_ metadata as one family                                                                                                            | [0001](../adr/0001-clean-architecture-core-owns-contracts.md), [0011](../adr/0011-entity-metadata-infrastructure-seam.md) | Core states persistence in its own vocabulary and the ORM package translates, which is what lets core keep zero runtime dependencies (ADR-0005) and stay testable with an in-memory fake.                                                                                                  |
 | **Specification**             | Filter AST (`core/src/query/filter.ts`)                                                                                                                                                                                                                                                                                   | —                                                                                                                         | Composable, provider-independent query trees that each adapter translates once, instead of per-ORM query fragments leaking upward. Composition only — the AST is pure data with no evaluation method; evaluation is the adapter's job (next row).                                          |
@@ -219,7 +219,7 @@ sequenceDiagram
     participant A as Adapter
     C->>E: execute("deleteOne", id)
     E->>A: delete(id, ctx)
-    Note over A: strategy-resolved: hard, or soft<br/>when the entity has a marker field (Phase 14)
+    Note over A: strategy-resolved: hard, or soft<br/>when the entity has a marker field
     A-->>E: void
     E-->>C: 204 No Content
 ```
@@ -262,7 +262,7 @@ Kavo is **not**:
 | Choice                                    | Won                                                                                    | Cost accepted                                                                                                                                       |
 | ----------------------------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | No hooks/validation/policy stages (v6)    | A lean, comprehensible pipeline; fewer mechanisms to learn                             | Cross-cutting behavior lives in consumer code; teams wanting interception must wrap the service                                                     |
-| Contracts complete up front (Phase 3)     | Later phases never mutate core types; adapters/bindings build against a stable surface | Some contracts (relations, bulk) ship before their implementations; risk of design-before-feedback, mitigated by the vertical slices of Milestone C |
+| Contracts complete up front               | Later work never mutates core types; adapters/bindings build against a stable surface | Some contracts (relations, bulk) ship before their implementations; risk of design-before-feedback, mitigated by shipping vertical slices |
 | Registry as the single dispatch mechanism | Disable/override/custom and route generation all fall out of one table                 | Even built-ins pay the indirection; slightly more machinery in the minimal path                                                                     |
 | AST-based filtering with allowlists       | ORM independence, injection-safe by construction, 400s instead of silent drops         | A parser/translator pair to maintain; wire grammar is a public contract                                                                             |
 | Bootstrap-frozen config                   | Zero per-request merge cost; config errors fail fast with entity + key path            | No runtime reconfiguration; anything dynamic must be a per-call parameter                                                                           |

@@ -1,6 +1,6 @@
 # ADR-0009 — RFC 9457 problem details as the wire error shape
 
-**Status:** accepted (Phase 1; catalog and hierarchy in Phase 6)
+**Status:** accepted
 
 ## Context
 
@@ -12,7 +12,7 @@ details document.
 
 The default serialized error is an RFC 9457 problem-details document
 (`ProblemDetailsDto`) with Kavo extensions: a stable `code`
-(`KAVO_*`, catalog in Phase 6 — codes are API surface), `errors[]` for
+(`KAVO_*`, catalog in doc 6 — codes are API surface), `errors[]` for
 field-level query issues, `items[]` for per-index bulk failures. Kavo
 exceptions never extend Nest's; the `@kavo/nest` exception filter is the
 boundary that maps them.

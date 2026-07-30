@@ -4,8 +4,8 @@ import type { RelationEdgeSettings } from "../config/settings.js";
 import { ConfigurationException } from "../errors/exceptions.js";
 
 /**
- * Map-backed relation registry, built once at bootstrap from two sources
- * (Phase 15): the adapter's ORM metadata supplies *shape* — name, target,
+ * Map-backed relation registry, built once at bootstrap from two sources:
+ * the adapter's ORM metadata supplies *shape* — name, target,
  * cardinality — and `relations.edges` config supplies *permission*, which
  * metadata can never know. Inclusion is opt-in, so a relation with no
  * config entry stays `includable: false`.

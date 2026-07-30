@@ -42,13 +42,13 @@ Follow the existing ADRs' structure (e.g. ADR-0013):
 ```markdown
 # ADR-00NN — <decision, stated as the resolution, not the topic>
 
-**Status:** accepted (Phase N, if applicable)
+**Status:** accepted
 
 ## Context
 
 The tension or constraint that forces a choice — what two things are in
 conflict, and why the obvious alternative doesn't work. Reference the
-specific mechanism it collides with (a phase, another ADR, a boundary rule).
+specific mechanism it collides with (another ADR, a boundary rule).
 
 ## Decision
 

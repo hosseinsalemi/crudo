@@ -2,8 +2,8 @@ import type { OperationId } from "../operations/operation.js";
 
 /**
  * Stable, string-based error code. Codes are API surface: the full catalog
- * (code → HTTP status → when it fires → payload extensions) is defined in
- * Phase 6, and renaming a code is a breaking change (Phase 18 semver
+ * (code → HTTP status → when it fires → payload extensions) is defined
+ * elsewhere, and renaming a code is a breaking change (semver
  * policy).
  */
 export type KavoErrorCode = `KAVO_${string}`;
@@ -16,8 +16,8 @@ export interface ErrorContext {
 }
 
 /**
- * Contract every Kavo exception class (Phase 6) satisfies. Deliberately
- * an interface, not a base class: `@kavo/core` in Milestone A ships types
+ * Contract every Kavo exception class satisfies. Deliberately
+ * an interface, not a base class: `@kavo/core` ships types
  * only, and downstream layers (the `@kavo/nest` exception filter) program
  * against this shape, never against `instanceof`.
  *
@@ -26,7 +26,7 @@ export interface ErrorContext {
  */
 export interface CrudException {
   readonly code: KavoErrorCode;
-  /** HTTP status this error maps to (from the Phase 6 catalog). */
+  /** HTTP status this error maps to (from the error catalog). */
   readonly status: number;
   readonly messageKey: string;
   readonly messageParams: Readonly<Record<string, string | number>>;
@@ -43,7 +43,7 @@ export interface CrudException {
 /**
  * Maps arbitrary thrown values to Kavo exceptions at the engine boundary.
  * Adapter errors are translated by the adapter's own mapping table
- * (Phase 9); anything unrecognized becomes a `PersistenceException` with
+ * anything unrecognized becomes a `PersistenceException` with
  * the original as `cause`.
  */
 export interface ErrorHandler {

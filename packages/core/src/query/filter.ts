@@ -3,7 +3,7 @@ import type { FieldPath } from "../types/field-path.js";
 /**
  * Comparison operators of the filter AST, in SCREAMING_SNAKE per the naming
  * conventions. Their camelCase wire tokens (`eq`, `notIn`, `isNotNull`, …)
- * belong to the query-string grammar (Phase 5); the AST never sees wire
+ * belong to the query-string grammar; the AST never sees wire
  * spellings.
  *
  * Modeled as a string-literal union rather than a TypeScript `enum`:
@@ -36,7 +36,7 @@ export type FilterOperator =
 /** Logical connectives for filter groups. */
 export type LogicalOperator = "AND" | "OR" | "NOT";
 
-/** A single comparison value after type coercion (Phase 5). */
+/** A single comparison value after type coercion. */
 export type FilterScalar = string | number | boolean | Date | null;
 
 /**
@@ -56,7 +56,7 @@ export interface FilterCondition<Entity = unknown> {
 
 /**
  * Branch node of the filter AST. A `NOT` group carries exactly one child;
- * `AND`/`OR` groups carry one or more. The parser (Phase 5) enforces the
+ * `AND`/`OR` groups carry one or more. The parser enforces the
  * arity; the type stays uniform so the tree is trivially walkable.
  */
 export interface FilterGroup<Entity = unknown> {

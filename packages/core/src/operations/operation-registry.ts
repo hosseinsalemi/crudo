@@ -14,17 +14,17 @@ export interface OperationDescriptor<Entity = unknown, Input = unknown, Output =
    */
   readonly enabled: boolean;
   readonly handler: OperationHandler<Entity, Input, Output>;
-  /** Explicit input DTO; `null` = the Phase 4 slot default. */
+  /** Explicit input DTO; `null` = the slot default. */
   readonly input: DtoClass | null;
-  /** Explicit output DTO; `null` = the Phase 4 slot default. */
+  /** Explicit output DTO; `null` = the slot default. */
   readonly output: DtoClass | null;
   readonly meta: OperationMetadata;
 }
 
 /**
- * The per-entity operation table (Phase 7). The engine dispatches *every*
+ * The per-entity operation table. The engine dispatches *every*
  * operation through this registry — the built-in CRUD handlers are just
- * default entries, nothing about them is special-cased. Phase 13's
+ * default entries, nothing about them is special-cased. The
  * disable/override/custom config is a control surface over this registry,
  * and `@kavo/nest` route generation reads it — which is what makes later
  * operations appear as routes with zero changes to the generator.

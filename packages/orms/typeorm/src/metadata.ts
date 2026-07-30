@@ -31,8 +31,8 @@ function fieldKindOf(column: ColumnMetadata): FieldKind {
 
 /**
  * Build the core `EntityMetadata` for one entity from the DataSource's
- * TypeORM metadata (Phase 9: the adapter feeds core's metadata seam; core
- * never sees TypeORM types).
+ * TypeORM metadata: the adapter feeds core's metadata seam; core
+ * never sees TypeORM types.
  */
 export function buildEntityMetadata<Entity extends object>(
   dataSource: DataSource,
@@ -67,10 +67,10 @@ export function buildEntityMetadata<Entity extends object>(
     // The *resolved* target class, not `relation.type`: a string-target
     // relation (`@ManyToOne("Owner", …)`, the form that keeps import
     // cycles off the runtime graph) leaves `type` as the entity name, and
-    // core matches registered entities by class identity (Phase 15).
+    // core matches registered entities by class identity.
     target: () => relation.inverseEntityMetadata.target as ClassRef,
     cardinality: relation.isOneToMany || relation.isManyToMany ? "many" : "one",
-    // Inclusion is an opt-in allowlist (Phase 15); ORM metadata only
+    // Inclusion is an opt-in allowlist; ORM metadata only
     // supplies shape, never permission.
     includable: false,
     strategy: "auto",
@@ -82,7 +82,7 @@ export function buildEntityMetadata<Entity extends object>(
     idField: primary.propertyName,
     fields,
     relations,
-    // `@DeleteDateColumn` detection (Phase 14): the ORM's own declaration
+    // `@DeleteDateColumn` detection: the ORM's own declaration
     // is what makes zero-config soft delete work. Explicit
     // `softDelete.field` config still wins over it — core decides, this
     // only reports.

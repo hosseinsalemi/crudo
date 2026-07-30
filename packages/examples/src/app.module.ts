@@ -11,7 +11,7 @@ import { AddressController } from "./address/address.controller.js";
 
 /**
  * Reference wiring: the app hands `@kavo/nest` its infrastructure (here
- * TypeORM's) — the packages never import each other (Phase 2 boundary;
+ * TypeORM's) — the packages never import each other (package boundary;
  * adapters meet the framework in the DI container).
  *
  * `forRoot()` defaults to the in-memory SQLite `DatabaseModule`;

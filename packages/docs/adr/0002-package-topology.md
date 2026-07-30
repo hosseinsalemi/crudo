@@ -1,6 +1,6 @@
 # ADR-0002 — Three packages under `orms/` / `frameworks/` parent folders
 
-**Status:** accepted (Phase 2)
+**Status:** accepted
 
 ## Context
 

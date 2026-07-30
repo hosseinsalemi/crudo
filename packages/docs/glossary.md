@@ -10,12 +10,12 @@ themselves (prefixes, casing, suffixes) live in the Conventions section of
 | **Entity**             | The ORM-mapped domain class a Crud instance is built for.                                                                                | model, record                   |
 | **Operation**          | One named unit of dispatch (`createOne`, `findMany`, custom ids). Always names its cardinality: `<verb>One` / `<verb>Many`.              | action, endpoint, method        |
 | **Standard operation** | One of the built-in CRUD operations shipped as default registry entries.                                                                 | default operation               |
-| **Custom operation**   | A developer-registered operation with its own input/output DTOs (Phase 14).                                                              | custom action                   |
+| **Custom operation**   | A developer-registered operation with its own input/output DTOs.                                                                         | custom action                   |
 | **Operation registry** | The per-entity table (`OperationRegistry`) the engine dispatches through; route generation reads it.                                     | operation map                   |
 | **Handler**            | The execution unit of one operation (`OperationHandler.execute`).                                                                        | resolver, executor              |
 | **Adapter**            | An ORM-facing implementation of core persistence contracts (`TypeOrmRepositoryAdapter`). Named for what it adapts.                       | driver, provider                |
 | **Reader / Writer**    | The read half (`EntityReader`) and write half (`EntityWriter`) of an adapter; `RepositoryAdapter` is both.                               | repository, DAO                 |
-| **Engine**             | The core pipeline that runs the request lifecycle (`CrudEngine`, Phase 7).                                                               | runtime, kernel                 |
+| **Engine**             | The core pipeline that runs the request lifecycle (`CrudEngine`).                                                                        | runtime, kernel                 |
 | **Context**            | The per-request object threaded through the pipeline (`CrudContext`).                                                                    | request state                   |
 | **Query context**      | Caller-facing query input (`QueryContext`) or its validated normalized form (`NormalizedQueryContext`).                                  | search, criteria                |
 | **Filter AST**         | The provider-independent expression tree (`FilterExpression`) built from wire filters.                                                   | where clause                    |
@@ -33,5 +33,5 @@ themselves (prefixes, casing, suffixes) live in the Conventions section of
 | **Principal**          | The authenticated caller carried opaquely on the context.                                                                                | user, actor                     |
 | **Problem details**    | The RFC 9457 error document (`ProblemDetailsDto`) all errors serialize to.                                                               | error response                  |
 | **Error code**         | The stable `KAVO_*` string identifying an error kind; API surface.                                                                       | error type                      |
-| **Soft delete**        | Marking a row deleted via the marker field instead of removing it (Phase 14, doc 11). `restore` un-deletes; `purge` permanently removes. | archive, trash                  |
-| **Include**            | Embedding a relation in a response (`include=posts.comments`), opt-in per relation (Phase 15, doc 12).                                   | expand, join, populate          |
+| **Soft delete**        | Marking a row deleted via the marker field instead of removing it (doc 11). `restore` un-deletes; `purge` permanently removes.           | archive, trash                  |
+| **Include**            | Embedding a relation in a response (`include=posts.comments`), opt-in per relation (doc 12).                                             | expand, join, populate          |

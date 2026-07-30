@@ -14,7 +14,7 @@ interface DraftNode {
 }
 
 /**
- * The Phase 15 include-resolution algorithm:
+ * The include-resolution algorithm:
  *
  * 1. parse dot-paths into a tree — overlapping paths merge, so `posts` and
  *    `posts.comments` produce one `posts` node with a `comments` child;

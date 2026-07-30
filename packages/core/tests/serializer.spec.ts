@@ -49,7 +49,7 @@ function ada(overrides: Partial<User> = {}): User {
 
 const COLUMNS = ["id", "name", "email", "age", "status", "createdAt"];
 
-describe("DefaultSerializer — response projection (Phase 4)", () => {
+describe("DefaultSerializer — response projection", () => {
   const serializer = new DefaultSerializer<User>(userMetadata);
 
   it("projects every column when no DTO is registered", () => {
@@ -108,7 +108,7 @@ describe("DefaultSerializer — response projection (Phase 4)", () => {
   });
 });
 
-describe("DefaultSerializer — relation keys (Phase 15, doc 04 §6)", () => {
+describe("DefaultSerializer — relation keys (doc 04 §6)", () => {
   const serializer = new DefaultSerializer<Post>(postMetadata);
 
   const post = (): Post =>
@@ -153,7 +153,7 @@ describe("DefaultSerializer — relation keys (Phase 15, doc 04 §6)", () => {
   });
 });
 
-describe("DefaultDeserializer — write projection (Phase 4)", () => {
+describe("DefaultDeserializer — write projection", () => {
   const deserializer = new DefaultDeserializer<User>(userMetadata);
 
   it("keeps the writable columns and drops keys the entity does not have", () => {
@@ -199,7 +199,7 @@ describe("DefaultDeserializer — write projection (Phase 4)", () => {
   });
 });
 
-describe("DefaultDtoResolver — slot resolution (Phase 4)", () => {
+describe("DefaultDtoResolver — slot resolution", () => {
   class CreateUserDto {}
   class UpdateUserDto {}
   class PatchUserDto {}

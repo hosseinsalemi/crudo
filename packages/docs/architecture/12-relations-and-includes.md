@@ -1,7 +1,7 @@
-# 12 — Relation System & Nested Includes (Phase 15)
+# 12 — Relation System & Nested Includes
 
 `GET /owners?include=pets&fields[pets]=id,name` — everything between that
-query string and the SQL is this phase.
+query string and the SQL is documented here.
 
 ```ts
 @Crud(Owner, {
@@ -130,7 +130,7 @@ case, and `auto` resolves it to `join` exactly like `Pet.owner`.
   `item` DTO (`list` for a to-many, which falls back to `item`), else the
   target's derived default. A relation key on the _parent's_ DTO is
   documentation, not a load: it stays absent until the node is included.
-- **Soft delete (Phase 14):** soft-deleted related rows are excluded from
+- **Soft delete:** soft-deleted related rows are excluded from
   includes. Root-level `withDeleted` applies to the **root only** — the
   adapter spells the child predicate out rather than leaving it to the
   ORM's default, so widening the root never silently widens the relation.

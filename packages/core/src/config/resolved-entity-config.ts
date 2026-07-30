@@ -19,7 +19,7 @@ export interface ResolvedQueryAllowlists<Entity = unknown> {
  *
  * All merging happens once at bootstrap; the result is immutable. Invalid
  * config fails fast at bootstrap with an error naming the entity, the key
- * path, and the offending value (Phase 8).
+ * path, and the offending value.
  */
 export interface ResolvedEntityConfig<Entity = unknown> {
   readonly entityName: string;
@@ -29,13 +29,13 @@ export interface ResolvedEntityConfig<Entity = unknown> {
   settingsFor(operation: OperationId): KavoSettings;
   readonly allowlists: ResolvedQueryAllowlists<Entity>;
   /**
-   * The delete strategy resolved for this scope (Phase 14) — `hard` with
+   * The delete strategy resolved for this scope — `hard` with
    * a `null` field for everything that isn't soft-deletable, so adapters
    * branch on one object instead of re-deriving the decision.
    */
   readonly softDelete: ResolvedSoftDelete;
-  /** Bootstrap-cached DTO resolution (Phase 4). */
+  /** Bootstrap-cached DTO resolution. */
   readonly dto: DtoResolver<Entity>;
-  /** Relation edges of this entity (Phase 15). */
+  /** Relation edges of this entity. */
   readonly relations: RelationRegistry<Entity>;
 }

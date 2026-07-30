@@ -3,7 +3,7 @@ import { WireQuery } from "@kavo/core";
 import { flattenQuery } from "@kavo/nest";
 
 /**
- * Each row is one Phase 5 query written the two ways a query parser can
+ * Each row is one query written the two ways a query parser can
  * deliver it: `nested` is the qs-"extended" (Express 4) parse, `flat` is
  * the "simple" (Express 5) parse, which is also the form the grammar is
  * specified against.
@@ -69,7 +69,7 @@ const equivalents: readonly {
   },
 ];
 
-describe("flattenQuery — parser-agnostic flat bracket keys (Phase 5)", () => {
+describe("flattenQuery — parser-agnostic flat bracket keys", () => {
   it.each(equivalents)("flattens $name to the specified flat form", ({ nested, flat }) => {
     expect(flattenQuery(nested)).toEqual(flat);
   });
@@ -96,7 +96,7 @@ describe("flattenQuery — parser-agnostic flat bracket keys (Phase 5)", () => {
   });
 });
 
-describe("flattenQuery — arrays and the [] suffix rule (Phase 5)", () => {
+describe("flattenQuery — arrays and the [] suffix rule", () => {
   it("appends [] to a bracketed key whose value is an array", () => {
     expect(flattenQuery({ "filter[status][in]": ["active", "pending"] })).toEqual({
       "filter[status][in][]": ["active", "pending"],
@@ -124,7 +124,7 @@ describe("flattenQuery — arrays and the [] suffix rule (Phase 5)", () => {
   });
 });
 
-describe("flattenQuery — nesting depth and empty values (Phase 5)", () => {
+describe("flattenQuery — nesting depth and empty values", () => {
   it("flattens an arbitrarily deep nested group into one bracket key", () => {
     expect(flattenQuery({ filter: { or: { 0: { role: { eq: "admin" } }, 1: { status: { eq: "banned" } } } } })).toEqual(
       {

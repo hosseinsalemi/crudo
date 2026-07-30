@@ -11,7 +11,7 @@ function parse(params: Record<string, unknown>) {
   return parser.parse(params, config);
 }
 
-describe("DefaultFilterParser — bracket grammar (Phase 5)", () => {
+describe("DefaultFilterParser — bracket grammar", () => {
   it("parses a single comparison with coercion", () => {
     const filter = parse({ "filter[age][gte]": "18" });
     expect(filter.root).toEqual({

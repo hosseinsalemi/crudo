@@ -9,7 +9,7 @@ import type {
 import { NotFoundException } from "@kavo/core";
 
 /**
- * A small relation graph for include tests (Phase 15):
+ * A small relation graph for include tests:
  * `Author 1—* Post 1—* Comment`, plus `Post *—1 Author` back-edge so a
  * path can revisit a type and exercise the depth-based cycle guard.
  */

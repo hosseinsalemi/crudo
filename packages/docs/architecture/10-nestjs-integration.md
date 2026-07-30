@@ -1,4 +1,4 @@
-# 10 — NestJS Integration (Phases 11–12)
+# 10 — NestJS Integration
 
 `@kavo/nest` turns one decorator into a full CRUD controller:
 
@@ -9,7 +9,7 @@ export class UserController {}
 ```
 
 `@nestjs/common`/`core` are peerDependencies; `@nestjs/swagger` is an
-optional peer. The package never imports an ORM adapter (Phase 2
+optional peer. The package never imports an ORM adapter (ADR-0002
 boundary) — infrastructure arrives through DI.
 
 ## 1. Module design
@@ -84,7 +84,7 @@ Disabled entries (config `operations.<id>: false`, or a default-off
 entry) get **no route**. Any entry's route shape is overridable through
 its own `meta.routes` (`method`, `path`, `successStatus`);
 `meta.routes.enabled: false` keeps it service-only. Because generation
-walks the registry, Phase 14's restore/purge appeared by _enabling
+walks the registry, soft delete's restore/purge appeared by _enabling
 entries_ — this generator did not change. Their enablement is
 config-declared rather than metadata-driven, precisely because
 decoration time has no ORM metadata (ADR-0013): `softDelete: { strategy:
@@ -229,11 +229,11 @@ between Kavo's hierarchy and HTTP: catalog status +
 
 Optional and zero-cost when absent (`createRequire` probe, cached).
 When `@nestjs/swagger` is installed, generated routes get: operation ids
-(`User_findMany`), the `:id` param, the Phase 5 query params documented
-on list routes, registered DTO classes as body schemas (`ApiBody`), and
+(`User_findMany`), the `:id` param, the query params documented on list
+routes (doc 5), registered DTO classes as body schemas (`ApiBody`), and
 problem-details response schemas for 400/404. Allowlist-derived
 per-field query documentation needs ORM metadata, which doesn't exist at
-decoration time — revisited in Phase 16's DX pass.
+decoration time — revisited in a future DX pass.
 
 ## 5. Testing
 
@@ -241,6 +241,6 @@ decoration time — revisited in Phase 16's DX pass.
 infrastructure (no ORM in this package): all six routes, envelope shape,
 grammar wiring, problem-details mapping, disabled operations,
 manual-method-wins, custom + service-only operations, the service token,
-the soft-delete routes (Phase 14), relation includes (Phase 15), and the
+the soft-delete routes, relation includes, and the
 Swagger body/hint schemas. The full-stack path (Nest → engine → TypeORM → SQLite) is the
 checkpoint app's suite in `packages/examples`.

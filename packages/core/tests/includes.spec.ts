@@ -90,7 +90,7 @@ const authorWithPosts = (): Author =>
     ],
   });
 
-describe("include resolution (Phase 15)", () => {
+describe("include resolution", () => {
   it("rejects a relation nobody opted in — inclusion is an allowlist", async () => {
     const fixture = blog();
     const { authors } = fixture;
@@ -230,7 +230,7 @@ describe("include resolution (Phase 15)", () => {
   });
 });
 
-describe("include serialization (Phase 15)", () => {
+describe("include serialization", () => {
   it("projects an included node through the target's own shape", async () => {
     const fixture = blog({
       author: { relations: { edges: { posts: { includable: true } } } },
@@ -324,7 +324,7 @@ describe("include serialization (Phase 15)", () => {
   });
 });
 
-describe("association by id (Phase 15, ADR-0014)", () => {
+describe("association by id (ADR-0014)", () => {
   it("accepts a scalar id, an { id } reference, and narrows a deep payload", async () => {
     const fixture = blog();
     const { posts, postAdapter } = fixture;

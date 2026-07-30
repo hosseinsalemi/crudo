@@ -11,7 +11,7 @@ export interface EntityRuntimeInfo<Entity extends object = object> {
 }
 
 /**
- * Cross-entity lookup (Phase 15). Nested includes are the first feature
+ * Cross-entity lookup. Nested includes are the first feature
  * that needs to see *another* entity's resolved config: an included node's
  * selectable allowlist, DTOs, delete strategy, and further relations all
  * come from the target entity, never from the entity being queried — a

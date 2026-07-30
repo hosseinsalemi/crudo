@@ -48,8 +48,8 @@ function pickSettings(config: Readonly<Record<string, unknown>> | undefined): De
 }
 
 /**
- * Merge and validate one entity's configuration, once, at bootstrap
- * (Phase 8): `built-in defaults → global → entity → operation`. The result
+ * Merge and validate one entity's configuration, once, at bootstrap:
+ * `built-in defaults → global → entity → operation`. The result
  * is deep-frozen; per-call overrides are parameters (`CrudCallOptions`),
  * never writes into this object.
  */
@@ -106,7 +106,7 @@ export function resolveEntityConfig<Entity extends object>(
 }
 
 /**
- * Allowlist derivation (Phase 5 security posture): when a list is not
+ * Allowlist derivation (security posture): when a list is not
  * configured explicitly, it defaults to the entity's **own scalar
  * columns** — relation paths are never filterable/sortable/selectable
  * unless opted in explicitly. Anything outside the list is a 400 at query
@@ -126,7 +126,7 @@ function resolveAllowlists<Entity extends object>(
 }
 
 /**
- * Debug dump (Phase 8 deliverable): the resolved configuration for one
+ * Debug dump: the resolved configuration for one
  * entity as a plain printable object — what you `console.log` when a
  * merge result surprises you.
  */

@@ -23,7 +23,7 @@ export interface CrudContextState {
 }
 
 /**
- * The per-request context threaded through the whole pipeline (Phase 7) —
+ * The per-request context threaded through the whole pipeline —
  * one object carrying identity, resolved config, and request-scoped state.
  */
 export interface CrudContext<Entity = unknown> {

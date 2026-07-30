@@ -1,6 +1,6 @@
 # ADR-0012 — Decoration-time route generation in @kavo/nest
 
-**Status:** accepted (Phases 11–12)
+**Status:** accepted
 
 ## Context
 
@@ -50,4 +50,4 @@ array.
   time.
 - Limitation: decoration time has no ORM metadata, so Swagger docs can't
   enumerate allowlist-derived per-field query params yet (doc 10 §4);
-  acceptable for Milestone B, revisited in Phase 16.
+  acceptable for now, revisited as a future DX option.

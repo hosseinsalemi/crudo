@@ -2,13 +2,13 @@ import type { CrudInfrastructure, KavoSettings, DeepPartial, PaginationStrategy 
 
 /**
  * `KavoModule.forRoot` options — the NestJS skin over core's
- * `createKavo` (Phase 8): `defaults` is the same global-scope settings
+ * `createKavo`: `defaults` is the same global-scope settings
  * tree, passed through untouched.
  *
  * `infrastructure` arrives from the application (e.g.
  * `createTypeOrmInfrastructure(dataSource)`), not from an `orm: "typeorm"`
- * string: `@kavo/nest` must not import ORM adapters (the Phase 2
- * boundary — adapters reach Nest via DI, not imports), and an explicit
+ * string: `@kavo/nest` must not import ORM adapters (adapters reach Nest
+ * via DI, not imports), and an explicit
  * object keeps the door open for any adapter without a registry of names.
  */
 export interface KavoModuleOptions {

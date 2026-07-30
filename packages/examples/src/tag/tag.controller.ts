@@ -5,7 +5,7 @@ import { CreateTagDto, UpdateTagDto, TagItemDto, TagListDto } from "./tag.dtos.j
 
 /**
  * Plain CRUD over `Tag`, the many-to-many side pets associate by id
- * (`include=tags` on `/cats`, Phase 15).
+ * (`include=tags` on `/cats`).
  */
 @Crud(Tag, {
   dto: {

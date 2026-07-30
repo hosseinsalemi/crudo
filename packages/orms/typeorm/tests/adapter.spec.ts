@@ -88,7 +88,7 @@ async function seed(): Promise<void> {
   for (const row of rows) await authors.createOne(row as never);
 }
 
-describe("metadata derivation (Phase 9 seam)", () => {
+describe("metadata derivation seam", () => {
   it("derives fields, id, generated flags, and relations", () => {
     const metadata = buildEntityMetadata(dataSource, Author);
     expect(metadata.name).toBe("Author");
@@ -107,7 +107,7 @@ describe("metadata derivation (Phase 9 seam)", () => {
   });
 });
 
-describe("TypeOrmRepositoryAdapter — CRUD (Phase 10)", () => {
+describe("TypeOrmRepositoryAdapter — CRUD", () => {
   it("creates, reads, updates, patches, deletes against the real database", async () => {
     const created = await authors.createOne({
       email: "ada@x.io",

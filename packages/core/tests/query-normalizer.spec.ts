@@ -6,7 +6,7 @@ import { issuesOf } from "./support/query-issues.js";
 const config = resolveEntityConfig(userMetadata, undefined, undefined);
 const normalizer = new QueryNormalizer(userMetadata);
 
-describe("QueryNormalizer — wire params (Phase 5 pipeline)", () => {
+describe("QueryNormalizer — wire params", () => {
   it("normalizes the full reference query", () => {
     const query = normalizer.normalizeWire(
       {

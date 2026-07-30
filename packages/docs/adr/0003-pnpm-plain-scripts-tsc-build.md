@@ -1,6 +1,6 @@
 # ADR-0003 — pnpm workspaces + plain scripts + `tsc -b`; no task runner
 
-**Status:** accepted (Phase 2)
+**Status:** accepted
 
 ## Context
 
@@ -23,5 +23,5 @@ cruiser — the CI gate.
 - No remote caching or parallel non-tsc pipelines — irrelevant at three
   type-only/type-heavy packages.
 - Revisit when the workspace gains many packages or expensive non-tsc
-  steps (Phase 17 e2e is the checkpoint); adopting a runner later is
+  steps (a future e2e suite is the checkpoint); adopting a runner later is
   additive since scripts stay per-package.

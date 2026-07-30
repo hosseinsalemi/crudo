@@ -8,7 +8,7 @@ export interface ListMetaDto {
 }
 
 /**
- * The list response envelope (normative — Phase 4).
+ * The list response envelope (normative).
  *
  * Pagination fields are flat at the top level: they are first-class
  * response data every consumer needs, not metadata. `limit`/`offset`

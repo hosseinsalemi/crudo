@@ -1,5 +1,5 @@
 /**
- * @kavo/typeorm — TypeORM adapter for Kavo (Phases 9–10).
+ * @kavo/typeorm — TypeORM adapter for Kavo.
  *
  * Implements `@kavo/core`'s `RepositoryAdapter` over a TypeORM
  * `DataSource` and feeds core's entity-metadata seam from TypeORM

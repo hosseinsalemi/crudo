@@ -115,7 +115,7 @@ async function seed(): Promise<{ blogId: number; articleId: number }> {
   return { blogId: blog.id, articleId: first.id };
 }
 
-describe("TypeOrmRepositoryAdapter — join loading (Phase 15)", () => {
+describe("TypeOrmRepositoryAdapter — join loading", () => {
   it("embeds a to-one relation from the main query", async () => {
     const { blogId } = await seed();
     const list = await articles.findMany({ include: ["blog"], sort: [{ field: "id", direction: "asc" }] });
@@ -139,7 +139,7 @@ describe("TypeOrmRepositoryAdapter — join loading (Phase 15)", () => {
   });
 });
 
-describe("TypeOrmRepositoryAdapter — batch loading (Phase 15)", () => {
+describe("TypeOrmRepositoryAdapter — batch loading", () => {
   it("embeds a to-many relation without disturbing root pagination", async () => {
     await seed();
     const list = await blogs.findMany({ include: ["articles"] });
@@ -174,7 +174,7 @@ describe("TypeOrmRepositoryAdapter — batch loading (Phase 15)", () => {
   });
 });
 
-describe("Pagination correctness with a joined to-many (Phase 15, normative)", () => {
+describe("Pagination correctness with a joined to-many (normative)", () => {
   it("counts and slices distinct roots even when the join multiplies rows", async () => {
     await seed(); // one blog, two articles
     await dataSource.getRepository(Blog).save({ name: "Second" });
@@ -189,7 +189,7 @@ describe("Pagination correctness with a joined to-many (Phase 15, normative)", (
   });
 });
 
-describe("Single-query eager loading for detail views (Phase 15)", () => {
+describe("Single-query eager loading for detail views", () => {
   it("findOne with a joined to-many fires exactly one query", async () => {
     const { blogId } = await seed();
     const before = queryLogger.count;
@@ -205,7 +205,7 @@ describe("Single-query eager loading for detail views (Phase 15)", () => {
   });
 });
 
-describe("Includes and soft delete (Phases 14–15)", () => {
+describe("Includes and soft delete", () => {
   it("excludes soft-deleted related rows", async () => {
     const { articleId } = await seed();
     await articles.deleteOne(articleId);
@@ -228,7 +228,7 @@ describe("Includes and soft delete (Phases 14–15)", () => {
   });
 });
 
-describe("Sparse fieldsets on included nodes (Phase 15)", () => {
+describe("Sparse fieldsets on included nodes", () => {
   it("narrows the embedded shape and strips keys fetched for stitching", async () => {
     await seed();
     const list = await blogs.findMany({
