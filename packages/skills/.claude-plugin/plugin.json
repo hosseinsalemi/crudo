@@ -1,0 +1,14 @@
+{
+  "name": "kavo-skills",
+  "displayName": "Kavo Developer Skills",
+  "description": "Reference skills for building apps with @kavo/core, @kavo/typeorm, @kavo/nest, and @kavo/graphql — quick start, @Crud() config, global config, query grammar, DTOs, error handling, soft delete, and GraphQL.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Kavo Labs",
+    "url": "https://github.com/kavo-labs/kavo"
+  },
+  "homepage": "https://github.com/kavo-labs/kavo",
+  "repository": "https://github.com/kavo-labs/kavo",
+  "license": "MIT",
+  "keywords": ["kavo", "crud", "typeorm", "nestjs", "graphql"]
+}

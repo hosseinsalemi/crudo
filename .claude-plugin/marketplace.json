@@ -1,0 +1,19 @@
+{
+  "name": "kavo-marketplace",
+  "description": "Official Claude Code plugin marketplace for the Kavo CRUD framework",
+  "owner": {
+    "name": "Kavo Labs",
+    "url": "https://github.com/kavo-labs/kavo"
+  },
+  "plugins": [
+    {
+      "name": "kavo-skills",
+      "description": "Reference skills for building apps with @kavo/core, @kavo/typeorm, @kavo/nest, and @kavo/graphql.",
+      "source": "./packages/skills",
+      "version": "1.0.0",
+      "author": {
+        "name": "Kavo Labs"
+      }
+    }
+  ]
+}

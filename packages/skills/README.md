@@ -19,11 +19,28 @@ routes, and grammar memorized instead of guessing from source.
 
 ## Install
 
+This directory is also a Claude Code **plugin** (`.claude-plugin/plugin.json`),
+listed in this repo's own marketplace catalog
+(`/.claude-plugin/marketplace.json`). Inside Claude Code:
+
+```
+/plugin marketplace add kavo-labs/kavo
+/plugin install kavo-skills@kavo-marketplace
+```
+
+Update later with:
+
+```
+/plugin marketplace update kavo-marketplace
+```
+
+### Manual install (no plugin support)
+
 One command, from your project root — pulls all eight skills straight from
 GitHub into `.claude/skills/`, no npm publish step and no clone required:
 
 ```bash
-npx degit kavo-labs/kavo/packages/skills .claude/skills --force
+npx degit kavo-labs/kavo/packages/skills/skills .claude/skills --force
 ```
 
 `--force` lets this merge into an existing, non-empty `.claude/skills/`
@@ -35,7 +52,7 @@ Re-run the same command any time to pick up updates.
 ### Installing a single skill
 
 ```bash
-npx degit kavo-labs/kavo/packages/skills/quick-start .claude/skills/quick-start --force
+npx degit kavo-labs/kavo/packages/skills/skills/quick-start .claude/skills/quick-start --force
 ```
 
 Swap `quick-start` for any name from the table above.

@@ -46,11 +46,16 @@ TypeORM app wired up with all three packages.
 
 If you use Claude Code, [`packages/skills`](packages/skills) has eight
 ready-made skills covering `@Crud()`, global config, the query grammar,
-DTOs, errors, soft delete, and GraphQL. Install them into your own project:
+DTOs, errors, soft delete, and GraphQL — published as a plugin via this
+repo's own marketplace:
 
-```bash
-npx degit kavo-labs/kavo/packages/skills .claude/skills --force
 ```
+/plugin marketplace add kavo-labs/kavo
+/plugin install kavo-skills@kavo-marketplace
+```
+
+See [`packages/skills`](packages/skills) for a manual, non-plugin install
+option.
 
 ## Development
 
