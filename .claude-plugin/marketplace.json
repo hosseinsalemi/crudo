@@ -9,7 +9,7 @@
     {
       "name": "kavo-skills",
       "description": "Reference skills for building apps with @kavo/core, @kavo/typeorm, @kavo/nest, and @kavo/graphql.",
-      "source": "./packages/skills",
+      "source": "./packages/claude-plugin",
       "version": "1.0.0",
       "author": {
         "name": "Kavo Labs"
