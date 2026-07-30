@@ -107,6 +107,26 @@ export function registerCrudE2eSuite(getApp: () => INestApplication): void {
       expect(Object.keys(response.body.items[0])).toEqual(["id", "name"]);
     });
 
+    it("restricts filterable, sortable, and selectable to an explicit list (issue #45)", async () => {
+      // `indoor`/`livesLeft`/`createdAt` are still in every response
+      // (`CatItemDto` includes them) but are not on the explicit
+      // filterable/sortable/selectable lists in `cat.controller.ts`.
+      const filtered = await request(server()).get("/cats").query("filter[indoor][eq]=true").expect(400);
+      expect(filtered.body.errors).toEqual([
+        expect.objectContaining({ field: "indoor", code: "KAVO_QUERY_INVALID_FIELD" }),
+      ]);
+
+      const sorted = await request(server()).get("/cats").query("sort=livesLeft").expect(400);
+      expect(sorted.body.errors).toEqual([
+        expect.objectContaining({ field: "livesLeft", code: "KAVO_QUERY_INVALID_FIELD" }),
+      ]);
+
+      const selected = await request(server()).get("/cats").query("fields=id,createdAt").expect(400);
+      expect(selected.body.errors).toEqual([
+        expect.objectContaining({ field: "createdAt", code: "KAVO_QUERY_INVALID_FIELD" }),
+      ]);
+    });
+
     it("honors the entity-scope pagination override (defaultLimit 10, max 50)", async () => {
       const defaulted = await request(server()).get("/cats").expect(200);
       expect(defaulted.body.limit).toBe(10);
@@ -209,6 +229,25 @@ export function registerCrudE2eSuite(getApp: () => INestApplication): void {
       await request(server()).delete(`/owners/${id}`).expect(204);
       await request(server()).delete(`/owners/${id}/purge`).expect(204);
       await request(server()).patch(`/owners/${id}/restore`).expect(404);
+    });
+
+    it("keeps deletedAt out of the filterable, sortable, and selectable allowlists (issue #45)", async () => {
+      // `deletedAt` is soft-delete plumbing, not client-queryable data —
+      // Owner's `@Crud` config excludes it explicitly via `{ exclude }`.
+      const filtered = await request(server()).get("/owners").query("filter[deletedAt][eq]=x").expect(400);
+      expect(filtered.body.errors).toEqual([
+        expect.objectContaining({ field: "deletedAt", code: "KAVO_QUERY_INVALID_FIELD" }),
+      ]);
+
+      const sorted = await request(server()).get("/owners").query("sort=deletedAt").expect(400);
+      expect(sorted.body.errors).toEqual([
+        expect.objectContaining({ field: "deletedAt", code: "KAVO_QUERY_INVALID_FIELD" }),
+      ]);
+
+      const selected = await request(server()).get("/owners").query("fields=id,deletedAt").expect(400);
+      expect(selected.body.errors).toEqual([
+        expect.objectContaining({ field: "deletedAt", code: "KAVO_QUERY_INVALID_FIELD" }),
+      ]);
     });
 
     it("leaves hard-delete entities without restore or purge routes", async () => {

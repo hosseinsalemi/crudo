@@ -112,6 +112,12 @@ fields:     root: [id, name, email]
   (`KAVO_QUERY_INVALID_FIELD`), never a silent drop. Programmatic
   callers (`findMany({ filter })`) pass through the **same** allowlist
   and limit checks — typed input skips coercion, not security.
+- **Excluding instead of enumerating:** each allowlist key also accepts
+  `{ exclude: [...] }` instead of an explicit array — resolved at
+  bootstrap to every own column except the ones named, so hiding one
+  column (e.g. a soft-delete marker) doesn't require re-listing every
+  other one. Resolution still starts from the same own-columns default,
+  so the result stays fail-closed like the plain array form.
 - **Limits** (configurable per scope, doc 8): `query.maxFilterDepth`
   (default 3) on the built AST, `query.maxInValues` (default 100) on
   `in`/`notIn` arrays, `pagination.maxLimit` (default 100) on page size.

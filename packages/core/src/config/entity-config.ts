@@ -8,6 +8,17 @@ import type { OperationHandler, OperationMetadata } from "../operations/operatio
 import type { StandardOperationId } from "../operations/operation.js";
 
 /**
+ * One allowlist key's raw configuration: either the explicit set of paths
+ * to allow, or `{ exclude }` — every own column except the ones named.
+ * `exclude` is resolved against the entity's own columns at bootstrap
+ * (`resolveAllowlists`), never evaluated eagerly here — the `@Crud(...)`
+ * config object is built at class-decoration time, before any ORM metadata
+ * exists (ADR-0013), so there is nothing to resolve `exclude` against yet.
+ */
+export type QueryFieldSelector<Entity> =
+  readonly FieldPath<Entity>[] | { readonly exclude: readonly FieldPath<Entity>[] };
+
+/**
  * Security allowlists: what a request may filter, sort, and
  * select on — including relation paths. Anything outside an allowlist is
  * rejected with a 400 (`QueryValidationException`), never silently
@@ -15,9 +26,9 @@ import type { StandardOperationId } from "../operations/operation.js";
  * entity metadata at bootstrap.
  */
 export interface QueryAllowlists<Entity = unknown> {
-  readonly filterable?: readonly FieldPath<Entity>[];
-  readonly sortable?: readonly FieldPath<Entity>[];
-  readonly selectable?: readonly FieldPath<Entity>[];
+  readonly filterable?: QueryFieldSelector<Entity>;
+  readonly sortable?: QueryFieldSelector<Entity>;
+  readonly selectable?: QueryFieldSelector<Entity>;
 }
 
 /**

@@ -1,6 +1,6 @@
 import type { KavoSettings } from "./settings.js";
 import type { DeepPartial } from "../types/utility.js";
-import type { EntityConfig, OperationConfig } from "./entity-config.js";
+import type { EntityConfig, OperationConfig, QueryFieldSelector } from "./entity-config.js";
 import type { ResolvedEntityConfig, ResolvedQueryAllowlists } from "./resolved-entity-config.js";
 import type { EntityMetadata } from "../metadata/entity-metadata.js";
 import type { FieldPath } from "../types/field-path.js";
@@ -119,10 +119,26 @@ function resolveAllowlists<Entity extends object>(
   const ownColumns = metadata.fields.map((field) => field.name) as unknown as readonly FieldPath<Entity>[];
   const configured = entityConfig?.allowlists;
   return deepFreeze({
-    filterable: configured?.filterable ?? ownColumns,
-    sortable: configured?.sortable ?? ownColumns,
-    selectable: configured?.selectable ?? ownColumns,
+    filterable: resolveFieldSelector(ownColumns, configured?.filterable),
+    sortable: resolveFieldSelector(ownColumns, configured?.sortable),
+    selectable: resolveFieldSelector(ownColumns, configured?.selectable),
   });
+}
+
+/**
+ * Resolves one allowlist key's raw selector against the entity's own
+ * columns: an explicit array is used as-is; `{ exclude }` resolves to
+ * `ownColumns` minus the named paths, so a column outside `ownColumns` can
+ * never appear via `exclude` and stays fail-closed like the plain default.
+ */
+function resolveFieldSelector<Entity>(
+  ownColumns: readonly FieldPath<Entity>[],
+  selector: QueryFieldSelector<Entity> | undefined,
+): readonly FieldPath<Entity>[] {
+  if (selector === undefined) return ownColumns;
+  if (!("exclude" in selector)) return selector;
+  const excluded = new Set(selector.exclude);
+  return ownColumns.filter((column) => !excluded.has(column));
 }
 
 /**
