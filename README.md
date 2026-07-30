@@ -42,6 +42,16 @@ pnpm add @nestjs/swagger
 [`packages/examples`](packages/examples) for a full, runnable NestJS +
 TypeORM app wired up with all three packages.
 
+## Claude Code skills
+
+If you use Claude Code, [`packages/skills`](packages/skills) has eight
+ready-made skills covering `@Crud()`, global config, the query grammar,
+DTOs, errors, soft delete, and GraphQL. Install them into your own project:
+
+```bash
+npx degit kavo-labs/kavo/packages/skills .claude/skills --force
+```
+
 ## Development
 
 ```bash
