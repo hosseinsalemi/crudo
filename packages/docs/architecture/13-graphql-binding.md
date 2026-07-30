@@ -177,7 +177,58 @@ graphql: true })` mounts `POST /graphql`; `{ graphql: { path: "api/graphql"
   same decorator function afterward compiles fine but silently drops the
   constructor's `ModuleRef` injection.
 
-## 6. What's out of scope (by design, for now)
+## 6. Lazy-loading an optional protocol dependency
+
+`graphql` is an _optional_ peer of `@kavo/nest` (`peerDependenciesMeta.graphql.optional: true`)
+— an app that never touches GraphQL shouldn't need it installed. That
+guarantee only holds if nothing `@kavo/nest`'s always-loaded module graph
+(`index.ts`, `kavo.module.ts`) reaches at import time ever statically
+imports `@kavo/graphql` or `graphql`. A static top-level `import` is
+resolved eagerly, so a single one anywhere in that graph — even several
+files deep — makes `import { Crud } from "@kavo/nest"` itself crash with
+a raw `ERR_MODULE_NOT_FOUND` whenever `graphql` isn't installed, for
+every app, whether or not it ever sets `KavoModule`'s `graphql` option.
+This was a real bug in this package's first version, caught by asking
+"what error shows if graphql isn't installed" rather than by a test —
+`load-graphql.spec.ts`'s first test (`import("@kavo/nest")` must not
+throw even when `@kavo/graphql` is mocked to explode) is what pins the
+fix now.
+
+`@kavo/nest/src/graphql/load-graphql.ts` is the fix, and the pattern to
+copy for any future optional dependency (a future `@kavo/grpc` glue
+package, or a second protocol binding for `@kavo/express`/`@kavo/fastify`):
+
+- `loadGraphQL()` dynamically `import()`s the optional package(s) inside
+  a function body — never a top-level `import` — caches the result
+  (`null` on failure, so a second call doesn't retry), and throws a clear
+  `ConfigurationException` on failure instead of leaking the raw
+  module-resolution error.
+- Only `import type { ... } from "graphql"` appears at the top of
+  `base-crud-graphql.controller.ts` — type-only imports are fully erased
+  by `tsc` (`isolatedModules`/`verbatimModuleSyntax`, `tsconfig.base.json`),
+  so they cost nothing at runtime and never require the package to be
+  installed, only present at _compile_ time (always true for a workspace
+  package like `@kavo/graphql`).
+- `loadGraphQL()` is only ever called from code a consumer reaches by
+  opting in — `BaseCrudGraphQLController.onModuleInit`/`execute` — never
+  from `index.ts` or `kavo.module.ts` directly. Those two files only
+  reference the _types_ and the plain functions/classes around GraphQL
+  (`createDefaultGraphQLController`, `DEFAULT_GRAPHQL_PATH`), none of
+  which themselves import `@kavo/graphql` or `graphql` at the top level.
+
+One wrinkle worth remembering if a future binding copies this: `@kavo/nest`
+already had exactly this problem solved once, for `@nestjs/swagger`
+(`swagger.ts`'s `loadSwagger()`) — but that one uses a **synchronous**
+`createRequire(...).require(...)`, because `@nestjs/swagger` ships as
+CommonJS. `@kavo/graphql` is Kavo's own package, built as ESM
+(`tsconfig.base.json`'s `"module": "Node16"` + `"type": "module"`), and
+Node cannot `require()` an ES module synchronously — only a dynamic
+`import()` (necessarily async) works for lazily loading an ESM package.
+`BaseCrudGraphQLController.onModuleInit`/`execute` are `async` for
+exactly this reason; a future binding lazily loading another first-party
+ESM package should expect the same.
+
+## 7. What's out of scope (by design, for now)
 
 - Schema derivation from `EntityMetadata` — `itemType`/`createInputType`/etc.
   are hand-written per entity, the same status core's DTOs were before
