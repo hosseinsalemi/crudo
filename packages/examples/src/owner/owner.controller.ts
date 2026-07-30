@@ -28,6 +28,14 @@ import { CreateOwnerDto, UpdateOwnerDto, OwnerItemDto, OwnerListDto } from "./ow
     list: OwnerListDto,
   },
   softDelete: { strategy: "soft" },
+  // `deletedAt` is soft-delete plumbing (`@DeleteDateColumn`), not data a
+  // client should ever filter, sort, or select on — `{ exclude }` resolves
+  // to every own column except this one, without hand-enumerating the rest.
+  allowlists: {
+    filterable: { exclude: ["deletedAt"] },
+    sortable: { exclude: ["deletedAt"] },
+    selectable: { exclude: ["deletedAt"] },
+  },
   // `include=pets` — opt-in per relation. Pets are a to-many,
   // so they batch-load: one extra query per page of owners, never a joined
   // row explosion under pagination. `address` is the to-one counterpart —

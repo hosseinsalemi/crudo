@@ -21,6 +21,16 @@ import { CreateCatDto, UpdateCatDto, CatItemDto, CatListDto } from "./cat.dtos.j
     list: CatListDto,
   },
   pagination: { defaultLimit: 10, maxLimit: 50 },
+  // Explicit include-lists (the plain form, contrast Owner's `{ exclude }`
+  // in owner.controller.ts): `indoor`, `livesLeft`, and `createdAt` are
+  // still returned in every response (`CatItemDto` includes them), just
+  // not queryable — narrower than "every own column" without excluding
+  // anything by name.
+  allowlists: {
+    filterable: ["id", "name", "age", "size"],
+    sortable: ["id", "name", "age"],
+    selectable: ["id", "name", "age", "size"],
+  },
   // The to-one side of the owner edge joins; `tags` is a to-many (many-to-
   // many) and batches. `fields[owner]=id,name` / `fields[tags]=id,name`
   // narrow each embedded relation.
