@@ -161,6 +161,29 @@ export function registerCrudE2eSuite(getApp: () => INestApplication): void {
       ]);
     });
 
+    it("rejects a filter nested deeper than the default maxFilterDepth over a real query", async () => {
+      // Built-in default is 3; four nested logical wrappers exceeds it
+      // regardless of exactly where the count starts.
+      const response = await request(server())
+        .get("/cats")
+        .query("filter[or][0][and][0][or][0][and][0][name][eq]=x")
+        .expect(400);
+      expect(response.body).toMatchObject({ code: "KAVO_QUERY_INVALID" });
+      expect(response.body.errors).toEqual([
+        expect.objectContaining({ field: "filter", code: "KAVO_QUERY_LIMIT_EXCEEDED" }),
+      ]);
+    });
+
+    it("rejects an `in` value list past the default maxInValues over a real query", async () => {
+      // Built-in default is 100; 101 values trips it.
+      const query = Array.from({ length: 101 }, (_, i) => `filter[age][in][]=${i}`).join("&");
+      const response = await request(server()).get("/cats").query(query).expect(400);
+      expect(response.body).toMatchObject({ code: "KAVO_QUERY_INVALID" });
+      expect(response.body.errors).toEqual([
+        expect.objectContaining({ field: "age", code: "KAVO_QUERY_LIMIT_EXCEEDED" }),
+      ]);
+    });
+
     it("embeds relations both ways: a joined owner and batched pets", async () => {
       const owner = await request(server()).post("/owners").send({ name: "Rae", email: "rae@x.io" }).expect(201);
       const ownerId = owner.body.id as number;
@@ -186,6 +209,29 @@ export function registerCrudE2eSuite(getApp: () => INestApplication): void {
       expect(owners.body.items[0].pets).toEqual([expect.objectContaining({ name: "Kit" })]);
       const one = await request(server()).get(`/owners/${ownerId}?include=pets`).expect(200);
       expect(one.body.pets).toHaveLength(1);
+    });
+
+    it("embeds a two-level include (cat -> owner -> pets) within the default relation budget", async () => {
+      // Built-in defaults (maxIncludeDepth: 2, maxIncludedNodes: 10) are
+      // exactly enough for this real, two-level joined-then-batched tree —
+      // never exercised together elsewhere in this suite. `owner.pets`
+      // itself cannot be the second level here: `Pet` is the abstract STI
+      // base `owner.pets` targets, and only the concrete `Cat`/`Dog`
+      // subtypes carry a registered @Crud config, so nothing below
+      // `owner.pets` is includable (a real, separate limitation from the
+      // relation budgets this test is actually about).
+      const owner = await request(server()).post("/owners").send({ name: "Nia", email: "nia@x.io" }).expect(201);
+      const ownerId = owner.body.id as number;
+      const cat = await request(server())
+        .post("/cats")
+        .send({ name: "Momo", age: 2, size: "small", indoor: true, livesLeft: 9, owner: ownerId })
+        .expect(201);
+
+      const response = await request(server()).get(`/cats/${cat.body.id}?include=owner.pets`).expect(200);
+      expect(response.body.owner).toMatchObject({
+        name: "Nia",
+        pets: [expect.objectContaining({ name: "Momo" })],
+      });
     });
 
     it("keeps a relation out of the response until it is included", async () => {
