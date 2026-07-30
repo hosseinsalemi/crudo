@@ -41,7 +41,7 @@ One command, from your project root — pulls all eight skills straight from
 GitHub into `.claude/skills/`, no npm publish step and no clone required:
 
 ```bash
-npx degit kavo-labs/kavo/packages/skills/skills .claude/skills --force
+npx degit kavo-labs/kavo/packages/claude-plugin/skills .claude/skills --force
 ```
 
 `--force` lets this merge into an existing, non-empty `.claude/skills/`
@@ -53,7 +53,7 @@ Re-run the same command any time to pick up updates.
 ### Installing a single skill
 
 ```bash
-npx degit kavo-labs/kavo/packages/skills/skills/quick-start .claude/skills/quick-start --force
+npx degit kavo-labs/kavo/packages/claude-plugin/skills/quick-start .claude/skills/quick-start --force
 ```
 
 Swap `quick-start` for any name from the table above.
