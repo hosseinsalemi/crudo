@@ -2,19 +2,21 @@ import { defineConfig } from "vitepress";
 
 export default defineConfig({
   title: "Kavo",
-  description: "Design documentation for the Kavo CRUD framework",
+  description: "A production-grade CRUD framework for TypeScript",
   base: "/",
   srcDir: ".",
   srcExclude: ["README.md"],
   cleanUrls: true,
   ignoreDeadLinks: [/CLAUDE(\.md)?$/],
 
+  head: [
+    ["meta", { property: "og:title", content: "Kavo" }],
+    ["meta", { property: "og:description", content: "A production-grade CRUD framework for TypeScript" }],
+    ["meta", { name: "theme-color", content: "#7c5cff" }],
+  ],
+
   themeConfig: {
-    nav: [
-      { text: "Guide", link: "/architecture/01-system-architecture" },
-      { text: "ADRs", link: "/adr/0001-clean-architecture-core-owns-contracts" },
-      { text: "Glossary", link: "/glossary" },
-    ],
+    nav: [{ text: "Guide", link: "/architecture/01-system-architecture" }],
 
     sidebar: [
       {

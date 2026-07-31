@@ -1,0 +1,64 @@
+:root {
+  --vp-c-brand-1: #7c5cff;
+  --vp-c-brand-2: #6a45e6;
+  --vp-c-brand-3: #5c3dc0;
+  --vp-c-brand-soft: rgba(124, 92, 255, 0.14);
+
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(120deg, #9b7fe0 20%, #6a45e6);
+}
+
+.dark {
+  --vp-c-brand-1: #a78bfa;
+  --vp-c-brand-2: #8b6fe0;
+  --vp-c-brand-3: #7c5cff;
+}
+
+.VPHero {
+  position: relative;
+  overflow: visible;
+}
+
+.VPHero .container {
+  position: relative;
+  z-index: 1;
+}
+
+.VPHero .name {
+  font-size: clamp(4.5rem, 6vw + 3rem, 9.5rem);
+  line-height: 1;
+}
+
+.VPHero .text {
+  font-size: clamp(2.6rem, 3vw + 1.6rem, 5rem);
+  line-height: 1.1;
+}
+
+.VPHero.has-image .name {
+  font-size: clamp(2.75rem, 4vw + 1.5rem, 4.5rem);
+}
+
+.VPHero.has-image .text {
+  font-size: clamp(1.75rem, 2vw + 1.1rem, 2.75rem);
+  line-height: 1.2;
+}
+
+.VPHero.has-image .image-container {
+  width: 100%;
+  height: auto;
+}
+
+@media (min-width: 960px) {
+  .VPHero.has-image .image-container {
+    display: flex;
+    transform: none;
+  }
+}
+
+.VPHero.has-image .image-bg {
+  display: none;
+}
+
+.VPFeature .icon {
+  font-size: 28px;
+}
