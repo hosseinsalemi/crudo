@@ -34,17 +34,21 @@ Because the build compiles `src` only, each package also has a `tsconfig.tests.j
 
 ## Architecture
 
-Three packages in a strict hub-and-spoke topology (`pnpm-workspace.yaml`):
+Four packages in a strict hub-and-spoke topology (`pnpm-workspace.yaml`):
 
 ```
 @kavo/nest ──▶ @kavo/core ◀── @kavo/typeorm
+                   ▲
+                   │
+              @kavo/graphql
 ```
 
 - **`@kavo/core`** (`packages/core`) — all contracts, the type system, and the request engine. **Zero runtime dependencies** and imports nothing (ADR-0005). It has no knowledge of TypeORM or Nest.
 - **`@kavo/typeorm`** (`packages/orms/typeorm`) — implements core's `RepositoryAdapter` and feeds core's entity-metadata seam from TypeORM metadata. `typeorm` is a peer dependency.
 - **`@kavo/nest`** (`packages/frameworks/nest`) — the `@Crud` decorator and NestJS route generation.
+- **`@kavo/graphql`** (`packages/protocols/graphql`) — host-framework-agnostic GraphQL schema binding: builds a schema over a `createCrud` service, delegating every resolver to the same engine REST uses. Depends only on `@kavo/core` and the `graphql` peer; `@kavo/nest` optionally wires it in (`BaseCrudGraphQLController`) via DI, never via a direct import.
 
-These boundaries are **mechanically enforced** by `.dependency-cruiser.cjs`, not just convention: core may import nothing, adapters and framework bindings import the `@kavo/core` barrel only (no deep imports), and the adapter never imports the framework or vice versa — they meet only through Nest's DI container. An illegal import fails `pnpm depcruise` (part of `pnpm check`), not code review.
+These boundaries are **mechanically enforced** by `.dependency-cruiser.cjs`, not just convention: core may import nothing, adapters/protocol bindings/framework bindings import the `@kavo/core` barrel only (no deep imports), and spokes never import each other directly — they meet only through Nest's DI container. An illegal import fails `pnpm depcruise` (part of `pnpm check`), not code review.
 
 ### The request pipeline (the spine)
 

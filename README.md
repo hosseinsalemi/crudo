@@ -12,18 +12,20 @@ conventions in [`CLAUDE.md`](CLAUDE.md) are normative.
 
 ## Packages
 
-| Package                                  | Role                                                       |
-| ---------------------------------------- | ---------------------------------------------------------- |
-| [`@kavo/core`](packages/core)            | Contracts, type system, engine — zero runtime dependencies |
-| [`@kavo/typeorm`](packages/orms/typeorm) | TypeORM adapter (`RepositoryAdapter` implementation)       |
-| [`@kavo/nest`](packages/frameworks/nest) | NestJS binding (`@Crud` decorator, route generation)       |
+| Package                                       | Role                                                             |
+| --------------------------------------------- | ---------------------------------------------------------------- |
+| [`@kavo/core`](packages/core)                 | Contracts, type system, engine — zero runtime dependencies       |
+| [`@kavo/typeorm`](packages/orms/typeorm)      | TypeORM adapter (`RepositoryAdapter` implementation)             |
+| [`@kavo/nest`](packages/frameworks/nest)      | NestJS binding (`@Crud` decorator, route generation)             |
+| [`@kavo/graphql`](packages/protocols/graphql) | Host-agnostic GraphQL schema binding over a `createCrud` service |
 
 Design docs, glossary, and ADRs live in [`docs`](docs).
 
 ## Install
 
-`@kavo/core` has zero runtime dependencies; `@kavo/typeorm` and `@kavo/nest`
-each need their ORM/framework as a peer dependency:
+`@kavo/core` has zero runtime dependencies; `@kavo/typeorm`, `@kavo/nest`,
+and `@kavo/graphql` each need their ORM/framework/protocol as a peer
+dependency:
 
 ```bash
 # core contracts and engine — always required
@@ -36,11 +38,14 @@ pnpm add @kavo/typeorm typeorm reflect-metadata
 pnpm add @kavo/nest @nestjs/common @nestjs/core reflect-metadata rxjs
 # optional, for OpenAPI schema generation:
 pnpm add @nestjs/swagger
+
+# GraphQL schema binding (host-framework-agnostic)
+pnpm add @kavo/graphql graphql
 ```
 
 (`npm install` / `yarn add` work the same way.) See
 [`packages/examples`](packages/examples) for a full, runnable NestJS +
-TypeORM app wired up with all three packages.
+TypeORM app wired up with all four packages.
 
 ## Claude Code skills
 

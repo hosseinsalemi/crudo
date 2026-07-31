@@ -47,8 +47,9 @@ workflow.
 
 3. **Apply the version, in lockstep** (ADR-0004 — [`docs/adr/0004-lockstep-versioning.md`](../../docs/adr/0004-lockstep-versioning.md)):
    set the new version in `packages/core/package.json`,
-   `packages/orms/typeorm/package.json`, and
-   `packages/frameworks/nest/package.json`. Leave `packages/examples`
+   `packages/orms/typeorm/package.json`,
+   `packages/frameworks/nest/package.json`, and
+   `packages/protocols/graphql/package.json`. Leave `packages/examples`
    (private, unpublished) alone.
 
 4. **Regenerate the lockfile and gate:**
@@ -64,15 +65,17 @@ workflow.
 5. **Confirm with the user before doing anything irreversible.** State
    plainly: committing and pushing straight to `main`, then pushing tag
    `vX.Y.Z`, triggers `.github/workflows/publish.yml`, which publishes
-   `@kavo/core`, `@kavo/typeorm`, and `@kavo/nest` to the public npm registry
-   and creates a GitHub Release for the tag — none of this is meaningfully
-   undoable once pushed. Wait for an explicit go-ahead before step 6.
+   `@kavo/core`, `@kavo/typeorm`, `@kavo/nest`, and `@kavo/graphql` to the
+   public npm registry and creates a GitHub Release for the tag — none of
+   this is meaningfully undoable once pushed. Wait for an explicit
+   go-ahead before step 6.
 
 6. **Commit directly to `main`, then tag and push both:**
 
    ```bash
    git add packages/core/package.json packages/orms/typeorm/package.json \
-           packages/frameworks/nest/package.json pnpm-lock.yaml
+           packages/frameworks/nest/package.json packages/protocols/graphql/package.json \
+           pnpm-lock.yaml
    git commit -m "chore(release): vX.Y.Z"
    git push origin main
    git tag -a vX.Y.Z -m "vX.Y.Z"
