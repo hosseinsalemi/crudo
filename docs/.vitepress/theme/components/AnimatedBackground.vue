@@ -92,13 +92,23 @@ const bubbles = Array.from({ length: 34 }, (_, i) => ({
 }
 
 @keyframes drift-a {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(50px, 30px) scale(1.08); }
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(50px, 30px) scale(1.08);
+  }
 }
 
 @keyframes drift-b {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(-40px, 25px) scale(1.06); }
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-40px, 25px) scale(1.06);
+  }
 }
 
 .bubbles {
@@ -118,10 +128,20 @@ const bubbles = Array.from({ length: 34 }, (_, i) => ({
 }
 
 @keyframes rise {
-  0% { transform: translate(0, 0); opacity: 0; }
-  10% { opacity: 0.55; }
-  90% { opacity: 0.25; }
-  100% { transform: translate(12px, -420px); opacity: 0; }
+  0% {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.55;
+  }
+  90% {
+    opacity: 0.25;
+  }
+  100% {
+    transform: translate(12px, -420px);
+    opacity: 0;
+  }
 }
 
 .wave {
@@ -152,8 +172,12 @@ const bubbles = Array.from({ length: 34 }, (_, i) => ({
 }
 
 @keyframes drift-wave {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
 }
 
 :root {
