@@ -273,6 +273,58 @@ export class BooksController {}
 }
 </style>
 
+<div class="ai-section">
+  <p class="ai-title">Built for agentic development</p>
+  <p class="ai-subtitle">Built with Claude Code, and shipped with skills so your agent moves just as fast.</p>
+  <div class="ai-install">
+
+```
+/plugin marketplace add kavo-labs/kavo
+/plugin install kavo-skills@kavo-marketplace
+```
+
+  <p class="ai-install-note">Fewer tokens, ship faster.</p>
+  </div>
+</div>
+
+<style scoped>
+.ai-section {
+  margin: 64px 0;
+  text-align: center;
+}
+
+.ai-title {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--vp-c-text-1);
+}
+
+.ai-subtitle {
+  margin: 0 0 28px;
+  font-size: 14.5px;
+  color: var(--vp-c-text-2);
+}
+
+.ai-install {
+  max-width: 480px;
+  margin: 24px auto 0;
+  text-align: left;
+}
+
+.ai-install-note {
+  margin: 10px 0 0;
+  font-size: 13.5px;
+  text-align: center;
+  color: var(--vp-c-text-3);
+}
+
+.ai-install :deep(div[class*='language-']) {
+  border-radius: 12px;
+}
+</style>
+
 <div class="feature-section">
   <p class="feature-title">Everything a CRUD API needs</p>
   <p class="feature-subtitle">One decorator, the full surface — configurable at global, entity, operation, and per-call scope.</p>
