@@ -5,6 +5,8 @@
  * The rules here are the executable form of the dependency graph:
  *
  *   @kavo/nest ──▶ @kavo/core ◀── @kavo/typeorm
+ *                       ▲
+ *                       └── @kavo/prisma
  *
  * `@kavo/core` imports nothing. Adapters and framework bindings import the
  * core barrel only — deep imports are not API. An illegal import fails CI
@@ -36,6 +38,18 @@ module.exports = {
         'path-only rule would miss `from "@kavo/nest"` — the spelling ' +
         "anyone would actually write.",
       from: { path: "^packages/orms/typeorm/src" },
+      to: { path: "^(packages/frameworks|@kavo/nest)" },
+    },
+    {
+      name: "prisma-only-imports-core",
+      severity: "error",
+      comment:
+        "@kavo/prisma may depend on @kavo/core and the @prisma/client peer — " +
+        "never on @kavo/nest (ADR-0002). Both spellings are matched: a " +
+        "workspace package specifier does not resolve to a path here, so a " +
+        'path-only rule would miss `from "@kavo/nest"` — the spelling ' +
+        "anyone would actually write.",
+      from: { path: "^packages/orms/prisma/src" },
       to: { path: "^(packages/frameworks|@kavo/nest)" },
     },
     {

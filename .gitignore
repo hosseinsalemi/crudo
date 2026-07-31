@@ -6,3 +6,5 @@ dist/
 .todo
 api.rest
 docs/.vitepress/cache
+packages/orms/prisma/prisma/*.db
+packages/orms/prisma/prisma/*.db-journal
