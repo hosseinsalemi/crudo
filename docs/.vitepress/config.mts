@@ -97,5 +97,9 @@ export default defineConfig({
     search: {
       provider: "local",
     },
+
+    footer: {
+      copyright: `Built by the Kavo community`,
+    },
   },
 });
