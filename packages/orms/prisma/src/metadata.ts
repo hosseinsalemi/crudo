@@ -1,0 +1,141 @@
+import type { ClassRef, EntityMetadata, FieldKind, FieldMetadata, RelationDescriptor } from "@kavo/core";
+import { ConfigurationException } from "@kavo/core";
+import type { PrismaDatamodel, PrismaField } from "./datamodel.js";
+
+/**
+ * Prisma scalar type name → core's ORM-independent `FieldKind`. Unrecognized
+ * scalar names (a future Prisma type this mapping hasn't caught up to)
+ * degrade to `string`, same posture as `@kavo/typeorm`'s fallback.
+ */
+function fieldKindOf(field: PrismaField): FieldKind {
+  if (field.kind === "enum") return "enum";
+  switch (field.type) {
+    case "Int":
+    case "Float":
+    case "BigInt":
+    case "Decimal":
+      return "number";
+    case "Boolean":
+      return "boolean";
+    case "DateTime":
+      return "date";
+    case "Json":
+      return "json";
+    default:
+      return "string";
+  }
+}
+
+/**
+ * A column is "generated" (excluded from `create`/`update`/`patch` DTO
+ * defaults, per `EntityMetadata.fields[].generated`) when Prisma or the
+ * database computes its value at write time rather than the caller
+ * supplying one: `@updatedAt`, or a function-style `@default(...)`
+ * (`autoincrement()`, `now()`, `cuid()`, `uuid()`, `dbgenerated(...)`).
+ * A literal default (`@default("active")`, `@default(0)`) is an ordinary
+ * writable column with a fallback value, not a generated one — matching
+ * `@kavo/typeorm`, where `@Column({ default: "active" })` isn't `generated`
+ * either.
+ */
+function isGeneratedField(field: PrismaField): boolean {
+  if (field.isUpdatedAt) return true;
+  if (!field.hasDefaultValue) return false;
+  const value = field.default;
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Build core's `EntityMetadata` for one entity from Prisma's DMMF.
+ *
+ * Prisma models have no runtime class the way TypeORM's `@Entity()`
+ * classes do, so `entity` is a *marker class* the caller declares purely as
+ * the `ClassRef` identity `createCrud` requires — matched to a DMMF model
+ * by name (`class Author {}` ↔ `model Author { … }`). `entities` is the
+ * name→class registry that lets a relation's target model name resolve
+ * back to *its* marker class; TypeORM gets this for free from
+ * `DataSource#entities`, Prisma has no equivalent, so
+ * `createPrismaInfrastructure` collects it explicitly (see
+ * `docs/adr/0017-prisma-marker-classes-and-entity-registry.md`).
+ */
+export function buildEntityMetadata<Entity extends object>(
+  datamodel: PrismaDatamodel,
+  entity: ClassRef<Entity>,
+  entities: ReadonlyMap<string, ClassRef>,
+): EntityMetadata<Entity> {
+  const modelName = entity.name;
+  const model = datamodel.models.find((candidate) => candidate.name === modelName);
+  if (model === undefined) {
+    throw new ConfigurationException(
+      modelName,
+      "entity",
+      `No Prisma model named '${modelName}' in the supplied datamodel — the marker class name must match ` +
+        `the schema's model name exactly`,
+    );
+  }
+
+  const idFields = model.fields.filter((field) => field.isId);
+  if (idFields.length !== 1) {
+    throw new ConfigurationException(
+      modelName,
+      "id",
+      `Kavo requires exactly one @id field; found ${idFields.length} on model '${modelName}' ` +
+        `(composite primary keys are out of scope)`,
+    );
+  }
+
+  const fields: FieldMetadata[] = model.fields
+    .filter((field) => field.kind !== "object")
+    .map((field) => ({
+      name: field.name,
+      kind: fieldKindOf(field),
+      nullable: field.isList ? false : !field.isRequired,
+      generated: isGeneratedField(field),
+      ...(field.kind === "enum" && {
+        enumValues: (datamodel.enums.find((candidate) => candidate.name === field.type)?.values ?? []).map(
+          (value) => value.name,
+        ),
+      }),
+    }));
+
+  const relations: RelationDescriptor[] = model.fields
+    .filter((field): field is PrismaField & { kind: "object" } => field.kind === "object")
+    .map((field) => relationDescriptor(field, modelName, entities));
+
+  return {
+    entity,
+    name: model.name,
+    idField: idFields[0]!.name,
+    fields,
+    relations,
+    // Prisma declares no delete-marker column the way TypeORM's
+    // `@DeleteDateColumn` does — soft delete is always explicit
+    // `softDelete.field` configuration for this adapter, never
+    // auto-detected.
+    softDeleteField: null,
+  };
+}
+
+function relationDescriptor(
+  field: PrismaField,
+  ownerModelName: string,
+  entities: ReadonlyMap<string, ClassRef>,
+): RelationDescriptor {
+  return {
+    name: field.name,
+    target: () => {
+      const target = entities.get(field.type);
+      if (target === undefined) {
+        throw new ConfigurationException(
+          ownerModelName,
+          field.name,
+          `Relation '${field.name}' targets Prisma model '${field.type}', but no marker class for it was ` +
+            `registered with createPrismaInfrastructure's 'entities' list`,
+        );
+      }
+      return target;
+    },
+    cardinality: field.isList ? "many" : "one",
+    includable: false,
+    strategy: "auto",
+  };
+}

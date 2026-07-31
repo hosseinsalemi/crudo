@@ -24,7 +24,7 @@ features:
     details: DTOs, query grammar, error handling, the engine, configuration, and the TypeORM/Nest bindings.
     link: /architecture/04-dto-system
   - title: Core features
-    details: Soft delete, relations and includes, GraphQL binding.
+    details: Soft delete, relations and includes, GraphQL binding, the Prisma adapter.
     link: /architecture/11-soft-delete
   - title: Reference
     details: Glossary and architecture decision records.

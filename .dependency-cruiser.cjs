@@ -5,6 +5,8 @@
  * The rules here are the executable form of the dependency graph:
  *
  *   @kavo/nest ──▶ @kavo/core ◀── @kavo/typeorm
+ *                       ▲
+ *                       └── @kavo/prisma
  *
  * `@kavo/core` imports nothing. Adapters and framework bindings import the
  * core barrel only — deep imports are not API. An illegal import fails CI
@@ -39,6 +41,18 @@ module.exports = {
       to: { path: "^(packages/frameworks|@kavo/nest)" },
     },
     {
+      name: "prisma-only-imports-core",
+      severity: "error",
+      comment:
+        "@kavo/prisma may depend on @kavo/core and the @prisma/client peer — " +
+        "never on @kavo/nest (ADR-0002). Both spellings are matched: a " +
+        "workspace package specifier does not resolve to a path here, so a " +
+        'path-only rule would miss `from "@kavo/nest"` — the spelling ' +
+        "anyone would actually write.",
+      from: { path: "^packages/orms/prisma/src" },
+      to: { path: "^(packages/frameworks|@kavo/nest)" },
+    },
+    {
       name: "nest-only-imports-core",
       severity: "error",
       comment:
@@ -50,7 +64,7 @@ module.exports = {
         "@kavo/nest back (ADR-0016). Package-specifier form matched too, " +
         "per the note on typeorm-only-imports-core.",
       from: { path: "^packages/frameworks/nest/src" },
-      to: { path: "^(packages/orms|@kavo/typeorm)" },
+      to: { path: "^(packages/orms|@kavo/(typeorm|prisma))" },
     },
     {
       name: "graphql-only-imports-core",
@@ -62,7 +76,7 @@ module.exports = {
         "same constraint as an ORM adapter). Package-specifier form matched " +
         "too, per the note on typeorm-only-imports-core.",
       from: { path: "^packages/protocols/graphql/src" },
-      to: { path: "^(packages/orms|packages/frameworks|@kavo/(typeorm|nest))" },
+      to: { path: "^(packages/orms|packages/frameworks|@kavo/(typeorm|prisma|nest))" },
     },
     {
       name: "no-cross-package-deep-imports-core",

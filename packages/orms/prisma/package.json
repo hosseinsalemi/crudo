@@ -1,0 +1,40 @@
+{
+  "name": "@kavo/prisma",
+  "version": "0.4.0",
+  "description": "Kavo Prisma adapter — implements @kavo/core's RepositoryAdapter over Prisma Client.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kavo-labs/kavo.git",
+    "directory": "packages/orms/prisma"
+  },
+  "homepage": "https://github.com/kavo-labs/kavo/tree/main/packages/orms/prisma#readme",
+  "type": "module",
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "generate": "prisma generate --schema prisma/schema.prisma && prisma db push --schema prisma/schema.prisma --skip-generate --accept-data-loss"
+  },
+  "dependencies": {
+    "@kavo/core": "workspace:^"
+  },
+  "peerDependencies": {
+    "@prisma/client": "^5.0.0 || ^6.0.0"
+  },
+  "devDependencies": {
+    "@prisma/client": "^6.19.3",
+    "prisma": "^6.19.3"
+  }
+}

@@ -43,6 +43,7 @@ export default defineConfig({
           { text: "Soft delete", link: "/architecture/11-soft-delete" },
           { text: "Relations and includes", link: "/architecture/12-relations-and-includes" },
           { text: "GraphQL binding", link: "/architecture/13-graphql-binding" },
+          { text: "Prisma adapter", link: "/architecture/14-prisma-adapter" },
         ],
       },
       {
@@ -81,6 +82,10 @@ export default defineConfig({
             link: "/adr/0015-global-operation-defaults-are-engine-only",
           },
           { text: "0016 — GraphQL protocols package", link: "/adr/0016-graphql-protocols-package" },
+          {
+            text: "0017 — Prisma marker classes and entity registry",
+            link: "/adr/0017-prisma-marker-classes-and-entity-registry",
+          },
         ],
       },
     ],

@@ -1,0 +1,94 @@
+import type {
+  ClassRef,
+  CrudInfrastructure,
+  EntityMetadata,
+  KavoInstance,
+  KavoOptions,
+  RepositoryAdapter,
+} from "@kavo/core";
+import { createKavo } from "@kavo/core";
+import type { PrismaDatamodel } from "./datamodel.js";
+import { buildEntityMetadata } from "./metadata.js";
+import type { PrismaClientLike } from "./prisma-client-like.js";
+import { PrismaRepositoryAdapter } from "./prisma-repository-adapter.js";
+
+/**
+ * What Prisma needs beyond the client instance, mirroring what TypeORM's
+ * `DataSource` supplies for free:
+ *
+ * - `datamodel` — Prisma's DMMF (`Prisma.dmmf.datamodel` from the
+ *   generated client), the metadata seam's data source.
+ * - `entities` — every marker class this Kavo root will call `createCrud`
+ *   with. Prisma models have no runtime class the way TypeORM's
+ *   `@Entity()` classes do, so each entity needs a caller-declared class
+ *   purely as `ClassRef` identity (`class Author {}` ↔ `model Author`,
+ *   matched by name) — and a relation's target model name can only resolve
+ *   back to *its* marker class if every marker class was registered up
+ *   front. See `docs/adr/0017-prisma-marker-classes-and-entity-registry.md`.
+ */
+export interface PrismaInfrastructureOptions {
+  readonly datamodel: PrismaDatamodel;
+  readonly entities: readonly ClassRef[];
+  /**
+   * Whether the connector supports Prisma's `mode: "insensitive"` string
+   * filter (Postgres, MongoDB) — `false` for MySQL, SQLite, SQL Server,
+   * where Prisma rejects the argument outright. Defaults to `true`
+   * (Postgres is the common case); set explicitly for any other connector.
+   * See `FilterTranslatorOptions`.
+   */
+  readonly caseInsensitiveFilters?: boolean;
+}
+
+/**
+ * The Prisma implementation of core's infrastructure seam: metadata and
+ * adapters derived from one Prisma Client, cached per entity (metadata
+ * derivation and adapter construction are bootstrap work, not per-request
+ * work) — same shape as `@kavo/typeorm`'s `createTypeOrmInfrastructure`.
+ */
+export function createPrismaInfrastructure(
+  prismaClient: PrismaClientLike,
+  options: PrismaInfrastructureOptions,
+): CrudInfrastructure {
+  const byName = new Map(options.entities.map((entity) => [entity.name, entity]));
+  const metadataCache = new Map<ClassRef, EntityMetadata>();
+  const adapterCache = new Map<ClassRef, RepositoryAdapter>();
+
+  function metadataFor<Entity extends object>(entity: ClassRef<Entity>): EntityMetadata<Entity> {
+    let metadata = metadataCache.get(entity);
+    if (metadata === undefined) {
+      metadata = buildEntityMetadata(options.datamodel, entity, byName);
+      metadataCache.set(entity, metadata);
+    }
+    return metadata as EntityMetadata<Entity>;
+  }
+
+  return {
+    metadataFor,
+    adapterFor<Entity extends object>(entity: ClassRef<Entity>) {
+      let adapter = adapterCache.get(entity);
+      if (adapter === undefined) {
+        adapter = new PrismaRepositoryAdapter(prismaClient, metadataFor(entity), {
+          caseInsensitiveFilters: options.caseInsensitiveFilters ?? true,
+        }) as RepositoryAdapter;
+        adapterCache.set(entity, adapter);
+      }
+      return adapter as RepositoryAdapter<Entity>;
+    },
+  };
+}
+
+/**
+ * Sugar for the common case: a Kavo root instance wired to one Prisma
+ * Client, so `kavo.createCrud(Author)` is genuinely zero-config beyond
+ * declaring the marker classes once.
+ */
+export function createPrismaKavo(
+  prismaClient: PrismaClientLike,
+  options: PrismaInfrastructureOptions & Omit<KavoOptions, "infrastructure">,
+): KavoInstance {
+  const { datamodel, entities, caseInsensitiveFilters, ...kavoOptions } = options;
+  return createKavo({
+    ...kavoOptions,
+    infrastructure: createPrismaInfrastructure(prismaClient, { datamodel, entities, caseInsensitiveFilters }),
+  });
+}
