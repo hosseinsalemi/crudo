@@ -132,7 +132,7 @@ export class BooksController {}
 
 .before-after-lead {
   grid-column: 1 / -1;
-  margin: 0 0 4px;
+  margin: 46px 0 4px;
   text-align: center;
   font-size: 15px;
   color: var(--vp-c-text-2);
