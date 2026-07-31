@@ -1,0 +1,302 @@
+import type {
+  CrudContext,
+  EntityId,
+  EntityMetadata,
+  IncludeTree,
+  NormalizedQueryContext,
+  RepositoryAdapter,
+  ResolvedSoftDelete,
+} from "@kavo/core";
+import { AlreadyDeletedException, ConfigurationException, NotDeletedException, NotFoundException } from "@kavo/core";
+import { mapDriverError } from "./error-mapping.js";
+import { translateFilter, type FilterTranslatorOptions, type PrismaWhere } from "./filter-translator.js";
+import { delegateName, type PrismaClientLike, type PrismaModelDelegate } from "./prisma-client-like.js";
+
+/**
+ * `RepositoryAdapter` over a Prisma Client model delegate: CRUD with hard
+ * *or* soft delete, restore, purge, filtering, sorting, pagination,
+ * optional counting.
+ *
+ * **No join/batch split.** `@kavo/typeorm` translates `IncludeNode.strategy`
+ * because it drives a raw SQL query builder, where a to-many `JOIN`
+ * multiplies root rows and a separate batched query is how that's avoided.
+ * Prisma's `include` has no such failure mode: it always resolves relations
+ * as its own internally-batched queries, to-one or to-many alike, never a
+ * row-multiplying join — so a to-many include never disturbs root
+ * pagination regardless of which strategy core resolved. This adapter
+ * therefore *ignores* `IncludeNode.strategy` and maps every node the same
+ * way; there is nothing for the distinction to control here.
+ */
+export class PrismaRepositoryAdapter<Entity extends object> implements RepositoryAdapter<Entity> {
+  private readonly delegate: PrismaModelDelegate;
+  private readonly idField: string;
+
+  constructor(
+    private readonly prismaClient: PrismaClientLike,
+    private readonly metadata: EntityMetadata<Entity>,
+    private readonly filterOptions: FilterTranslatorOptions = { caseInsensitiveFilters: true },
+  ) {
+    const name = delegateName(metadata.name);
+    const delegate = prismaClient[name];
+    if (delegate === undefined) {
+      throw new ConfigurationException(
+        metadata.name,
+        "entity",
+        `Prisma Client has no '${name}' delegate for model '${metadata.name}'`,
+      );
+    }
+    this.delegate = delegate;
+    this.idField = metadata.idField;
+  }
+
+  // ── Reads ────────────────────────────────────────────────────────────
+
+  async findOneById(
+    id: EntityId,
+    query: NormalizedQueryContext<Entity> | null,
+    context: CrudContext<Entity>,
+  ): Promise<Entity | null> {
+    try {
+      const where = this.scopeToLive({ [this.idField]: id }, context, query?.withDeleted ?? false);
+      const include = this.buildInclude(query?.include ?? {});
+      const row = await this.delegate.findFirst({ where, ...(include && { include }) });
+      return (row as Entity | null) ?? null;
+    } catch (error) {
+      throw mapDriverError(error, errorContext(context));
+    }
+  }
+
+  async findOne(query: NormalizedQueryContext<Entity>, context: CrudContext<Entity>): Promise<Entity | null> {
+    try {
+      const row = await this.delegate.findFirst(this.buildFindArgs(query, context));
+      return (row as Entity | null) ?? null;
+    } catch (error) {
+      throw mapDriverError(error, errorContext(context));
+    }
+  }
+
+  async findMany(query: NormalizedQueryContext<Entity>, context: CrudContext<Entity>): Promise<readonly Entity[]> {
+    try {
+      const rows = await this.delegate.findMany({
+        ...this.buildFindArgs(query, context),
+        skip: query.pagination.offset,
+        take: query.pagination.limit,
+      });
+      return rows as Entity[];
+    } catch (error) {
+      throw mapDriverError(error, errorContext(context));
+    }
+  }
+
+  async count(query: NormalizedQueryContext<Entity>, context: CrudContext<Entity>): Promise<number> {
+    try {
+      // A dedicated count — never fetch-then-length: the engine only calls
+      // this when `query.count` is true, so `total: null` costs zero queries.
+      const where = this.scopeToLive(translateFilter(query.filter, this.filterOptions), context, query.withDeleted);
+      return await this.delegate.count({ ...(where && { where }) });
+    } catch (error) {
+      throw mapDriverError(error, errorContext(context));
+    }
+  }
+
+  private buildFindArgs(query: NormalizedQueryContext<Entity>, context: CrudContext<Entity>): Record<string, unknown> {
+    const where = this.scopeToLive(translateFilter(query.filter, this.filterOptions), context, query.withDeleted);
+    const orderBy = query.sort.map((sort) => nestOrderBy(sort.field as string, sort.direction));
+    const include = this.buildInclude(query.include);
+    return {
+      ...(where && { where }),
+      ...(orderBy.length > 0 && { orderBy }),
+      ...(include && { include }),
+    };
+  }
+
+  // ── Relation includes ───────────────────────────────────────────────
+
+  /**
+   * Translate a validated `IncludeTree` into Prisma's nested `include`
+   * clause. Soft-deleted related rows are excluded the same way for a
+   * to-one or to-many edge — Prisma accepts a `where` on either — mirroring
+   * `@kavo/typeorm`'s exclusion of soft-deleted rows from every include.
+   * A root `withDeleted` is the root's own opt-in only; it never widens an
+   * included relation (same rule as `@kavo/typeorm`).
+   */
+  private buildInclude(tree: IncludeTree): Record<string, unknown> | undefined {
+    const entries = Object.values(tree);
+    if (entries.length === 0) return undefined;
+    const include: Record<string, unknown> = {};
+    for (const node of entries) {
+      const where = node.softDelete.strategy === "soft" ? { [node.softDelete.field]: null } : undefined;
+      const children = this.buildInclude(node.children);
+      if (where === undefined && children === undefined) {
+        include[node.relation.name] = true;
+      } else {
+        include[node.relation.name] = { ...(where && { where }), ...(children && { include: children }) };
+      }
+    }
+    return include;
+  }
+
+  // ── Soft delete ──────────────────────────────────────────────────────
+
+  private scopeToLive(
+    where: PrismaWhere | undefined,
+    context: CrudContext<Entity>,
+    withDeleted: boolean,
+  ): PrismaWhere | undefined {
+    const softDelete = context.config.softDelete;
+    if (softDelete.strategy !== "soft" || withDeleted) return where;
+    const live = { [softDelete.field]: null };
+    if (where === undefined) return live;
+    return { AND: [where, live] };
+  }
+
+  /** The resolved strategy, refused when an operation requires soft. */
+  private requireSoftDelete(context: CrudContext<Entity>, operation: string): ResolvedSoftDelete & { field: string } {
+    const softDelete = context.config.softDelete;
+    if (softDelete.strategy !== "soft") {
+      throw new ConfigurationException(
+        context.entityName,
+        "softDelete",
+        `'${operation}' requires a soft-deletable entity, but '${context.entityName}' ` +
+          `resolves to a hard delete strategy`,
+      );
+    }
+    return softDelete;
+  }
+
+  private isDeleted(row: Record<string, unknown>, field: string): boolean {
+    return row[field] !== null && row[field] !== undefined;
+  }
+
+  private async byId(
+    id: EntityId,
+    context: CrudContext<Entity>,
+    withDeleted: boolean,
+  ): Promise<Record<string, unknown> | null> {
+    const where = this.scopeToLive({ [this.idField]: id }, context, withDeleted);
+    return (await this.delegate.findFirst({ where })) as Record<string, unknown> | null;
+  }
+
+  // ── Writes ───────────────────────────────────────────────────────────
+
+  async create(data: Partial<Entity>, context: CrudContext<Entity>): Promise<Entity> {
+    try {
+      return (await this.delegate.create({ data })) as Entity;
+    } catch (error) {
+      throw mapDriverError(error, errorContext(context));
+    }
+  }
+
+  async update(id: EntityId, data: Partial<Entity>, context: CrudContext<Entity>): Promise<Entity> {
+    return this.writeExisting(id, data, context);
+  }
+
+  async patch(id: EntityId, data: Partial<Entity>, context: CrudContext<Entity>): Promise<Entity> {
+    return this.writeExisting(id, data, context);
+  }
+
+  /**
+   * update and patch share one primitive: the *shape* of `data` differs
+   * (full body vs. sparse) because the DTO layer differs, not the
+   * persistence mechanics. A soft-deleted row is invisible to writes,
+   * exactly as it is to reads — reviving one is `restore`'s job, so
+   * existence is checked against the live scope before the write.
+   */
+  private async writeExisting(id: EntityId, data: Partial<Entity>, context: CrudContext<Entity>): Promise<Entity> {
+    try {
+      const existing = await this.byId(id, context, false);
+      if (existing === null) throw this.notFound(id, context);
+      return (await this.delegate.update({ where: { [this.idField]: id }, data })) as Entity;
+    } catch (error) {
+      throw mapDriverError(error, errorContext(context));
+    }
+  }
+
+  async delete(id: EntityId, context: CrudContext<Entity>): Promise<void> {
+    const softDelete = context.config.softDelete;
+    try {
+      if (softDelete.strategy === "hard") {
+        const existing = await this.byId(id, context, false);
+        if (existing === null) throw this.notFound(id, context);
+        await this.delegate.delete({ where: { [this.idField]: id } });
+        return;
+      }
+      const { field } = softDelete;
+      const existing = await this.byId(id, context, true);
+      if (existing === null) throw this.notFound(id, context);
+      if (this.isDeleted(existing, field)) {
+        throw new AlreadyDeletedException({
+          messageParams: { entity: context.entityName, id: String(id) },
+          context: errorContext(context),
+        });
+      }
+      await this.delegate.update({ where: { [this.idField]: id }, data: { [field]: new Date() } });
+    } catch (error) {
+      throw mapDriverError(error, errorContext(context));
+    }
+  }
+
+  async restore(id: EntityId, context: CrudContext<Entity>): Promise<Entity> {
+    try {
+      const { field } = this.requireSoftDelete(context, "restore");
+      const existing = await this.byId(id, context, true);
+      if (existing === null) throw this.notFound(id, context);
+      if (!this.isDeleted(existing, field)) {
+        throw new NotDeletedException({
+          messageParams: { entity: context.entityName, id: String(id) },
+          context: errorContext(context),
+        });
+      }
+      return (await this.delegate.update({ where: { [this.idField]: id }, data: { [field]: null } })) as Entity;
+    } catch (error) {
+      throw mapDriverError(error, errorContext(context));
+    }
+  }
+
+  async purge(id: EntityId, context: CrudContext<Entity>): Promise<void> {
+    const softDelete = context.config.softDelete;
+    try {
+      if (softDelete.strategy === "soft") {
+        // Purge is the second step of a two-step delete: it removes a row
+        // that is already soft-deleted, never a live one.
+        const existing = await this.byId(id, context, true);
+        if (existing === null) throw this.notFound(id, context);
+        if (!this.isDeleted(existing, softDelete.field)) {
+          throw new NotDeletedException({
+            messageParams: { entity: context.entityName, id: String(id) },
+            context: errorContext(context),
+          });
+        }
+      } else {
+        const existing = await this.byId(id, context, false);
+        if (existing === null) throw this.notFound(id, context);
+      }
+      await this.delegate.delete({ where: { [this.idField]: id } });
+    } catch (error) {
+      throw mapDriverError(error, errorContext(context));
+    }
+  }
+
+  private notFound(id: EntityId, context: CrudContext<Entity>): NotFoundException {
+    return new NotFoundException({
+      messageParams: { entity: context.entityName, id: String(id) },
+      context: errorContext(context),
+    });
+  }
+}
+
+function nestOrderBy(field: string, direction: "asc" | "desc"): Record<string, unknown> {
+  const segments = field.split(".");
+  return segments.reduceRight<Record<string, unknown>>(
+    (inner, segment, index) => ({ [segment]: index === segments.length - 1 ? direction : inner }),
+    {},
+  );
+}
+
+function errorContext<Entity>(context: CrudContext<Entity>) {
+  return {
+    entityName: context.entityName,
+    operation: context.operation,
+    correlationId: context.correlationId,
+  };
+}

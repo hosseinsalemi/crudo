@@ -1,0 +1,78 @@
+// Test-fixture schema for @kavo/prisma's own test suite — mirrors the
+// entities @kavo/typeorm declares inline (via decorators) per spec file.
+// Prisma has no equivalent of "define an entity inline in a test file", so
+// every fixture model used across tests/*.spec.ts lives in this one schema,
+// generating one shared PrismaClient the test files reuse.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ── adapter.spec.ts ─────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+model Author {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String
+  age       Int
+  status    String   @default("active")
+  bio       String?
+  role      Role     @default(MEMBER)
+  createdAt DateTime @default(now())
+  books     Book[]
+}
+
+model Book {
+  id       Int     @id @default(autoincrement())
+  title    String
+  authorId Int?
+  author   Author? @relation(fields: [authorId], references: [id])
+}
+
+// ── includes.spec.ts ────────────────────────────────────────────────────
+
+model Blog {
+  id       Int       @id @default(autoincrement())
+  name     String
+  articles Article[]
+}
+
+model Article {
+  id        Int      @id @default(autoincrement())
+  title     String
+  blogId    Int?
+  blog      Blog?    @relation(fields: [blogId], references: [id])
+  notes     Note[]
+  deletedAt DateTime?
+}
+
+model Note {
+  id        Int      @id @default(autoincrement())
+  body      String
+  articleId Int?
+  article   Article? @relation(fields: [articleId], references: [id])
+}
+
+// ── soft-delete.spec.ts ─────────────────────────────────────────────────
+
+model Ticket {
+  id        Int       @id @default(autoincrement())
+  reference String    @unique
+  title     String
+  deletedAt DateTime?
+}
+
+model Invoice {
+  id         Int       @id @default(autoincrement())
+  number     String
+  archivedAt DateTime?
+}
