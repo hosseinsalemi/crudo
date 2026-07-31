@@ -6,7 +6,7 @@ description: How to add a new Kavo exception — hierarchy placement, error-code
 # Adding an exception
 
 Kavo has one exception hierarchy, one error-code catalog, and one wire shape
-(RFC 9457 problem details, ADR-0009) — `packages/docs/architecture/06-error-handling.md`.
+(RFC 9457 problem details, ADR-0009) — `docs/architecture/06-error-handling.md`.
 A new failure mode is a new catalog entry, never a raw `Error`, a bare string
 code, or a second serialization path.
 
@@ -67,6 +67,6 @@ mapping table actually recognizes the driver error it claims to.
 ## Docs
 
 Add the row to the error-catalog table in
-`packages/docs/architecture/06-error-handling.md` §2. A code missing from
+`docs/architecture/06-error-handling.md` §2. A code missing from
 that table is invisible to the next reader and to API consumers relying on
 the docs as the catalog's source of truth.

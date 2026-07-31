@@ -34,7 +34,7 @@ after it is extra instructions or corrections to fold in during implementation.
    the invariants and ADRs your change touches (registry-driven operations,
    ADR-0006; decoration-time routes, ADR-0012; the explicit named barrel,
    ADR-0010; the composition root freezing after `createCrud`) and read the
-   governing ADR in `packages/docs/adr/` before changing behavior it covers.
+   governing ADR in `docs/adr/` before changing behavior it covers.
    Follow the naming conventions in `CLAUDE.md` — they are normative.
 
 4. **Create the branch, in an isolated worktree.** Follow the `conventions`
@@ -74,7 +74,7 @@ after it is extra instructions or corrections to fold in during implementation.
    make it pass.
 
 9. **Update the docs** if you changed behavior an ADR or a
-   `packages/docs/architecture/` document governs. Silent divergence is a
+   `docs/architecture/` document governs. Silent divergence is a
    review finding.
 
 10. **Leave the changes uncommitted** and report what changed, against the

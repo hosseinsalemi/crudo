@@ -8,5 +8,5 @@
   "env": {
     "builtin": true
   },
-  "ignorePatterns": ["packages/docs/**", "**/dist/**"]
+  "ignorePatterns": ["docs/**", "**/dist/**"]
 }

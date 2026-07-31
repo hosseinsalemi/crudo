@@ -6,7 +6,7 @@ pagination, nested includes, field selection, optional per-operation DTOs,
 transactions, and problem-details errors — behind generated NestJS routes,
 configurable at global, entity, operation, and per-call scope.
 
-The design is documented in [`packages/docs`](packages/docs) — the
+The design is documented in [`docs`](docs) — the
 architecture notes and ADRs there are authoritative, and the naming
 conventions in [`CLAUDE.md`](CLAUDE.md) are normative.
 
@@ -18,7 +18,7 @@ conventions in [`CLAUDE.md`](CLAUDE.md) are normative.
 | [`@kavo/typeorm`](packages/orms/typeorm) | TypeORM adapter (`RepositoryAdapter` implementation)       |
 | [`@kavo/nest`](packages/frameworks/nest) | NestJS binding (`@Crud` decorator, route generation)       |
 
-Design docs, glossary, and ADRs live in [`packages/docs`](packages/docs).
+Design docs, glossary, and ADRs live in [`docs`](docs).
 
 ## Install
 

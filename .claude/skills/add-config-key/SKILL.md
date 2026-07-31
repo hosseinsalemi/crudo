@@ -6,7 +6,7 @@ description: How to add a new key to KavoSettings — schema, default, merge sem
 # Adding a config key
 
 Kavo has **one** configuration mechanism: `KavoSettings`, merged through a
-single precedence chain (`packages/docs/architecture/08-configuration.md`):
+single precedence chain (`docs/architecture/08-configuration.md`):
 
 ```
 built-in defaults → global (createKavo) → entity (createCrud)
@@ -72,7 +72,7 @@ Finish with `pnpm check`.
 
 ## Docs
 
-Update `packages/docs/architecture/08-configuration.md`'s key table (§1) —
+Update `docs/architecture/08-configuration.md`'s key table (§1) —
 it's the single source of truth for what's configurable, and a key missing
 from it is invisible to the next reader. If the key represents a new
 load-bearing precedent (not just a parameter on an existing mechanism),

@@ -1,6 +1,6 @@
 /**
  * Mechanical enforcement of the package boundaries defined in
- * packages/docs/architecture/02-monorepo-and-packages.md.
+ * docs/architecture/02-monorepo-and-packages.md.
  *
  * The rules here are the executable form of the dependency graph:
  *

@@ -38,7 +38,7 @@ or private.
    - **Affected packages** — `@kavo/core`, `@kavo/typeorm`, `@kavo/nest`,
      docs, or a combination.
    - **Constraints** — the invariants that must survive. Check
-     `packages/docs/adr/` for ones this issue touches (core purity, registry-
+     `docs/adr/` for ones this issue touches (core purity, registry-
      driven operations, the explicit barrel, decoration-time routes, soft
      delete, and relations are common ones) and cite them by number. Also cite
      the naming conventions in `CLAUDE.md` if relevant. Cite only what

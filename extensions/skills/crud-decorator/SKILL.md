@@ -20,7 +20,7 @@ at `onModuleInit` (`KavoCrudBinder`) — not through the constructor. Reach it
 with `boundCrudService(this)`, never constructor injection, inside a
 `@Crud`-decorated class.
 
-Full detail: `packages/docs/architecture/10-nestjs-integration.md`.
+Full detail: `docs/architecture/10-nestjs-integration.md`.
 
 ## Generated routes
 
@@ -142,7 +142,7 @@ below if omitted:
   against the target entity's `selectable` allowlist.
 
 Full detail (cycle guard, pagination-correctness guarantee, soft-delete
-interplay, write semantics for relations): `packages/docs/architecture/12-relations-and-includes.md`.
+interplay, write semantics for relations): `docs/architecture/12-relations-and-includes.md`.
 The wire-side `include=`/`fields[<relation>]=` grammar is in the
 `query-grammar` skill.
 

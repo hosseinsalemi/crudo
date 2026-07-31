@@ -6,7 +6,7 @@ description: Reference for Kavo's global configuration — the KavoSettings prec
 # Global config reference
 
 Kavo has **one** configuration mechanism, `KavoSettings`, merged through a
-single precedence chain (`packages/docs/architecture/08-configuration.md`):
+single precedence chain (`docs/architecture/08-configuration.md`):
 
 ```
 built-in defaults → global (createKavo / KavoModule.forRoot) → entity (createCrud / @Crud)
@@ -102,6 +102,6 @@ entity — settings, allowlists, relations, and every per-operation view — as 
 plain printable object. Useful for confirming what actually won the
 precedence chain without re-deriving it by hand.
 
-Full detail: `packages/docs/architecture/08-configuration.md`; the
+Full detail: `docs/architecture/08-configuration.md`; the
 `add-config-key` skill covers adding a _new_ key to this schema rather than
 using the existing ones.

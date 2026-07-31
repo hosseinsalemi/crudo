@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "packages/docs/**"
+      - "docs/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -44,7 +44,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5
         with:
-          path: packages/docs/.vitepress/dist
+          path: docs/.vitepress/dist
 
   deploy:
     needs: build

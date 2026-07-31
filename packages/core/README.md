@@ -27,6 +27,6 @@ src/
 
 Only the barrel (`@kavo/core`) is public API; deep imports are not.
 
-See `packages/docs/architecture/03-core-contracts-and-type-system.md` for
+See `docs/architecture/03-core-contracts-and-type-system.md` for
 the generic-parameter table, `FieldPath` notes, and the module-augmentation
 pattern for `OperationMetadata`.

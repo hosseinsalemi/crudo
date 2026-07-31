@@ -10,7 +10,7 @@ means entity-derived defaults; registering a class narrows exactly one slot.
 DTOs are shapes for **typing, serialization, and Swagger docs only** — there
 is no validation subsystem attached to them (that's the caller's own
 pipe/guard, e.g. Nest's `ValidationPipe`). Full detail:
-`packages/docs/architecture/04-dto-system.md`. Config-side wiring
+`docs/architecture/04-dto-system.md`. Config-side wiring
 (`@Crud(Entity, { dto: {...} })`) is in the `crud-decorator` skill.
 
 ## The six slots

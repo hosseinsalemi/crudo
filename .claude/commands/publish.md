@@ -45,7 +45,7 @@ workflow.
    to 0, minor resets patch to 0). State the computed version and _why_
    (which commits triggered the bump level) before touching any files.
 
-3. **Apply the version, in lockstep** (ADR-0004 — [`packages/docs/adr/0004-lockstep-versioning.md`](../../packages/docs/adr/0004-lockstep-versioning.md)):
+3. **Apply the version, in lockstep** (ADR-0004 — [`docs/adr/0004-lockstep-versioning.md`](../../docs/adr/0004-lockstep-versioning.md)):
    set the new version in `packages/core/package.json`,
    `packages/orms/typeorm/package.json`, and
    `packages/frameworks/nest/package.json`. Leave `packages/examples`

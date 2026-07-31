@@ -10,7 +10,7 @@ every generated route documents itself automatically; leave it out and
 `@Crud` costs nothing extra. No config flag turns this on or off: Kavo
 detects the package at runtime (`createRequire(...).require("@nestjs/swagger")`,
 cached, never throws if absent) and documents routes only when it's there.
-Full detail: `packages/docs/architecture/10-nestjs-integration.md` §4.
+Full detail: `docs/architecture/10-nestjs-integration.md` §4.
 
 ## Install
 

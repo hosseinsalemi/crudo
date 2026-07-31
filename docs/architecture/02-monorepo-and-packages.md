@@ -52,7 +52,7 @@ implying any get built ahead of real work landing (ADR-0002, ADR-0016).
   build a `GraphQLSchema` over a `createCrud` service — host-framework-
   agnostic, same constraint as an ORM adapter: it depends on `@kavo/core`
   and the `graphql` peer only, never `@kavo/nest` or any other framework
-  package. See `packages/docs/architecture/13-graphql-binding.md`.
+  package. See `docs/architecture/13-graphql-binding.md`.
 
 Every package earns its place: core is the hub, and every other package
 adapts exactly one external technology or protocol — an ORM, a host

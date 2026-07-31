@@ -95,25 +95,25 @@ as breaking.
 
 ## Docs sync
 
-`packages/docs/` (architecture notes and ADRs) is the authoritative source per
+`docs/` (architecture notes and ADRs) is the authoritative source per
 `CLAUDE.md` — code and docs disagreeing is a real defect, not a nitpick,
 because the next planner or reviewer trusts the docs over re-deriving behavior
 from source.
 
-- **`packages/docs/adr/0001`–`0014`** — one ADR per load-bearing decision.
+- **`docs/adr/0001`–`0014`** — one ADR per load-bearing decision.
   A change that introduces a new load-bearing invariant (a new seam, a new
   precedence rule, a new mechanically-enforced boundary) with no corresponding
   ADR is a finding. A change that _contradicts_ an existing ADR without
   superseding it (ADRs are point-in-time decisions; superseding one needs an
   explicit new ADR referencing the old one, not a silent code change) is a
   finding.
-- **`packages/docs/architecture/*.md`** — mirrors the packages (query
+- **`docs/architecture/*.md`** — mirrors the packages (query
   grammar, error handling, engine, TypeORM adapter, Nest integration, soft
   delete, relations). If the change alters behavior one of these documents
   describes in specifics (not just "engine gets faster" but "the pipeline now
   has a new stage", "the wire token mapping changed", "a new config key exists
   at this precedence level"), the matching doc should have moved too.
-- **`packages/docs/glossary.md`** — one canonical name per concept. A new
+- **`docs/glossary.md`** — one canonical name per concept. A new
   operation, config key, or exception introduces a term; check it either
   reuses an existing glossary term or the glossary gained an entry. A rename
   that leaves the old term in the glossary is a finding (stale synonym).
@@ -142,7 +142,7 @@ people to ignore this section.
 - Exceptions are `*Exception` with stable `KAVO_SNAKE_CASE` codes.
 - Config keys are camelCase with positively-phrased booleans (`exposeInternals`,
   never `hideInternals`). No `I` prefix on interfaces.
-- One canonical name per concept — check `packages/docs/glossary.md`. A synonym
+- One canonical name per concept — check `docs/glossary.md`. A synonym
   is a finding.
 
 ## Output
