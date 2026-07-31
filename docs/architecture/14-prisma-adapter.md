@@ -64,7 +64,7 @@ pagination-correctness rule (doc 12) avoids that. Prisma's `include` has
 no such failure mode: it always resolves relations as its own internally
 batched queries, to-one or to-many alike, never a row-multiplying join —
 so a to-many include never disturbs root pagination regardless of which
-strategy core resolved. `PrismaRepositoryAdapter` therefore *ignores*
+strategy core resolved. `PrismaRepositoryAdapter` therefore _ignores_
 `IncludeNode.strategy` entirely and maps every node the same way: a
 nested `include` entry, with a `where` excluding soft-deleted rows when
 the target is soft-deletable (Prisma accepts `where` inside `include` for
@@ -86,13 +86,13 @@ normalizes every connector's errors into its own driver-agnostic
 `P####` catalog, so unlike `@kavo/typeorm`'s table this one needs no
 per-database code lists. The original error always travels as `cause`:
 
-| Prisma code                  | Exception                                  |
-| ----------------------------- | ------------------------------------------- |
-| `P2002` unique constraint      | `ConflictException`                         |
-| `P2003` / `P2014` FK/relation  | `ConflictException`                         |
-| `P2025` record not found       | `NotFoundException`                         |
-| `P2034` transaction conflict   | `TransactionException` (`retryable: true`)  |
-| anything else                  | `PersistenceException` with `cause`         |
+| Prisma code                   | Exception                                  |
+| ----------------------------- | ------------------------------------------ |
+| `P2002` unique constraint     | `ConflictException`                        |
+| `P2003` / `P2014` FK/relation | `ConflictException`                        |
+| `P2025` record not found      | `NotFoundException`                        |
+| `P2034` transaction conflict  | `TransactionException` (`retryable: true`) |
+| anything else                 | `PersistenceException` with `cause`        |
 
 ## 6. Attachment points for later work
 

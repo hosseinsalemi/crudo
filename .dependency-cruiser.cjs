@@ -64,7 +64,7 @@ module.exports = {
         "@kavo/nest back (ADR-0016). Package-specifier form matched too, " +
         "per the note on typeorm-only-imports-core.",
       from: { path: "^packages/frameworks/nest/src" },
-      to: { path: "^(packages/orms|@kavo/typeorm)" },
+      to: { path: "^(packages/orms|@kavo/(typeorm|prisma))" },
     },
     {
       name: "graphql-only-imports-core",
@@ -76,7 +76,7 @@ module.exports = {
         "same constraint as an ORM adapter). Package-specifier form matched " +
         "too, per the note on typeorm-only-imports-core.",
       from: { path: "^packages/protocols/graphql/src" },
-      to: { path: "^(packages/orms|packages/frameworks|@kavo/(typeorm|nest))" },
+      to: { path: "^(packages/orms|packages/frameworks|@kavo/(typeorm|prisma|nest))" },
     },
     {
       name: "no-cross-package-deep-imports-core",

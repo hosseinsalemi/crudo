@@ -53,20 +53,21 @@ export function createPrismaInfrastructure(
   const metadataCache = new Map<ClassRef, EntityMetadata>();
   const adapterCache = new Map<ClassRef, RepositoryAdapter>();
 
+  function metadataFor<Entity extends object>(entity: ClassRef<Entity>): EntityMetadata<Entity> {
+    let metadata = metadataCache.get(entity);
+    if (metadata === undefined) {
+      metadata = buildEntityMetadata(options.datamodel, entity, byName);
+      metadataCache.set(entity, metadata);
+    }
+    return metadata as EntityMetadata<Entity>;
+  }
+
   return {
-    metadataFor<Entity extends object>(entity: ClassRef<Entity>) {
-      let metadata = metadataCache.get(entity);
-      if (metadata === undefined) {
-        metadata = buildEntityMetadata(options.datamodel, entity, byName);
-        metadataCache.set(entity, metadata);
-      }
-      return metadata as EntityMetadata<Entity>;
-    },
+    metadataFor,
     adapterFor<Entity extends object>(entity: ClassRef<Entity>) {
       let adapter = adapterCache.get(entity);
       if (adapter === undefined) {
-        const metadata = buildEntityMetadata(options.datamodel, entity, byName);
-        adapter = new PrismaRepositoryAdapter(prismaClient, metadata, {
+        adapter = new PrismaRepositoryAdapter(prismaClient, metadataFor(entity), {
           caseInsensitiveFilters: options.caseInsensitiveFilters ?? true,
         }) as RepositoryAdapter;
         adapterCache.set(entity, adapter);

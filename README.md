@@ -16,7 +16,7 @@ conventions in [`CLAUDE.md`](CLAUDE.md) are normative.
 | --------------------------------------------- | ---------------------------------------------------------------- |
 | [`@kavo/core`](packages/core)                 | Contracts, type system, engine — zero runtime dependencies       |
 | [`@kavo/typeorm`](packages/orms/typeorm)      | TypeORM adapter (`RepositoryAdapter` implementation)             |
-| [`@kavo/prisma`](packages/orms/prisma)        | Prisma adapter (`RepositoryAdapter` implementation)               |
+| [`@kavo/prisma`](packages/orms/prisma)        | Prisma adapter (`RepositoryAdapter` implementation)              |
 | [`@kavo/nest`](packages/frameworks/nest)      | NestJS binding (`@Crud` decorator, route generation)             |
 | [`@kavo/graphql`](packages/protocols/graphql) | Host-agnostic GraphQL schema binding over a `createCrud` service |
 

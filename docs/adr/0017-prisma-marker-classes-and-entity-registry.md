@@ -38,7 +38,7 @@ identity `createCrud` needs. `buildEntityMetadata` looks it up by
 Because Prisma has no built-in registry, `createPrismaInfrastructure`
 takes an explicit `entities: readonly ClassRef[]` — every marker class
 the Kavo root will ever see — alongside `datamodel`. A relation's target
-model name resolves back to *its* marker class through a `name → class`
+model name resolves back to _its_ marker class through a `name → class`
 map built from that list once, at infrastructure construction. Declaring
 a marker class without adding it to `entities` is a discoverable failure
 only if something actually asks for that relation's target (a lazy
