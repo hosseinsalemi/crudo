@@ -349,6 +349,12 @@ export class BooksController {}
 <div class="stack-section">
   <p class="stack-title">Works With Your Stack</p>
   <p class="stack-subtitle">First-class support for the tools you already use.</p>
+  <div class="stack-badges">
+    <span class="stack-badge">TypeORM</span>
+    <span class="stack-badge">Prisma</span>
+    <span class="stack-badge">NestJS</span>
+    <span class="stack-badge">GraphQL</span>
+  </div>
 </div>
 
 <style scoped>
@@ -369,5 +375,25 @@ export class BooksController {}
   margin: 0;
   font-size: 14.5px;
   color: var(--vp-c-text-2);
+}
+
+.stack-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin: 24px auto 0;
+  max-width: 480px;
+}
+
+.stack-badge {
+  padding: 7px 16px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 999px;
+  font-family: var(--vp-font-family-mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--vp-c-text-2);
+  background: var(--vp-c-bg-soft);
 }
 </style>
