@@ -3,7 +3,7 @@ import { defineConfig } from "vitepress";
 export default defineConfig({
   title: "Kavo",
   description: "Design documentation for the Kavo CRUD framework",
-  base: "/kavo/",
+  base: "/",
   srcDir: ".",
   srcExclude: ["README.md"],
   cleanUrls: true,
