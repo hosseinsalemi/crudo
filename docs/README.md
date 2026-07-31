@@ -24,6 +24,7 @@ These documents and the [ADRs](adr/) are authoritative.
 
 - [architecture/11-soft-delete.md](architecture/11-soft-delete.md) — strategy resolution, restore/purge, `withDeleted`, unique-index and cascade edges
 - [architecture/12-relations-and-includes.md](architecture/12-relations-and-includes.md) — relation registry, include resolution, join/batch loading, pagination rule, write-side
+- [architecture/14-prisma-adapter.md](architecture/14-prisma-adapter.md) — marker classes, metadata seam, query translation, error mapping
 
 ## Reference
 
