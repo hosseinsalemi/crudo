@@ -129,7 +129,10 @@ describe("BaseCrudGraphQLController", () => {
     app = moduleRef.createNestApplication();
     await app.init();
 
-    adapter.rows.push({ ...new Todo(), id: 1, title: "a", done: false }, { ...new Todo(), id: 2, title: "b", done: true });
+    adapter.rows.push(
+      { ...new Todo(), id: 1, title: "a", done: false },
+      { ...new Todo(), id: 2, title: "b", done: true },
+    );
 
     const listed = await request(app.getHttpServer() as Parameters<typeof request>[0])
       .post("/graphql")
