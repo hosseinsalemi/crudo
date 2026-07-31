@@ -1,5 +1,6 @@
 node_modules/
 dist/
+.vitepress/cache/
 *.tsbuildinfo
 .DS_Store
 .todo

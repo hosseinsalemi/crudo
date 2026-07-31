@@ -16,7 +16,10 @@
     "prettify": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "pnpm run build && pnpm run typecheck && pnpm run depcruise && pnpm run lint && pnpm run test",
-    "start": "pnpm --filter @kavo/examples start"
+    "start": "pnpm --filter @kavo/examples start",
+    "docs:dev": "vitepress dev packages/docs",
+    "docs:build": "vitepress build packages/docs",
+    "docs:preview": "vitepress preview packages/docs"
   },
   "devDependencies": {
     "@swc/core": "^1.15.47",
@@ -26,6 +29,7 @@
     "prettier": "^3.9.6",
     "typescript": "^5.5.4",
     "unplugin-swc": "^1.5.1",
+    "vitepress": "^1.6.4",
     "vitest": "^4.1.10"
   }
 }
