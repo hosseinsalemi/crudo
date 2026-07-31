@@ -90,4 +90,60 @@ describe("BaseCrudGraphQLController", () => {
     expect(fetched.body.errors).toBeUndefined();
     expect(fetched.body.data.todo).toEqual({ title: "from graphql", done: false });
   });
+
+  it("resolves the todos list query with the pagination envelope over HTTP", async () => {
+    const adapter = new InMemoryTodoAdapter();
+    const moduleRef = await Test.createTestingModule({
+      imports: [KavoModule.forRoot({ infrastructure: fakeInfrastructure(adapter), provideServices: true })],
+      controllers: [TodoController, GraphQLController],
+    }).compile();
+    app = moduleRef.createNestApplication();
+    await app.init();
+
+    for (const title of ["a", "b", "c"]) {
+      await request(app.getHttpServer() as Parameters<typeof request>[0])
+        .post("/graphql")
+        .send({ query: `mutation { createTodo(input: { title: "${title}", done: false }) { id } }` })
+        .expect(200);
+    }
+
+    const listed = await request(app.getHttpServer() as Parameters<typeof request>[0])
+      .post("/graphql")
+      .send({ query: `query { todos(limit: 1, offset: 1) { items { title } total limit offset } }` })
+      .expect(200);
+    expect(listed.body.errors).toBeUndefined();
+    expect(listed.body.data.todos).toEqual({
+      items: [{ title: "b" }],
+      total: 3,
+      limit: 1,
+      offset: 1,
+    });
+  });
+
+  it("resolves the todos list query with sort and filter args over HTTP", async () => {
+    const adapter = new InMemoryTodoAdapter();
+    const moduleRef = await Test.createTestingModule({
+      imports: [KavoModule.forRoot({ infrastructure: fakeInfrastructure(adapter), provideServices: true })],
+      controllers: [TodoController, GraphQLController],
+    }).compile();
+    app = moduleRef.createNestApplication();
+    await app.init();
+
+    adapter.rows.push({ ...new Todo(), id: 1, title: "a", done: false }, { ...new Todo(), id: 2, title: "b", done: true });
+
+    const listed = await request(app.getHttpServer() as Parameters<typeof request>[0])
+      .post("/graphql")
+      .send({
+        query: `query {
+          todos(sort: ["-title"], filter: { kind: "condition", field: "done", operator: "EQ", value: true }) {
+            items { id }
+          }
+        }`,
+      })
+      .expect(200);
+
+    expect(listed.body.errors).toBeUndefined();
+    expect(adapter.lastQuery?.sort).toEqual([{ field: "title", direction: "desc" }]);
+    expect(adapter.lastQuery?.filter.root).toEqual({ kind: "condition", field: "done", operator: "EQ", value: true });
+  });
 });
