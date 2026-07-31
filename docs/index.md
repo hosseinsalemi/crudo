@@ -17,9 +17,12 @@ hero:
 <div class="before-after">
   <p class="before-after-lead">Stop writing repetitive CRUD endpoints.</p>
   <div class="before-after-col before-after-col--before">
-    <div class="before-after-header before-after-header--before">
-      <span class="before-after-label-title"><span class="before-after-dot before-after-dot--before"></span>Without Kavo</span>
-      <span class="before-after-count before-after-count--before">77 lines</span>
+    <div class="before-after-header before-after-header--before before-after-header--stacked">
+      <div class="before-after-header-row">
+        <span class="before-after-label-title"><span class="before-after-dot before-after-dot--before"></span>Without Kavo</span>
+        <span class="before-after-count before-after-count--before">77 lines</span>
+      </div>
+      <p class="before-after-subtitle before-after-subtitle--before">No pagination, filtering, sorting, or field selection.</p>
     </div>
 
 ```ts
@@ -101,9 +104,14 @@ export class BooksController {
 
   </div>
   <div class="before-after-col before-after-col--after">
-    <div class="before-after-header before-after-header--after">
-      <span class="before-after-label-title"><span class="before-after-dot before-after-dot--after"></span>With Kavo</span>
-      <span class="before-after-count before-after-count--after">3 lines</span>
+    <div class="before-after-header before-after-header--after before-after-header--stacked">
+      <div class="before-after-header-row">
+        <span class="before-after-label-title"><span class="before-after-dot before-after-dot--after"></span>With Kavo</span>
+        <span class="before-after-count before-after-count--after">3 lines</span>
+      </div>
+      <p class="before-after-subtitle before-after-subtitle--after">
+        <strong>Pagination</strong>, <strong>filtering</strong>, <strong>sorting</strong>, and <strong>field selection</strong> — all included.
+      </p>
     </div>
 
 ```ts
@@ -196,6 +204,38 @@ export class BooksController {}
 
 .before-after-header--after .before-after-count {
   color: var(--vp-c-brand-1);
+}
+
+.before-after-header--stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.before-after-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.before-after-subtitle {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.before-after-subtitle--before {
+  color: var(--vp-c-text-3);
+}
+
+.before-after-subtitle--after {
+  color: var(--vp-c-text-2);
+}
+
+.before-after-subtitle--after strong {
+  color: var(--vp-c-brand-1);
+  font-weight: 600;
 }
 
 .before-after-col :deep(div[class*='language-']) {
