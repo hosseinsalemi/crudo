@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { useData } from "vitepress";
 
-const { theme } = useData();
+const { theme, frontmatter } = useData();
 </script>
 
 <template>
   <a
+    v-if="frontmatter.layout === 'home'"
     class="version-badge"
     :href="`https://www.npmjs.com/package/@kavo/core`"
     target="_blank"
