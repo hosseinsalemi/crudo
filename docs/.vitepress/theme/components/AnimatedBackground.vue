@@ -43,7 +43,7 @@
 <script setup lang="ts">
 const bubbles = Array.from({ length: 34 }, (_, i) => ({
   left: (i * 37 + 5) % 100,
-  size: 3 + ((i * 13) % 12),
+  size: 5 + ((i * 13) % 14),
   duration: 8 + ((i * 7) % 12),
   delay: -((i * 3) % 16),
 }));
@@ -124,11 +124,32 @@ const bubbles = Array.from({ length: 34 }, (_, i) => ({
   position: absolute;
   bottom: -20px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.05) 70%);
+  background: radial-gradient(
+    circle at 35% 30%,
+    rgba(255, 255, 255, 0.9),
+    rgba(255, 255, 255, 0.15) 45%,
+    rgba(255, 255, 255, 0.05) 75%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow:
+    inset -2px -2px 3px rgba(255, 255, 255, 0.15),
+    inset 1px 1px 2px rgba(255, 255, 255, 0.5);
   opacity: 0;
   animation-name: rise;
   animation-timing-function: ease-in;
   animation-iteration-count: infinite;
+}
+
+.bubble::after {
+  content: "";
+  position: absolute;
+  top: 16%;
+  left: 26%;
+  width: 28%;
+  height: 28%;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  filter: blur(1px);
 }
 
 @keyframes rise {
