@@ -56,6 +56,10 @@ const bubbles = Array.from({ length: 34 }, (_, i) => ({
   overflow: hidden;
   pointer-events: none;
   z-index: 0;
+  mask-image: linear-gradient(to bottom, black 15%, transparent 100%);
+}
+
+.dark .ocean {
   mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
 }
 
