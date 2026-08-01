@@ -242,5 +242,9 @@ infrastructure (no ORM in this package): all six routes, envelope shape,
 grammar wiring, problem-details mapping, disabled operations,
 manual-method-wins, custom + service-only operations, the service token,
 the soft-delete routes, relation includes, and the
-Swagger body/hint schemas. The full-stack path (Nest → engine → TypeORM → SQLite) is the
-checkpoint app's suite in `packages/examples`.
+Swagger body/hint schemas. The full-stack paths are the checkpoint app's
+suites in `packages/examples`: Nest → engine → TypeORM → SQLite/Postgres
+(`app.e2e.spec.ts`, `app-postgres.e2e.spec.ts`) and Nest → engine →
+Mongoose → MongoDB (`app-mongo.e2e.spec.ts`). The Mongoose one is what
+proves route generation composes with a document store — string `_id`s,
+`populate`-loaded includes, and config-declared soft-delete routes.

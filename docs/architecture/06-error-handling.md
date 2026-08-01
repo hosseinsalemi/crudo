@@ -60,8 +60,10 @@ params; core ships the English defaults.
 
 ## 4. Mapping strategy
 
-Adapter errors are translated by the adapter's own table
-(`@kavo/typeorm`'s `mapDriverError`, doc 09 §5) _inside_ the adapter;
+Adapter errors are translated by the adapter's own table — each adapter
+has one, keyed on whatever its driver reports (`@kavo/typeorm` doc 09 §5,
+`@kavo/prisma` doc 14 §5, `@kavo/mongoose` doc 15 §6) — _inside_ the
+adapter;
 whatever reaches the engine unrecognized becomes `PersistenceException`
 with the original as `cause` — never swallowed. Whether `cause` details
 leak into responses is governed by `errors.exposeInternals` (default
