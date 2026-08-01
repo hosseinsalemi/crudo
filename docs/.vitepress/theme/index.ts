@@ -3,6 +3,7 @@ import DefaultTheme from "vitepress/theme";
 import AnimatedBackground from "./components/AnimatedBackground.vue";
 import HeroTerminal from "./components/HeroTerminal.vue";
 import HeroInfo from "./components/HeroInfo.vue";
+import VersionBadge from "./components/VersionBadge.vue";
 import "./custom.css";
 
 export default {
@@ -12,6 +13,7 @@ export default {
       "home-hero-before": () => h(AnimatedBackground),
       "home-hero-info": () => h(HeroInfo),
       "home-hero-image": () => h(HeroTerminal),
+      "nav-bar-content-before": () => h(VersionBadge),
     });
   },
 };

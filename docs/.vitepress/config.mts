@@ -1,6 +1,11 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitepress";
 
 const hostname = "https://kavo.js.org";
+
+const corePackageJsonUrl = new URL("../../packages/core/package.json", import.meta.url);
+const { version } = JSON.parse(readFileSync(fileURLToPath(corePackageJsonUrl), "utf-8")) as { version: string };
 
 export default defineConfig({
   title: "Kavo",
@@ -40,6 +45,8 @@ export default defineConfig({
 
   themeConfig: {
     nav: [{ text: "Guide", link: "/architecture/01-system-architecture" }],
+
+    version,
 
     sidebar: [
       {
