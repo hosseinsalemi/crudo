@@ -3,7 +3,7 @@ import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module.js";
 
-// Matches the `docker run` command in packages/examples/README.md.
+// Matches the `docker run` command in packages/examples/nest-typeorm/README.md.
 const POSTGRES_OPTIONS = {
   host: "localhost",
   port: 5432,

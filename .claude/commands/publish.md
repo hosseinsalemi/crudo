@@ -49,7 +49,7 @@ workflow.
    set the new version in `packages/core/package.json`,
    `packages/orms/typeorm/package.json`,
    `packages/frameworks/nest/package.json`, and
-   `packages/protocols/graphql/package.json`. Leave `packages/examples`
+   `packages/protocols/graphql/package.json`. Leave `packages/examples/*`
    (private, unpublished) alone.
 
 4. **Regenerate the lockfile and gate:**

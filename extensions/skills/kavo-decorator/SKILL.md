@@ -203,7 +203,7 @@ export class UserController {
 }
 ```
 
-See `packages/examples/src/address/address.controller.ts` for a worked
+See `packages/examples/nest-typeorm/src/address/address.controller.ts` for a worked
 example (`normalizePostalCode`, `validatePostalCode`).
 
 **Rule of thumb:** reach for `@Override` when the action _is_ one of the
