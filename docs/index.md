@@ -110,7 +110,7 @@ export class BooksController {
         <span class="before-after-count before-after-count--after">3 lines</span>
       </div>
       <p class="before-after-subtitle before-after-subtitle--after">
-        <strong>Pagination</strong>, <strong>filtering</strong>, <strong>sorting</strong>, and <strong>field selection</strong> — all included.
+        <strong>Pagination</strong>, <strong>filtering</strong>, <strong>sorting</strong>, <strong>field selection</strong>, and more — all included.
       </p>
     </div>
 
