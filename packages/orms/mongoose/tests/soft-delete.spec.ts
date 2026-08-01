@@ -1,0 +1,211 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { Schema } from "mongoose";
+import {
+  AlreadyDeletedException,
+  ConflictException,
+  NotDeletedException,
+  NotFoundException,
+  type DefaultKavoService,
+} from "@kavo/core";
+import { buildEntityMetadata, createMongooseKavo } from "@kavo/mongoose";
+import {
+  clearCollections,
+  ensureIndexes,
+  rejectionOf,
+  startTestDatabase,
+  type TestDatabase,
+} from "./support/database.js";
+
+interface Ticket {
+  _id: string;
+  reference: string;
+  title: string;
+  deletedAt: Date | null;
+}
+
+interface Invoice {
+  _id: string;
+  number: string;
+  archivedAt: Date | null;
+}
+
+/**
+ * Declared through a factory so the models keep their *inferred* Mongoose
+ * types — annotating them with `ReturnType<connection["model"]>` would
+ * collapse them to `Model<unknown>`.
+ */
+function defineModels(connection: TestDatabase["connection"]) {
+  return {
+    Ticket: connection.model(
+      "Ticket",
+      new Schema({
+        reference: { type: String, unique: true },
+        title: String,
+        deletedAt: { type: Date, default: null },
+      }),
+    ),
+    Invoice: connection.model("Invoice", new Schema({ number: String, archivedAt: { type: Date, default: null } })),
+  };
+}
+
+let database: TestDatabase;
+let models: ReturnType<typeof defineModels>;
+let tickets: DefaultKavoService<Ticket>;
+let invoices: DefaultKavoService<Invoice>;
+
+beforeAll(async () => {
+  database = await startTestDatabase();
+  models = defineModels(database.connection);
+  await ensureIndexes(models.Ticket, models.Invoice);
+
+  const kavo = createMongooseKavo(database.connection);
+  // Double cast on purpose: Mongoose's model type describes a *hydrated
+  // document*, while Kavo serves lean data with `_id` already rendered as a
+  // string. The interfaces above are the shape the service actually
+  // returns, which is what these tests assert.
+  tickets = kavo.createCrud(models.Ticket, {
+    softDelete: { field: "deletedAt" },
+    operations: { purgeOne: true },
+  }) as unknown as DefaultKavoService<Ticket>;
+  invoices = kavo.createCrud(models.Invoice, {
+    softDelete: { field: "archivedAt" },
+  }) as unknown as DefaultKavoService<Invoice>;
+});
+
+afterAll(async () => {
+  await database.stop();
+});
+
+beforeEach(async () => {
+  await clearCollections(database.connection);
+});
+
+async function newTicket(reference = "T-1"): Promise<string> {
+  const created = (await tickets.createOne({ reference, title: "broken login" } as never)) as Ticket;
+  return created._id;
+}
+
+describe("metadata seam — no auto-detected soft-delete field", () => {
+  it("reports softDeleteField as null (Mongoose has no @DeleteDateColumn equivalent)", () => {
+    expect(buildEntityMetadata(models.Ticket as never, database.connection).softDeleteField).toBeNull();
+  });
+});
+
+describe("MongooseRepositoryAdapter — soft delete", () => {
+  it("stamps the marker field and hides the document from every read", async () => {
+    const id = await newTicket();
+    await tickets.deleteOne(id);
+
+    const raw = (await models.Ticket.findById(id).lean()) as unknown as { deletedAt: unknown };
+    expect(raw.deletedAt).toBeInstanceOf(Date);
+
+    await expect(tickets.findOne(id)).rejects.toBeInstanceOf(NotFoundException);
+    expect((await tickets.findMany()).items).toHaveLength(0);
+    expect((await tickets.findMany()).total).toBe(0);
+  });
+
+  it("returns deleted documents under withDeleted", async () => {
+    const id = await newTicket();
+    await tickets.deleteOne(id);
+
+    const list = await tickets.findMany({ withDeleted: true });
+    expect(list.items).toHaveLength(1);
+    expect(list.total).toBe(1);
+    expect(await tickets.findOne(id, { withDeleted: true } as never)).toMatchObject({ _id: id });
+  });
+
+  it("keeps updates away from deleted documents", async () => {
+    const id = await newTicket();
+    await tickets.deleteOne(id);
+    const error = await rejectionOf(tickets.patchOne(id, { title: "resurrected" } as never));
+    expect(error).toBeInstanceOf(NotFoundException);
+    expect(error.code).toBe("KAVO_NOT_FOUND");
+  });
+
+  it("rejects a second delete with 409 already-deleted", async () => {
+    const id = await newTicket();
+    await tickets.deleteOne(id);
+    const error = await rejectionOf(tickets.deleteOne(id));
+    expect(error).toBeInstanceOf(AlreadyDeletedException);
+    expect(error.code).toBe("KAVO_ALREADY_DELETED");
+  });
+
+  it("restores a deleted document and refuses to restore a live one", async () => {
+    const id = await newTicket();
+    await tickets.deleteOne(id);
+
+    const restored = await tickets.restoreOne(id);
+    expect(restored).toMatchObject({ _id: id, deletedAt: null });
+    expect((await tickets.findMany()).items).toHaveLength(1);
+
+    const error = await rejectionOf(tickets.restoreOne(id));
+    expect(error).toBeInstanceOf(NotDeletedException);
+    expect(error.code).toBe("KAVO_NOT_DELETED");
+  });
+
+  it("purges a deleted document for good, but never a live one", async () => {
+    const id = await newTicket();
+    const error = await rejectionOf(tickets.purgeOne(id));
+    expect(error).toBeInstanceOf(NotDeletedException);
+    expect(error.code).toBe("KAVO_NOT_DELETED");
+
+    await tickets.deleteOne(id);
+    await tickets.purgeOne(id);
+    expect(await models.Ticket.countDocuments({})).toBe(0);
+  });
+
+  it("reports a missing document as 404 rather than already-deleted", async () => {
+    const absent = "507f1f77bcf86cd799439011";
+    await expect(tickets.deleteOne(absent)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(tickets.restoreOne(absent)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(tickets.purgeOne(absent)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it("lets exactly one of two concurrent deletes win, and keeps the first timestamp", async () => {
+    // The marker predicate lives in the update filter, so the transition is
+    // atomic: a read-then-write would let both callers pass the
+    // `isDeleted` check, both report success, and the later write overwrite
+    // the recorded deletion time.
+    const id = await newTicket("T-race");
+    const outcomes = await Promise.allSettled([tickets.deleteOne(id), tickets.deleteOne(id)]);
+    const fulfilled = outcomes.filter((outcome) => outcome.status === "fulfilled");
+    const rejected = outcomes.filter((outcome) => outcome.status === "rejected");
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(AlreadyDeletedException);
+  });
+
+  it("lets exactly one of two concurrent restores win", async () => {
+    const id = await newTicket("T-race-2");
+    await tickets.deleteOne(id);
+    const outcomes = await Promise.allSettled([tickets.restoreOne(id), tickets.restoreOne(id)]);
+    expect(outcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(1);
+    const rejected = outcomes.find((outcome) => outcome.status === "rejected") as PromiseRejectedResult;
+    expect(rejected.reason).toBeInstanceOf(NotDeletedException);
+  });
+
+  it("still conflicts on a unique index held by a deleted document", async () => {
+    // A soft-deleted document keeps occupying its unique indexes — the
+    // documented fix is a partial index scoped to live documents.
+    const id = await newTicket("T-dup");
+    await tickets.deleteOne(id);
+    await expect(tickets.createOne({ reference: "T-dup", title: "again" } as never)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+  });
+});
+
+describe("MongooseRepositoryAdapter — configured marker field", () => {
+  it("soft-deletes, excludes, and restores over an ordinary field", async () => {
+    const created = (await invoices.createOne({ number: "INV-1" } as never)) as Invoice;
+
+    await invoices.deleteOne(created._id);
+    const raw = (await models.Invoice.findById(created._id).lean()) as unknown as { archivedAt: unknown };
+    expect(raw.archivedAt).toBeInstanceOf(Date);
+    expect((await invoices.findMany()).items).toHaveLength(0);
+    expect((await invoices.findMany({ withDeleted: true })).items).toHaveLength(1);
+
+    expect(await invoices.restoreOne(created._id)).toMatchObject({ _id: created._id, archivedAt: null });
+    expect((await invoices.findMany()).items).toHaveLength(1);
+  });
+});
