@@ -5,8 +5,8 @@ import { Body, Controller, HttpCode, Post } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
 import { Test } from "@nestjs/testing";
 import type { INestApplication } from "@nestjs/common";
-import { Crud, KavoModule, BaseCrudGraphQLController } from "@kavo/nest";
-import { registerCrudGraphQLTypes } from "@kavo/graphql";
+import { Kavo, KavoModule, BaseKavoGraphQLController } from "@kavo/nest";
+import { registerKavoGraphQLTypes } from "@kavo/graphql";
 import {
   GraphQLBoolean,
   GraphQLInputObjectType,
@@ -18,12 +18,12 @@ import {
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
 
 /**
- * Proves `BaseCrudGraphQLController` end to end: a concrete controller
+ * Proves `BaseKavoGraphQLController` end to end: a concrete controller
  * that only adds `@Controller`/`@Post` discovers `Todo` through
- * `getCrudEntities()` + `registerCrudGraphQLTypes`, merges it onto one
+ * `getKavoEntities()` + `registerKavoGraphQLTypes`, merges it onto one
  * schema at `onModuleInit`, and resolves through the exact
- * `DefaultCrudService` REST binds to. Vitest isolates modules per file, so
- * this is a safe place for a single `@Crud(Todo)` registration (same
+ * `DefaultKavoService` REST binds to. Vitest isolates modules per file, so
+ * this is a safe place for a single `@Kavo(Todo)` registration (same
  * reasoning as `for-feature-registry.e2e.spec.ts`).
  */
 const TodoType = new GraphQLObjectType({
@@ -41,14 +41,14 @@ const CreateTodoInput = new GraphQLInputObjectType({
     done: { type: GraphQLBoolean },
   },
 });
-registerCrudGraphQLTypes(Todo, { itemType: TodoType, createInputType: CreateTodoInput });
+registerKavoGraphQLTypes(Todo, { itemType: TodoType, createInputType: CreateTodoInput });
 
-@Crud(Todo)
+@Kavo(Todo)
 @Controller("todos")
 class TodoController {}
 
 @Controller("graphql")
-class GraphQLController extends BaseCrudGraphQLController {
+class GraphQLController extends BaseKavoGraphQLController {
   constructor(moduleRef: ModuleRef) {
     super(moduleRef);
   }
@@ -66,8 +66,8 @@ afterEach(async () => {
   await app.close();
 });
 
-describe("BaseCrudGraphQLController", () => {
-  it("discovers @Crud(Todo) and resolves a mutation + query against the merged schema", async () => {
+describe("BaseKavoGraphQLController", () => {
+  it("discovers @Kavo(Todo) and resolves a mutation + query against the merged schema", async () => {
     const adapter = new InMemoryTodoAdapter();
     const moduleRef = await Test.createTestingModule({
       imports: [KavoModule.forRoot({ infrastructure: fakeInfrastructure(adapter), provideServices: true })],

@@ -1,5 +1,5 @@
 import { Controller } from "@nestjs/common";
-import { Crud } from "@kavo/nest";
+import { Kavo } from "@kavo/nest";
 import { Dog } from "./dog.entity.js";
 
 /**
@@ -11,6 +11,6 @@ import { Dog } from "./dog.entity.js";
  * `DogItemDto` for the polymorphic `pets` union — that usage is independent
  * of this route's own config.
  */
-@Crud(Dog)
+@Kavo(Dog)
 @Controller("dogs")
 export class DogController {}

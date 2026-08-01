@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Prisma, type PrismaClient } from "@prisma/client";
-import type { KavoInstance, DefaultCrudService } from "@kavo/core";
+import type { KavoInstance, DefaultKavoService } from "@kavo/core";
 import { createPrismaKavo } from "@kavo/prisma";
 import { newTestPrismaClient } from "./support/client.js";
 
@@ -27,8 +27,8 @@ class Note {
 
 let client: PrismaClient;
 let kavo: KavoInstance;
-let blogs: DefaultCrudService<Blog>;
-let articles: DefaultCrudService<Article>;
+let blogs: DefaultKavoService<Blog>;
+let articles: DefaultKavoService<Article>;
 
 beforeAll(() => {
   client = newTestPrismaClient();
@@ -39,12 +39,12 @@ beforeAll(() => {
   });
   blogs = kavo.createCrud(Blog, {
     relations: { edges: { articles: { includable: true } } },
-  }) as DefaultCrudService<Blog>;
+  }) as DefaultKavoService<Blog>;
   articles = kavo.createCrud(Article, {
     softDelete: { field: "deletedAt" },
     relations: { edges: { blog: { includable: true }, notes: { includable: true } } },
     allowlists: { filterable: ["id", "title", "blog.name"] },
-  } as never) as DefaultCrudService<Article>;
+  } as never) as DefaultKavoService<Article>;
   kavo.createCrud(Note, { relations: { edges: { article: { includable: true } } } });
 });
 

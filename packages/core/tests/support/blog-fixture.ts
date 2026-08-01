@@ -1,5 +1,5 @@
 import type {
-  CrudContext,
+  KavoContext,
   EntityId,
   EntityMetadata,
   NormalizedQueryContext,
@@ -116,7 +116,7 @@ export class SeededAdapter<Entity extends object> implements RepositoryAdapter<E
     return row;
   }
 
-  async update(id: EntityId, data: Partial<Entity>, context: CrudContext<Entity>): Promise<Entity> {
+  async update(id: EntityId, data: Partial<Entity>, context: KavoContext<Entity>): Promise<Entity> {
     const row = await this.findOneById(id, null);
     if (row === null) {
       throw new NotFoundException({ messageParams: { entity: context.entityName, id: String(id) } });
@@ -125,7 +125,7 @@ export class SeededAdapter<Entity extends object> implements RepositoryAdapter<E
     return row;
   }
 
-  async patch(id: EntityId, data: Partial<Entity>, context: CrudContext<Entity>): Promise<Entity> {
+  async patch(id: EntityId, data: Partial<Entity>, context: KavoContext<Entity>): Promise<Entity> {
     return this.update(id, data, context);
   }
 

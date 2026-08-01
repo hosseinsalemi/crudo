@@ -1,4 +1,4 @@
-import type { ErrorContext, ErrorHandler, CrudException } from "./crud-exception.js";
+import type { ErrorContext, ErrorHandler, KavoExceptionShape } from "./kavo-exception-shape.js";
 import { KavoException, PersistenceException } from "./exceptions.js";
 
 /**
@@ -12,7 +12,7 @@ import { KavoException, PersistenceException } from "./exceptions.js";
  * the exception's own context is missing.
  */
 export class DefaultErrorHandler implements ErrorHandler {
-  handle(error: unknown, context: ErrorContext): CrudException {
+  handle(error: unknown, context: ErrorContext): KavoExceptionShape {
     if (error instanceof KavoException) {
       return this.enrich(error, context);
     }
@@ -23,7 +23,7 @@ export class DefaultErrorHandler implements ErrorHandler {
     });
   }
 
-  private enrich(exception: KavoException, context: ErrorContext): CrudException {
+  private enrich(exception: KavoException, context: ErrorContext): KavoExceptionShape {
     const merged: ErrorContext = {
       entityName: exception.context.entityName ?? context.entityName,
       operation: exception.context.operation ?? context.operation,
@@ -33,6 +33,6 @@ export class DefaultErrorHandler implements ErrorHandler {
     // the enriched context through a same-shape proxy object.
     return Object.create(exception, {
       context: { value: merged, enumerable: true },
-    }) as CrudException;
+    }) as KavoExceptionShape;
   }
 }

@@ -1,9 +1,9 @@
 export {
-  createCrudGraphQLSchema,
-  mergeCrudGraphQLSchemas,
-  type CrudGraphQLOptions,
-  type BoundCrudService,
+  createKavoGraphQLSchema,
+  mergeKavoGraphQLSchemas,
+  type KavoGraphQLOptions,
+  type BoundKavoService,
 } from "./schema.js";
-export { registerCrudGraphQLTypes, getCrudGraphQLTypes, type CrudGraphQLTypes } from "./registry.js";
-export { resolveCrudGraphQLSchema, type CrudEntityRef } from "./discovery.js";
+export { registerKavoGraphQLTypes, getKavoGraphQLTypes, type KavoGraphQLTypes } from "./registry.js";
+export { resolveKavoGraphQLSchema, type KavoEntityRef } from "./discovery.js";
 export { GraphQLJSON } from "./json-scalar.js";

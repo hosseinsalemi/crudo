@@ -1,4 +1,4 @@
-import type { CrudContext } from "../context/crud-context.js";
+import type { KavoContext } from "../context/kavo-context.js";
 
 /**
  * Opaque, module-augmentable metadata bag carried by every operation
@@ -34,5 +34,5 @@ export interface OperationMetadata {}
  * the fully-resolved per-request context.
  */
 export interface OperationHandler<Entity = unknown, Input = unknown, Output = unknown> {
-  execute(input: Input, context: CrudContext<Entity>): Promise<Output>;
+  execute(input: Input, context: KavoContext<Entity>): Promise<Output>;
 }

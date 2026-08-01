@@ -1,7 +1,7 @@
 import { Body, Delete, Get, HttpCode, Param, Patch, Post, Put, Query } from "@nestjs/common";
 import type {
   ClassRef,
-  DefaultCrudService,
+  DefaultKavoService,
   EntityConfig,
   EntityInput,
   OperationDescriptor,
@@ -10,20 +10,20 @@ import type {
   StandardOperationId,
 } from "@kavo/core";
 import { ConfigurationException, createOperationRegistry } from "@kavo/core";
-import type { CrudHttpMethod, CrudRouteOptions } from "./operation-metadata.js";
+import type { KavoHttpMethod, KavoRouteOptions } from "./operation-metadata.js";
 import type { OverrideMetadata } from "./override.decorator.js";
-import { CRUD_CONTROLLER_METADATA, CRUD_OVERRIDE_METADATA, CRUD_SERVICE_PROPERTY } from "./tokens.js";
+import { KAVO_CONTROLLER_METADATA, KAVO_OVERRIDE_METADATA, KAVO_SERVICE_PROPERTY } from "./tokens.js";
 import { WireQueryPipe } from "./wire-query.pipe.js";
 import { applySwaggerMetadata } from "./swagger.js";
 
-/** What `@Crud` records on the controller for `KavoModule.forFeature`. */
-export interface CrudControllerMetadata {
+/** What `@Kavo` records on the controller for `KavoModule.forFeature`. */
+export interface KavoControllerMetadata {
   readonly entity: ClassRef;
   readonly config?: EntityConfig<object>;
 }
 
 /**
- * Every `@Crud`-decorated class, in decoration order — populated as a side
+ * Every `@Kavo`-decorated class, in decoration order — populated as a side
  * effect of the decorator running at class-definition time (import time),
  * which is always before any `KavoModule.forRoot`/`forRootAsync` call
  * (nested inside `@Module({...})`, which only runs after every controller
@@ -35,15 +35,15 @@ export interface CrudControllerMetadata {
  * differently-configured classes against the same entity in one file,
  * always pass `forFeature` an explicit array instead.
  */
-const registeredCrudControllers = new Map<Function, CrudControllerMetadata>();
+const registeredKavoControllers = new Map<Function, KavoControllerMetadata>();
 
 /** @internal used by `KavoModule.forFeature()`'s no-argument form. */
-export function getRegisteredCrudControllers(): ReadonlyMap<Function, CrudControllerMetadata> {
-  return registeredCrudControllers;
+export function getRegisteredKavoControllers(): ReadonlyMap<Function, KavoControllerMetadata> {
+  return registeredKavoControllers;
 }
 
 /**
- * Every `@Crud`-decorated entity the process has seen, in decoration
+ * Every `@Kavo`-decorated entity the process has seen, in decoration
  * order — the public, read-only counterpart of the registry above. Meant
  * for a second binding (e.g. a GraphQL schema) that wants to mirror
  * whatever entities are already exposed over REST without a hand-kept
@@ -53,8 +53,8 @@ export function getRegisteredCrudControllers(): ReadonlyMap<Function, CrudContro
  * since unlike `forFeature` it never has to pick one config to bind a DI
  * token to.
  */
-export function getCrudEntities(): readonly CrudControllerMetadata[] {
-  return Array.from(registeredCrudControllers.values());
+export function getKavoEntities(): readonly KavoControllerMetadata[] {
+  return Array.from(registeredKavoControllers.values());
 }
 
 /**
@@ -63,7 +63,7 @@ export function getCrudEntities(): readonly CrudControllerMetadata[] {
  * union so a misspelled id cannot sit here unread.
  */
 const STANDARD_ROUTES: Readonly<
-  Partial<Record<StandardOperationId, { method: CrudHttpMethod; path: string; status: number }>>
+  Partial<Record<StandardOperationId, { method: KavoHttpMethod; path: string; status: number }>>
 > = {
   createOne: { method: "POST", path: "", status: 201 },
   findMany: { method: "GET", path: "", status: 200 },
@@ -96,7 +96,7 @@ const BODYLESS_WRITES: ReadonlySet<StandardOperationId> = new Set<StandardOperat
  */
 const NEST_ROUTE_ARGS_METADATA = "__routeArguments__";
 
-const METHOD_DECORATORS: Record<CrudHttpMethod, (path: string) => MethodDecorator> = {
+const METHOD_DECORATORS: Record<KavoHttpMethod, (path: string) => MethodDecorator> = {
   GET: Get,
   POST: Post,
   PUT: Put,
@@ -105,14 +105,14 @@ const METHOD_DECORATORS: Record<CrudHttpMethod, (path: string) => MethodDecorato
 };
 
 interface ResolvedRoute {
-  readonly method: CrudHttpMethod;
+  readonly method: KavoHttpMethod;
   readonly path: string;
   readonly status: number;
   readonly hasIdParam: boolean;
 }
 
 /**
- * `@Crud(UserEntity)` — registry-driven route generation.
+ * `@Kavo(UserEntity)` — registry-driven route generation.
  *
  * The decorator builds the entity's operation registry (the same
  * `createOperationRegistry` the engine uses) and generates one route per
@@ -135,9 +135,9 @@ interface ResolvedRoute {
  * what lets Nest's router see the methods during its normal controller
  * scan — Nest maps routes before any module lifecycle hook runs, so this
  * is the only moment that works. The service instance arrives later:
- * `KavoModule`'s discovery binder finds every `@Crud`-decorated controller
+ * `KavoModule`'s discovery binder finds every `@Kavo`-decorated controller
  * at `onModuleInit` (via `@nestjs/core`'s `DiscoveryService`, so no explicit
- * registration list is needed) and assigns `this[CRUD_SERVICE_PROPERTY]`
+ * registration list is needed) and assigns `this[KAVO_SERVICE_PROPERTY]`
  * directly — no DI provider or constructor injection involved.
  *
  * The generic parameters are inferred and exist purely to typecheck the
@@ -148,7 +148,7 @@ interface ResolvedRoute {
  * registering one slot does not constrain the others. Route generation
  * itself is entity-agnostic, so everything below consumes the erased view.
  */
-export function Crud<
+export function Kavo<
   Entity extends object,
   CreateDto = EntityInput<Entity>,
   UpdateDto = EntityInput<Entity>,
@@ -165,9 +165,9 @@ export function Crud<
       prototype: Record<string, unknown>;
     };
     const erasedConfig = config as EntityConfig<object> | undefined;
-    const metadata: CrudControllerMetadata = { entity, config: erasedConfig };
-    Reflect.defineMetadata(CRUD_CONTROLLER_METADATA, metadata, target);
-    registeredCrudControllers.set(target, metadata);
+    const metadata: KavoControllerMetadata = { entity, config: erasedConfig };
+    Reflect.defineMetadata(KAVO_CONTROLLER_METADATA, metadata, target);
+    registeredKavoControllers.set(target, metadata);
 
     const registry = createOperationRegistry(erasedConfig);
     const overrides = collectOverrides(controller.prototype, entity.name, registry);
@@ -218,7 +218,7 @@ function collectOverrides(
   const overrides = new Map<OperationId, string>();
   for (const methodName of Object.getOwnPropertyNames(prototype)) {
     if (methodName === "constructor") continue;
-    const metadata = Reflect.getMetadata(CRUD_OVERRIDE_METADATA, prototype, methodName) as OverrideMetadata | undefined;
+    const metadata = Reflect.getMetadata(KAVO_OVERRIDE_METADATA, prototype, methodName) as OverrideMetadata | undefined;
     if (metadata === undefined) continue;
     const existing = overrides.get(metadata.operationId);
     if (existing !== undefined) {
@@ -260,13 +260,13 @@ function assertNoOwnParamMetadata(
     throw new ConfigurationException(
       entityName,
       `override.${operationId}`,
-      `'${methodName}' must not declare its own @Param/@Query/@Body — @Crud applies the operation's own param wiring`,
+      `'${methodName}' must not declare its own @Param/@Query/@Body — @Kavo applies the operation's own param wiring`,
     );
   }
 }
 
 function resolveRoute(descriptor: OperationDescriptor<object>): ResolvedRoute | null {
-  const options: CrudRouteOptions = descriptor.meta.routes ?? {};
+  const options: KavoRouteOptions = descriptor.meta.routes ?? {};
   if (options.enabled === false) return null; // service-only
   // A non-standard id is absent from the table by design and falls back to
   // the defaults below — the registry's own genericity (ADR-0006), even
@@ -336,12 +336,12 @@ function applyParamDecorators(
   }
 }
 
-function usesBody(method: CrudHttpMethod): boolean {
+function usesBody(method: KavoHttpMethod): boolean {
   return method === "POST" || method === "PUT" || method === "PATCH";
 }
 
 type BoundController = Record<string, unknown> & {
-  [CRUD_SERVICE_PROPERTY]: DefaultCrudService<object>;
+  [KAVO_SERVICE_PROPERTY]: DefaultKavoService<object>;
 };
 
 function makeHandler(
@@ -355,41 +355,41 @@ function makeHandler(
   switch (id) {
     case "createOne":
       return async function (this: BoundController, body: unknown) {
-        return this[CRUD_SERVICE_PROPERTY].createOne(body as never);
+        return this[KAVO_SERVICE_PROPERTY].createOne(body as never);
       };
     case "findMany":
       return async function (this: BoundController, query: unknown) {
-        return this[CRUD_SERVICE_PROPERTY].findMany(query as never);
+        return this[KAVO_SERVICE_PROPERTY].findMany(query as never);
       };
     case "findOne":
       return async function (this: BoundController, id: unknown, query: unknown) {
-        return this[CRUD_SERVICE_PROPERTY].findOne(id as never, query as never);
+        return this[KAVO_SERVICE_PROPERTY].findOne(id as never, query as never);
       };
     case "updateOne":
       return async function (this: BoundController, id: unknown, body: unknown) {
-        return this[CRUD_SERVICE_PROPERTY].updateOne(id as never, body as never);
+        return this[KAVO_SERVICE_PROPERTY].updateOne(id as never, body as never);
       };
     case "patchOne":
       return async function (this: BoundController, id: unknown, body: unknown) {
-        return this[CRUD_SERVICE_PROPERTY].patchOne(id as never, body as never);
+        return this[KAVO_SERVICE_PROPERTY].patchOne(id as never, body as never);
       };
     case "deleteOne":
       return async function (this: BoundController, id: unknown) {
-        await this[CRUD_SERVICE_PROPERTY].deleteOne(id as never);
+        await this[KAVO_SERVICE_PROPERTY].deleteOne(id as never);
       };
     case "restoreOne":
       return async function (this: BoundController, id: unknown) {
-        return this[CRUD_SERVICE_PROPERTY].restoreOne(id as never);
+        return this[KAVO_SERVICE_PROPERTY].restoreOne(id as never);
       };
     case "purgeOne":
       return async function (this: BoundController, id: unknown) {
-        await this[CRUD_SERVICE_PROPERTY].purgeOne(id as never);
+        await this[KAVO_SERVICE_PROPERTY].purgeOne(id as never);
       };
     default:
       return async function (this: BoundController, ...args: unknown[]) {
         const requestId = route.hasIdParam ? (args[0] as string) : null;
         const body = route.hasIdParam ? args[1] : args[0];
-        const response = await this[CRUD_SERVICE_PROPERTY].engine.execute({
+        const response = await this[KAVO_SERVICE_PROPERTY].engine.execute({
           operation: id,
           id: requestId,
           body: (body ?? null) as never,

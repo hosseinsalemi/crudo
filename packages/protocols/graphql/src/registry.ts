@@ -3,13 +3,13 @@ import type { GraphQLInputObjectType, GraphQLObjectType } from "graphql";
 
 /**
  * GraphQL object/input types (and which mutations to expose) for one
- * entity — the hand-written part `registerCrudGraphQLTypes` attaches to a
- * class. Each mutation flag/input mirrors `CrudGraphQLOptions` in
+ * entity — the hand-written part `registerKavoGraphQLTypes` attaches to a
+ * class. Each mutation flag/input mirrors `KavoGraphQLOptions` in
  * `schema.ts` one for one — omit any of them to leave that mutation off
- * the schema for this entity, same opt-in shape `@Crud`'s own `operations`
+ * the schema for this entity, same opt-in shape `@Kavo`'s own `operations`
  * config uses on the REST side.
  */
-export interface CrudGraphQLTypes {
+export interface KavoGraphQLTypes {
   readonly itemType: GraphQLObjectType;
   /** Omit to leave the `create<Name>` mutation off the schema for this entity. */
   readonly createInputType?: GraphQLInputObjectType;
@@ -25,22 +25,22 @@ export interface CrudGraphQLTypes {
   readonly purgeOne?: boolean;
 }
 
-const typeRegistry = new Map<ClassRef, CrudGraphQLTypes>();
+const typeRegistry = new Map<ClassRef, KavoGraphQLTypes>();
 
 /**
  * Attaches GraphQL types to an entity once, next to its DTOs — the
- * counterpart of `@kavo/nest`'s `getCrudEntities()`: a consumer can walk
- * every `@Crud` entity and look up its GraphQL types here, wiring a merged
- * schema with no per-entity list of its own (see `resolveCrudGraphQLSchema`
+ * counterpart of `@kavo/nest`'s `getKavoEntities()`: a consumer can walk
+ * every `@Kavo` entity and look up its GraphQL types here, wiring a merged
+ * schema with no per-entity list of its own (see `resolveKavoGraphQLSchema`
  * in `discovery.ts`, which does exactly that). An entity with no
  * registration here simply has no GraphQL surface — opt-in, not implied by
- * `@Crud` alone. Process-wide, same scope as `@kavo/nest`'s own registry.
+ * `@Kavo` alone. Process-wide, same scope as `@kavo/nest`'s own registry.
  */
-export function registerCrudGraphQLTypes(entity: ClassRef, types: CrudGraphQLTypes): void {
+export function registerKavoGraphQLTypes(entity: ClassRef, types: KavoGraphQLTypes): void {
   typeRegistry.set(entity, types);
 }
 
-/** The types `registerCrudGraphQLTypes` attached to `entity`, or `undefined` if it never registered any. */
-export function getCrudGraphQLTypes(entity: ClassRef): CrudGraphQLTypes | undefined {
+/** The types `registerKavoGraphQLTypes` attached to `entity`, or `undefined` if it never registered any. */
+export function getKavoGraphQLTypes(entity: ClassRef): KavoGraphQLTypes | undefined {
   return typeRegistry.get(entity);
 }

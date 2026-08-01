@@ -5,7 +5,7 @@ import { ConfigurationException } from "@kavo/core";
  * Proves the actual bug this file exists to fix: before `loadGraphQL()`,
  * `@kavo/nest`'s always-loaded module graph (`index.ts`, `kavo.module.ts`)
  * statically imported `@kavo/graphql`, which statically imports the
- * `graphql` peer — meaning `import { Crud } from "@kavo/nest"` itself
+ * `graphql` peer — meaning `import { Kavo } from "@kavo/nest"` itself
  * crashed with a raw `ERR_MODULE_NOT_FOUND` whenever `graphql` (an
  * *optional* peer) wasn't installed, for every app, whether or not it
  * ever touched GraphQL. `vi.mock` stands in for "`graphql` isn't

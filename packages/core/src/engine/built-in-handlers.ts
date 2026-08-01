@@ -1,4 +1,4 @@
-import type { CrudContext } from "../context/crud-context.js";
+import type { KavoContext } from "../context/kavo-context.js";
 import type { EntityId } from "../types/entity-id.js";
 import type { OperationHandler } from "../operations/operation-handler.js";
 import type { RepositoryAdapter } from "../persistence/repository-adapter.js";
@@ -28,7 +28,7 @@ export interface IdentifiedWrite<Entity> {
 export function builtInHandlers<Entity extends object>(
   adapter: RepositoryAdapter<Entity>,
 ): StandardHandlerFactory<Entity> {
-  const notFound = (context: CrudContext<Entity>, id: EntityId): never => {
+  const notFound = (context: KavoContext<Entity>, id: EntityId): never => {
     throw new NotFoundException({
       messageParams: { entity: context.entityName, id: String(id) },
       context: {
@@ -44,18 +44,18 @@ export function builtInHandlers<Entity extends object>(
   // be added without one.
   const handlers: Record<StandardOperationId, OperationHandler<Entity, never, unknown>> = {
     createOne: {
-      async execute(input: Partial<Entity>, context: CrudContext<Entity>) {
+      async execute(input: Partial<Entity>, context: KavoContext<Entity>) {
         return adapter.create(input, context);
       },
     },
     findOne: {
-      async execute(id: EntityId, context: CrudContext<Entity>) {
+      async execute(id: EntityId, context: KavoContext<Entity>) {
         const entity = await adapter.findOneById(id, context.query, context);
         return entity ?? notFound(context, id);
       },
     },
     findMany: {
-      async execute(_input: null, context: CrudContext<Entity>): Promise<FindManyResult<Entity>> {
+      async execute(_input: null, context: KavoContext<Entity>): Promise<FindManyResult<Entity>> {
         const query = context.query;
         if (query === null) {
           throw new Error("findMany requires a normalized query on the context");
@@ -66,17 +66,17 @@ export function builtInHandlers<Entity extends object>(
       },
     },
     updateOne: {
-      async execute(input: IdentifiedWrite<Entity>, context: CrudContext<Entity>) {
+      async execute(input: IdentifiedWrite<Entity>, context: KavoContext<Entity>) {
         return adapter.update(input.id, input.data, context);
       },
     },
     patchOne: {
-      async execute(input: IdentifiedWrite<Entity>, context: CrudContext<Entity>) {
+      async execute(input: IdentifiedWrite<Entity>, context: KavoContext<Entity>) {
         return adapter.patch(input.id, input.data, context);
       },
     },
     deleteOne: {
-      async execute(id: EntityId, context: CrudContext<Entity>) {
+      async execute(id: EntityId, context: KavoContext<Entity>) {
         // Hard or soft per `context.config.softDelete` — the strategy is
         // resolved at config time and applied by the adapter,
         // so there is no branch here.
@@ -85,14 +85,14 @@ export function builtInHandlers<Entity extends object>(
       },
     },
     restoreOne: {
-      async execute(id: EntityId, context: CrudContext<Entity>) {
+      async execute(id: EntityId, context: KavoContext<Entity>) {
         // Restore returns the revived row: it reuses the `item` DTO slot,
         // so no new DTO shape enters the system.
         return adapter.restore(id, context);
       },
     },
     purgeOne: {
-      async execute(id: EntityId, context: CrudContext<Entity>) {
+      async execute(id: EntityId, context: KavoContext<Entity>) {
         await adapter.purge(id, context);
         return null;
       },

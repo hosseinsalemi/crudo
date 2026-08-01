@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { CrudContext, IncludeNode, NormalizedQueryContext, ResolvedEntityConfig } from "@kavo/core";
+import type { KavoContext, IncludeNode, NormalizedQueryContext, ResolvedEntityConfig } from "@kavo/core";
 import {
   DefaultDeserializer,
   DefaultDtoResolver,
   DefaultSerializer,
-  createCrudContext,
+  createKavoContext,
   resolveEntityConfig,
 } from "@kavo/core";
 import { User, contextStub, userMetadata } from "./support/user-fixture.js";
@@ -27,8 +27,8 @@ const EMPTY_QUERY = {
 function readContext<Entity extends object>(
   config: ResolvedEntityConfig<Entity>,
   query: Partial<NormalizedQueryContext<Entity>> = {},
-): CrudContext<Entity> {
-  return createCrudContext<Entity>({
+): KavoContext<Entity> {
+  return createKavoContext<Entity>({
     operation: "findMany",
     config,
     query: { ...(EMPTY_QUERY as NormalizedQueryContext<Entity>), ...query },
@@ -194,7 +194,7 @@ describe("DefaultDeserializer — write projection", () => {
   });
 
   it("treats a bodyless request as an empty payload", () => {
-    // `CrudRequest.body` is nullable, and every write deserializes it.
+    // `KavoRequest.body` is nullable, and every write deserializes it.
     expect(deserializer.deserialize(null, null, contextStub())).toEqual({});
   });
 });

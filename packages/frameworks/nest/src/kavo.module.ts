@@ -4,16 +4,16 @@ import { APP_FILTER, DiscoveryModule, DiscoveryService } from "@nestjs/core";
 import type { ClassRef, KavoInstance } from "@kavo/core";
 import { ConfigurationException, createKavo } from "@kavo/core";
 import type { KavoModuleOptions } from "./kavo-options.js";
-import type { CrudControllerMetadata } from "./crud.decorator.js";
-import { getRegisteredCrudControllers } from "./crud.decorator.js";
+import type { KavoControllerMetadata } from "./kavo.decorator.js";
+import { getRegisteredKavoControllers } from "./kavo.decorator.js";
 import { KavoExceptionFilter } from "./kavo-exception.filter.js";
 import { createDefaultGraphQLController, DEFAULT_GRAPHQL_PATH } from "./graphql/default-graphql.controller.js";
 import {
   KAVO_INSTANCE,
   KAVO_MODULE_OPTIONS,
-  CRUD_CONTROLLER_METADATA,
-  CRUD_SERVICE_PROPERTY,
-  getCrudServiceToken,
+  KAVO_CONTROLLER_METADATA,
+  KAVO_SERVICE_PROPERTY,
+  getKavoServiceToken,
 } from "./tokens.js";
 
 /** `graphql: true` mounts the default controller at `POST /graphql`; `{ path }` mounts it at `POST <path>` instead. */
@@ -30,7 +30,7 @@ export interface KavoModuleAsyncOptions extends Pick<ModuleMetadata, "imports"> 
   inject?: readonly (string | symbol | Type)[];
   /**
    * Fold in what `forFeature()` (no arguments) does — a DI provider under
-   * `getCrudServiceToken(Entity)` for every `@Crud`-decorated class the
+   * `getKavoServiceToken(Entity)` for every `@Kavo`-decorated class the
    * process has seen — so a normal app needs only this one call. Off by
    * default for the same reason the standalone no-arg `forFeature()` is
    * opt-in: the registry is process-wide, and `@kavo/nest`'s own tests
@@ -39,13 +39,13 @@ export interface KavoModuleAsyncOptions extends Pick<ModuleMetadata, "imports"> 
    */
   provideServices?: boolean;
   /**
-   * Mounts a default GraphQL controller — every `@Crud` entity that also
-   * called `registerCrudGraphQLTypes` (`@kavo/graphql`), merged onto one
+   * Mounts a default GraphQL controller — every `@Kavo` entity that also
+   * called `registerKavoGraphQLTypes` (`@kavo/graphql`), merged onto one
    * schema, with no controller of your own to write. `true` mounts it at
    * `POST /graphql`; `{ path: "api/graphql" }` mounts it there instead.
    * Implies `provideServices` (the merged schema's resolvers need every
    * entity's service as a DI provider to look up via `ModuleRef`, the same
-   * requirement `BaseCrudGraphQLController` always has) even if
+   * requirement `BaseKavoGraphQLController` always has) even if
    * `provideServices` itself is left unset.
    */
   graphql?: KavoGraphQLOption;
@@ -57,32 +57,32 @@ export interface KavoModuleAsyncOptions extends Pick<ModuleMetadata, "imports"> 
  *
  * - `forRoot`/`forRootAsync` (global): create the Kavo root instance,
  *   register the problem-details exception filter app-wide, and register
- *   `KavoCrudBinder` — an `onModuleInit` pass that uses `@nestjs/core`'s
- *   `DiscoveryService` to find every `@Crud`-decorated controller already
+ *   `KavoBinder` — an `onModuleInit` pass that uses `@nestjs/core`'s
+ *   `DiscoveryService` to find every `@Kavo`-decorated controller already
  *   in the app's module graph (an ordinary Nest `controllers:` array is
  *   enough to put it there) and assign its bound service directly onto
- *   `this[CRUD_SERVICE_PROPERTY]`. No DI provider or explicit list is
+ *   `this[KAVO_SERVICE_PROPERTY]`. No DI provider or explicit list is
  *   needed for this — the generated route methods only ever read that
  *   property at request time, well after `onModuleInit` has run.
  * - `forFeature(controllers)`: registers the controllers (redundant once
  *   they're already in some module's `controllers:` array) and additionally
- *   provides the entity's `CrudService` under `getCrudServiceToken(Entity)`
+ *   provides the entity's `KavoService` under `getKavoServiceToken(Entity)`
  *   as a real DI provider — needed only by a controller (or other class)
  *   that constructor-injects that token itself, e.g. to reach the base
  *   service from a fully custom, registry-independent route. `forFeature()`
- *   called with **no arguments** does the same for every `@Crud`-decorated
+ *   called with **no arguments** does the same for every `@Kavo`-decorated
  *   class the process has seen so far, with no list at all — the scope that
  *   makes this safe (one config per entity, one Kavo instance per process)
  *   is exactly a normal app, not `@kavo/nest`'s own tests, which always pass
- *   an explicit array. Prefer `boundCrudService(this)` inside a
- *   `@Crud`-decorated class over either form when the consumer is that same
+ *   an explicit array. Prefer `boundKavoService(this)` inside a
+ *   `@Kavo`-decorated class over either form when the consumer is that same
  *   class.
  * - `{ provideServices: true }` on `forRoot`/`forRootAsync` folds the
  *   no-argument `forFeature()` in directly, so a normal app states its
  *   Kavo config in one call instead of two.
  *
  * The service is a **singleton** either way — the engine threads all
- * per-request state through `CrudContext`, so request scope would only
+ * per-request state through `KavoContext`, so request scope would only
  * cost throughput.
  */
 @Module({})
@@ -106,7 +106,7 @@ export class KavoModule {
           inject: [KAVO_MODULE_OPTIONS],
         },
         { provide: APP_FILTER, useClass: KavoExceptionFilter },
-        KavoCrudBinder,
+        KavoBinder,
         ...serviceProviders,
       ],
       exports: [KAVO_INSTANCE, KAVO_MODULE_OPTIONS, ...serviceProviders],
@@ -134,7 +134,7 @@ export class KavoModule {
           inject: [KAVO_MODULE_OPTIONS],
         },
         { provide: APP_FILTER, useClass: KavoExceptionFilter },
-        KavoCrudBinder,
+        KavoBinder,
         ...serviceProviders,
       ],
       exports: [KAVO_INSTANCE, KAVO_MODULE_OPTIONS, ...serviceProviders],
@@ -143,14 +143,14 @@ export class KavoModule {
 
   /**
    * Called with an explicit array: registers those controllers and, for
-   * each, provides its entity's `CrudService` under
-   * `getCrudServiceToken(Entity)`.
+   * each, provides its entity's `KavoService` under
+   * `getKavoServiceToken(Entity)`.
    *
-   * Called with no arguments: provides every entity in the registry `@Crud`
+   * Called with no arguments: provides every entity in the registry `@Kavo`
    * populates at decoration time — no controller list, since the caller
    * already put them in an ordinary `controllers:` array (the
-   * `KavoCrudBinder` covers those; this form exists purely for a
-   * constructor-injected `getCrudServiceToken`). Fails fast if two
+   * `KavoBinder` covers those; this form exists purely for a
+   * constructor-injected `getKavoServiceToken`). Fails fast if two
    * different controllers registered the same entity — the provider token
    * is per-entity, so which config wins would otherwise be silently
    * ambiguous.
@@ -161,17 +161,17 @@ export class KavoModule {
       return { module: KavoModule, providers, exports: providers };
     }
     const providers: Provider[] = controllers.map((controller) => {
-      const metadata = Reflect.getMetadata(CRUD_CONTROLLER_METADATA, controller) as CrudControllerMetadata | undefined;
+      const metadata = Reflect.getMetadata(KAVO_CONTROLLER_METADATA, controller) as KavoControllerMetadata | undefined;
       if (metadata === undefined) {
         throw new ConfigurationException(
           controller.name,
           "forFeature",
-          `${controller.name} is not decorated with @Crud(Entity) — ` +
-            "KavoModule.forFeature only accepts @Crud controllers",
+          `${controller.name} is not decorated with @Kavo(Entity) — ` +
+            "KavoModule.forFeature only accepts @Kavo controllers",
         );
       }
       return {
-        provide: getCrudServiceToken(metadata.entity),
+        provide: getKavoServiceToken(metadata.entity),
         useFactory: (kavo: KavoInstance) => kavo.createCrud(metadata.entity, metadata.config),
         inject: [KAVO_INSTANCE],
       };
@@ -188,20 +188,20 @@ export class KavoModule {
 function providersFromRegistry(): Provider[] {
   const ownerByEntity = new Map<ClassRef, Function>();
   const providers: Provider[] = [];
-  for (const [controller, metadata] of getRegisteredCrudControllers()) {
+  for (const [controller, metadata] of getRegisteredKavoControllers()) {
     const existingOwner = ownerByEntity.get(metadata.entity);
     if (existingOwner !== undefined) {
       throw new ConfigurationException(
         metadata.entity.name,
         "forFeature",
-        `both '${(existingOwner as Type).name}' and '${(controller as Type).name}' are @Crud(${metadata.entity.name}) — ` +
+        `both '${(existingOwner as Type).name}' and '${(controller as Type).name}' are @Kavo(${metadata.entity.name}) — ` +
           "KavoModule.forFeature() with no arguments needs at most one controller per entity; " +
           "pass an explicit array to disambiguate",
       );
     }
     ownerByEntity.set(metadata.entity, controller);
     providers.push({
-      provide: getCrudServiceToken(metadata.entity),
+      provide: getKavoServiceToken(metadata.entity),
       useFactory: (kavo: KavoInstance) => kavo.createCrud(metadata.entity, metadata.config),
       inject: [KAVO_INSTANCE],
     });
@@ -213,11 +213,11 @@ function providersFromRegistry(): Provider[] {
  * Runs once at `onModuleInit`, after Nest has finished instantiating every
  * controller in the app — late enough that `DiscoveryService` sees the full,
  * real module graph, and still well before the first request, which is all
- * the generated route methods need (they read `CRUD_SERVICE_PROPERTY` at
+ * the generated route methods need (they read `KAVO_SERVICE_PROPERTY` at
  * request time, never at construction time).
  */
 @Injectable()
-class KavoCrudBinder implements OnModuleInit {
+class KavoBinder implements OnModuleInit {
   constructor(
     private readonly discovery: DiscoveryService,
     @Inject(KAVO_INSTANCE) private readonly kavo: KavoInstance,
@@ -228,9 +228,9 @@ class KavoCrudBinder implements OnModuleInit {
       const metatype = wrapper.metatype;
       const instance = wrapper.instance as Record<string, unknown> | undefined;
       if (metatype === null || instance === undefined) continue;
-      const metadata = Reflect.getMetadata(CRUD_CONTROLLER_METADATA, metatype) as CrudControllerMetadata | undefined;
+      const metadata = Reflect.getMetadata(KAVO_CONTROLLER_METADATA, metatype) as KavoControllerMetadata | undefined;
       if (metadata === undefined) continue;
-      instance[CRUD_SERVICE_PROPERTY] = this.kavo.createCrud(metadata.entity, metadata.config);
+      instance[KAVO_SERVICE_PROPERTY] = this.kavo.createCrud(metadata.entity, metadata.config);
     }
   }
 }

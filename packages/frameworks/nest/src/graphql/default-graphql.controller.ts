@@ -1,6 +1,6 @@
 import { Body, Controller, HttpCode, Post, type Type } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
-import { BaseCrudGraphQLController } from "./base-crud-graphql.controller.js";
+import { BaseKavoGraphQLController } from "./base-kavo-graphql.controller.js";
 
 /** `KavoModule.forRoot`/`forRootAsync({ graphql: true })`'s default mount path when no `path` override is given. */
 export const DEFAULT_GRAPHQL_PATH = "graphql";
@@ -22,12 +22,12 @@ export const DEFAULT_GRAPHQL_PATH = "graphql";
  *
  * A consumer wanting a different method, auth guard, or transport
  * (subscriptions, batched requests) writes their own controller extending
- * `BaseCrudGraphQLController` instead and leaves `graphql` unset — this
+ * `BaseKavoGraphQLController` instead and leaves `graphql` unset — this
  * factory and a custom controller are alternatives, never both at once.
  */
-export function createDefaultGraphQLController(path: string = DEFAULT_GRAPHQL_PATH): Type<BaseCrudGraphQLController> {
+export function createDefaultGraphQLController(path: string = DEFAULT_GRAPHQL_PATH): Type<BaseKavoGraphQLController> {
   @Controller(path)
-  class DefaultGraphQLController extends BaseCrudGraphQLController {
+  class DefaultGraphQLController extends BaseKavoGraphQLController {
     constructor(moduleRef: ModuleRef) {
       super(moduleRef);
     }

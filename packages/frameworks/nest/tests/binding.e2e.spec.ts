@@ -4,10 +4,10 @@ import request from "supertest";
 import { Controller, Get, Inject, Param, type INestApplication } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { Test } from "@nestjs/testing";
-import type { DefaultCrudService, NormalizedQueryContext, OperationHandler } from "@kavo/core";
+import type { DefaultKavoService, NormalizedQueryContext, OperationHandler } from "@kavo/core";
 import { ConfigurationException, WireQuery } from "@kavo/core";
 import type { KavoModuleOptions } from "@kavo/nest";
-import { Crud, KavoModule, Override, enumProp, flattenQuery, getCrudServiceToken, oneOfArray } from "@kavo/nest";
+import { Kavo, KavoModule, Override, enumProp, flattenQuery, getKavoServiceToken, oneOfArray } from "@kavo/nest";
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
 
 let app: INestApplication;
@@ -49,8 +49,8 @@ function server(): Parameters<typeof request>[0] {
   return app.getHttpServer() as Parameters<typeof request>[0];
 }
 
-describe("@Crud route generation", () => {
-  @Crud(Todo)
+describe("@Kavo route generation", () => {
+  @Kavo(Todo)
   @Controller("todos")
   class TodoController {}
 
@@ -146,8 +146,8 @@ describe("@Crud route generation", () => {
     expect(created.body).not.toHaveProperty("hacker");
   });
 
-  it("exposes the typed service under getCrudServiceToken", async () => {
-    const service = app.get<DefaultCrudService<Todo>>(getCrudServiceToken(Todo));
+  it("exposes the typed service under getKavoServiceToken", async () => {
+    const service = app.get<DefaultKavoService<Todo>>(getKavoServiceToken(Todo));
     const item = await service.createOne({ title: "via service" } as never);
     expect(item).toMatchObject({ title: "via service" });
   });
@@ -158,8 +158,8 @@ describe("@Crud route generation", () => {
   });
 });
 
-describe("@Crud page pagination over the wire", () => {
-  @Crud(Todo, { pagination: { strategy: "page", defaultLimit: 2, maxLimit: 3 } })
+describe("@Kavo page pagination over the wire", () => {
+  @Kavo(Todo, { pagination: { strategy: "page", defaultLimit: 2, maxLimit: 3 } })
   @Controller("todos")
   class PagedController {}
 
@@ -213,8 +213,8 @@ describe("@Crud page pagination over the wire", () => {
   });
 });
 
-describe("@Crud query-parser agnosticism", () => {
-  @Crud(Todo)
+describe("@Kavo query-parser agnosticism", () => {
+  @Kavo(Todo)
   @Controller("todos")
   class TodoController {}
 
@@ -249,9 +249,9 @@ describe("@Crud query-parser agnosticism", () => {
   });
 });
 
-describe("@Crud operation control surface", () => {
+describe("@Kavo operation control surface", () => {
   it("generates no route for a disabled operation", async () => {
-    @Crud(Todo, { operations: { deleteOne: false } })
+    @Kavo(Todo, { operations: { deleteOne: false } })
     @Controller("todos")
     class NoDeleteController {}
 
@@ -266,7 +266,7 @@ describe("@Crud operation control surface", () => {
     // retract the already-generated DELETE route. It reaches the bound
     // service instead: the route still exists, but calling it always
     // answers with a 405 problem-details document, never a 2xx or a bare 404.
-    @Crud(Todo)
+    @Kavo(Todo)
     @Controller("todos")
     class GloballyGuardedController {}
 
@@ -280,7 +280,7 @@ describe("@Crud operation control surface", () => {
   });
 
   it("an entity-level override still wins over a global operations default", async () => {
-    @Crud(Todo, { operations: { deleteOne: true } })
+    @Kavo(Todo, { operations: { deleteOne: true } })
     @Controller("todos")
     class ReenabledController {}
 
@@ -290,7 +290,7 @@ describe("@Crud operation control surface", () => {
   });
 
   it("manual-method-wins: a hand-written method suppresses generation", async () => {
-    @Crud(Todo)
+    @Kavo(Todo)
     @Controller("todos")
     class ManualController {
       @Get(":id")
@@ -315,7 +315,7 @@ describe("@Crud operation control surface", () => {
       },
     });
 
-    @Crud(Todo, {
+    @Kavo(Todo, {
       operations: {
         createOne: { handler: overrideHandler("createOne") },
         updateOne: { handler: overrideHandler("updateOne") },
@@ -366,12 +366,12 @@ describe("@Crud operation control surface", () => {
   });
 });
 
-describe("@Crud @Override — controller-method overrides that keep generated route metadata (issue #23)", () => {
+describe("@Kavo @Override — controller-method overrides that keep generated route metadata (issue #23)", () => {
   it("keeps findOne's generated route/param wiring, delegating to the decorated method", async () => {
-    @Crud(Todo)
+    @Kavo(Todo)
     @Controller("todos")
     class OverrideFindOneController {
-      constructor(@Inject(getCrudServiceToken(Todo)) private readonly base: DefaultCrudService<Todo>) {}
+      constructor(@Inject(getKavoServiceToken(Todo)) private readonly base: DefaultKavoService<Todo>) {}
 
       @Override()
       async findOne(id: string, query: WireQuery): Promise<unknown> {
@@ -395,10 +395,10 @@ describe("@Crud @Override — controller-method overrides that keep generated ro
   it("passes an overridden findOne a WireQuery instance, not a raw query object (issue #25)", async () => {
     let received: unknown;
 
-    @Crud(Todo)
+    @Kavo(Todo)
     @Controller("todos")
     class OverrideFindOneQueryShapeController {
-      constructor(@Inject(getCrudServiceToken(Todo)) private readonly base: DefaultCrudService<Todo>) {}
+      constructor(@Inject(getKavoServiceToken(Todo)) private readonly base: DefaultKavoService<Todo>) {}
 
       @Override()
       async findOne(id: string, query: WireQuery): Promise<unknown> {
@@ -418,10 +418,10 @@ describe("@Crud @Override — controller-method overrides that keep generated ro
   it("passes an overridden findMany a WireQuery instance, not a raw query object (issue #25)", async () => {
     let received: unknown;
 
-    @Crud(Todo)
+    @Kavo(Todo)
     @Controller("todos")
     class OverrideFindManyQueryShapeController {
-      constructor(@Inject(getCrudServiceToken(Todo)) private readonly base: DefaultCrudService<Todo>) {}
+      constructor(@Inject(getKavoServiceToken(Todo)) private readonly base: DefaultKavoService<Todo>) {}
 
       @Override()
       async findMany(query: WireQuery): Promise<unknown> {
@@ -438,10 +438,10 @@ describe("@Crud @Override — controller-method overrides that keep generated ro
   });
 
   it("keeps filtering intact when a stale override still manually double-wraps its already-wired query (issue #25 regression)", async () => {
-    @Crud(Todo)
+    @Kavo(Todo)
     @Controller("todos")
     class StaleDoubleWrapController {
-      constructor(@Inject(getCrudServiceToken(Todo)) private readonly base: DefaultCrudService<Todo>) {}
+      constructor(@Inject(getKavoServiceToken(Todo)) private readonly base: DefaultKavoService<Todo>) {}
 
       // Pre-#25 pattern: `query` is already a WireQuery (via WireQueryPipe),
       // but this override still calls flattenQuery/WireQuery on it itself.
@@ -468,10 +468,10 @@ describe("@Crud @Override — controller-method overrides that keep generated ro
   });
 
   it("keeps createOne's generated route/param wiring (body alone, 201, no :id)", async () => {
-    @Crud(Todo)
+    @Kavo(Todo)
     @Controller("todos")
     class OverrideCreateOneController {
-      constructor(@Inject(getCrudServiceToken(Todo)) private readonly base: DefaultCrudService<Todo>) {}
+      constructor(@Inject(getKavoServiceToken(Todo)) private readonly base: DefaultKavoService<Todo>) {}
 
       @Override()
       async createOne(body: { title: string }): Promise<unknown> {
@@ -485,10 +485,10 @@ describe("@Crud @Override — controller-method overrides that keep generated ro
   });
 
   it("wires an explicit operationId to a differently-named method (id+body write), not just name-matched ones", async () => {
-    @Crud(Todo)
+    @Kavo(Todo)
     @Controller("todos")
     class ExplicitIdOverrideController {
-      constructor(@Inject(getCrudServiceToken(Todo)) private readonly base: DefaultCrudService<Todo>) {}
+      constructor(@Inject(getKavoServiceToken(Todo)) private readonly base: DefaultKavoService<Todo>) {}
 
       // The method name is unrelated to "updateOne" — proves resolution
       // uses the override map's target, not descriptor.id, end to end.
@@ -505,7 +505,7 @@ describe("@Crud @Override — controller-method overrides that keep generated ro
   });
 
   it("keeps an overridden operation's own custom meta.routes shape (id-bearing route)", async () => {
-    @Crud(Todo, {
+    @Kavo(Todo, {
       operations: {
         updateOne: { meta: { routes: { method: "POST", path: ":id/activate" } } },
       },
@@ -527,10 +527,10 @@ describe("@Crud @Override — controller-method overrides that keep generated ro
   });
 
   it("documents an overridden route with the same Swagger shape a generated one would carry", async () => {
-    @Crud(Todo)
+    @Kavo(Todo)
     @Controller("todos")
     class OverrideSwaggerController {
-      constructor(@Inject(getCrudServiceToken(Todo)) private readonly base: DefaultCrudService<Todo>) {}
+      constructor(@Inject(getKavoServiceToken(Todo)) private readonly base: DefaultKavoService<Todo>) {}
 
       @Override()
       async findOne(id: string, query: WireQuery): Promise<unknown> {
@@ -553,7 +553,7 @@ describe("@Crud @Override — controller-method overrides that keep generated ro
   });
 
   it("leaves plain manual-method-wins (no @Override) exactly as before", async () => {
-    @Crud(Todo)
+    @Kavo(Todo)
     @Controller("todos")
     class ManualStillWinsController {
       @Get(":id")
@@ -570,7 +570,7 @@ describe("@Crud @Override — controller-method overrides that keep generated ro
   it("throws at decoration time when two methods override the same operation", () => {
     let error: unknown;
     try {
-      @Crud(Todo)
+      @Kavo(Todo)
       @Controller("todos")
       class DuplicateOverrideController {
         @Override("createOne")
@@ -589,7 +589,7 @@ describe("@Crud @Override — controller-method overrides that keep generated ro
   it("throws at decoration time when @Override names an operation that is off by default", () => {
     let error: unknown;
     try {
-      @Crud(Todo)
+      @Kavo(Todo)
       @Controller("todos")
       class DisabledOverrideController {
         @Override("purgeOne")
@@ -606,7 +606,7 @@ describe("@Crud @Override — controller-method overrides that keep generated ro
   it("throws at decoration time when @Override names an operation id absent from the registry", () => {
     let error: unknown;
     try {
-      @Crud(Todo)
+      @Kavo(Todo)
       @Controller("todos")
       class GhostOverrideController {
         @Override("ghost")
@@ -623,7 +623,7 @@ describe("@Crud @Override — controller-method overrides that keep generated ro
   it("throws at decoration time when @Override targets a service-only operation", () => {
     let error: unknown;
     try {
-      @Crud(Todo, {
+      @Kavo(Todo, {
         operations: {
           deleteOne: { meta: { routes: { enabled: false } } },
         },
@@ -644,7 +644,7 @@ describe("@Crud @Override — controller-method overrides that keep generated ro
   it("throws at decoration time when the overridden method declares its own @Param/@Body", () => {
     let error: unknown;
     try {
-      @Crud(Todo)
+      @Kavo(Todo)
       @Controller("todos")
       class SelfParamOverrideController {
         @Override()
@@ -668,7 +668,7 @@ describe("KavoExceptionFilter — non-Kavo handler failures", () => {
     },
   };
 
-  @Crud(Todo, { operations: { createOne: { handler: exploding } } })
+  @Kavo(Todo, { operations: { createOne: { handler: exploding } } })
   @Controller("todos")
   class ExplodingController {}
 
@@ -706,8 +706,8 @@ describe("KavoExceptionFilter — non-Kavo handler failures", () => {
   });
 });
 
-describe("@Crud soft-delete routes", () => {
-  @Crud(Todo, {
+describe("@Kavo soft-delete routes", () => {
+  @Kavo(Todo, {
     softDelete: { strategy: "soft" },
     operations: { purgeOne: true },
   })
@@ -755,7 +755,7 @@ describe("@Crud soft-delete routes", () => {
   });
 
   it("keeps purge unrouted unless it is asked for by name", async () => {
-    @Crud(Todo, { softDelete: { strategy: "soft" } })
+    @Kavo(Todo, { softDelete: { strategy: "soft" } })
     @Controller("todos")
     class RestoreOnlyController {}
 
@@ -768,8 +768,8 @@ describe("@Crud soft-delete routes", () => {
   });
 });
 
-describe("@Crud relation includes", () => {
-  @Crud(Todo, { relations: { edges: { list: { includable: true } } } })
+describe("@Kavo relation includes", () => {
+  @Kavo(Todo, { relations: { edges: { list: { includable: true } } } })
   @Controller("todos")
   class IncludingController {}
 
@@ -794,7 +794,7 @@ describe("@Crud relation includes", () => {
   });
 
   it("rejects a relation that is not includable, with problem details", async () => {
-    @Crud(Todo)
+    @Kavo(Todo)
     @Controller("todos")
     class ClosedController {}
 
@@ -817,7 +817,7 @@ describe("@Crud relation includes", () => {
   });
 });
 
-describe("@Crud Swagger request-body schemas", () => {
+describe("@Kavo Swagger request-body schemas", () => {
   class CreateTodoDto {
     title = "";
     priority = 0;
@@ -835,7 +835,7 @@ describe("@Crud Swagger request-body schemas", () => {
     title = "";
   }
 
-  @Crud(Todo, {
+  @Kavo(Todo, {
     dto: { create: CreateTodoDto, item: TodoItemDto, list: TodoListDto },
   })
   @Controller("todos")
@@ -904,7 +904,7 @@ describe("@Crud Swagger request-body schemas", () => {
   });
 });
 
-describe("@Crud Swagger DTO slot fallbacks", () => {
+describe("@Kavo Swagger DTO slot fallbacks", () => {
   class UpdateTodoDto {
     title = "";
     done = false;
@@ -919,7 +919,7 @@ describe("@Crud Swagger DTO slot fallbacks", () => {
   // resolver falls `patch` back to `update` and `list` back to `item`, and
   // the docs must follow the same chain the engine will actually use —
   // otherwise the published schema advertises a shape the API never emits.
-  @Crud(Todo, { dto: { update: UpdateTodoDto, item: TodoOnlyItemDto } })
+  @Kavo(Todo, { dto: { update: UpdateTodoDto, item: TodoOnlyItemDto } })
   @Controller("todos")
   class FallbackController {}
 
@@ -957,7 +957,7 @@ describe("@Crud Swagger DTO slot fallbacks", () => {
   });
 });
 
-describe("@Crud Swagger schema hints (enum, oneOf)", () => {
+describe("@Kavo Swagger schema hints (enum, oneOf)", () => {
   class VariantA {
     id = 0;
     a = "";
@@ -977,7 +977,7 @@ describe("@Crud Swagger schema hints (enum, oneOf)", () => {
     children = oneOfArray<VariantA | VariantB>([VariantA, VariantB]);
   }
 
-  @Crud(Todo, { dto: { create: CreateHintedDto, item: HintedItemDto } })
+  @Kavo(Todo, { dto: { create: CreateHintedDto, item: HintedItemDto } })
   @Controller("todos")
   class HintedController {}
 

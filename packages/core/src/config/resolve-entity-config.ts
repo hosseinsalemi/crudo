@@ -50,7 +50,7 @@ function pickSettings(config: Readonly<Record<string, unknown>> | undefined): De
 /**
  * Merge and validate one entity's configuration, once, at bootstrap:
  * `built-in defaults → global → entity → operation`. The result
- * is deep-frozen; per-call overrides are parameters (`CrudCallOptions`),
+ * is deep-frozen; per-call overrides are parameters (`KavoCallOptions`),
  * never writes into this object.
  */
 export function resolveEntityConfig<Entity extends object>(

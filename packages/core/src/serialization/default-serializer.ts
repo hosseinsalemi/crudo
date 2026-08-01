@@ -1,4 +1,4 @@
-import type { CrudContext } from "../context/crud-context.js";
+import type { KavoContext } from "../context/kavo-context.js";
 import type { DtoClass } from "../dto/dto.js";
 import type { Deserializer, Serializer } from "./serializer.js";
 import type { EntityCatalog } from "../metadata/entity-catalog.js";
@@ -46,7 +46,7 @@ export class DefaultSerializer<Entity = unknown> implements Serializer<Entity> {
   serializeItem<ItemDto>(
     entity: Entity,
     dto: DtoClass<ItemDto & object> | null,
-    context: CrudContext<Entity>,
+    context: KavoContext<Entity>,
   ): ItemDto {
     return this.project(
       entity,
@@ -61,7 +61,7 @@ export class DefaultSerializer<Entity = unknown> implements Serializer<Entity> {
   serializeList<ListDto>(
     entities: readonly Entity[],
     dto: DtoClass<ListDto & object> | null,
-    context: CrudContext<Entity>,
+    context: KavoContext<Entity>,
   ): readonly ListDto[] {
     return entities.map((entity) => this.serializeItem(entity, dto as DtoClass<ListDto & object> | null, context));
   }
@@ -78,7 +78,7 @@ export class DefaultSerializer<Entity = unknown> implements Serializer<Entity> {
     relations: readonly string[],
     selection: readonly string[] | null | undefined,
     include: IncludeTree,
-    context: CrudContext<Entity>,
+    context: KavoContext<Entity>,
   ): Record<string, unknown> {
     const source = entity as Record<string, unknown>;
     const projection = keys ?? Object.keys(source);
@@ -97,7 +97,7 @@ export class DefaultSerializer<Entity = unknown> implements Serializer<Entity> {
     return result;
   }
 
-  private projectRelated(value: unknown, node: IncludeNode, context: CrudContext<Entity>): unknown {
+  private projectRelated(value: unknown, node: IncludeNode, context: KavoContext<Entity>): unknown {
     if (value === null || value === undefined) {
       return node.relation.cardinality === "many" ? [] : null;
     }
@@ -152,7 +152,7 @@ export class DefaultDeserializer<Entity = unknown> implements Deserializer<Entit
     this.writableProjection = [...columns, ...relations.keys()];
   }
 
-  deserialize<Shape>(raw: unknown, dto: DtoClass<Shape & object> | null, _context: CrudContext<Entity>): Shape {
+  deserialize<Shape>(raw: unknown, dto: DtoClass<Shape & object> | null, _context: KavoContext<Entity>): Shape {
     if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
       return {} as Shape;
     }

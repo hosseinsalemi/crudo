@@ -1,17 +1,17 @@
-import type { CrudCallOptions } from "./crud-call-options.js";
-import type { CrudRequest } from "../context/crud-request.js";
-import type { CrudService } from "./crud-service.js";
+import type { KavoCallOptions } from "./kavo-call-options.js";
+import type { KavoRequest } from "../context/kavo-request.js";
+import type { KavoService } from "./kavo-service.js";
 import type { EntityId } from "../types/entity-id.js";
 import type { EntityInput } from "../types/utility.js";
 import type { ListResultDto } from "../dto/list-result.js";
 import type { OperationId } from "../operations/operation.js";
 import type { QueryContext } from "../query/query-context.js";
-import { CrudEngine } from "../engine/crud-engine.js";
+import { KavoEngine } from "../engine/kavo-engine.js";
 
 /**
  * The programmatic surface bound to one entity's engine — what
  * `createCrud` returns. Methods are sugar over the engine's transport-
- * agnostic `CrudRequest`/`CrudResponse` envelopes; generated NestJS routes
+ * agnostic `KavoRequest`/`KavoResponse` envelopes; generated NestJS routes
  * delegate to the same engine, so both paths run the identical pipeline.
  *
  * Soft-delete operations (restore, purge) dispatch like everything else;
@@ -19,7 +19,7 @@ import { CrudEngine } from "../engine/crud-engine.js";
  * entity that does not declare soft delete raises
  * `OperationDisabledException`.
  */
-export class DefaultCrudService<
+export class DefaultKavoService<
   Entity extends object,
   Id extends EntityId = EntityId,
   CreateDto = EntityInput<Entity>,
@@ -28,20 +28,20 @@ export class DefaultCrudService<
   QueryDto = QueryContext<Entity>,
   ItemDto = Entity,
   ListDto = ItemDto,
-> implements CrudService<Entity, Id, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto> {
-  constructor(readonly engine: CrudEngine<Entity>) {}
+> implements KavoService<Entity, Id, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto> {
+  constructor(readonly engine: KavoEngine<Entity>) {}
 
-  private request(partial: Partial<CrudRequest<Entity>> & { operation: OperationId }): CrudRequest<Entity> {
+  private request(partial: Partial<KavoRequest<Entity>> & { operation: OperationId }): KavoRequest<Entity> {
     return {
       id: null,
       body: null,
       query: null,
       options: null,
       ...partial,
-    } as CrudRequest<Entity>;
+    } as KavoRequest<Entity>;
   }
 
-  async createOne(data: CreateDto, options?: CrudCallOptions): Promise<ItemDto> {
+  async createOne(data: CreateDto, options?: KavoCallOptions): Promise<ItemDto> {
     const response = await this.engine.execute(
       this.request({
         operation: "createOne",
@@ -52,7 +52,7 @@ export class DefaultCrudService<
     return response.item as ItemDto;
   }
 
-  async findOne(id: Id, query?: QueryDto, options?: CrudCallOptions): Promise<ItemDto> {
+  async findOne(id: Id, query?: QueryDto, options?: KavoCallOptions): Promise<ItemDto> {
     const response = await this.engine.execute(
       this.request({
         operation: "findOne",
@@ -64,7 +64,7 @@ export class DefaultCrudService<
     return response.item as ItemDto;
   }
 
-  async findMany(query?: QueryDto, options?: CrudCallOptions): Promise<ListResultDto<ListDto>> {
+  async findMany(query?: QueryDto, options?: KavoCallOptions): Promise<ListResultDto<ListDto>> {
     const response = await this.engine.execute(
       this.request({
         operation: "findMany",
@@ -75,7 +75,7 @@ export class DefaultCrudService<
     return response.list as ListResultDto<ListDto>;
   }
 
-  async updateOne(id: Id, data: UpdateDto, options?: CrudCallOptions): Promise<ItemDto> {
+  async updateOne(id: Id, data: UpdateDto, options?: KavoCallOptions): Promise<ItemDto> {
     const response = await this.engine.execute(
       this.request({
         operation: "updateOne",
@@ -87,7 +87,7 @@ export class DefaultCrudService<
     return response.item as ItemDto;
   }
 
-  async patchOne(id: Id, data: PatchDto, options?: CrudCallOptions): Promise<ItemDto> {
+  async patchOne(id: Id, data: PatchDto, options?: KavoCallOptions): Promise<ItemDto> {
     const response = await this.engine.execute(
       this.request({
         operation: "patchOne",
@@ -99,16 +99,16 @@ export class DefaultCrudService<
     return response.item as ItemDto;
   }
 
-  async deleteOne(id: Id, options?: CrudCallOptions): Promise<void> {
+  async deleteOne(id: Id, options?: KavoCallOptions): Promise<void> {
     await this.engine.execute(this.request({ operation: "deleteOne", id, options: options ?? null }));
   }
 
-  async restoreOne(id: Id, options?: CrudCallOptions): Promise<ItemDto> {
+  async restoreOne(id: Id, options?: KavoCallOptions): Promise<ItemDto> {
     const response = await this.engine.execute(this.request({ operation: "restoreOne", id, options: options ?? null }));
     return response.item as ItemDto;
   }
 
-  async purgeOne(id: Id, options?: CrudCallOptions): Promise<void> {
+  async purgeOne(id: Id, options?: KavoCallOptions): Promise<void> {
     await this.engine.execute(this.request({ operation: "purgeOne", id, options: options ?? null }));
   }
 }

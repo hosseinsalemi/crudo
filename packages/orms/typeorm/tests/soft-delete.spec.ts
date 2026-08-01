@@ -6,7 +6,7 @@ import {
   ConflictException,
   NotDeletedException,
   NotFoundException,
-  type DefaultCrudService,
+  type DefaultKavoService,
 } from "@kavo/core";
 import { buildEntityMetadata, createTypeOrmKavo } from "@kavo/typeorm";
 
@@ -40,8 +40,8 @@ class Invoice {
 }
 
 let dataSource: DataSource;
-let tickets: DefaultCrudService<Ticket>;
-let invoices: DefaultCrudService<Invoice>;
+let tickets: DefaultKavoService<Ticket>;
+let invoices: DefaultKavoService<Invoice>;
 
 beforeAll(async () => {
   dataSource = new DataSource({
@@ -55,10 +55,10 @@ beforeAll(async () => {
   tickets = kavo.createCrud(Ticket, {
     softDelete: { strategy: "soft" },
     operations: { purgeOne: true },
-  }) as DefaultCrudService<Ticket>;
+  }) as DefaultKavoService<Ticket>;
   invoices = kavo.createCrud(Invoice, {
     softDelete: { field: "archivedAt" },
-  }) as DefaultCrudService<Invoice>;
+  }) as DefaultKavoService<Invoice>;
 });
 
 afterAll(async () => {

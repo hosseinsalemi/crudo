@@ -1,4 +1,4 @@
-import type { CrudException, ErrorContext } from "./crud-exception.js";
+import type { KavoExceptionShape, ErrorContext } from "./kavo-exception-shape.js";
 import type { QueryIssueDto } from "./problem-details.js";
 import type { CatalogedErrorCode } from "./error-catalog.js";
 import { ERROR_CATALOG, renderMessage } from "./error-catalog.js";
@@ -15,12 +15,12 @@ export interface KavoExceptionOptions {
  * catalog code; status, title, and the English `detail` template all come
  * from the catalog, so an exception cannot disagree with it.
  *
- * Downstream layers should keep programming against the `CrudException`
+ * Downstream layers should keep programming against the `KavoExceptionShape`
  * *shape* (the `@kavo/nest` filter catches this class only as a
  * convenience at the HTTP boundary) — the hierarchy is extensible by
  * adding leaves, never by editing existing ones.
  */
-export abstract class KavoException extends Error implements CrudException {
+export abstract class KavoException extends Error implements KavoExceptionShape {
   readonly code: CatalogedErrorCode;
   readonly status: number;
   readonly messageKey: string;

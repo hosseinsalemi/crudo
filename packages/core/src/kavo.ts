@@ -1,5 +1,5 @@
 import type { ClassRef, EntityInput } from "./types/utility.js";
-import type { CrudInfrastructure, EntityMetadata } from "./metadata/entity-metadata.js";
+import type { KavoInfrastructure, EntityMetadata } from "./metadata/entity-metadata.js";
 import type { EntityConfig } from "./config/entity-config.js";
 import type { EntityId } from "./types/entity-id.js";
 import type { GlobalConfig } from "./config/global-config.js";
@@ -9,9 +9,9 @@ import type { RepositoryAdapter } from "./persistence/repository-adapter.js";
 import type { IncludeResolver } from "./relations/include-resolver.js";
 import type { OperationRegistry } from "./operations/operation-registry.js";
 import type { ResolvedEntityConfig } from "./config/resolved-entity-config.js";
-import { CrudEngine } from "./engine/crud-engine.js";
+import { KavoEngine } from "./engine/kavo-engine.js";
 import { ConfigurationException } from "./errors/exceptions.js";
-import { DefaultCrudService } from "./service/default-crud-service.js";
+import { DefaultKavoService } from "./service/default-kavo-service.js";
 import { DefaultErrorHandler } from "./errors/default-error-handler.js";
 import { DefaultDeserializer, DefaultSerializer } from "./serialization/default-serializer.js";
 import { QueryNormalizer } from "./query/query-normalizer.js";
@@ -29,13 +29,13 @@ import { STANDARD_OPERATIONS } from "./operations/default-operation-registry.js"
  * core ever importing it.
  */
 export interface KavoOptions extends GlobalConfig {
-  readonly infrastructure?: CrudInfrastructure;
+  readonly infrastructure?: KavoInfrastructure;
   /** Custom pagination strategies, addressable via `pagination.strategy`. */
   readonly paginationStrategies?: readonly PaginationStrategy[];
 }
 
 /** Per-entity overrides of what the root `infrastructure` would supply. */
-export interface CrudRuntime<Entity extends object> {
+export interface KavoRuntime<Entity extends object> {
   readonly adapter?: RepositoryAdapter<Entity>;
   readonly metadata?: EntityMetadata<Entity>;
 }
@@ -58,8 +58,8 @@ export interface KavoInstance {
   >(
     entity: ClassRef<Entity>,
     config?: EntityConfig<Entity, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto>,
-    runtime?: CrudRuntime<Entity>,
-  ): DefaultCrudService<Entity, EntityId, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto>;
+    runtime?: KavoRuntime<Entity>,
+  ): DefaultKavoService<Entity, EntityId, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto>;
 
   /** Debug dump: resolved configuration for one registered entity. */
   describe(entityName: string): Record<string, unknown> | undefined;
@@ -119,7 +119,7 @@ export function createKavo(options: KavoOptions = {}): KavoInstance {
         config: resolved as unknown as ResolvedEntityConfig<object>,
       });
 
-      const engine = new CrudEngine<Entity>({
+      const engine = new KavoEngine<Entity>({
         metadata: metadata as EntityMetadata<Entity>,
         config: resolved,
         registry,
@@ -134,7 +134,7 @@ export function createKavo(options: KavoOptions = {}): KavoInstance {
       });
 
       registered.set(resolved.entityName, describeResolvedConfig(resolved, Object.keys(STANDARD_OPERATIONS)));
-      return new DefaultCrudService(engine) as never;
+      return new DefaultKavoService(engine) as never;
     },
 
     describe(entityName) {
@@ -185,7 +185,7 @@ export function createCrud<
 >(
   entity: ClassRef<Entity>,
   config?: EntityConfig<Entity, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto>,
-  runtime?: CrudRuntime<Entity>,
-): DefaultCrudService<Entity, EntityId, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto> {
+  runtime?: KavoRuntime<Entity>,
+): DefaultKavoService<Entity, EntityId, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto> {
   return createKavo().createCrud(entity, config, runtime);
 }

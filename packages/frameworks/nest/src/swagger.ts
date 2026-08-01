@@ -1,11 +1,11 @@
 import { createRequire } from "node:module";
 import type { ClassRef, DtoResolver, EntityConfig, OperationDescriptor, OperationDtoMap } from "@kavo/core";
 import { DefaultDtoResolver } from "@kavo/core";
-import type { CrudHttpMethod } from "./operation-metadata.js";
+import type { KavoHttpMethod } from "./operation-metadata.js";
 import { isSchemaHint, readSchemaHint, type SchemaHint } from "./schema-hints.js";
 
 interface RouteShape {
-  readonly method: CrudHttpMethod;
+  readonly method: KavoHttpMethod;
   readonly path: string;
   readonly status: number;
   readonly hasIdParam: boolean;

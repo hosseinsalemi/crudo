@@ -2,7 +2,7 @@ import "reflect-metadata";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Column, DataSource, DeleteDateColumn, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 import type { Logger } from "typeorm";
-import type { KavoInstance, DefaultCrudService } from "@kavo/core";
+import type { KavoInstance, DefaultKavoService } from "@kavo/core";
 import { createTypeOrmKavo } from "@kavo/typeorm";
 
 /** Counts SELECT statements so a test can assert "exactly one query fired". */
@@ -62,9 +62,9 @@ class Note {
 
 let dataSource: DataSource;
 let kavo: KavoInstance;
-let blogs: DefaultCrudService<Blog>;
-let joinedBlogs: DefaultCrudService<Blog>;
-let articles: DefaultCrudService<Article>;
+let blogs: DefaultKavoService<Blog>;
+let joinedBlogs: DefaultKavoService<Blog>;
+let articles: DefaultKavoService<Article>;
 const queryLogger = new QueryCountingLogger();
 
 beforeAll(async () => {
@@ -80,20 +80,20 @@ beforeAll(async () => {
   kavo = createTypeOrmKavo(dataSource);
   blogs = kavo.createCrud(Blog, {
     relations: { edges: { articles: { includable: true } } },
-  }) as DefaultCrudService<Blog>;
+  }) as DefaultKavoService<Blog>;
   articles = kavo.createCrud(Article, {
     softDelete: { strategy: "soft" },
     relations: { edges: { blog: { includable: true }, notes: { includable: true } } },
     // Filtering across a relation path is its own allowlist decision,
     // independent of whether the relation may be included.
     allowlists: { filterable: ["id", "title", "blog.name"] },
-  } as never) as DefaultCrudService<Article>;
+  } as never) as DefaultKavoService<Article>;
   kavo.createCrud(Note, { relations: { edges: { article: { includable: true } } } });
   // The same entity with the to-many forced to `join`: the case the
   // normative pagination rule exists for.
   joinedBlogs = createTypeOrmKavo(dataSource).createCrud(Blog, {
     relations: { edges: { articles: { includable: true, strategy: "join" } } },
-  }) as DefaultCrudService<Blog>;
+  }) as DefaultKavoService<Blog>;
 });
 
 afterAll(async () => {

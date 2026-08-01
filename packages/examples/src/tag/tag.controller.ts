@@ -1,5 +1,5 @@
 import { Controller } from "@nestjs/common";
-import { Crud } from "@kavo/nest";
+import { Kavo } from "@kavo/nest";
 import { Tag } from "./tag.entity.js";
 import { CreateTagDto, UpdateTagDto, TagItemDto, TagListDto } from "./tag.dtos.js";
 
@@ -7,7 +7,7 @@ import { CreateTagDto, UpdateTagDto, TagItemDto, TagListDto } from "./tag.dtos.j
  * Plain CRUD over `Tag`, the many-to-many side pets associate by id
  * (`include=tags` on `/cats`).
  */
-@Crud(Tag, {
+@Kavo(Tag, {
   dto: {
     create: CreateTagDto,
     update: UpdateTagDto,

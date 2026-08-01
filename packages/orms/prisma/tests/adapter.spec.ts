@@ -6,7 +6,7 @@ import {
   PersistenceException,
   QueryValidationException,
   type KavoInstance,
-  type DefaultCrudService,
+  type DefaultKavoService,
 } from "@kavo/core";
 import { buildEntityMetadata, createPrismaKavo } from "@kavo/prisma";
 import { newTestPrismaClient } from "./support/client.js";
@@ -35,7 +35,7 @@ class Book {
 
 let client: PrismaClient;
 let kavo: KavoInstance;
-let authors: DefaultCrudService<Author>;
+let authors: DefaultKavoService<Author>;
 
 beforeAll(() => {
   client = newTestPrismaClient();
@@ -44,7 +44,7 @@ beforeAll(() => {
     entities: [Author, Book],
     caseInsensitiveFilters: false, // SQLite rejects Prisma's `mode: "insensitive"`
   });
-  authors = kavo.createCrud(Author) as DefaultCrudService<Author>;
+  authors = kavo.createCrud(Author) as DefaultKavoService<Author>;
 });
 
 afterAll(async () => {
@@ -223,7 +223,7 @@ describe("PrismaRepositoryAdapter — query translation", () => {
   it("filters on relation paths when explicitly allowlisted", async () => {
     const scoped = kavo.createCrud(Book, {
       allowlists: { filterable: ["title", "author.name" as never] },
-    }) as DefaultCrudService<Book>;
+    }) as DefaultKavoService<Book>;
     await seed();
     const ada = (await authors.findMany()).items.map((a) => a as Author).find((a) => a.name === "Ada")!;
     await client.book.create({ data: { title: "Notes", authorId: ada.id } });
@@ -238,7 +238,7 @@ describe("PrismaRepositoryAdapter — query translation", () => {
   it("associates a relation by writing its scalar foreign-key field (ADR-0014)", async () => {
     const books = kavo.createCrud(Book, {
       relations: { edges: { author: { includable: true } } },
-    } as never) as DefaultCrudService<Book>;
+    } as never) as DefaultKavoService<Book>;
     const author = (await authors.createOne({ email: "assoc@x.io", name: "Assoc", age: 1 } as never)) as Author;
 
     const created = (await books.createOne({ title: "Assoc Book", authorId: author.id } as never)) as Book;

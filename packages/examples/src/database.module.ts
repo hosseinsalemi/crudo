@@ -27,7 +27,7 @@ export interface PostgresOptions {
  * `docker run` used locally, and `tests/app-postgres.e2e.spec.ts` for how
  * the e2e suite self-provisions one via Testcontainers.
  *
- * Global so `DATA_SOURCE` is injectable straight into any `@Crud`
+ * Global so `DATA_SOURCE` is injectable straight into any `@Kavo`
  * controller (e.g. `AddressController`'s `@Override`'d methods), not just
  * where `DatabaseModule` is nested (`KavoModule.forRootAsync`'s own
  * `imports`).

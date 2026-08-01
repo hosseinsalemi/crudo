@@ -55,7 +55,7 @@ export interface EntityMetadata<Entity = unknown> {
  * in-memory fake. Passed to `createKavo` once — individual `createCrud`
  * calls may still override the adapter per entity.
  */
-export interface CrudInfrastructure {
+export interface KavoInfrastructure {
   metadataFor<Entity extends object>(entity: ClassRef<Entity>): EntityMetadata<Entity>;
   adapterFor<Entity extends object>(entity: ClassRef<Entity>): RepositoryAdapter<Entity>;
 }

@@ -1,4 +1,4 @@
-import type { CrudException } from "./crud-exception.js";
+import type { KavoExceptionShape } from "./kavo-exception-shape.js";
 import type { ProblemDetailsDto } from "./problem-details.js";
 import { ERROR_CATALOG } from "./error-catalog.js";
 import { QueryValidationException } from "./exceptions.js";
@@ -24,7 +24,10 @@ export interface ProblemDetailsOptions {
  * This is the default wire shape; a consumer wanting a
  * different one swaps this serializer, never the exception hierarchy.
  */
-export function toProblemDetails(exception: CrudException, options: ProblemDetailsOptions = {}): ProblemDetailsDto {
+export function toProblemDetails(
+  exception: KavoExceptionShape,
+  options: ProblemDetailsOptions = {},
+): ProblemDetailsDto {
   const catalog = ERROR_CATALOG[exception.code as keyof typeof ERROR_CATALOG];
   const detail =
     options.exposeInternals && exception.cause !== undefined

@@ -40,8 +40,8 @@ export interface TransactionOptions {
  * than it had before. It is kept because core's type system was fixed once
  * and is not meant to churn; if that stops being reason enough, deleting it
  * is the honest next step.
- * `TransactionContext` is already live: it is threaded through `CrudContext`
- * and `CrudCallOptions` as an opaque adapter handle.
+ * `TransactionContext` is already live: it is threaded through `KavoContext`
+ * and `KavoCallOptions` as an opaque adapter handle.
  */
 export interface TransactionManager {
   run<Result>(

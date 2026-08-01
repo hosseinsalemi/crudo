@@ -2,7 +2,7 @@ import type { EntityId } from "../types/entity-id.js";
 import type { EntityInput } from "../types/utility.js";
 import type { QueryContext } from "../query/query-context.js";
 import type { ListResultDto } from "../dto/list-result.js";
-import type { CrudCallOptions } from "./crud-call-options.js";
+import type { KavoCallOptions } from "./kavo-call-options.js";
 
 /**
  * The primary programmatic surface — what `createCrud(Entity, config)`
@@ -17,7 +17,7 @@ import type { CrudCallOptions } from "./crud-call-options.js";
  * drop them when a build does not want them; this build does not, so the
  * `*Many` surface is absent rather than present-but-throwing.
  */
-export interface CrudService<
+export interface KavoService<
   Entity,
   Id extends EntityId = EntityId,
   CreateDto = EntityInput<Entity>,
@@ -27,28 +27,28 @@ export interface CrudService<
   ItemDto = Entity,
   ListDto = ItemDto,
 > {
-  createOne(data: CreateDto, options?: CrudCallOptions): Promise<ItemDto>;
+  createOne(data: CreateDto, options?: KavoCallOptions): Promise<ItemDto>;
 
-  findOne(id: Id, query?: QueryDto, options?: CrudCallOptions): Promise<ItemDto>;
-  findMany(query?: QueryDto, options?: CrudCallOptions): Promise<ListResultDto<ListDto>>;
+  findOne(id: Id, query?: QueryDto, options?: KavoCallOptions): Promise<ItemDto>;
+  findMany(query?: QueryDto, options?: KavoCallOptions): Promise<ListResultDto<ListDto>>;
 
-  updateOne(id: Id, data: UpdateDto, options?: CrudCallOptions): Promise<ItemDto>;
+  updateOne(id: Id, data: UpdateDto, options?: KavoCallOptions): Promise<ItemDto>;
 
-  patchOne(id: Id, data: PatchDto, options?: CrudCallOptions): Promise<ItemDto>;
+  patchOne(id: Id, data: PatchDto, options?: KavoCallOptions): Promise<ItemDto>;
 
   /** Hard or soft per the resolved delete strategy. */
-  deleteOne(id: Id, options?: CrudCallOptions): Promise<void>;
+  deleteOne(id: Id, options?: KavoCallOptions): Promise<void>;
 
   /**
    * Un-deletes a soft-deleted row. Reuses the `item` DTO slot — no
    * dedicated restore shape. Enabled when the entity config
    * declares soft delete.
    */
-  restoreOne(id: Id, options?: CrudCallOptions): Promise<ItemDto>;
+  restoreOne(id: Id, options?: KavoCallOptions): Promise<ItemDto>;
 
   /**
    * Permanently removes a soft-deleted row; disabled by default, enabled
    * with `operations: { purgeOne: true }`.
    */
-  purgeOne(id: Id, options?: CrudCallOptions): Promise<void>;
+  purgeOne(id: Id, options?: KavoCallOptions): Promise<void>;
 }

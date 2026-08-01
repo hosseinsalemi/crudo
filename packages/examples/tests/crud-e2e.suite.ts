@@ -217,7 +217,7 @@ export function registerCrudE2eSuite(getApp: () => INestApplication): void {
       // never exercised together elsewhere in this suite. `owner.pets`
       // itself cannot be the second level here: `Pet` is the abstract STI
       // base `owner.pets` targets, and only the concrete `Cat`/`Dog`
-      // subtypes carry a registered @Crud config, so nothing below
+      // subtypes carry a registered @Kavo config, so nothing below
       // `owner.pets` is includable (a real, separate limitation from the
       // relation budgets this test is actually about).
       const owner = await request(server()).post("/owners").send({ name: "Nia", email: "nia@x.io" }).expect(201);
@@ -279,7 +279,7 @@ export function registerCrudE2eSuite(getApp: () => INestApplication): void {
 
     it("keeps deletedAt out of the filterable, sortable, and selectable allowlists (issue #45)", async () => {
       // `deletedAt` is soft-delete plumbing, not client-queryable data —
-      // Owner's `@Crud` config excludes it explicitly via `{ exclude }`.
+      // Owner's `@Kavo` config excludes it explicitly via `{ exclude }`.
       const filtered = await request(server()).get("/owners").query("filter[deletedAt][eq]=x").expect(400);
       expect(filtered.body.errors).toEqual([
         expect.objectContaining({ field: "deletedAt", code: "KAVO_QUERY_INVALID_FIELD" }),
