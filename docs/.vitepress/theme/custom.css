@@ -67,6 +67,43 @@
   font-size: 16px;
 }
 
+.VPHero .actions .VPButton.brand {
+  position: relative;
+  border: none;
+  background: linear-gradient(135deg, var(--vp-c-brand-1), var(--vp-c-brand-3));
+  box-shadow:
+    0 1px 1px rgba(255, 255, 255, 0.2) inset,
+    0 8px 24px -8px rgba(124, 92, 255, 0.55);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    filter 0.2s ease;
+}
+
+.VPHero .actions .VPButton.brand:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow:
+    0 1px 1px rgba(255, 255, 255, 0.25) inset,
+    0 12px 32px -8px rgba(124, 92, 255, 0.7);
+}
+
+.VPHero .actions .VPButton.brand:active {
+  transform: translateY(0);
+  filter: brightness(0.98);
+}
+
+.VPHero .actions .VPButton.alt {
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.VPHero .actions .VPButton.alt:hover {
+  transform: translateY(-1px);
+}
+
 .VPFeature .icon {
   font-size: 28px;
 }
