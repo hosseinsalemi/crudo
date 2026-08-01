@@ -1,5 +1,6 @@
 import type { RelationLoadStrategy } from "../relations/relation-descriptor.js";
 import type { StandardOperationId } from "../operations/operation.js";
+import type { Sort } from "../query/sort.js";
 
 /**
  * The complete, canonical settings schema — one schema for every scope.
@@ -27,6 +28,13 @@ export interface QuerySettings {
   readonly maxFilterDepth: number;
   /** Max array length for `IN`/`NOT_IN`/`BETWEEN` values. */
   readonly maxInValues: number;
+  /**
+   * Order applied when a request supplies no `sort` — a client-supplied
+   * `sort` always wins outright, never merges with this. Fields are
+   * validated against the sortable allowlist at bootstrap, the same as
+   * client-supplied sort fields are at request time.
+   */
+  readonly defaultSort: readonly Sort[];
 }
 
 export interface ErrorSettings {

@@ -17,6 +17,7 @@ built-in defaults → global (createKavo) → entity (createCrud)
 | `pagination.strategy`                            | `"offset"`               | `"page"` built in; custom via `paginationStrategies`                   |
 | `pagination.count`                               | `true`                   | `false` skips the count query; envelope reports `total: null`          |
 | `query.maxFilterDepth` / `maxInValues`           | 3 / 100                  |                                                                        |
+| `query.defaultSort`                              | `[]` (unset)             | order applied when a request supplies no `sort` (issue #56); see below |
 | `errors.exposeInternals`                         | `false`                  | leak driver detail into responses                                      |
 | `relations.maxIncludeDepth` / `maxIncludedNodes` | 2 / 10                   | include depth budget and total node cap                                |
 | `relations.edges.<name>`                         | `{}`                     | per-relation `includable` / `defaultInclude` / `maxDepth` / `strategy` |
@@ -80,6 +81,22 @@ request.
 expected a positive integer, got -1`). The same bar applies to unknown
 pagination strategies, missing infrastructure, non-`@Kavo` controllers in
 `forFeature`, and custom-operation id collisions.
+
+### `query.defaultSort`
+
+Order applied when a request supplies no `sort` at all — a client- or
+caller-supplied `sort`, when present, always wins outright; the two never
+merge. Each entry is `{ field, direction }` (the same shape as a parsed
+`Sort`), resolved through the full precedence chain like every other
+setting, so it can be set globally, per entity, per operation, or per call.
+Fields are checked against the same sortable allowlist client-supplied
+`sort` fields are checked against, but as soon as the value is set rather
+than when a request uses it: at **bootstrap** (`resolveEntityConfig`) for
+global/entity/operation scope, and when a per-call override is merged
+(`KavoEngine.configViewFor`) for per-call scope — so a bad default fails
+fast at the scope that introduced it instead of producing a broken
+`ORDER BY` on the first request that hits it. Doc 05 covers the
+request-time semantics (client `sort` vs. this fallback).
 
 ## 5. Root factory and framework skin
 
