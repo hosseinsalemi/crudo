@@ -10,7 +10,7 @@ single precedence chain (`docs/architecture/08-configuration.md`):
 
 ```
 built-in defaults → global (createKavo) → entity (createCrud)
-                  → operation (operations.<id>) → per-call (CrudCallOptions)
+                  → operation (operations.<id>) → per-call (KavoCallOptions)
 ```
 
 The schema-extensibility rule (doc 08 §1) is normative: **feature work adds
@@ -25,7 +25,7 @@ through the engine, stop; it belongs in `KavoSettings`.
    a resolved config can observe.
 2. **The settings type** — extend the `KavoSettings` interface/schema so the
    new key is typed at every scope (global defaults, entity config,
-   `operations.<id>` overrides, `CrudCallOptions.settings`).
+   `operations.<id>` overrides, `KavoCallOptions.settings`).
 3. **`mergeSettings`** (`packages/core/src/config/merge-settings.ts`) — confirm
    the new key's shape matches the existing merge semantics rather than
    inventing a new one:
@@ -64,7 +64,7 @@ Per the `write-tests` skill, at minimum:
 - `false`-disables-then-nearer-re-enables, if the key supports that;
 - bootstrap validation rejects an invalid value with `ConfigurationException`
   and the right code, naming the entity and key path;
-- if the key is per-call (`CrudCallOptions.settings`), that it's merged as a
+- if the key is per-call (`KavoCallOptions.settings`), that it's merged as a
   parameter for that request only and never mutates the frozen resolved
   config for subsequent calls.
 

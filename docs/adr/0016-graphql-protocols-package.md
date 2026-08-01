@@ -16,7 +16,7 @@ paradigm that could sit atop any host framework — Nest today, a future
 Express/Fastify/Next.js binding later — the same way REST does. Treating
 `@kavo/graphql` as a third `frameworks/*` sibling would conflate protocol
 with host framework and give it no natural way to reach `@kavo/nest`'s
-discovery internals (`getCrudEntities()`, `ModuleRef`) without either
+discovery internals (`getKavoEntities()`, `ModuleRef`) without either
 package importing the other in both directions — exactly the
 `frameworks/* <-> frameworks/*` edge ADR-0002's boundary rules exist to
 prevent between adapter and framework.
@@ -31,7 +31,7 @@ never a host framework package.
 
 Host framework packages (`packages/frameworks/*`) may depend on a
 protocol package to build framework-specific glue — `@kavo/nest` depends
-on `@kavo/graphql` to provide `BaseCrudGraphQLController` and
+on `@kavo/graphql` to provide `BaseKavoGraphQLController` and
 `createDefaultGraphQLController` — but never the reverse.
 `graphql-only-imports-core` enforces the reverse direction by blocking
 `@kavo/graphql` from importing `packages/frameworks` or `@kavo/nest`. The
@@ -52,16 +52,16 @@ Cases:
   shape and may depend on whichever `protocols/*` package(s) it wants to
   offer glue for.
 
-An entity opts into GraphQL exposure separately from its `@Crud` config —
-`registerCrudGraphQLTypes(Entity, {...})`, not a `@Crud(Entity, { graphql:
-{...} })` option — because `@kavo/graphql` cannot know `@Crud` exists
+An entity opts into GraphQL exposure separately from its `@Kavo` config —
+`registerKavoGraphQLTypes(Entity, {...})`, not a `@Kavo(Entity, { graphql:
+{...} })` option — because `@kavo/graphql` cannot know `@Kavo` exists
 (same reasoning ADR-0002 already gives for adapters never being reachable
 from framework config directly).
 
 ## Consequences
 
 - `@kavo/graphql`'s host-agnostic discovery helper
-  (`resolveCrudGraphQLSchema`) is reusable verbatim by any future host
+  (`resolveKavoGraphQLSchema`) is reusable verbatim by any future host
   framework binding — only "how to enumerate entities" and "how to
   resolve a bound service" differ per host, and both are supplied by the
   caller, never by `@kavo/graphql` itself.

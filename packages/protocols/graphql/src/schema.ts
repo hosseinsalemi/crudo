@@ -9,7 +9,7 @@ import {
   type GraphQLFieldConfig,
   type GraphQLInputObjectType,
 } from "graphql";
-import type { DefaultCrudService, EntityId } from "@kavo/core";
+import type { DefaultKavoService, EntityId } from "@kavo/core";
 import { ConfigurationException } from "@kavo/core";
 import { GraphQLJSON } from "./json-scalar.js";
 
@@ -31,7 +31,7 @@ function parseSortArg(tokens: readonly string[] | undefined): { field: string; d
 /**
  * What a query/mutation resolver in this binding actually calls — the
  * transport-agnostic programmatic surface `createCrud` returns. Kept as a
- * structural type (not `DefaultCrudService` itself) so a caller only has to
+ * structural type (not `DefaultKavoService` itself) so a caller only has to
  * satisfy the handful of methods a schema actually wires up, the same way
  * `@kavo/nest`'s standard-operation routes bind to it. Exported (not just
  * internal) so `discovery.ts`'s host-agnostic resolver callback can name it.
@@ -39,12 +39,12 @@ function parseSortArg(tokens: readonly string[] | undefined): { field: string; d
  * Every standard operation is picked unconditionally — whether a given
  * field actually reaches the schema is decided per entity by which
  * `*InputType`/`include*` options `crudFields` receives, mirroring how
- * `@Crud`'s own `operations` config opts entities in or out on the REST
+ * `@Kavo`'s own `operations` config opts entities in or out on the REST
  * side. Calling `restoreOne`/`purgeOne` against an entity that never
  * declared soft delete still raises `OperationDisabledException` from the
  * engine itself — this binding does not re-check that, same as REST.
  */
-export type BoundCrudService<
+export type BoundKavoService<
   Entity extends object,
   Id extends EntityId,
   CreateDto,
@@ -53,7 +53,7 @@ export type BoundCrudService<
   ItemDto,
   ListDto,
 > = Pick<
-  DefaultCrudService<Entity, Id, CreateDto, UpdateDto, PatchDto, unknown, ItemDto, ListDto>,
+  DefaultKavoService<Entity, Id, CreateDto, UpdateDto, PatchDto, unknown, ItemDto, ListDto>,
   "findOne" | "findMany" | "createOne" | "updateOne" | "patchOne" | "deleteOne" | "restoreOne" | "purgeOne"
 >;
 
@@ -65,7 +65,7 @@ export type BoundCrudService<
  * that field never reaches the schema, the same "declare what you want"
  * shape `createInputType` already had.
  */
-export interface CrudGraphQLOptions<
+export interface KavoGraphQLOptions<
   Entity extends object,
   Id extends EntityId,
   CreateDto,
@@ -76,7 +76,7 @@ export interface CrudGraphQLOptions<
 > {
   /** Singular, capitalized entity name — becomes `Query.<lowerName>` / `<Name>List` / `createName` / etc. */
   readonly name: string;
-  readonly service: BoundCrudService<Entity, Id, CreateDto, UpdateDto, PatchDto, ItemDto, ListDto>;
+  readonly service: BoundKavoService<Entity, Id, CreateDto, UpdateDto, PatchDto, ItemDto, ListDto>;
   readonly itemType: GraphQLObjectType;
   /** Omit to leave the `create<Name>` mutation off the schema. */
   readonly createInputType?: GraphQLInputObjectType;
@@ -97,8 +97,8 @@ function lowerFirst(value: string): string {
 }
 
 /**
- * Field maps for one entity's binding — the unit `createCrudGraphQLSchema`
- * wraps and `mergeCrudGraphQLSchemas`/`resolveCrudGraphQLSchema` combine.
+ * Field maps for one entity's binding — the unit `createKavoGraphQLSchema`
+ * wraps and `mergeKavoGraphQLSchemas`/`resolveKavoGraphQLSchema` combine.
  * Not exported from the barrel: an internal building block, same status as
  * `lowerFirst`.
  */
@@ -111,7 +111,7 @@ export function crudFields<
   ItemDto,
   ListDto,
 >(
-  options: CrudGraphQLOptions<Entity, Id, CreateDto, UpdateDto, PatchDto, ItemDto, ListDto>,
+  options: KavoGraphQLOptions<Entity, Id, CreateDto, UpdateDto, PatchDto, ItemDto, ListDto>,
 ): {
   query: Record<string, GraphQLFieldConfig<unknown, unknown>>;
   mutation: Record<string, GraphQLFieldConfig<unknown, unknown>>;
@@ -225,12 +225,12 @@ export function crudFields<
  * resolver delegates straight to the bound service, which itself is sugar
  * over `engine.execute` — the identical pipeline REST runs.
  *
- * For an app with more than one entity, prefer `mergeCrudGraphQLSchemas` (or
- * `resolveCrudGraphQLSchema` for a framework-driven registry) — they put
+ * For an app with more than one entity, prefer `mergeKavoGraphQLSchemas` (or
+ * `resolveKavoGraphQLSchema` for a framework-driven registry) — they put
  * every entity's fields on one `Query`/`Mutation` root instead of one
  * schema (and one mounted endpoint) per entity.
  */
-export function createCrudGraphQLSchema<
+export function createKavoGraphQLSchema<
   Entity extends object,
   Id extends EntityId,
   CreateDto,
@@ -238,7 +238,7 @@ export function createCrudGraphQLSchema<
   PatchDto,
   ItemDto,
   ListDto,
->(options: CrudGraphQLOptions<Entity, Id, CreateDto, UpdateDto, PatchDto, ItemDto, ListDto>): GraphQLSchema {
+>(options: KavoGraphQLOptions<Entity, Id, CreateDto, UpdateDto, PatchDto, ItemDto, ListDto>): GraphQLSchema {
   const { query, mutation } = crudFields(options);
   return new GraphQLSchema({
     query: new GraphQLObjectType({ name: "Query", fields: query }),
@@ -250,12 +250,12 @@ export function createCrudGraphQLSchema<
 /**
  * Combines several entities' bindings onto one `Query`/`Mutation` root —
  * the shape an app actually wants: one `/graphql` endpoint for every
- * `@Crud` entity, not one per entity. Each entry is the same options shape
- * `createCrudGraphQLSchema` takes; field names are namespaced by each
+ * `@Kavo` entity, not one per entity. Each entry is the same options shape
+ * `createKavoGraphQLSchema` takes; field names are namespaced by each
  * entity's own `name`, so entries never collide with each other.
  */
-export function mergeCrudGraphQLSchemas(
-  bindings: readonly CrudGraphQLOptions<object, EntityId, unknown, unknown, unknown, unknown, unknown>[],
+export function mergeKavoGraphQLSchemas(
+  bindings: readonly KavoGraphQLOptions<object, EntityId, unknown, unknown, unknown, unknown, unknown>[],
 ): GraphQLSchema {
   const query: Record<string, GraphQLFieldConfig<unknown, unknown>> = {};
   const mutation: Record<string, GraphQLFieldConfig<unknown, unknown>> = {};
@@ -271,13 +271,13 @@ export function mergeCrudGraphQLSchemas(
     // or more fields.`) — graphql-js would only report that cryptically, on
     // the first request, deep inside `graphql()`'s own schema validation.
     // Failing fast here, at schema-build time, with a message that names the
-    // actual fix, is what `resolveCrudGraphQLSchema` (zero entities
+    // actual fix, is what `resolveKavoGraphQLSchema` (zero entities
     // discovered) relies on to fail at boot instead of at request time.
     throw new ConfigurationException(
       "GraphQLSchema",
       "bindings",
-      "no entity registered any GraphQL types — call registerCrudGraphQLTypes(Entity, {...}) " +
-        "for at least one @Crud entity before enabling a GraphQL endpoint",
+      "no entity registered any GraphQL types — call registerKavoGraphQLTypes(Entity, {...}) " +
+        "for at least one @Kavo entity before enabling a GraphQL endpoint",
     );
   }
 

@@ -1,6 +1,6 @@
 ---
 name: dto-slots
-description: Reference for Kavo's six optional DTO slots (create/update/patch/query/item/list) — entity-derived defaults, the dtoShapeKeys narrowing rule, and serialization order. Use when registering a DTO class on @Crud's dto option, or answering "why isn't my field showing/hiding" or "what shape does this response have" questions.
+description: Reference for Kavo's six optional DTO slots (create/update/patch/query/item/list) — entity-derived defaults, the dtoShapeKeys narrowing rule, and serialization order. Use when registering a DTO class on @Kavo's dto option, or answering "why isn't my field showing/hiding" or "what shape does this response have" questions.
 ---
 
 # DTO slots reference
@@ -11,7 +11,7 @@ DTOs are shapes for **typing, serialization, and Swagger docs only** — there
 is no validation subsystem attached to them (that's the caller's own
 pipe/guard, e.g. Nest's `ValidationPipe`). Full detail:
 `docs/architecture/04-dto-system.md`. Config-side wiring
-(`@Crud(Entity, { dto: {...} })`) is in the `crud-decorator` skill.
+(`@Kavo(Entity, { dto: {...} })`) is in the `kavo-decorator` skill.
 
 ## The six slots
 
@@ -81,5 +81,5 @@ When a response embeds an included relation (`include=pets`), the node's
 shape comes from the **target entity's own registered `item`/`list` DTOs**
 (falling back to that entity's own derived default) — never a DTO
 registered on the parent. The relation is a full resource in its own right;
-see the `crud-decorator` skill's "relations" section for how inclusion
+see the `kavo-decorator` skill's "relations" section for how inclusion
 itself is allowlisted.

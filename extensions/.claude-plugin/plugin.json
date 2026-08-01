@@ -1,7 +1,7 @@
 {
   "name": "kavo-skills",
   "displayName": "Kavo Developer Skills",
-  "description": "Reference skills for building apps with @kavo/core, @kavo/typeorm, @kavo/nest, and @kavo/graphql — quick start, @Crud() config, global config, query grammar, DTOs, error handling, soft delete, Swagger, and GraphQL.",
+  "description": "Reference skills for building apps with @kavo/core, @kavo/typeorm, @kavo/nest, and @kavo/graphql — quick start, @Kavo() config, global config, query grammar, DTOs, error handling, soft delete, Swagger, and GraphQL.",
   "version": "1.0.0",
   "author": {
     "name": "Kavo Labs",

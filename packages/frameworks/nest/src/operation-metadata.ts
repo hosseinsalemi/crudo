@@ -6,10 +6,10 @@
  */
 
 /** HTTP verbs the route generator can emit. */
-export type CrudHttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+export type KavoHttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
-export interface CrudRouteOptions {
-  readonly method?: CrudHttpMethod;
+export interface KavoRouteOptions {
+  readonly method?: KavoHttpMethod;
   /** Route path relative to the controller (`":id/activate"`). */
   readonly path?: string;
   /**
@@ -23,6 +23,6 @@ export interface CrudRouteOptions {
 
 declare module "@kavo/core" {
   interface OperationMetadata {
-    routes?: CrudRouteOptions;
+    routes?: KavoRouteOptions;
   }
 }

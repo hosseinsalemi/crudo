@@ -1,25 +1,25 @@
 # 07 — CRUD Engine
 
-`CrudEngine` (`core/src/engine/crud-engine.ts`) is the authoritative
+`KavoEngine` (`core/src/engine/kavo-engine.ts`) is the authoritative
 request lifecycle. Both entry surfaces — the programmatic
-`DefaultCrudService` and the generated NestJS routes — build the same
-transport-agnostic `CrudRequest` and run the identical pipeline.
+`DefaultKavoService` and the generated NestJS routes — build the same
+transport-agnostic `KavoRequest` and run the identical pipeline.
 
 ## 1. Lifecycle (Template Method; every boundary a seam)
 
 ```
-CrudRequest
+KavoRequest
  → Operation Resolution   registry lookup; disabled/unknown → OperationDisabledException
  → Config Resolution      settingsFor(operation) + per-call overrides (parameters, never writes)
  → Query Resolution       reads only: WireQuery → normalizeWire, QueryContext → normalizeInput
- → Context Assembly       CrudContext: identity, config view, principal, transaction ⟨reserved⟩,
+ → Context Assembly       KavoContext: identity, config view, principal, transaction ⟨reserved⟩,
                           normalized query, correlationId, typed state bag
  → DTO Resolution         descriptor.input/output else the doc-4 slot default
  → Deserialization        writes only: body → allowed-key projection
  → Handler Execution      OperationHandler from the registry (built-in, overridden, or custom)
  → Response Mapping       item / ListResultDto envelope / void
  → Serialization          DTO mapping → field selection
-CrudResponse
+KavoResponse
 ```
 
 Deliberately lean: no validation stage, no hooks, no policy stage — the
@@ -32,12 +32,12 @@ when it does (a custom operation addressed by `:id` — cardinality `"one"`,
 same as `updateOne`/`patchOne` — needs the id to identify its target, and
 `request.id` is simply absent for `createOne`).
 
-## 2. `CrudContext` contents
+## 2. `KavoContext` contents
 
 Entity + operation identity, the resolved config view (with per-call
 settings already merged), `principal` (opaque to core, set by the
 framework layer), `transaction` (an opaque handle a programmatic caller may
-pass through `CrudCallOptions`; `null` otherwise, and nothing in v6 creates
+pass through `KavoCallOptions`; `null` otherwise, and nothing in v6 creates
 one — the adapter-level hook is reserved), the normalized
 query for reads (`null` for writes), a `correlationId` (generated if the
 caller didn't forward one), and the typed `state` bag
@@ -69,7 +69,7 @@ files and the ADR behind each, is
 - **Template Method** — the fixed lifecycle above.
 - **Strategy** — repository adapter, serializer/deserializer, pagination
   strategies, error handler: all constructor-injected interfaces.
-- **Dependency Injection** — `CrudEngineDependencies` is plain
+- **Dependency Injection** — `KavoEngineDependencies` is plain
   constructor injection; no container in core (`@kavo/nest` provides
   one at the framework layer).
 

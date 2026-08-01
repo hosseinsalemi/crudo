@@ -1,5 +1,5 @@
 import type {
-  CrudContext,
+  KavoContext,
   EntityId,
   EntityMetadata,
   IncludeTree,
@@ -54,7 +54,7 @@ export class PrismaRepositoryAdapter<Entity extends object> implements Repositor
   async findOneById(
     id: EntityId,
     query: NormalizedQueryContext<Entity> | null,
-    context: CrudContext<Entity>,
+    context: KavoContext<Entity>,
   ): Promise<Entity | null> {
     try {
       const where = this.scopeToLive({ [this.idField]: id }, context, query?.withDeleted ?? false);
@@ -66,7 +66,7 @@ export class PrismaRepositoryAdapter<Entity extends object> implements Repositor
     }
   }
 
-  async findOne(query: NormalizedQueryContext<Entity>, context: CrudContext<Entity>): Promise<Entity | null> {
+  async findOne(query: NormalizedQueryContext<Entity>, context: KavoContext<Entity>): Promise<Entity | null> {
     try {
       const row = await this.delegate.findFirst(this.buildFindArgs(query, context));
       return (row as Entity | null) ?? null;
@@ -75,7 +75,7 @@ export class PrismaRepositoryAdapter<Entity extends object> implements Repositor
     }
   }
 
-  async findMany(query: NormalizedQueryContext<Entity>, context: CrudContext<Entity>): Promise<readonly Entity[]> {
+  async findMany(query: NormalizedQueryContext<Entity>, context: KavoContext<Entity>): Promise<readonly Entity[]> {
     try {
       const rows = await this.delegate.findMany({
         ...this.buildFindArgs(query, context),
@@ -88,7 +88,7 @@ export class PrismaRepositoryAdapter<Entity extends object> implements Repositor
     }
   }
 
-  async count(query: NormalizedQueryContext<Entity>, context: CrudContext<Entity>): Promise<number> {
+  async count(query: NormalizedQueryContext<Entity>, context: KavoContext<Entity>): Promise<number> {
     try {
       // A dedicated count — never fetch-then-length: the engine only calls
       // this when `query.count` is true, so `total: null` costs zero queries.
@@ -99,7 +99,7 @@ export class PrismaRepositoryAdapter<Entity extends object> implements Repositor
     }
   }
 
-  private buildFindArgs(query: NormalizedQueryContext<Entity>, context: CrudContext<Entity>): Record<string, unknown> {
+  private buildFindArgs(query: NormalizedQueryContext<Entity>, context: KavoContext<Entity>): Record<string, unknown> {
     const where = this.scopeToLive(translateFilter(query.filter, this.filterOptions), context, query.withDeleted);
     const orderBy = query.sort.map((sort) => nestOrderBy(sort.field as string, sort.direction));
     const include = this.buildInclude(query.include);
@@ -140,7 +140,7 @@ export class PrismaRepositoryAdapter<Entity extends object> implements Repositor
 
   private scopeToLive(
     where: PrismaWhere | undefined,
-    context: CrudContext<Entity>,
+    context: KavoContext<Entity>,
     withDeleted: boolean,
   ): PrismaWhere | undefined {
     const softDelete = context.config.softDelete;
@@ -151,7 +151,7 @@ export class PrismaRepositoryAdapter<Entity extends object> implements Repositor
   }
 
   /** The resolved strategy, refused when an operation requires soft. */
-  private requireSoftDelete(context: CrudContext<Entity>, operation: string): ResolvedSoftDelete & { field: string } {
+  private requireSoftDelete(context: KavoContext<Entity>, operation: string): ResolvedSoftDelete & { field: string } {
     const softDelete = context.config.softDelete;
     if (softDelete.strategy !== "soft") {
       throw new ConfigurationException(
@@ -170,7 +170,7 @@ export class PrismaRepositoryAdapter<Entity extends object> implements Repositor
 
   private async byId(
     id: EntityId,
-    context: CrudContext<Entity>,
+    context: KavoContext<Entity>,
     withDeleted: boolean,
   ): Promise<Record<string, unknown> | null> {
     const where = this.scopeToLive({ [this.idField]: id }, context, withDeleted);
@@ -179,7 +179,7 @@ export class PrismaRepositoryAdapter<Entity extends object> implements Repositor
 
   // ── Writes ───────────────────────────────────────────────────────────
 
-  async create(data: Partial<Entity>, context: CrudContext<Entity>): Promise<Entity> {
+  async create(data: Partial<Entity>, context: KavoContext<Entity>): Promise<Entity> {
     try {
       return (await this.delegate.create({ data })) as Entity;
     } catch (error) {
@@ -187,11 +187,11 @@ export class PrismaRepositoryAdapter<Entity extends object> implements Repositor
     }
   }
 
-  async update(id: EntityId, data: Partial<Entity>, context: CrudContext<Entity>): Promise<Entity> {
+  async update(id: EntityId, data: Partial<Entity>, context: KavoContext<Entity>): Promise<Entity> {
     return this.writeExisting(id, data, context);
   }
 
-  async patch(id: EntityId, data: Partial<Entity>, context: CrudContext<Entity>): Promise<Entity> {
+  async patch(id: EntityId, data: Partial<Entity>, context: KavoContext<Entity>): Promise<Entity> {
     return this.writeExisting(id, data, context);
   }
 
@@ -202,7 +202,7 @@ export class PrismaRepositoryAdapter<Entity extends object> implements Repositor
    * exactly as it is to reads — reviving one is `restore`'s job, so
    * existence is checked against the live scope before the write.
    */
-  private async writeExisting(id: EntityId, data: Partial<Entity>, context: CrudContext<Entity>): Promise<Entity> {
+  private async writeExisting(id: EntityId, data: Partial<Entity>, context: KavoContext<Entity>): Promise<Entity> {
     try {
       const existing = await this.byId(id, context, false);
       if (existing === null) throw this.notFound(id, context);
@@ -212,7 +212,7 @@ export class PrismaRepositoryAdapter<Entity extends object> implements Repositor
     }
   }
 
-  async delete(id: EntityId, context: CrudContext<Entity>): Promise<void> {
+  async delete(id: EntityId, context: KavoContext<Entity>): Promise<void> {
     const softDelete = context.config.softDelete;
     try {
       if (softDelete.strategy === "hard") {
@@ -236,7 +236,7 @@ export class PrismaRepositoryAdapter<Entity extends object> implements Repositor
     }
   }
 
-  async restore(id: EntityId, context: CrudContext<Entity>): Promise<Entity> {
+  async restore(id: EntityId, context: KavoContext<Entity>): Promise<Entity> {
     try {
       const { field } = this.requireSoftDelete(context, "restore");
       const existing = await this.byId(id, context, true);
@@ -253,7 +253,7 @@ export class PrismaRepositoryAdapter<Entity extends object> implements Repositor
     }
   }
 
-  async purge(id: EntityId, context: CrudContext<Entity>): Promise<void> {
+  async purge(id: EntityId, context: KavoContext<Entity>): Promise<void> {
     const softDelete = context.config.softDelete;
     try {
       if (softDelete.strategy === "soft") {
@@ -277,7 +277,7 @@ export class PrismaRepositoryAdapter<Entity extends object> implements Repositor
     }
   }
 
-  private notFound(id: EntityId, context: CrudContext<Entity>): NotFoundException {
+  private notFound(id: EntityId, context: KavoContext<Entity>): NotFoundException {
     return new NotFoundException({
       messageParams: { entity: context.entityName, id: String(id) },
       context: errorContext(context),
@@ -293,7 +293,7 @@ function nestOrderBy(field: string, direction: "asc" | "desc"): Record<string, u
   );
 }
 
-function errorContext<Entity>(context: CrudContext<Entity>) {
+function errorContext<Entity>(context: KavoContext<Entity>) {
   return {
     entityName: context.entityName,
     operation: context.operation,

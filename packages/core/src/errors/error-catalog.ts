@@ -1,4 +1,4 @@
-import type { KavoErrorCode } from "./crud-exception.js";
+import type { KavoErrorCode } from "./kavo-exception-shape.js";
 
 /**
  * One catalog entry: everything stable about an error code. Codes are API

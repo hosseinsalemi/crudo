@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import { Override } from "@kavo/nest";
 
 // The reflect key is internal to @kavo/nest; read it back the same way
-// crud.decorator.ts does, via a tiny re-declaration, to keep this test
+// kavo.decorator.ts does, via a tiny re-declaration, to keep this test
 // black-box over the public `Override` decorator alone.
-const CRUD_OVERRIDE_METADATA = "kavo:override";
+const KAVO_OVERRIDE_METADATA = "kavo:override";
 
 describe("Override — method-decorator metadata (issue #23)", () => {
   it("defaults the operation id to the decorated method's own name", () => {
@@ -13,7 +13,7 @@ describe("Override — method-decorator metadata (issue #23)", () => {
       @Override()
       findOne(): void {}
     }
-    expect(Reflect.getMetadata(CRUD_OVERRIDE_METADATA, Controller.prototype, "findOne")).toEqual({
+    expect(Reflect.getMetadata(KAVO_OVERRIDE_METADATA, Controller.prototype, "findOne")).toEqual({
       operationId: "findOne",
     });
   });
@@ -23,7 +23,7 @@ describe("Override — method-decorator metadata (issue #23)", () => {
       @Override("createOne")
       customCreate(): void {}
     }
-    expect(Reflect.getMetadata(CRUD_OVERRIDE_METADATA, Controller.prototype, "customCreate")).toEqual({
+    expect(Reflect.getMetadata(KAVO_OVERRIDE_METADATA, Controller.prototype, "customCreate")).toEqual({
       operationId: "createOne",
     });
   });
@@ -32,6 +32,6 @@ describe("Override — method-decorator metadata (issue #23)", () => {
     class Controller {
       plain(): void {}
     }
-    expect(Reflect.getMetadata(CRUD_OVERRIDE_METADATA, Controller.prototype, "plain")).toBeUndefined();
+    expect(Reflect.getMetadata(KAVO_OVERRIDE_METADATA, Controller.prototype, "plain")).toBeUndefined();
   });
 });

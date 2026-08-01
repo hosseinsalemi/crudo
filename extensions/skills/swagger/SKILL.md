@@ -7,7 +7,7 @@ description: Reference for Kavo's optional Swagger/OpenAPI integration — insta
 
 `@nestjs/swagger` is an **optional peer** of `@kavo/nest` — install it and
 every generated route documents itself automatically; leave it out and
-`@Crud` costs nothing extra. No config flag turns this on or off: Kavo
+`@Kavo` costs nothing extra. No config flag turns this on or off: Kavo
 detects the package at runtime (`createRequire(...).require("@nestjs/swagger")`,
 cached, never throws if absent) and documents routes only when it's there.
 Full detail: `docs/architecture/10-nestjs-integration.md` §4.
@@ -18,8 +18,8 @@ Full detail: `docs/architecture/10-nestjs-integration.md` §4.
 npm install @nestjs/swagger
 ```
 
-That's the only step — no `@Crud` config option, no `KavoModule` option.
-Existing `@Crud`-decorated controllers pick up documentation the next time
+That's the only step — no `@Kavo` config option, no `KavoModule` option.
+Existing `@Kavo`-decorated controllers pick up documentation the next time
 the app boots with `@nestjs/swagger` present.
 
 ## Wiring the docs endpoint (`main.ts`)
@@ -67,12 +67,12 @@ route's method/param/status decorators.
 - **Allowlist-derived per-field query documentation.** `filter[field][op]=`
   is documented as a generic shape, not expanded into one `ApiQuery` per
   actual filterable/sortable field — that needs ORM metadata, which doesn't
-  exist yet at `@Crud` decoration time (ADR-0012). If you want per-field
+  exist yet at `@Kavo` decoration time (ADR-0012). If you want per-field
   query docs today, add them yourself with plain `@ApiQuery()` on the
   controller class.
-- **Fully custom, registry-independent routes** (see `crud-decorator`'s
+- **Fully custom, registry-independent routes** (see `kavo-decorator`'s
   section on those) get no automatic Swagger metadata — they're ordinary
   Nest methods, so document them with plain `@ApiOperation()`/`@ApiBody()`
-  etc. exactly as you would on any non-`@Crud` controller.
+  etc. exactly as you would on any non-`@Kavo` controller.
 - **GraphQL routes** (see `graphql-binding`) are a separate binding entirely
   and are not covered by this REST-focused Swagger integration.

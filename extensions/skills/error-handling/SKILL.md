@@ -12,7 +12,7 @@ wire shape (RFC 9457 problem details, ADR-0009). Full detail:
 ## Hierarchy
 
 ```
-KavoException (abstract; implements the CrudException contract)
+KavoException (abstract; implements the KavoExceptionShape contract)
 ├─ QueryValidationException     carries issues[] → errors[] extension
 ├─ NotFoundException
 ├─ ConflictException

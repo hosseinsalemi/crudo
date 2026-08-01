@@ -10,8 +10,8 @@ later work never needs to mutate `@kavo/core` types.
 
 | Parameter    | Purpose                                                        | Default                                                                           | Override example                                      |
 | ------------ | -------------------------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| `TEntity`    | The ORM-mapped entity class everything is typed against        | — (always inferred from `createCrud(Entity)`)                                     | `CrudService<User>`                                   |
-| `TId`        | Primary-key type; appears in `findOne(id)`, `deleteOne(id)`, … | `EntityId` (`string \| number`)                                                   | `CrudService<User, string>` for UUID keys             |
+| `TEntity`    | The ORM-mapped entity class everything is typed against        | — (always inferred from `createCrud(Entity)`)                                     | `KavoService<User>`                                   |
+| `TId`        | Primary-key type; appears in `findOne(id)`, `deleteOne(id)`, … | `EntityId` (`string \| number`)                                                   | `KavoService<User, string>` for UUID keys             |
 | `TCreateDto` | `POST` request body                                            | `EntityInput<TEntity>` (the entity's scalar properties, all optional — see below) | `dto: { create: CreateUserDto }`                      |
 | `TUpdateDto` | `PUT` full-replace body                                        | `EntityInput<TEntity>`                                                            | `dto: { update: UpdateUserDto }`                      |
 | `TPatchDto`  | `PATCH` partial body                                           | `Partial<TUpdateDto>` — follows `update` when that is overridden                  | `dto: { patch: PatchUserDto }`                        |
@@ -52,7 +52,7 @@ the entity's **scalar** properties, **all optional**.
   (doc 4) still drops generated columns, and registering a `create` DTO
   restores full strictness — which is what a configured setup does.
 
-The generic parameters are also inferred by `@Crud(Entity, config)`, whose
+The generic parameters are also inferred by `@Kavo(Entity, config)`, whose
 chain mirrors this one exactly. Until then its config was typed
 `EntityConfig<object>`, so nothing inside a controller's config was
 checked against its entity.
@@ -187,16 +187,16 @@ Enforced by dependency-cruiser (`core-imports-nothing`), not convention.
 
 | Area          | Contracts                                                                                                                                                              |
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Service       | `CrudService`, `CrudCallOptions`, `IdentifiedInput`                                                                                                                    |
+| Service       | `KavoService`, `KavoCallOptions`, `IdentifiedInput`                                                                                                                    |
 | Persistence   | `EntityReader`, `EntityWriter`, `RepositoryAdapter`                                                                                                                    |
 | Transactions  | `TransactionManager`, `TransactionContext`, `TransactionOptions` — not implemented, see below                                                                          |
 | Query         | `Filter*`, `FilterExpression`, `Sort`, `Pagination`, `PaginationStrategy`, `FieldSelection`, `QueryContext`, `NormalizedQueryContext`, `FilterParser`, `FilterBuilder` |
 | DTO           | `Dto`, `DtoClass`, `OperationDtoMap`, `DtoResolver`, `ListResultDto`, `ListMetaDto`, `BulkResultDto` (bulk reserved)                                                   |
-| Errors        | `CrudException`, `KavoErrorCode`, `ErrorHandler`, `ProblemDetailsDto`                                                                                                  |
+| Errors        | `KavoExceptionShape`, `KavoErrorCode`, `ErrorHandler`, `ProblemDetailsDto`                                                                                             |
 | Config        | `KavoSettings` (+ per-area settings), `GlobalConfig`, `EntityConfig`, `OperationConfig`, `ResolvedEntityConfig`                                                        |
 | Operations    | `OperationId`, `OperationHandler`, `OperationMetadata`, `OperationDescriptor`, `OperationRegistry`                                                                     |
 | Relations     | `RelationDescriptor`, `RelationRegistry`, `IncludeTree`, `IncludeNode`, `IncludeResolver`, `EntityCatalog`                                                             |
-| Context       | `CrudContext`, `CrudContextState`, `StateKey`, `CrudRequest`, `CrudResponse`                                                                                           |
+| Context       | `KavoContext`, `KavoContextState`, `StateKey`, `KavoRequest`, `KavoResponse`                                                                                           |
 | Serialization | `Serializer`, `Deserializer`                                                                                                                                           |
 
 `TransactionManager` / `TransactionOptions` / `TransactionPropagation` are
@@ -208,4 +208,4 @@ because this doc fixes core's type system once and later work never mutates
 it — the `@remarks` at `core/src/persistence/transaction-manager.ts` is the
 definition-site record.
 `TransactionContext` is the exception: it is live, threaded through
-`CrudContext` and `CrudCallOptions` as an opaque adapter handle.
+`KavoContext` and `KavoCallOptions` as an opaque adapter handle.

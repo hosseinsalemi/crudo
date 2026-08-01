@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CrudContext, EntityId, NormalizedQueryContext, RepositoryAdapter } from "@kavo/core";
+import type { KavoContext, EntityId, NormalizedQueryContext, RepositoryAdapter } from "@kavo/core";
 import { createKavo } from "@kavo/core";
 import { InMemoryUserAdapter, User, userMetadata } from "./support/user-fixture.js";
 
@@ -29,53 +29,53 @@ class CountingUserAdapter implements RepositoryAdapter<User> {
   async findOneById(
     id: EntityId,
     _query: NormalizedQueryContext<User> | null,
-    _context: CrudContext<User>,
+    _context: KavoContext<User>,
   ): Promise<User | null> {
     this.calls.findOneById++;
     return this.inner.findOneById(id);
   }
 
-  async findOne(query: NormalizedQueryContext<User>, _context: CrudContext<User>): Promise<User | null> {
+  async findOne(query: NormalizedQueryContext<User>, _context: KavoContext<User>): Promise<User | null> {
     this.calls.findOne++;
     return this.inner.findOne(query);
   }
 
-  async findMany(query: NormalizedQueryContext<User>, _context: CrudContext<User>): Promise<readonly User[]> {
+  async findMany(query: NormalizedQueryContext<User>, _context: KavoContext<User>): Promise<readonly User[]> {
     this.calls.findMany++;
     return this.inner.findMany(query);
   }
 
-  async count(query: NormalizedQueryContext<User>, _context: CrudContext<User>): Promise<number> {
+  async count(query: NormalizedQueryContext<User>, _context: KavoContext<User>): Promise<number> {
     this.calls.count++;
     return this.inner.count(query);
   }
 
-  async create(data: Partial<User>, _context: CrudContext<User>): Promise<User> {
+  async create(data: Partial<User>, _context: KavoContext<User>): Promise<User> {
     this.calls.create++;
     return this.inner.create(data);
   }
 
-  async update(id: EntityId, data: Partial<User>, _context: CrudContext<User>): Promise<User> {
+  async update(id: EntityId, data: Partial<User>, _context: KavoContext<User>): Promise<User> {
     this.calls.update++;
     return this.inner.update(id, data);
   }
 
-  async patch(id: EntityId, data: Partial<User>, _context: CrudContext<User>): Promise<User> {
+  async patch(id: EntityId, data: Partial<User>, _context: KavoContext<User>): Promise<User> {
     this.calls.patch++;
     return this.inner.patch(id, data);
   }
 
-  async delete(id: EntityId, _context: CrudContext<User>): Promise<void> {
+  async delete(id: EntityId, _context: KavoContext<User>): Promise<void> {
     this.calls.delete++;
     await this.inner.delete(id);
   }
 
-  async restore(_id: EntityId, _context: CrudContext<User>): Promise<User> {
+  async restore(_id: EntityId, _context: KavoContext<User>): Promise<User> {
     this.calls.restore++;
     return this.inner.restore();
   }
 
-  async purge(id: EntityId, _context: CrudContext<User>): Promise<void> {
+  async purge(id: EntityId, _context: KavoContext<User>): Promise<void> {
     this.calls.purge++;
     await this.inner.purge(id);
   }

@@ -1,6 +1,6 @@
 import type {
   ClassRef,
-  CrudInfrastructure,
+  KavoInfrastructure,
   EntityMetadata,
   KavoInstance,
   KavoOptions,
@@ -48,7 +48,7 @@ export interface PrismaInfrastructureOptions {
 export function createPrismaInfrastructure(
   prismaClient: PrismaClientLike,
   options: PrismaInfrastructureOptions,
-): CrudInfrastructure {
+): KavoInfrastructure {
   const byName = new Map(options.entities.map((entity) => [entity.name, entity]));
   const metadataCache = new Map<ClassRef, EntityMetadata>();
   const adapterCache = new Map<ClassRef, RepositoryAdapter>();

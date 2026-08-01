@@ -26,7 +26,7 @@ after it is extra instructions or corrections to fold in during implementation.
    silently narrow the scope.
 
 3. **Locate the seam before writing code.** Kavo is built out of swappable
-   seams (`packages/core/src/engine/crud-engine.ts`'s Template Method:
+   seams (`packages/core/src/engine/kavo-engine.ts`'s Template Method:
    operation resolution → config resolution → DTO resolution →
    deserialization → query resolution → handler execution → response mapping
    → serialization). Most changes are "add or modify a seam", not "add a

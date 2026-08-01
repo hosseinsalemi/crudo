@@ -88,7 +88,7 @@ here:
   per to-many level, stitched by id; the deterministic alias scheme is what
   lets an include join and a relation-path filter share one join (§2).
 - **Transactions:** still a seam, and the only one left. Every method
-  already receives `CrudContext`; a `QueryRunner` would ride on
+  already receives `KavoContext`; a `QueryRunner` would ride on
   `context.transaction.handle`, with reads/writes switching to the runner's
   manager when present. Nothing binds it in v6 — the sole consumer would be
   bulk `atomic` mode, which this build dropped (doc 03 §5).

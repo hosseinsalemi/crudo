@@ -1,4 +1,4 @@
-import type { KavoErrorCode } from "./crud-exception.js";
+import type { KavoErrorCode } from "./kavo-exception-shape.js";
 
 /** One field-level query issue (`errors[]` extension). */
 export interface QueryIssueDto {

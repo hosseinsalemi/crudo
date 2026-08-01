@@ -1,11 +1,11 @@
 import { Controller } from "@nestjs/common";
-import { Crud } from "@kavo/nest";
+import { Kavo } from "@kavo/nest";
 import { Cat } from "./cat.entity.js";
 import { CreateCatDto, UpdateCatDto, CatItemDto, CatListDto } from "./cat.dtos.js";
 
 /**
  * CRUD over the concrete `Cat` subtype: one decorator, zero methods.
- * Binding `@Crud` to the child (never the abstract `Pet` base) lets the
+ * Binding `@Kavo` to the child (never the abstract `Pet` base) lets the
  * child repository auto-write the `species` discriminator on create.
  * Routes: POST /cats, GET /cats, GET/PUT/DELETE /cats/:id (PATCH disabled).
  * `include=owner` embeds the owner; `owner` is also writable by id
@@ -13,7 +13,7 @@ import { CreateCatDto, UpdateCatDto, CatItemDto, CatListDto } from "./cat.dtos.j
  * tags (a many-to-many, batch-loaded like any other to-many); `tags` is
  * likewise writable by an array of ids.
  */
-@Crud(Cat, {
+@Kavo(Cat, {
   dto: {
     create: CreateCatDto,
     update: UpdateCatDto,

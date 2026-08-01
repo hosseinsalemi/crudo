@@ -3,7 +3,7 @@ import { WireQuery } from "@kavo/core";
 import { flattenQuery } from "./flatten-query.js";
 
 /**
- * Backs every read-kind `@Query()` param `@Crud` applies — to a generated
+ * Backs every read-kind `@Query()` param `@Kavo` applies — to a generated
  * route and to an `@Override`'d method alike, since both go through the same
  * `applyParamDecorators` call site. Wrapping this in Nest's own pipe seam
  * (rather than wrapping the value inside `makeHandler`) is what lets an

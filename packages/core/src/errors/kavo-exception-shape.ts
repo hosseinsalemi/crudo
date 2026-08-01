@@ -24,7 +24,7 @@ export interface ErrorContext {
  * Human-readable text is built from `messageKey` + `messageParams` so a
  * consumer can localize; `detail` carries the English default.
  */
-export interface CrudException {
+export interface KavoExceptionShape {
   readonly code: KavoErrorCode;
   /** HTTP status this error maps to (from the error catalog). */
   readonly status: number;
@@ -47,5 +47,5 @@ export interface CrudException {
  * the original as `cause`.
  */
 export interface ErrorHandler {
-  handle(error: unknown, context: ErrorContext): CrudException;
+  handle(error: unknown, context: ErrorContext): KavoExceptionShape;
 }

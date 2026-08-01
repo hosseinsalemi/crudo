@@ -36,7 +36,7 @@ export type { DtoClass, DtoSlot, Dto, DtoResolver, OperationDtoMap } from "./dto
 export type { ListMetaDto, ListResultDto } from "./dto/list-result.js";
 
 // ── Errors ────────────────────────────────────────────────────────────
-export type { KavoErrorCode, CrudException, ErrorContext, ErrorHandler } from "./errors/crud-exception.js";
+export type { KavoErrorCode, KavoExceptionShape, ErrorContext, ErrorHandler } from "./errors/kavo-exception-shape.js";
 export type { ProblemDetailsDto, QueryIssueDto } from "./errors/problem-details.js";
 
 // ── Configuration ─────────────────────────────────────────────────────
@@ -68,9 +68,9 @@ export type { IncludeRequest, IncludeResolver } from "./relations/include-resolv
 export { DefaultIncludeResolver } from "./relations/default-include-resolver.js";
 
 // ── Request context & envelopes ───────────────────────────────────────
-export type { CrudContext, CrudContextState, StateKey } from "./context/crud-context.js";
-export type { CrudRequest } from "./context/crud-request.js";
-export type { CrudResponse } from "./context/crud-response.js";
+export type { KavoContext, KavoContextState, StateKey } from "./context/kavo-context.js";
+export type { KavoRequest } from "./context/kavo-request.js";
+export type { KavoResponse } from "./context/kavo-response.js";
 
 // ── Serialization ─────────────────────────────────────────────────────
 export type { Deserializer, Serializer } from "./serialization/serializer.js";
@@ -88,8 +88,8 @@ export type {
 } from "./persistence/transaction-manager.js";
 
 // ── Service surface ───────────────────────────────────────────────────
-export type { CrudCallOptions } from "./service/crud-call-options.js";
-export type { CrudService } from "./service/crud-service.js";
+export type { KavoCallOptions } from "./service/kavo-call-options.js";
+export type { KavoService } from "./service/kavo-service.js";
 
 // ════════════════════════════════════════════════════════════════════
 // Runtime — implementations of the contracts above.
@@ -99,7 +99,7 @@ export type { CrudService } from "./service/crud-service.js";
 export { assertNever } from "./types/assert-never.js";
 
 // ── Entity metadata seam ──────────────────────────────────────────────
-export type { CrudInfrastructure, EntityMetadata, FieldKind, FieldMetadata } from "./metadata/entity-metadata.js";
+export type { KavoInfrastructure, EntityMetadata, FieldKind, FieldMetadata } from "./metadata/entity-metadata.js";
 export {
   DefaultEntityCatalog,
   type EntityCatalog,
@@ -160,10 +160,10 @@ export {
   type StandardHandlerFactory,
 } from "./operations/default-operation-registry.js";
 export { builtInHandlers, type FindManyResult, type IdentifiedWrite } from "./engine/built-in-handlers.js";
-export { CrudEngine, WireQuery, type CrudEngineDependencies } from "./engine/crud-engine.js";
-export { DefaultCrudContextState, createCrudContext, type CrudContextInit } from "./context/default-crud-context.js";
+export { KavoEngine, WireQuery, type KavoEngineDependencies } from "./engine/kavo-engine.js";
+export { DefaultKavoContextState, createKavoContext, type KavoContextInit } from "./context/default-kavo-context.js";
 export { DefaultRelationRegistry } from "./relations/default-relation-registry.js";
 
 // ── Service & root factory ────────────────────────────────────────────
-export { DefaultCrudService } from "./service/default-crud-service.js";
-export { createCrud, createKavo, type CrudRuntime, type KavoInstance, type KavoOptions } from "./kavo.js";
+export { DefaultKavoService } from "./service/default-kavo-service.js";
+export { createCrud, createKavo, type KavoRuntime, type KavoInstance, type KavoOptions } from "./kavo.js";

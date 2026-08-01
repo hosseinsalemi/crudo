@@ -5,7 +5,7 @@
 ## Context
 
 Disabling an operation was, until now, only an entity-scope decision
-(`operations: { deleteOne: false }` in each `createCrud`/`@Crud` config).
+(`operations: { deleteOne: false }` in each `createCrud`/`@Kavo` config).
 Apps that want a conservative default — read-mostly APIs, admin-only
 writes — had to repeat the same block on every entity. This adds a
 global `KavoSettings.operations` boolean map, resolved through the
@@ -37,9 +37,9 @@ defaults) that doesn't need the route removed, only the request refused.
 A global `defaults.operations.<id>` reaches **only** the engine/service
 side of the split: `createKavo`'s `createCrud` resolves it through
 `resolveEntityConfig` and passes it to `createOperationRegistry`, which
-every `DefaultCrudService` call and every `engine.execute(...)` custom
+every `DefaultKavoService` call and every `engine.execute(...)` custom
 dispatch goes through. `@kavo/nest`'s route generation
-(`crud.decorator.ts`) calls `createOperationRegistry` the same way it
+(`kavo.decorator.ts`) calls `createOperationRegistry` the same way it
 always has — two arguments, entity config only, no global value — so it
 keeps computing `enabled` from exactly what it could see before this
 change.

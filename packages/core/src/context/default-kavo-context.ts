@@ -1,11 +1,11 @@
-import type { CrudContext, CrudContextState, StateKey } from "./crud-context.js";
+import type { KavoContext, KavoContextState, StateKey } from "./kavo-context.js";
 import type { NormalizedQueryContext } from "../query/query-context.js";
 import type { OperationId } from "../operations/operation.js";
 import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
 import type { TransactionContext } from "../persistence/transaction-manager.js";
 
 /** Map-backed implementation of the typed per-request state bag. */
-export class DefaultCrudContextState implements CrudContextState {
+export class DefaultKavoContextState implements KavoContextState {
   private readonly values = new Map<symbol, unknown>();
 
   get<T>(key: StateKey<T>): T | undefined {
@@ -31,7 +31,7 @@ export function randomUuid(): string {
   return (globalThis as unknown as { crypto: { randomUUID(): string } }).crypto.randomUUID();
 }
 
-export interface CrudContextInit<Entity> {
+export interface KavoContextInit<Entity> {
   readonly operation: OperationId;
   readonly config: ResolvedEntityConfig<Entity>;
   readonly principal?: unknown;
@@ -45,7 +45,7 @@ export interface CrudContextInit<Entity> {
  * here when the caller (e.g. a framework layer forwarding an upstream
  * request id) doesn't supply one.
  */
-export function createCrudContext<Entity>(init: CrudContextInit<Entity>): CrudContext<Entity> {
+export function createKavoContext<Entity>(init: KavoContextInit<Entity>): KavoContext<Entity> {
   return {
     entityName: init.config.entityName,
     operation: init.operation,
@@ -54,6 +54,6 @@ export function createCrudContext<Entity>(init: CrudContextInit<Entity>): CrudCo
     transaction: init.transaction ?? null,
     query: init.query ?? null,
     correlationId: init.correlationId ?? randomUuid(),
-    state: new DefaultCrudContextState(),
+    state: new DefaultKavoContextState(),
   };
 }

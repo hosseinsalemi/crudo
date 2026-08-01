@@ -4,7 +4,7 @@
 query string and the SQL is documented here.
 
 ```ts
-@Crud(Owner, {
+@Kavo(Owner, {
   relations: { edges: { pets: { includable: true } } },
 })
 ```

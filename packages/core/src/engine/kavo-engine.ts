@@ -1,10 +1,10 @@
-import type { CrudContext } from "../context/crud-context.js";
-import type { CrudRequest } from "../context/crud-request.js";
-import type { CrudResponse } from "../context/crud-response.js";
+import type { KavoContext } from "../context/kavo-context.js";
+import type { KavoRequest } from "../context/kavo-request.js";
+import type { KavoResponse } from "../context/kavo-response.js";
 import type { DtoClass, DtoSlot } from "../dto/dto.js";
 import type { Deserializer, Serializer } from "../serialization/serializer.js";
 import type { EntityMetadata } from "../metadata/entity-metadata.js";
-import type { ErrorHandler } from "../errors/crud-exception.js";
+import type { ErrorHandler } from "../errors/kavo-exception-shape.js";
 import type { NormalizedQueryContext } from "../query/query-context.js";
 import type { QueryContext } from "../query/query-context.js";
 import type { OperationDescriptor, OperationRegistry } from "../operations/operation-registry.js";
@@ -13,7 +13,7 @@ import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
 import type { KavoSettings } from "../config/settings.js";
 import { OperationDisabledException, QueryValidationException } from "../errors/exceptions.js";
 import { QueryNormalizer } from "../query/query-normalizer.js";
-import { createCrudContext, randomUuid } from "../context/default-crud-context.js";
+import { createKavoContext, randomUuid } from "../context/default-kavo-context.js";
 import { mergeSettings } from "../config/merge-settings.js";
 import { validateSettings } from "../config/validate-settings.js";
 import { resolveSoftDelete } from "../persistence/soft-delete.js";
@@ -29,7 +29,7 @@ export class WireQuery {
   constructor(readonly params: Readonly<Record<string, unknown>>) {}
 }
 
-export interface CrudEngineDependencies<Entity extends object> {
+export interface KavoEngineDependencies<Entity extends object> {
   readonly metadata: EntityMetadata<Entity>;
   readonly config: ResolvedEntityConfig<Entity>;
   readonly registry: OperationRegistry<Entity>;
@@ -68,8 +68,8 @@ const INPUT_SLOTS: Readonly<Partial<Record<StandardOperationId, DtoSlot>>> = {
  * pagination strategies, and include resolver are all constructor-injected
  * — `createCrud` supplies the defaults, callers may supply their own.
  */
-export class CrudEngine<Entity extends object> {
-  constructor(private readonly deps: CrudEngineDependencies<Entity>) {}
+export class KavoEngine<Entity extends object> {
+  constructor(private readonly deps: KavoEngineDependencies<Entity>) {}
 
   get registry(): OperationRegistry<Entity> {
     return this.deps.registry;
@@ -79,7 +79,7 @@ export class CrudEngine<Entity extends object> {
     return this.deps.config;
   }
 
-  async execute(request: CrudRequest<Entity>): Promise<CrudResponse> {
+  async execute(request: KavoRequest<Entity>): Promise<KavoResponse> {
     const { config, errorHandler } = this.deps;
     const correlationId = randomUuid();
     try {
@@ -93,7 +93,7 @@ export class CrudEngine<Entity extends object> {
     }
   }
 
-  private async run(request: CrudRequest<Entity>, correlationId: string): Promise<CrudResponse> {
+  private async run(request: KavoRequest<Entity>, correlationId: string): Promise<KavoResponse> {
     const { registry, config } = this.deps;
 
     // Nothing is special-cased per verb — built-ins are ordinary registry
@@ -114,7 +114,7 @@ export class CrudEngine<Entity extends object> {
     const configView = this.configViewFor(request);
 
     const query = descriptor.kind === "read" ? this.normalizeQuery(request, configView) : null;
-    const context = createCrudContext<Entity>({
+    const context = createKavoContext<Entity>({
       operation: descriptor.id,
       config: configView,
       principal: request.options?.principal,
@@ -130,7 +130,7 @@ export class CrudEngine<Entity extends object> {
     return this.mapResponse(descriptor, result, context);
   }
 
-  private configViewFor(request: CrudRequest<Entity>): ResolvedEntityConfig<Entity> {
+  private configViewFor(request: KavoRequest<Entity>): ResolvedEntityConfig<Entity> {
     const { config } = this.deps;
     const base = config.settingsFor(request.operation);
     const overrides = request.options?.settings;
@@ -155,7 +155,7 @@ export class CrudEngine<Entity extends object> {
   }
 
   private normalizeQuery(
-    request: CrudRequest<Entity>,
+    request: KavoRequest<Entity>,
     config: ResolvedEntityConfig<Entity>,
   ): NormalizedQueryContext<Entity> {
     const { normalizer } = this.deps;
@@ -167,9 +167,9 @@ export class CrudEngine<Entity extends object> {
   }
 
   private resolveInput(
-    request: CrudRequest<Entity>,
+    request: KavoRequest<Entity>,
     descriptor: OperationDescriptor<Entity>,
-    context: CrudContext<Entity>,
+    context: KavoContext<Entity>,
   ): unknown {
     const { deserializer, config } = this.deps;
     // A custom id is simply absent from the table; the cast narrows for the
@@ -226,8 +226,8 @@ export class CrudEngine<Entity extends object> {
   private mapResponse(
     descriptor: OperationDescriptor<Entity>,
     result: unknown,
-    context: CrudContext<Entity>,
-  ): CrudResponse {
+    context: KavoContext<Entity>,
+  ): KavoResponse {
     const { serializer, config } = this.deps;
 
     if (descriptor.id === "findMany") {

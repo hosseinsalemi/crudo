@@ -1,5 +1,5 @@
 import type { EntityId } from "../types/entity-id.js";
-import type { CrudContext } from "../context/crud-context.js";
+import type { KavoContext } from "../context/kavo-context.js";
 import type { NormalizedQueryContext } from "../query/query-context.js";
 
 /**
@@ -18,14 +18,14 @@ export interface EntityReader<Entity = unknown, Id extends EntityId = EntityId> 
   findOneById(
     id: Id,
     query: NormalizedQueryContext<Entity> | null,
-    context: CrudContext<Entity>,
+    context: KavoContext<Entity>,
   ): Promise<Entity | null>;
   /** First match of the query, or `null`. */
-  findOne(query: NormalizedQueryContext<Entity>, context: CrudContext<Entity>): Promise<Entity | null>;
-  findMany(query: NormalizedQueryContext<Entity>, context: CrudContext<Entity>): Promise<readonly Entity[]>;
+  findOne(query: NormalizedQueryContext<Entity>, context: KavoContext<Entity>): Promise<Entity | null>;
+  findMany(query: NormalizedQueryContext<Entity>, context: KavoContext<Entity>): Promise<readonly Entity[]>;
   /**
    * Count of all rows matching the query's filter, ignoring pagination.
    * Only called when `query.count` is `true`.
    */
-  count(query: NormalizedQueryContext<Entity>, context: CrudContext<Entity>): Promise<number>;
+  count(query: NormalizedQueryContext<Entity>, context: KavoContext<Entity>): Promise<number>;
 }

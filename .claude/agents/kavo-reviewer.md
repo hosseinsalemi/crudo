@@ -47,7 +47,7 @@ and doc sync.
   and the engine loops over its entries. A `if (operation === "findMany")`
   branch in the engine is a finding: it should be a registry entry or a handler.
 - **One pipeline** — standard operations go through the typed
-  `DefaultCrudService` surface, custom ones through `service.engine.execute(...)`.
+  `DefaultKavoService` surface, custom ones through `service.engine.execute(...)`.
   A path that bypasses the engine is a finding.
 - **Decoration-time routes** (ADR-0012) — route generation happens when the
   class is defined. Anything that defers route registration breaks Nest's

@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import type { CatalogedErrorCode, CrudException, QueryIssueDto } from "@kavo/core";
+import type { CatalogedErrorCode, KavoExceptionShape, QueryIssueDto } from "@kavo/core";
 import {
   AlreadyDeletedException,
   ConfigurationException,
@@ -309,7 +309,7 @@ describe("DefaultErrorHandler — engine boundary mapping", () => {
   });
 
   it("hands the serializer a document a client can act on", () => {
-    const handled: CrudException = handler.handle(new Error("boom"), {
+    const handled: KavoExceptionShape = handler.handle(new Error("boom"), {
       operation: "updateOne",
       correlationId: "req-2",
     });

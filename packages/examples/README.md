@@ -1,7 +1,7 @@
 # examples
 
 The checkpoint app: a small Pet domain served over HTTP by the real stack
-— `@Crud(...)`-generated NestJS routes → CRUD engine → `@kavo/typeorm` →
+— `@Kavo(...)`-generated NestJS routes → CRUD engine → `@kavo/typeorm` →
 a real database — with filtering, sorting, pagination, DTO projections
 (`item` vs. leaner `list`), layered config, Swagger docs, and RFC 9457
 problem-details errors. `Cat` and `Dog` are single-table-inheritance

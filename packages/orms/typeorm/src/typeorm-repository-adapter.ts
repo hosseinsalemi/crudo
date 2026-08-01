@@ -1,6 +1,6 @@
 import type {
   ClassRef,
-  CrudContext,
+  KavoContext,
   EntityId,
   IncludeNode,
   IncludeTree,
@@ -69,7 +69,7 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
   async findOneById(
     id: EntityId,
     query: NormalizedQueryContext<Entity> | null,
-    context: CrudContext<Entity>,
+    context: KavoContext<Entity>,
   ): Promise<Entity | null> {
     try {
       const include = query?.include ?? {};
@@ -83,7 +83,7 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
     }
   }
 
-  async findOne(query: NormalizedQueryContext<Entity>, context: CrudContext<Entity>): Promise<Entity | null> {
+  async findOne(query: NormalizedQueryContext<Entity>, context: KavoContext<Entity>): Promise<Entity | null> {
     try {
       const entity = await this.buildQuery(query, context).take(1).getOne();
       if (entity !== null) await this.loadBatches([entity], this.entity, query.include);
@@ -93,7 +93,7 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
     }
   }
 
-  async findMany(query: NormalizedQueryContext<Entity>, context: CrudContext<Entity>): Promise<readonly Entity[]> {
+  async findMany(query: NormalizedQueryContext<Entity>, context: KavoContext<Entity>): Promise<readonly Entity[]> {
     try {
       const entities = await this.buildQuery(query, context)
         .skip(query.pagination.offset)
@@ -106,7 +106,7 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
     }
   }
 
-  async count(query: NormalizedQueryContext<Entity>, context: CrudContext<Entity>): Promise<number> {
+  async count(query: NormalizedQueryContext<Entity>, context: KavoContext<Entity>): Promise<number> {
     try {
       // A dedicated count query — never getManyAndCount: the engine only
       // calls this when `query.count` is true, so `total: null` costs
@@ -124,7 +124,7 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
    */
   private buildQuery(
     query: NormalizedQueryContext<Entity>,
-    context: CrudContext<Entity>,
+    context: KavoContext<Entity>,
     options: { sorted?: boolean; includes?: boolean } = {},
   ): SelectQueryBuilder<Entity> {
     const qb = this.repository.createQueryBuilder(this.alias);
@@ -239,7 +239,7 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
    * ordinary marker column needs the `IS NULL` predicate spelled out.
    * Entities that aren't soft-deletable touch neither branch.
    */
-  private scopeToLive(qb: SelectQueryBuilder<Entity>, context: CrudContext<Entity>, withDeleted: boolean): void {
+  private scopeToLive(qb: SelectQueryBuilder<Entity>, context: KavoContext<Entity>, withDeleted: boolean): void {
     const softDelete = context.config.softDelete;
     if (softDelete.strategy !== "soft") return;
     if (softDelete.field === this.deleteDateColumn) {
@@ -249,14 +249,14 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
     if (!withDeleted) qb.andWhere(`${this.alias}.${softDelete.field} IS NULL`);
   }
 
-  private byId(id: EntityId, context: CrudContext<Entity>, withDeleted: boolean): SelectQueryBuilder<Entity> {
+  private byId(id: EntityId, context: KavoContext<Entity>, withDeleted: boolean): SelectQueryBuilder<Entity> {
     const qb = this.repository.createQueryBuilder(this.alias).where(`${this.alias}.${this.idField} = :id`, { id });
     this.scopeToLive(qb, context, withDeleted);
     return qb;
   }
 
   /** The resolved strategy, refused when an operation requires soft. */
-  private requireSoftDelete(context: CrudContext<Entity>, operation: string): ResolvedSoftDelete & { field: string } {
+  private requireSoftDelete(context: KavoContext<Entity>, operation: string): ResolvedSoftDelete & { field: string } {
     const softDelete = context.config.softDelete;
     if (softDelete.strategy !== "soft") {
       throw new ConfigurationException(
@@ -275,7 +275,7 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
 
   // ── Writes (Repository API) ─────────────────────────────────────────
 
-  async create(data: Partial<Entity>, context: CrudContext<Entity>): Promise<Entity> {
+  async create(data: Partial<Entity>, context: KavoContext<Entity>): Promise<Entity> {
     try {
       const entity = this.repository.create(data as DeepPartial<Entity>);
       return await this.repository.save(entity);
@@ -284,11 +284,11 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
     }
   }
 
-  async update(id: EntityId, data: Partial<Entity>, context: CrudContext<Entity>): Promise<Entity> {
+  async update(id: EntityId, data: Partial<Entity>, context: KavoContext<Entity>): Promise<Entity> {
     return this.mergeAndSave(id, data, context);
   }
 
-  async patch(id: EntityId, data: Partial<Entity>, context: CrudContext<Entity>): Promise<Entity> {
+  async patch(id: EntityId, data: Partial<Entity>, context: KavoContext<Entity>): Promise<Entity> {
     return this.mergeAndSave(id, data, context);
   }
 
@@ -305,7 +305,7 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
    * *currently loaded* relation state on `existing`, which is exactly what
    * the extra preload would otherwise fetch.
    */
-  private async mergeAndSave(id: EntityId, data: Partial<Entity>, context: CrudContext<Entity>): Promise<Entity> {
+  private async mergeAndSave(id: EntityId, data: Partial<Entity>, context: KavoContext<Entity>): Promise<Entity> {
     try {
       // Scoped to live rows: a soft-deleted row is invisible to updates,
       // exactly as it is to reads. Reviving one is `restore`'s job.
@@ -323,7 +323,7 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
     }
   }
 
-  async delete(id: EntityId, context: CrudContext<Entity>): Promise<void> {
+  async delete(id: EntityId, context: KavoContext<Entity>): Promise<void> {
     const softDelete = context.config.softDelete;
     try {
       if (softDelete.strategy === "hard") {
@@ -354,7 +354,7 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
     }
   }
 
-  async restore(id: EntityId, context: CrudContext<Entity>): Promise<Entity> {
+  async restore(id: EntityId, context: KavoContext<Entity>): Promise<Entity> {
     try {
       const { field } = this.requireSoftDelete(context, "restore");
       const existing = await this.byId(id, context, true).getOne();
@@ -380,7 +380,7 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
     }
   }
 
-  async purge(id: EntityId, context: CrudContext<Entity>): Promise<void> {
+  async purge(id: EntityId, context: KavoContext<Entity>): Promise<void> {
     const softDelete = context.config.softDelete;
     try {
       if (softDelete.strategy === "soft") {
@@ -402,7 +402,7 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
     }
   }
 
-  private notFound(id: EntityId, context: CrudContext<Entity>): NotFoundException {
+  private notFound(id: EntityId, context: KavoContext<Entity>): NotFoundException {
     return new NotFoundException({
       messageParams: { entity: context.entityName, id: String(id) },
       context: errorContext(context),
@@ -422,7 +422,7 @@ function relatedRows(parents: readonly ObjectLiteral[], name: string): readonly 
   return rows;
 }
 
-function errorContext<Entity>(context: CrudContext<Entity>) {
+function errorContext<Entity>(context: KavoContext<Entity>) {
   return {
     entityName: context.entityName,
     operation: context.operation,

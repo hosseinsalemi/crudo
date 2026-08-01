@@ -10,7 +10,7 @@ define their own interfaces and have core adapt.
 
 ## Decision
 
-Every contract (`CrudService`, `RepositoryAdapter`, `TransactionManager`,
+Every contract (`KavoService`, `RepositoryAdapter`, `TransactionManager`,
 …) is declared in `@kavo/core`. Edge packages implement or consume core
 contracts; core never imports an edge. Dependency inversion is strict and
 mechanically enforced (dependency-cruiser + project references).

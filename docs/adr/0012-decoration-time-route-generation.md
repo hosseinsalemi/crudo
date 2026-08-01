@@ -12,28 +12,28 @@ drives generation (ADR-0006) is naturally a bootstrap product.
 
 ## Decision
 
-`@Crud(Entity, config)` generates routes **at class-decoration time**:
+`@Kavo(Entity, config)` generates routes **at class-decoration time**:
 it builds the operation registry from the entity config with the same
 `createOperationRegistry` the engine uses (in inspection mode — handlers
 unbound), defines one method per enabled entry on the prototype, and
 applies Nest's real decorators programmatically (`Post(path)(proto,
 name, descriptor)`, `Param("id")(…)`, `HttpCode(…)`). The service
 instance arrives later, but not through DI: `KavoModule`'s
-`KavoCrudBinder` (`onModuleInit`, via `@nestjs/core`'s
-`DiscoveryService`) finds every `@Crud`-decorated controller already in
+`KavoBinder` (`onModuleInit`, via `@nestjs/core`'s
+`DiscoveryService`) finds every `@Kavo`-decorated controller already in
 the app's module graph — however it got there, an ordinary Nest
 `controllers:` array is enough — and assigns
 `kavo.createCrud(entity, config)` directly onto
-`this[CRUD_SERVICE_PROPERTY]`, which the generated methods read at
+`this[KAVO_SERVICE_PROPERTY]`, which the generated methods read at
 request time. `onModuleInit` runs after Nest's own controller
 instantiation but well before the first request, which is the only
 timing the generated methods need. `forFeature` still exists, now only
 for the narrower case of a class that constructor-injects
-`getCrudServiceToken(Entity)` itself — that resolution _does_ need a
+`getKavoServiceToken(Entity)` itself — that resolution _does_ need a
 real DI provider, since it happens at instantiation time. Called with no
-arguments, `forFeature()` provides that token for every `@Crud`-decorated
+arguments, `forFeature()` provides that token for every `@Kavo`-decorated
 class the process has seen so far (read from the same decoration-time
-registry `KavoCrudBinder`'s metadata lookups already rely on), so a normal
+registry `KavoBinder`'s metadata lookups already rely on), so a normal
 app states its controller list exactly once, in an ordinary `controllers:`
 array.
 
@@ -42,9 +42,9 @@ array.
 - Works with Nest's normal controller scan — no custom router, no
   monkey-patching, and guards/interceptors/versioning/prefixes compose
   exactly as with hand-written methods.
-- The entity config is stated on the controller (`@Crud(Entity, config)`)
+- The entity config is stated on the controller (`@Kavo(Entity, config)`)
   and read back from the same decorator metadata by both route
-  generation and `KavoCrudBinder`'s service bootstrap — one source of
+  generation and `KavoBinder`'s service bootstrap — one source of
   truth; the two can't drift.
 - Manual-method-wins is a one-line `hasOwnProperty` check at decoration
   time.

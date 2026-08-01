@@ -10,10 +10,10 @@ import {
   graphql,
 } from "graphql";
 import {
-  createCrudGraphQLSchema,
-  getCrudGraphQLTypes,
-  mergeCrudGraphQLSchemas,
-  registerCrudGraphQLTypes,
+  createKavoGraphQLSchema,
+  getKavoGraphQLTypes,
+  mergeKavoGraphQLSchemas,
+  registerKavoGraphQLTypes,
 } from "@kavo/graphql";
 import {
   InMemoryNoteAdapter,
@@ -28,12 +28,12 @@ import {
 } from "./support/todo-fixture.js";
 
 /**
- * Proves the binding end to end: a schema built by `createCrudGraphQLSchema`
+ * Proves the binding end to end: a schema built by `createKavoGraphQLSchema`
  * resolves queries and mutations by calling straight into the same
  * `createCrud` service REST would bind to — no parallel pipeline, no
  * database, just the in-memory adapter core's own tests use.
  */
-describe("createCrudGraphQLSchema", () => {
+describe("createKavoGraphQLSchema", () => {
   const TodoType = new GraphQLObjectType({
     name: "Todo",
     fields: {
@@ -54,7 +54,7 @@ describe("createCrudGraphQLSchema", () => {
   function setup() {
     const adapter = new InMemoryTodoAdapter();
     const service = createKavo().createCrud(Todo, undefined, { adapter, metadata: todoMetadata });
-    const schema = createCrudGraphQLSchema({
+    const schema = createKavoGraphQLSchema({
       name: "Todo",
       service,
       itemType: TodoType,
@@ -114,7 +114,7 @@ describe("createCrudGraphQLSchema", () => {
       fields: { label: { type: new GraphQLNonNull(GraphQLString) } },
     });
 
-    const schema = mergeCrudGraphQLSchemas([
+    const schema = mergeKavoGraphQLSchemas([
       { name: "Todo", service: todoService, itemType: TodoType, createInputType: CreateTodoInput },
       { name: "Tag", service: tagService, itemType: TagType, createInputType: CreateTagInput },
     ]);
@@ -142,15 +142,15 @@ describe("createCrudGraphQLSchema", () => {
       adapter: new InMemoryTodoAdapter(),
       metadata: todoMetadata,
     });
-    const schema = createCrudGraphQLSchema({ name: "Todo", service, itemType: TodoType });
+    const schema = createKavoGraphQLSchema({ name: "Todo", service, itemType: TodoType });
     expect(schema.getMutationType()).toBeUndefined();
   });
 
   it("registers and retrieves GraphQL types per entity, letting a consumer discover them by class", () => {
-    expect(getCrudGraphQLTypes(Tag)).toBeUndefined();
+    expect(getKavoGraphQLTypes(Tag)).toBeUndefined();
 
-    registerCrudGraphQLTypes(Tag, { itemType: TodoType });
-    expect(getCrudGraphQLTypes(Tag)).toEqual({ itemType: TodoType });
+    registerKavoGraphQLTypes(Tag, { itemType: TodoType });
+    expect(getKavoGraphQLTypes(Tag)).toEqual({ itemType: TodoType });
   });
 
   it("resolves update/patch/delete mutations through the same engine", async () => {
@@ -170,7 +170,7 @@ describe("createCrudGraphQLSchema", () => {
       fields: { done: { type: GraphQLBoolean } },
     });
 
-    const schema = createCrudGraphQLSchema({
+    const schema = createKavoGraphQLSchema({
       name: "Todo",
       service,
       itemType: TodoType,
@@ -234,7 +234,7 @@ describe("createCrudGraphQLSchema", () => {
       },
     });
 
-    const schema = createCrudGraphQLSchema({
+    const schema = createKavoGraphQLSchema({
       name: "Note",
       service,
       itemType: NoteType,

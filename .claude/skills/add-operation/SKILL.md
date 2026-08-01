@@ -22,7 +22,7 @@ and doesn't touch `EntityConfig` at all:
 | **Disable** a standard operation         | `operations: { deleteOne: false }` — the entry stays in the registry so tooling can report it, but calling it raises `OperationDisabledException` and no route is generated. |
 | **Override** a standard operation (data) | `operations: { findOne: { handler } }` — a plain `OperationHandler` object replaces the handler; keeps the default DTO and serialization scaffolding.                        |
 | **Add a custom** operation               | `customOperations: { complete: { handler, input, output, meta } }` — declares its own input/output DTOs, because its shape is not guaranteed CRUD-like.                      |
-| **Override** a standard operation (code) | `@Override(operationId?)` (issue #23) — a controller method is the implementation; `@Crud` still generates the route from the registry. See below.                           |
+| **Override** a standard operation (code) | `@Override(operationId?)` (issue #23) — a controller method is the implementation; `@Kavo` still generates the route from the registry. See below.                           |
 
 Standard operations that are off by default (`purgeOne`, `restoreOne`) are
 turned on with `operations: { purgeOne: true }`.
@@ -36,19 +36,19 @@ it can reach:
 - `operations.<id>.handler` is a plain `OperationHandler` object — no `this`,
   no DI, just `execute(input, context)`. Use it when the override is pure
   logic against the adapter/context Kavo already hands you.
-- `@Override` is a real controller method, decorated so `@Crud` still emits
+- `@Override` is a real controller method, decorated so `@Kavo` still emits
   that operation's route (method, path, status, params, Swagger) — only the
   function backing the route changes. Use it when the override needs
   constructor-injected dependencies (most commonly the entity's own
-  `DefaultCrudService`, via `getCrudServiceToken`, to delegate to default
+  `DefaultKavoService`, via `getKavoServiceToken`, to delegate to default
   behavior — `this.base.createOne(dto)`), or reads more naturally as a method
   than a config value.
 
 ```ts
-@Crud(Address)
+@Kavo(Address)
 @Controller("addresses")
 class AddressController {
-  constructor(@Inject(getCrudServiceToken(Address)) private readonly base: DefaultCrudService<Address>) {}
+  constructor(@Inject(getKavoServiceToken(Address)) private readonly base: DefaultKavoService<Address>) {}
 
   @Override()
   async createOne(dto: CreateAddressDto): Promise<AddressItemDto> {
@@ -57,25 +57,25 @@ class AddressController {
 }
 ```
 
-Constraints, because `@Crud` still owns the route:
+Constraints, because `@Kavo` still owns the route:
 
 - `operationId` defaults to the method's own name (same inference
   manual-method-wins uses); pass it explicitly when the method name differs.
 - The method's parameters must be in the same fixed position a generated
   route would use — reads: `(id?, query)`; writes: `(id?, body)` — and must
-  **not** carry their own `@Param`/`@Query`/`@Body`. `@Crud` applies those
+  **not** carry their own `@Param`/`@Query`/`@Body`. `@Kavo` applies those
   itself; a method that also declares its own throws at decoration time.
 - Overriding an operation that's absent, disabled, or service-only
   (`meta.routes.enabled: false`) throws at decoration time too — there is no
   route for `@Override` to attach to.
 - Distinct from plain manual-method-wins (an _undecorated_ method whose name
   happens to match an operation id): that suppresses the route entirely, with
-  none of `@Crud`'s wiring applied. `@Override` keeps all of it.
+  none of `@Kavo`'s wiring applied. `@Override` keeps all of it.
 - **A read override's `query` is Nest's raw `@Query()` object, not
   normalized.** A generated route always wraps it — `new
 WireQuery(flattenQuery(query))` (`WireQuery` from `@kavo/core`,
   `flattenQuery` from `@kavo/nest`) — before it reaches
-  `DefaultCrudService`. Skip that and wire-format params (`?fields=`,
+  `DefaultKavoService`. Skip that and wire-format params (`?fields=`,
   `?include=`) reach the engine unparsed and 400.
 
 ## The descriptor

@@ -1,6 +1,6 @@
 # @kavo/nest
 
-NestJS binding for Kavo: `KavoModule.forRoot`/`forFeature`, the `@Crud`
+NestJS binding for Kavo: `KavoModule.forRoot`/`forFeature`, the `@Kavo`
 decorator, registry-driven route generation (manual-method-wins), the
 problem-details exception filter, and Swagger integration.
 

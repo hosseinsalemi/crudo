@@ -1,4 +1,4 @@
-import type { CrudContext, EntityId, EntityMetadata, NormalizedQueryContext, RepositoryAdapter } from "@kavo/core";
+import type { KavoContext, EntityId, EntityMetadata, NormalizedQueryContext, RepositoryAdapter } from "@kavo/core";
 import { NotFoundException } from "@kavo/core";
 
 /** Third entity — the only one that's soft-deletable, so `restoreOne`/`purgeOne` have something real to exercise. */
@@ -98,7 +98,7 @@ export class Todo {
   done = false;
 }
 
-/** Second entity — exists only to prove `mergeCrudGraphQLSchemas` puts two entities on one root without colliding. */
+/** Second entity — exists only to prove `mergeKavoGraphQLSchemas` puts two entities on one root without colliding. */
 export class Tag {
   id = 0;
   label = "";
@@ -249,6 +249,6 @@ export class InMemoryTodoAdapter implements RepositoryAdapter<Todo> {
   }
 }
 
-export function contextStub(): CrudContext<Todo> {
-  return {} as CrudContext<Todo>;
+export function contextStub(): KavoContext<Todo> {
+  return {} as KavoContext<Todo>;
 }

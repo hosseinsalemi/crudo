@@ -3,7 +3,7 @@ import { ConfigurationException, QueryValidationException, createKavo } from "@k
 import type {
   KavoInstance,
   KavoOptions,
-  DefaultCrudService,
+  DefaultKavoService,
   EntityConfig,
   EntityMetadata,
   IncludeNode,
@@ -21,8 +21,8 @@ import {
 
 interface Blog {
   kavo: KavoInstance;
-  authors: DefaultCrudService<Author>;
-  posts: DefaultCrudService<Post>;
+  authors: DefaultKavoService<Author>;
+  posts: DefaultKavoService<Post>;
   authorAdapter: SeededAdapter<Author>;
   postAdapter: SeededAdapter<Post>;
   authorRows: Author[];
@@ -62,8 +62,8 @@ function blog(
       adapterFor: (entity) => adapters.get(entity) as never,
     },
   });
-  const authors = kavo.createCrud(Author, configs.author as never) as DefaultCrudService<Author>;
-  const posts = kavo.createCrud(Post, configs.post as never) as DefaultCrudService<Post>;
+  const authors = kavo.createCrud(Author, configs.author as never) as DefaultKavoService<Author>;
+  const posts = kavo.createCrud(Post, configs.post as never) as DefaultKavoService<Post>;
   kavo.createCrud(Comment, configs.comment as never);
   return {
     kavo,

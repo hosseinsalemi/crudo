@@ -8,7 +8,7 @@ import {
   PersistenceException,
   QueryValidationException,
   type KavoInstance,
-  type DefaultCrudService,
+  type DefaultKavoService,
 } from "@kavo/core";
 import { buildEntityMetadata, createTypeOrmKavo } from "@kavo/typeorm";
 
@@ -55,7 +55,7 @@ class Book {
 
 let dataSource: DataSource;
 let kavo: KavoInstance;
-let authors: DefaultCrudService<Author>;
+let authors: DefaultKavoService<Author>;
 
 beforeAll(async () => {
   dataSource = new DataSource({
@@ -66,7 +66,7 @@ beforeAll(async () => {
   });
   await dataSource.initialize();
   kavo = createTypeOrmKavo(dataSource);
-  authors = kavo.createCrud(Author) as DefaultCrudService<Author>;
+  authors = kavo.createCrud(Author) as DefaultKavoService<Author>;
 });
 
 afterAll(async () => {
@@ -283,7 +283,7 @@ describe("TypeOrmRepositoryAdapter — query translation", () => {
   it("filters on relation paths when explicitly allowlisted", async () => {
     const scoped = kavo.createCrud(Book, {
       allowlists: { filterable: ["title", "author.name" as never] },
-    }) as DefaultCrudService<Book>;
+    }) as DefaultKavoService<Book>;
     await seed();
     const ada = (await authors.findMany()).items.map((a) => a as Author).find((a) => a.name === "Ada")!;
     await dataSource.getRepository(Book).save([

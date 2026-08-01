@@ -1,6 +1,6 @@
 import { expectTypeOf } from "vitest";
 import { createKavo } from "@kavo/core";
-import type { CrudContext, ListResultDto, OperationHandler, QueryContext } from "@kavo/core";
+import type { KavoContext, ListResultDto, OperationHandler, QueryContext } from "@kavo/core";
 import { Author } from "../support/blog-fixture.js";
 
 /**
@@ -42,7 +42,7 @@ const kavo = createKavo({
 const promote: OperationHandler<Author> = {
   async execute(_input, context) {
     // The handler's context is typed to the entity, not to `object`.
-    expectTypeOf(context).toEqualTypeOf<CrudContext<Author>>();
+    expectTypeOf(context).toEqualTypeOf<KavoContext<Author>>();
     return { promoted: true };
   },
 };

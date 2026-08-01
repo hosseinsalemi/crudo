@@ -1,4 +1,4 @@
-import type { CrudInfrastructure, KavoSettings, DeepPartial, PaginationStrategy } from "@kavo/core";
+import type { KavoInfrastructure, KavoSettings, DeepPartial, PaginationStrategy } from "@kavo/core";
 
 /**
  * `KavoModule.forRoot` options — the NestJS skin over core's
@@ -12,7 +12,7 @@ import type { CrudInfrastructure, KavoSettings, DeepPartial, PaginationStrategy 
  * object keeps the door open for any adapter without a registry of names.
  */
 export interface KavoModuleOptions {
-  readonly infrastructure?: CrudInfrastructure;
+  readonly infrastructure?: KavoInfrastructure;
   readonly defaults?: DeepPartial<KavoSettings>;
   readonly paginationStrategies?: readonly PaginationStrategy[];
 }

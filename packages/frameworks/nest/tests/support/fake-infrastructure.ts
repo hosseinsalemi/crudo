@@ -1,7 +1,7 @@
 import type {
   ClassRef,
-  CrudContext,
-  CrudInfrastructure,
+  KavoContext,
+  KavoInfrastructure,
   EntityId,
   EntityMetadata,
   NormalizedQueryContext,
@@ -112,25 +112,25 @@ export class InMemoryTodoAdapter implements RepositoryAdapter<Todo> {
   async findOneById(
     id: EntityId,
     query: NormalizedQueryContext<Todo> | null,
-    context: CrudContext<Todo>,
+    context: KavoContext<Todo>,
   ): Promise<Todo | null> {
     const row = this.rows.find((candidate) => candidate.id === Number(id)) ?? null;
     if (row === null) return null;
     return this.visible(row, context, query?.withDeleted ?? false) ? row : null;
   }
 
-  async findOne(query: NormalizedQueryContext<Todo>, context: CrudContext<Todo>): Promise<Todo | null> {
+  async findOne(query: NormalizedQueryContext<Todo>, context: KavoContext<Todo>): Promise<Todo | null> {
     this.lastQuery = query;
     return this.live(query, context)[0] ?? null;
   }
 
-  async findMany(query: NormalizedQueryContext<Todo>, context: CrudContext<Todo>): Promise<readonly Todo[]> {
+  async findMany(query: NormalizedQueryContext<Todo>, context: KavoContext<Todo>): Promise<readonly Todo[]> {
     this.lastQuery = query;
     const { offset, limit } = query.pagination;
     return this.live(query, context).slice(offset, offset + limit);
   }
 
-  async count(query: NormalizedQueryContext<Todo>, context: CrudContext<Todo>): Promise<number> {
+  async count(query: NormalizedQueryContext<Todo>, context: KavoContext<Todo>): Promise<number> {
     return this.live(query, context).length;
   }
 
@@ -153,7 +153,7 @@ export class InMemoryTodoAdapter implements RepositoryAdapter<Todo> {
     return this.update(id, data);
   }
 
-  async delete(id: EntityId, context: CrudContext<Todo>): Promise<void> {
+  async delete(id: EntityId, context: KavoContext<Todo>): Promise<void> {
     const row = await this.require(id);
     if (context.config.softDelete.strategy === "hard") {
       this.rows = this.rows.filter((candidate) => candidate.id !== Number(id));
@@ -172,7 +172,7 @@ export class InMemoryTodoAdapter implements RepositoryAdapter<Todo> {
    * this fake's own opinion — `deletedAt` is a plain property here, which
    * is exactly what a marker column is.
    */
-  async restore(id: EntityId, context: CrudContext<Todo>): Promise<Todo> {
+  async restore(id: EntityId, context: KavoContext<Todo>): Promise<Todo> {
     const row = await this.require(id);
     if (row.deletedAt === null) {
       throw new NotDeletedException({
@@ -183,7 +183,7 @@ export class InMemoryTodoAdapter implements RepositoryAdapter<Todo> {
     return row;
   }
 
-  async purge(id: EntityId, context: CrudContext<Todo>): Promise<void> {
+  async purge(id: EntityId, context: KavoContext<Todo>): Promise<void> {
     const row = await this.require(id);
     if (context.config.softDelete.strategy === "soft" && row.deletedAt === null) {
       throw new NotDeletedException({
@@ -193,11 +193,11 @@ export class InMemoryTodoAdapter implements RepositoryAdapter<Todo> {
     this.rows = this.rows.filter((candidate) => candidate.id !== Number(id));
   }
 
-  private live(query: NormalizedQueryContext<Todo>, context: CrudContext<Todo>): readonly Todo[] {
+  private live(query: NormalizedQueryContext<Todo>, context: KavoContext<Todo>): readonly Todo[] {
     return this.rows.filter((row) => this.visible(row, context, query.withDeleted));
   }
 
-  private visible(row: Todo, context: CrudContext<Todo>, withDeleted: boolean): boolean {
+  private visible(row: Todo, context: KavoContext<Todo>, withDeleted: boolean): boolean {
     if (context.config.softDelete.strategy !== "soft") return true;
     return withDeleted || row.deletedAt === null;
   }
@@ -213,7 +213,7 @@ export class InMemoryTodoAdapter implements RepositoryAdapter<Todo> {
   }
 }
 
-export function fakeInfrastructure(adapter: InMemoryTodoAdapter): CrudInfrastructure {
+export function fakeInfrastructure(adapter: InMemoryTodoAdapter): KavoInfrastructure {
   return {
     metadataFor<Entity extends object>(entity: ClassRef<Entity>) {
       if ((entity as ClassRef) === TodoList) {

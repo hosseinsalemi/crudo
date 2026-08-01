@@ -28,8 +28,8 @@ export class AppModule {
           imports: [DatabaseModule.forRoot(postgres)],
           inject: [DATA_SOURCE] as never[],
           // AddressController constructor-injects its own service
-          // (getCrudServiceToken), which needs a real DI provider —
-          // provideServices supplies one for every @Crud entity registered so
+          // (getKavoServiceToken), which needs a real DI provider —
+          // provideServices supplies one for every @Kavo entity registered so
           // far, with no separate call or list to keep in sync.
           provideServices: true,
           useFactory: (dataSource: DataSource) => ({

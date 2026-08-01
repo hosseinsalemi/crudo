@@ -1,5 +1,5 @@
 import type { DtoClass } from "../dto/dto.js";
-import type { CrudContext } from "../context/crud-context.js";
+import type { KavoContext } from "../context/kavo-context.js";
 
 /**
  * Maps persistence-layer entities to response DTOs. Order is normative:
@@ -7,11 +7,11 @@ import type { CrudContext } from "../context/crud-context.js";
  * applies the selection carried on `context.query`.
  */
 export interface Serializer<Entity = unknown> {
-  serializeItem<ItemDto>(entity: Entity, dto: DtoClass<ItemDto & object> | null, context: CrudContext<Entity>): ItemDto;
+  serializeItem<ItemDto>(entity: Entity, dto: DtoClass<ItemDto & object> | null, context: KavoContext<Entity>): ItemDto;
   serializeList<ListDto>(
     entities: readonly Entity[],
     dto: DtoClass<ListDto & object> | null,
-    context: CrudContext<Entity>,
+    context: KavoContext<Entity>,
   ): readonly ListDto[];
 }
 
@@ -22,5 +22,5 @@ export interface Serializer<Entity = unknown> {
  * shapes, it doesn't judge.
  */
 export interface Deserializer<Entity = unknown> {
-  deserialize<Shape>(raw: unknown, dto: DtoClass<Shape & object> | null, context: CrudContext<Entity>): Shape;
+  deserialize<Shape>(raw: unknown, dto: DtoClass<Shape & object> | null, context: KavoContext<Entity>): Shape;
 }

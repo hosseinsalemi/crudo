@@ -1,4 +1,4 @@
-import type { CrudContext, EntityId, EntityMetadata, NormalizedQueryContext, RepositoryAdapter } from "@kavo/core";
+import type { KavoContext, EntityId, EntityMetadata, NormalizedQueryContext, RepositoryAdapter } from "@kavo/core";
 import { AlreadyDeletedException, NotDeletedException, NotFoundException } from "@kavo/core";
 
 /**
@@ -45,24 +45,24 @@ export class InMemoryAccountAdapter implements RepositoryAdapter<Account> {
   async findOneById(
     id: EntityId,
     query: NormalizedQueryContext<Account> | null,
-    context: CrudContext<Account>,
+    context: KavoContext<Account>,
   ): Promise<Account | null> {
     const row = this.rows.find((candidate) => candidate.id === Number(id)) ?? null;
     if (row === null) return null;
     return this.visible(row, context, query?.withDeleted ?? false) ? row : null;
   }
 
-  async findOne(query: NormalizedQueryContext<Account>, context: CrudContext<Account>): Promise<Account | null> {
+  async findOne(query: NormalizedQueryContext<Account>, context: KavoContext<Account>): Promise<Account | null> {
     return (await this.findMany(query, context))[0] ?? null;
   }
 
-  async findMany(query: NormalizedQueryContext<Account>, context: CrudContext<Account>): Promise<readonly Account[]> {
+  async findMany(query: NormalizedQueryContext<Account>, context: KavoContext<Account>): Promise<readonly Account[]> {
     const visible = this.rows.filter((row) => this.visible(row, context, query.withDeleted));
     const { offset, limit } = query.pagination;
     return visible.slice(offset, offset + limit);
   }
 
-  async count(query: NormalizedQueryContext<Account>, context: CrudContext<Account>): Promise<number> {
+  async count(query: NormalizedQueryContext<Account>, context: KavoContext<Account>): Promise<number> {
     return this.rows.filter((row) => this.visible(row, context, query.withDeleted)).length;
   }
 
@@ -72,17 +72,17 @@ export class InMemoryAccountAdapter implements RepositoryAdapter<Account> {
     return row;
   }
 
-  async update(id: EntityId, data: Partial<Account>, context: CrudContext<Account>): Promise<Account> {
+  async update(id: EntityId, data: Partial<Account>, context: KavoContext<Account>): Promise<Account> {
     const row = await this.requireLive(id, context);
     Object.assign(row, data);
     return row;
   }
 
-  async patch(id: EntityId, data: Partial<Account>, context: CrudContext<Account>): Promise<Account> {
+  async patch(id: EntityId, data: Partial<Account>, context: KavoContext<Account>): Promise<Account> {
     return this.update(id, data, context);
   }
 
-  async delete(id: EntityId, context: CrudContext<Account>): Promise<void> {
+  async delete(id: EntityId, context: KavoContext<Account>): Promise<void> {
     const softDelete = context.config.softDelete;
     const row = this.require(id, context);
     if (softDelete.strategy === "hard") {
@@ -97,7 +97,7 @@ export class InMemoryAccountAdapter implements RepositoryAdapter<Account> {
     row.deletedAt = new Date();
   }
 
-  async restore(id: EntityId, context: CrudContext<Account>): Promise<Account> {
+  async restore(id: EntityId, context: KavoContext<Account>): Promise<Account> {
     const row = this.require(id, context);
     if (row.deletedAt === null) {
       throw new NotDeletedException({
@@ -108,7 +108,7 @@ export class InMemoryAccountAdapter implements RepositoryAdapter<Account> {
     return row;
   }
 
-  async purge(id: EntityId, context: CrudContext<Account>): Promise<void> {
+  async purge(id: EntityId, context: KavoContext<Account>): Promise<void> {
     const row = this.require(id, context);
     if (context.config.softDelete.strategy === "soft" && row.deletedAt === null) {
       throw new NotDeletedException({
@@ -118,12 +118,12 @@ export class InMemoryAccountAdapter implements RepositoryAdapter<Account> {
     this.rows = this.rows.filter((candidate) => candidate.id !== Number(id));
   }
 
-  private visible(row: Account, context: CrudContext<Account>, withDeleted: boolean): boolean {
+  private visible(row: Account, context: KavoContext<Account>, withDeleted: boolean): boolean {
     if (context.config.softDelete.strategy !== "soft") return true;
     return withDeleted || row.deletedAt === null;
   }
 
-  private require(id: EntityId, context: CrudContext<Account>): Account {
+  private require(id: EntityId, context: KavoContext<Account>): Account {
     const row = this.rows.find((candidate) => candidate.id === Number(id));
     if (row === undefined) {
       throw new NotFoundException({
@@ -133,7 +133,7 @@ export class InMemoryAccountAdapter implements RepositoryAdapter<Account> {
     return row;
   }
 
-  private async requireLive(id: EntityId, context: CrudContext<Account>): Promise<Account> {
+  private async requireLive(id: EntityId, context: KavoContext<Account>): Promise<Account> {
     const row = this.require(id, context);
     if (!this.visible(row, context, false)) {
       throw new NotFoundException({

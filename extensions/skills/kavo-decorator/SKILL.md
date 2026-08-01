@@ -1,24 +1,24 @@
 ---
-name: crud-decorator
-description: Reference for what @Crud(Entity, config?) generates and how to configure/override it — routes table, EntityConfig shape (dto/allowlists/operations), manual-method-wins, @Override, and fully custom routes. Use when writing or reviewing a @Crud-decorated controller, or answering "how do I configure/override this route" questions.
+name: kavo-decorator
+description: Reference for what @Kavo(Entity, config?) generates and how to configure/override it — routes table, EntityConfig shape (dto/allowlists/operations), manual-method-wins, @Override, and fully custom routes. Use when writing or reviewing a @Kavo-decorated controller, or answering "how do I configure/override this route" questions.
 ---
 
-# `@Crud()` reference
+# `@Kavo()` reference
 
-`@Crud(Entity, config?)` (`packages/frameworks/nest/src/crud.decorator.ts`) is a
+`@Kavo(Entity, config?)` (`packages/frameworks/nest/src/kavo.decorator.ts`) is a
 class decorator that builds the entity's operation registry at
 class-decoration time and generates one Nest route per **enabled** entry:
 
 ```ts
-@Crud(UserEntity)
+@Kavo(UserEntity)
 @Controller("users")
 export class UserController {}
 ```
 
-The bound `DefaultCrudService<Entity>` arrives later, via property injection
-at `onModuleInit` (`KavoCrudBinder`) — not through the constructor. Reach it
-with `boundCrudService(this)`, never constructor injection, inside a
-`@Crud`-decorated class.
+The bound `DefaultKavoService<Entity>` arrives later, via property injection
+at `onModuleInit` (`KavoBinder`) — not through the constructor. Reach it
+with `boundKavoService(this)`, never constructor injection, inside a
+`@Kavo`-decorated class.
 
 Full detail: `docs/architecture/10-nestjs-integration.md`.
 
@@ -74,7 +74,7 @@ Security allowlists: what a request may filter, sort, and select on,
 skips coercion, not security.
 
 ```ts
-@Crud(User, {
+@Kavo(User, {
   allowlists: {
     filterable: ["email", "status", "profile.city"],
     sortable: ["createdAt", "email"],
@@ -105,7 +105,7 @@ skips coercion, not security.
 Inclusion is its own allowlist, resolved per-edge under `relations.edges`:
 
 ```ts
-@Crud(Owner, {
+@Kavo(Owner, {
   relations: {
     edges: {
       pets: { includable: true },
@@ -133,7 +133,7 @@ below if omitted:
   route's main query (single round trip); leave a **list** route on `auto`
   so a paginated query keeps batching instead of multiplying joined rows.
   Since `strategy` is entity-wide, a detail route and a list route over the
-  same relation need two separate `createCrud`/`@Crud` registrations if they
+  same relation need two separate `createCrud`/`@Kavo` registrations if they
   want different strategies (see `blogs`/`joinedBlogs` in
   `packages/orms/typeorm/tests/includes.spec.ts`).
 - Nested levels read the **target** entity's own resolved allowlists/DTOs —
@@ -157,7 +157,7 @@ Three escalating options, from least to most custom:
    and Swagger metadata identical to a generated route. `operationId`
    defaults to the method's own name. Fixed parameter shape: reads take
    `(id?, query)`, writes take `(id?, body)`, and the method must not declare
-   its own `@Param`/`@Query`/`@Body` — `@Crud` fails fast at decoration time
+   its own `@Param`/`@Query`/`@Body` — `@Kavo` fails fast at decoration time
    if it does.
 
    ```ts
@@ -175,24 +175,24 @@ Three escalating options, from least to most custom:
    detected via `hasOwnProperty` on the prototype. No config needed, but you
    own all param wiring and Swagger metadata yourself.
 
-Resolution order in the `@Crud` loop: override map → manual-method-wins →
+Resolution order in the `@Kavo` loop: override map → manual-method-wins →
 generate. A decorated method never falls through to plain name-matching.
 
 ## Fully custom, registry-independent routes
 
 For an action with no operation identity of its own (`EntityConfig` has no
-surface for registering a new operation id), skip `@Crud` machinery entirely
+surface for registering a new operation id), skip `@Kavo` machinery entirely
 — write an ordinary Nest method with its own `@Get`/`@Post`/etc. and its own
-`@Param`/`@Query`/`@Body` on the same class. `@Crud` never inspects it (name
+`@Param`/`@Query`/`@Body` on the same class. `@Kavo` never inspects it (name
 matches neither the registry nor an `@Override`). Reach the bound service the
 same way:
 
 ```ts
 @Controller("users")
-@Crud(User)
+@Kavo(User)
 export class UserController {
-  private get base(): DefaultCrudService<User> {
-    return boundCrudService<User>(this);
+  private get base(): DefaultKavoService<User> {
+    return boundKavoService<User>(this);
   }
 
   @Get(":id/summary")

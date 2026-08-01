@@ -5,7 +5,7 @@ import {
   ConflictException,
   NotDeletedException,
   NotFoundException,
-  type DefaultCrudService,
+  type DefaultKavoService,
 } from "@kavo/core";
 import { buildEntityMetadata, createPrismaKavo } from "@kavo/prisma";
 import { newTestPrismaClient } from "./support/client.js";
@@ -26,8 +26,8 @@ class Invoice {
 }
 
 let client: PrismaClient;
-let tickets: DefaultCrudService<Ticket>;
-let invoices: DefaultCrudService<Invoice>;
+let tickets: DefaultKavoService<Ticket>;
+let invoices: DefaultKavoService<Invoice>;
 
 beforeAll(() => {
   client = newTestPrismaClient();
@@ -39,10 +39,10 @@ beforeAll(() => {
   tickets = kavo.createCrud(Ticket, {
     softDelete: { field: "deletedAt" },
     operations: { purgeOne: true },
-  }) as DefaultCrudService<Ticket>;
+  }) as DefaultKavoService<Ticket>;
   invoices = kavo.createCrud(Invoice, {
     softDelete: { field: "archivedAt" },
-  }) as DefaultCrudService<Invoice>;
+  }) as DefaultKavoService<Invoice>;
 });
 
 afterAll(async () => {

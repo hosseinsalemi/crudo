@@ -12,7 +12,7 @@ import type { FieldPath } from "../types/field-path.js";
  * typing would force every adapter to import a *value* from core just to
  * spell an operator. (Not for lack of runtime code — ADR-0005 is about
  * runtime *dependencies*, and core ships plenty of runtime: `ERROR_CATALOG`,
- * `BUILT_IN_DEFAULTS`, `CrudEngine`, every exception class.)
+ * `BUILT_IN_DEFAULTS`, `KavoEngine`, every exception class.)
  *
  * The union is kept honest by `OPERATOR_TOKENS` in `default-filter-parser`
  * (every operator must have a wire token) and by the exhaustive switch in

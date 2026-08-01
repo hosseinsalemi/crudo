@@ -20,7 +20,7 @@ class Owner implements SoftDeletable {
 }
 ```
 
-That's the whole opt-in for the common case — no `@Crud` config needed.
+That's the whole opt-in for the common case — no `@Kavo` config needed.
 `DELETE /owners/:id` now stamps the marker instead of removing the row, and
 every read excludes stamped rows.
 
@@ -42,7 +42,7 @@ This resolves at **every** settings scope, so one operation or a single
 call can narrow it:
 
 ```ts
-@Crud(Owner, {
+@Kavo(Owner, {
   operations: { deleteOne: { softDelete: { strategy: "hard" } } },
 })
 ```
@@ -60,7 +60,7 @@ call can narrow it:
 column:
 
 ```ts
-@Crud(Owner, {
+@Kavo(Owner, {
   softDelete: { strategy: "soft" }, // enables PATCH /:id/restore
   operations: { purgeOne: true },   // enables DELETE /:id/purge
 })

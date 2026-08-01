@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type {
-  CrudContext,
-  CrudEngine,
-  CrudRequest,
-  CrudResponse,
+  KavoContext,
+  KavoEngine,
+  KavoRequest,
+  KavoResponse,
   EntityId,
   NormalizedQueryContext,
   OperationId,
@@ -12,7 +12,7 @@ import type {
 } from "@kavo/core";
 import {
   ConfigurationException,
-  DefaultCrudService,
+  DefaultKavoService,
   OperationDisabledException,
   WireQuery,
   createKavo,
@@ -20,17 +20,17 @@ import {
 import { InMemoryUserAdapter, User, userMetadata } from "./support/user-fixture.js";
 
 /**
- * Captures the `CrudRequest` each typed method builds and answers with one
+ * Captures the `KavoRequest` each typed method builds and answers with one
  * canned envelope. The pipeline behind the engine is engine.spec's
  * subject; what this pins is dispatch — which operation id, and which
  * argument lands in which slot.
  */
 class RecordingEngine {
-  readonly requests: CrudRequest<User>[] = [];
+  readonly requests: KavoRequest<User>[] = [];
 
-  constructor(private readonly response: CrudResponse) {}
+  constructor(private readonly response: KavoResponse) {}
 
-  async execute(request: CrudRequest<User>): Promise<CrudResponse> {
+  async execute(request: KavoRequest<User>): Promise<KavoResponse> {
     this.requests.push(request);
     return this.response;
   }
@@ -39,15 +39,15 @@ class RecordingEngine {
 const ITEM = { id: 1, name: "Ada" };
 const LIST = { items: [ITEM], limit: 20, offset: 0, total: 1, meta: {} };
 
-function recorded(): { service: DefaultCrudService<User>; engine: RecordingEngine } {
+function recorded(): { service: DefaultKavoService<User>; engine: RecordingEngine } {
   const engine = new RecordingEngine({ operation: "recorded", item: ITEM, list: LIST });
   return {
-    service: new DefaultCrudService<User>(engine as unknown as CrudEngine<User>),
+    service: new DefaultKavoService<User>(engine as unknown as KavoEngine<User>),
     engine,
   };
 }
 
-function sole(engine: RecordingEngine): CrudRequest<User> {
+function sole(engine: RecordingEngine): KavoRequest<User> {
   expect(engine.requests).toHaveLength(1);
   return engine.requests[0]!;
 }
@@ -55,7 +55,7 @@ function sole(engine: RecordingEngine): CrudRequest<User> {
 /** Every typed method, called with an id/body/query where it takes one. */
 const CALLS: readonly {
   operation: OperationId;
-  call: (service: DefaultCrudService<User>, options: object) => Promise<unknown>;
+  call: (service: DefaultKavoService<User>, options: object) => Promise<unknown>;
 }[] = [
   { operation: "createOne", call: (service, options) => service.createOne({} as never, options) },
   { operation: "findOne", call: (service, options) => service.findOne(1, undefined, options) },
@@ -68,17 +68,17 @@ const CALLS: readonly {
 ];
 
 /**
- * Records the `CrudContext` every adapter call receives, delegating the
+ * Records the `KavoContext` every adapter call receives, delegating the
  * persistence itself to the shared in-memory fixture. `principal` and
  * `transaction` are opaque to core, so the adapter boundary is the only
  * place their arrival can be observed at all.
  */
 class ContextRecordingAdapter implements RepositoryAdapter<User> {
-  readonly contexts: CrudContext<User>[] = [];
+  readonly contexts: KavoContext<User>[] = [];
 
   constructor(private readonly inner: RepositoryAdapter<User> = new InMemoryUserAdapter()) {}
 
-  get last(): CrudContext<User> {
+  get last(): KavoContext<User> {
     const context = this.contexts[this.contexts.length - 1];
     if (context === undefined) throw new Error("the adapter was never called");
     return context;
@@ -87,53 +87,53 @@ class ContextRecordingAdapter implements RepositoryAdapter<User> {
   async findOneById(
     id: EntityId,
     query: NormalizedQueryContext<User> | null,
-    context: CrudContext<User>,
+    context: KavoContext<User>,
   ): Promise<User | null> {
     this.contexts.push(context);
     return this.inner.findOneById(id, query, context);
   }
 
-  async findOne(query: NormalizedQueryContext<User>, context: CrudContext<User>): Promise<User | null> {
+  async findOne(query: NormalizedQueryContext<User>, context: KavoContext<User>): Promise<User | null> {
     this.contexts.push(context);
     return this.inner.findOne(query, context);
   }
 
-  async findMany(query: NormalizedQueryContext<User>, context: CrudContext<User>): Promise<readonly User[]> {
+  async findMany(query: NormalizedQueryContext<User>, context: KavoContext<User>): Promise<readonly User[]> {
     this.contexts.push(context);
     return this.inner.findMany(query, context);
   }
 
-  async count(query: NormalizedQueryContext<User>, context: CrudContext<User>): Promise<number> {
+  async count(query: NormalizedQueryContext<User>, context: KavoContext<User>): Promise<number> {
     this.contexts.push(context);
     return this.inner.count(query, context);
   }
 
-  async create(data: Partial<User>, context: CrudContext<User>): Promise<User> {
+  async create(data: Partial<User>, context: KavoContext<User>): Promise<User> {
     this.contexts.push(context);
     return this.inner.create(data, context);
   }
 
-  async update(id: EntityId, data: Partial<User>, context: CrudContext<User>): Promise<User> {
+  async update(id: EntityId, data: Partial<User>, context: KavoContext<User>): Promise<User> {
     this.contexts.push(context);
     return this.inner.update(id, data, context);
   }
 
-  async patch(id: EntityId, data: Partial<User>, context: CrudContext<User>): Promise<User> {
+  async patch(id: EntityId, data: Partial<User>, context: KavoContext<User>): Promise<User> {
     this.contexts.push(context);
     return this.inner.patch(id, data, context);
   }
 
-  async delete(id: EntityId, context: CrudContext<User>): Promise<void> {
+  async delete(id: EntityId, context: KavoContext<User>): Promise<void> {
     this.contexts.push(context);
     await this.inner.delete(id, context);
   }
 
-  async restore(id: EntityId, context: CrudContext<User>): Promise<User> {
+  async restore(id: EntityId, context: KavoContext<User>): Promise<User> {
     this.contexts.push(context);
     return this.inner.restore(id, context);
   }
 
-  async purge(id: EntityId, context: CrudContext<User>): Promise<void> {
+  async purge(id: EntityId, context: KavoContext<User>): Promise<void> {
     this.contexts.push(context);
     await this.inner.purge(id, context);
   }
@@ -144,13 +144,13 @@ function makeCrud(config?: Parameters<ReturnType<typeof createKavo>["createCrud"
   const crud = createKavo().createCrud(User, config as never, {
     adapter,
     metadata: userMetadata,
-  }) as DefaultCrudService<User>;
+  }) as DefaultKavoService<User>;
   return { crud, adapter };
 }
 
 const ADA = { name: "Ada", email: "ada@example.com", age: 36 };
 
-describe("DefaultCrudService — typed dispatch", () => {
+describe("DefaultKavoService — typed dispatch", () => {
   it("dispatches one operation id per method and forwards the same call options", async () => {
     for (const { operation, call } of CALLS) {
       const { service, engine } = recorded();
@@ -244,10 +244,10 @@ describe("DefaultCrudService — typed dispatch", () => {
   });
 });
 
-describe("DefaultCrudService — the engine escape hatch", () => {
+describe("DefaultKavoService — the engine escape hatch", () => {
   it("exposes the very engine the typed methods dispatch through", () => {
     const { service, engine } = recorded();
-    expect(service.engine).toBe(engine as unknown as CrudEngine<User>);
+    expect(service.engine).toBe(engine as unknown as KavoEngine<User>);
   });
 
   it("produces the same result as the typed method for the same request", async () => {
@@ -292,14 +292,14 @@ describe("DefaultCrudService — the engine escape hatch", () => {
   });
 });
 
-describe("CrudCallOptions — principal", () => {
+describe("KavoCallOptions — principal", () => {
   it("surfaces the caller's principal on the context, unchanged", async () => {
-    const seen: CrudContext<User>[] = [];
+    const seen: KavoContext<User>[] = [];
     const { crud } = makeCrud({
       operations: {
         findMany: {
           handler: {
-            async execute(_input: unknown, context: CrudContext<User>) {
+            async execute(_input: unknown, context: KavoContext<User>) {
               seen.push(context);
               return { entities: [], total: 0 };
             },
@@ -328,7 +328,7 @@ describe("CrudCallOptions — principal", () => {
   });
 });
 
-describe("CrudCallOptions — transaction (doc 07 §2)", () => {
+describe("KavoCallOptions — transaction (doc 07 §2)", () => {
   it("hands the adapter the transaction context byte-identical", async () => {
     const { crud, adapter } = makeCrud();
     // `handle` is the adapter's native object; core must never read into it.
@@ -355,7 +355,7 @@ describe("CrudCallOptions — transaction (doc 07 §2)", () => {
   });
 });
 
-describe("CrudCallOptions — per-call settings", () => {
+describe("KavoCallOptions — per-call settings", () => {
   it("applies the override to that call only", async () => {
     const { crud } = makeCrud();
     await crud.createOne(ADA as never);
@@ -392,7 +392,7 @@ describe("CrudCallOptions — per-call settings", () => {
   });
 });
 
-describe("DefaultCrudService — query paths", () => {
+describe("DefaultKavoService — query paths", () => {
   it("normalizes a typed QueryContext without coercing its values", async () => {
     const { crud, adapter } = makeCrud();
     await crud.findMany({

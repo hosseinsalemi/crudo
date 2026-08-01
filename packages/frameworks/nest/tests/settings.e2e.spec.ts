@@ -4,18 +4,18 @@ import request from "supertest";
 import { Controller, type INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import type { KavoModuleOptions } from "@kavo/nest";
-import { Crud, KavoModule } from "@kavo/nest";
+import { Kavo, KavoModule } from "@kavo/nest";
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
 
 /**
- * End-to-end coverage for `@Crud`/`KavoSettings` knobs that
+ * End-to-end coverage for `@Kavo`/`KavoSettings` knobs that
  * `binding.e2e.spec.ts` never drives over HTTP (issue #47) — allowlists,
  * relation include budgets, filter limits, pagination `count`/limits, a
  * per-operation settings override, custom `meta.routes` on a
  * non-`@Override`'d standard operation, and `forRootAsync`. The no-arg
  * `KavoModule.forFeature()` path gets its own file (its registry is
  * process-wide, and this file — like `binding.e2e.spec.ts` — declares many
- * `@Crud(Todo, ...)` classes for the same entity).
+ * `@Kavo(Todo, ...)` classes for the same entity).
  */
 
 let app: INestApplication;
@@ -48,8 +48,8 @@ function server(): Parameters<typeof request>[0] {
   return app.getHttpServer() as Parameters<typeof request>[0];
 }
 
-describe("@Crud allowlists — filterable/sortable/selectable enforced over HTTP", () => {
-  @Crud(Todo, { allowlists: { filterable: ["done"], sortable: ["priority"], selectable: ["id", "title"] } })
+describe("@Kavo allowlists — filterable/sortable/selectable enforced over HTTP", () => {
+  @Kavo(Todo, { allowlists: { filterable: ["done"], sortable: ["priority"], selectable: ["id", "title"] } })
   @Controller("todos")
   class AllowlistedController {}
 
@@ -86,13 +86,13 @@ describe("@Crud allowlists — filterable/sortable/selectable enforced over HTTP
   });
 });
 
-describe("@Crud relation include budgets (maxIncludeDepth/maxIncludedNodes)", () => {
+describe("@Kavo relation include budgets (maxIncludeDepth/maxIncludedNodes)", () => {
   // `Todo.list` and `TodoList.list` deliberately share the relation name,
   // so one global `edges.list` entry opts both levels in at once (see
   // `fake-infrastructure.ts`) — an `include=list.list` request is a
   // genuine two-level tree, which a single relation can never produce
   // once a positive integer is the smallest legal budget.
-  @Crud(Todo)
+  @Kavo(Todo)
   @Controller("todos")
   class NestedIncludeController {}
 
@@ -121,7 +121,7 @@ describe("@Crud relation include budgets (maxIncludeDepth/maxIncludedNodes)", ()
   });
 
   it("accepts an include within both budgets", async () => {
-    @Crud(Todo, {
+    @Kavo(Todo, {
       relations: { maxIncludeDepth: 1, maxIncludedNodes: 1, edges: { list: { includable: true } } },
     })
     @Controller("todos")
@@ -132,9 +132,9 @@ describe("@Crud relation include budgets (maxIncludeDepth/maxIncludedNodes)", ()
   });
 });
 
-describe("@Crud query limits (maxFilterDepth/maxInValues) enforced over HTTP", () => {
+describe("@Kavo query limits (maxFilterDepth/maxInValues) enforced over HTTP", () => {
   it("rejects a filter tree deeper than the configured maxFilterDepth", async () => {
-    @Crud(Todo, { query: { maxFilterDepth: 1 } })
+    @Kavo(Todo, { query: { maxFilterDepth: 1 } })
     @Controller("todos")
     class ShallowFilterController {}
     await bootstrap(ShallowFilterController);
@@ -147,7 +147,7 @@ describe("@Crud query limits (maxFilterDepth/maxInValues) enforced over HTTP", (
   });
 
   it("rejects an `in` value list longer than the configured maxInValues", async () => {
-    @Crud(Todo, { query: { maxInValues: 1 } })
+    @Kavo(Todo, { query: { maxInValues: 1 } })
     @Controller("todos")
     class NarrowInController {}
     await bootstrap(NarrowInController);
@@ -160,8 +160,8 @@ describe("@Crud query limits (maxFilterDepth/maxInValues) enforced over HTTP", (
   });
 });
 
-describe("@Crud pagination — count and limit overrides over HTTP", () => {
-  @Crud(Todo, { pagination: { count: false, defaultLimit: 1, maxLimit: 2 } })
+describe("@Kavo pagination — count and limit overrides over HTTP", () => {
+  @Kavo(Todo, { pagination: { count: false, defaultLimit: 1, maxLimit: 2 } })
   @Controller("todos")
   class NoCountController {}
 
@@ -194,8 +194,8 @@ describe("@Crud pagination — count and limit overrides over HTTP", () => {
   });
 });
 
-describe("@Crud per-operation settings override — scoped to that operation only", () => {
-  @Crud(Todo, {
+describe("@Kavo per-operation settings override — scoped to that operation only", () => {
+  @Kavo(Todo, {
     pagination: { maxLimit: 100 },
     operations: { findMany: { pagination: { defaultLimit: 1, maxLimit: 1 } } },
   })
@@ -209,8 +209,8 @@ describe("@Crud per-operation settings override — scoped to that operation onl
   });
 });
 
-describe("@Crud custom meta.routes on a standard, non-@Override'd operation", () => {
-  @Crud(Todo, {
+describe("@Kavo custom meta.routes on a standard, non-@Override'd operation", () => {
+  @Kavo(Todo, {
     operations: { deleteOne: { meta: { routes: { path: ":id/remove", successStatus: 200 } } } },
   })
   @Controller("todos")
@@ -232,7 +232,7 @@ describe("@Crud custom meta.routes on a standard, non-@Override'd operation", ()
 });
 
 describe("KavoModule.forRootAsync — same route surface as forRoot", () => {
-  @Crud(Todo)
+  @Kavo(Todo)
   @Controller("todos")
   class AsyncController {}
 

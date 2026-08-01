@@ -1,22 +1,22 @@
 import type { OnModuleInit } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
 import type { ExecutionResult, GraphQLSchema } from "graphql";
-import { getCrudEntities } from "../crud.decorator.js";
-import { getCrudServiceToken } from "../tokens.js";
+import { getKavoEntities } from "../kavo.decorator.js";
+import { getKavoServiceToken } from "../tokens.js";
 import { loadGraphQL } from "./load-graphql.js";
 
 /**
- * Nest-side half of the `@kavo/graphql` glue: discovers every `@Crud`
- * entity that also called `registerCrudGraphQLTypes` and merges them onto
- * one schema, the same moment `KavoCrudBinder` does its own discovery pass
+ * Nest-side half of the `@kavo/graphql` glue: discovers every `@Kavo`
+ * entity that also called `registerKavoGraphQLTypes` and merges them onto
+ * one schema, the same moment `KavoBinder` does its own discovery pass
  * (`onModuleInit`, after every controller file has been imported). All the
- * actual schema-building is `@kavo/graphql`'s `resolveCrudGraphQLSchema` —
+ * actual schema-building is `@kavo/graphql`'s `resolveKavoGraphQLSchema` —
  * this class only supplies the two Nest-specific pieces that function
- * deliberately doesn't know about: how to enumerate `@Crud` entities
- * (`getCrudEntities()`) and how to resolve one's bound service (`ModuleRef`
- * + `getCrudServiceToken`). A future `@kavo/express`/`@kavo/fastify` binding
+ * deliberately doesn't know about: how to enumerate `@Kavo` entities
+ * (`getKavoEntities()`) and how to resolve one's bound service (`ModuleRef`
+ * + `getKavoServiceToken`). A future `@kavo/express`/`@kavo/fastify` binding
  * would supply its own version of just those two things and reuse the same
- * `resolveCrudGraphQLSchema` call.
+ * `resolveKavoGraphQLSchema` call.
  *
  * `@kavo/graphql` and `graphql` are both loaded lazily, via `loadGraphQL()`
  * — not imported at the top of this file — so that `@kavo/nest`'s
@@ -34,7 +34,7 @@ import { loadGraphQL } from "./load-graphql.js";
  *
  * ```ts
  * @Controller("graphql")
- * export class GraphQLController extends BaseCrudGraphQLController {
+ * export class GraphQLController extends BaseKavoGraphQLController {
  *   // Nest reads constructor-injection metadata off the concrete class, not
  *   // an inherited one — the subclass must declare this constructor (just
  *   // forwarding to `super`) even though it does nothing else.
@@ -50,19 +50,19 @@ import { loadGraphQL } from "./load-graphql.js";
  * }
  * ```
  *
- * An entity with no `registerCrudGraphQLTypes` call simply has no GraphQL
+ * An entity with no `registerKavoGraphQLTypes` call simply has no GraphQL
  * surface — opt-in per entity, same as the REST side is opt-in per
- * `@Crud` controller.
+ * `@Kavo` controller.
  */
-export abstract class BaseCrudGraphQLController implements OnModuleInit {
+export abstract class BaseKavoGraphQLController implements OnModuleInit {
   private schema!: GraphQLSchema;
 
   constructor(protected readonly moduleRef: ModuleRef) {}
 
   async onModuleInit(): Promise<void> {
-    const { resolveCrudGraphQLSchema } = await loadGraphQL();
-    this.schema = resolveCrudGraphQLSchema(getCrudEntities(), (entity) =>
-      this.moduleRef.get(getCrudServiceToken(entity), { strict: false }),
+    const { resolveKavoGraphQLSchema } = await loadGraphQL();
+    this.schema = resolveKavoGraphQLSchema(getKavoEntities(), (entity) =>
+      this.moduleRef.get(getKavoServiceToken(entity), { strict: false }),
     );
   }
 

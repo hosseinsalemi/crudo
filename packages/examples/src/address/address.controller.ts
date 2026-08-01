@@ -1,6 +1,6 @@
 import { Controller, Get, Inject, Param, Post } from "@nestjs/common";
-import { Crud, Override, getCrudServiceToken } from "@kavo/nest";
-import type { DefaultCrudService, EntityId, WireQuery } from "@kavo/core";
+import { Kavo, Override, getKavoServiceToken } from "@kavo/nest";
+import type { DefaultKavoService, EntityId, WireQuery } from "@kavo/core";
 import type { DataSource } from "typeorm";
 import { Address } from "./address.entity.js";
 import { CreateAddressDto, UpdateAddressDto, AddressItemDto, AddressListDto } from "./address.dtos.js";
@@ -11,9 +11,9 @@ import { assertValidPostalCode, clearOwnerAddress, normalizePostalCode } from ".
  * `Address` overrides all five singular standard operations, each backed
  * by an `@Override`'d controller method (issue #23) rather than a
  * config-level `operations.<id>.handler` — every method injects the
- * entity's own `DefaultCrudService` (`base`) to delegate to default
+ * entity's own `DefaultKavoService` (`base`) to delegate to default
  * behavior, and the raw `DataSource` for the one write that reaches across
- * entities. `@Crud` still generates every route's method, path, status,
+ * entities. `@Kavo` still generates every route's method, path, status,
  * params, and Swagger metadata from the registry (ADR-0006, ADR-0012);
  * only the function backing each route is this class's own method. Owners
  * still associate an address by id (`{"address": 1}` on `POST /owners` —
@@ -26,7 +26,7 @@ import { assertValidPostalCode, clearOwnerAddress, normalizePostalCode } from ".
  * route/Swagger/param machinery `@Override` exists to keep — they own
  * their own `@Post`/`@Get`, `@Param`, and status entirely.
  */
-@Crud(Address, {
+@Kavo(Address, {
   dto: {
     create: CreateAddressDto,
     update: UpdateAddressDto,
@@ -37,7 +37,7 @@ import { assertValidPostalCode, clearOwnerAddress, normalizePostalCode } from ".
 @Controller("addresses")
 export class AddressController {
   constructor(
-    @Inject(getCrudServiceToken(Address)) private readonly base: DefaultCrudService<Address>,
+    @Inject(getKavoServiceToken(Address)) private readonly base: DefaultKavoService<Address>,
     @Inject(DATA_SOURCE) private readonly dataSource: DataSource,
   ) {}
 
@@ -83,7 +83,7 @@ export class AddressController {
 
   /**
    * Augments the response with a derived, unpersisted field. `query`
-   * arrives already wired — `@Crud` applies the same `WireQuery`-producing
+   * arrives already wired — `@Kavo` applies the same `WireQuery`-producing
    * pipe to an `@Override`'d read method's `query` param as it does to a
    * generated route's.
    */
@@ -112,11 +112,11 @@ export class AddressController {
   /**
    * `GET /addresses/:id/validate-postal-code` — a fully custom,
    * registry-independent route (issue #26): a plain native `@Get` with its
-   * own `@Param`, no `customOperations` entry. `@Crud` never inspects this
+   * own `@Param`, no `customOperations` entry. `@Kavo` never inspects this
    * method — route generation only checks method names against registry
    * operation ids (manual-method-wins) or `@Override` metadata, and
    * `validatePostalCode` matches neither. It needs nothing from Kavo beyond
-   * the constructor-injected `base` service, the same `getCrudServiceToken`
+   * the constructor-injected `base` service, the same `getKavoServiceToken`
    * DI every `@Override`'d method above already uses.
    */
   @Get(":id/validate-postal-code")

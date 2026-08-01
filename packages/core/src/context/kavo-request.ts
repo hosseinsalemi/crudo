@@ -2,7 +2,7 @@ import type { EntityId } from "../types/entity-id.js";
 import type { EntityInput } from "../types/utility.js";
 import type { QueryContext } from "../query/query-context.js";
 import type { OperationId } from "../operations/operation.js";
-import type { CrudCallOptions } from "../service/crud-call-options.js";
+import type { KavoCallOptions } from "../service/kavo-call-options.js";
 
 /**
  * The transport-agnostic request envelope handed to the engine — what the
@@ -11,7 +11,7 @@ import type { CrudCallOptions } from "../service/crud-call-options.js";
  * on the operation: `id` for `*One` targets, `body` for writes,
  * `query` for reads.
  */
-export interface CrudRequest<
+export interface KavoRequest<
   Entity = unknown,
   Id extends EntityId = EntityId,
   CreateDto = EntityInput<Entity>,
@@ -24,5 +24,5 @@ export interface CrudRequest<
   readonly body: CreateDto | UpdateDto | PatchDto | null;
   readonly query: QueryDto | null;
   /** Per-call override scope — parameters, never config writes. */
-  readonly options: CrudCallOptions | null;
+  readonly options: KavoCallOptions | null;
 }

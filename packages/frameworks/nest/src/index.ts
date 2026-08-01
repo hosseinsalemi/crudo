@@ -1,24 +1,24 @@
 /**
  * @kavo/nest — NestJS binding for Kavo.
  *
- * `@Crud(Entity)` generates routes from the entity's operation registry;
+ * `@Kavo(Entity)` generates routes from the entity's operation registry;
  * `KavoModule.forRoot`/`forRootAsync` host the Kavo root instance, the RFC
  * 9457 exception filter, and a discovery binder that finds every
- * `@Crud`-decorated controller already registered in the app (however it
+ * `@Kavo`-decorated controller already registered in the app (however it
  * got there — an ordinary Nest `controllers:` array is enough) and binds
  * its service, with no explicit list required. `forFeature` remains for the
  * one case that still needs a real DI provider: a controller that
- * constructor-injects `getCrudServiceToken(Entity)` itself. This package
+ * constructor-injects `getKavoServiceToken(Entity)` itself. This package
  * augments core's `OperationMetadata` with its `routes` key (ADR-0007).
  * `@nestjs/*` are peerDependencies; `@nestjs/swagger` is optional.
  */
-export { Crud, getCrudEntities, type CrudControllerMetadata } from "./crud.decorator.js";
+export { Kavo, getKavoEntities, type KavoControllerMetadata } from "./kavo.decorator.js";
 export { Override, type OverrideMetadata } from "./override.decorator.js";
 export { KavoModule, type KavoModuleAsyncOptions, type KavoGraphQLOption } from "./kavo.module.js";
 export type { KavoModuleOptions } from "./kavo-options.js";
 export { KavoExceptionFilter } from "./kavo-exception.filter.js";
 export { flattenQuery } from "./flatten-query.js";
 export { enumProp, oneOfArray, type SchemaHint } from "./schema-hints.js";
-export { KAVO_INSTANCE, KAVO_MODULE_OPTIONS, getCrudServiceToken, boundCrudService } from "./tokens.js";
-export { BaseCrudGraphQLController } from "./graphql/base-crud-graphql.controller.js";
-export type { CrudHttpMethod, CrudRouteOptions } from "./operation-metadata.js";
+export { KAVO_INSTANCE, KAVO_MODULE_OPTIONS, getKavoServiceToken, boundKavoService } from "./tokens.js";
+export { BaseKavoGraphQLController } from "./graphql/base-kavo-graphql.controller.js";
+export type { KavoHttpMethod, KavoRouteOptions } from "./operation-metadata.js";

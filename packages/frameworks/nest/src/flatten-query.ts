@@ -11,7 +11,7 @@ import { WireQuery } from "@kavo/core";
  * binding parser-agnostic.
  *
  * Idempotent against an already-`WireQuery`-wrapped input (issue #25): since
- * `@Crud` now wires an `@Override`'d read method's `query` param through
+ * `@Kavo` now wires an `@Override`'d read method's `query` param through
  * `WireQueryPipe` automatically, a method still written against the pre-#25
  * contract — calling `new WireQuery(flattenQuery(query))` itself — would
  * otherwise flatten `WireQuery`'s own `params` property one bracket level

@@ -1,5 +1,5 @@
 import { Controller } from "@nestjs/common";
-import { Crud } from "@kavo/nest";
+import { Kavo } from "@kavo/nest";
 import { Owner } from "./owner.entity.js";
 import { CreateOwnerDto, UpdateOwnerDto, OwnerItemDto, OwnerListDto } from "./owner.dtos.js";
 
@@ -20,7 +20,7 @@ import { CreateOwnerDto, UpdateOwnerDto, OwnerItemDto, OwnerListDto } from "./ow
  * (issue #38) — this entity opts back in, which is the whole point of the
  * precedence chain: entity config always wins over the global default.
  */
-@Crud(Owner, {
+@Kavo(Owner, {
   dto: {
     create: CreateOwnerDto,
     update: UpdateOwnerDto,

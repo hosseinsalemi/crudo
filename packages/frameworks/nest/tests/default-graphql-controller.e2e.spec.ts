@@ -4,8 +4,8 @@ import request from "supertest";
 import { Controller } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import type { INestApplication } from "@nestjs/common";
-import { Crud, KavoModule } from "@kavo/nest";
-import { registerCrudGraphQLTypes } from "@kavo/graphql";
+import { Kavo, KavoModule } from "@kavo/nest";
+import { registerKavoGraphQLTypes } from "@kavo/graphql";
 import {
   GraphQLBoolean,
   GraphQLInputObjectType,
@@ -19,10 +19,10 @@ import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-in
 /**
  * Proves the zero-controller path: `KavoModule.forRoot({ graphql: true })`
  * mounts `POST /graphql` on its own — no `GraphQLController` anywhere in
- * this file, unlike `base-crud-graphql.controller.e2e.spec.ts`, which
+ * this file, unlike `base-kavo-graphql.controller.e2e.spec.ts`, which
  * covers the opt-out (a hand-written controller extending
- * `BaseCrudGraphQLController`). Vitest isolates modules per file, so a
- * single `@Crud(Todo)` registration here is safe, same reasoning as the
+ * `BaseKavoGraphQLController`). Vitest isolates modules per file, so a
+ * single `@Kavo(Todo)` registration here is safe, same reasoning as the
  * other GraphQL e2e specs.
  */
 const TodoType = new GraphQLObjectType({
@@ -40,9 +40,9 @@ const CreateTodoInput = new GraphQLInputObjectType({
     done: { type: GraphQLBoolean },
   },
 });
-registerCrudGraphQLTypes(Todo, { itemType: TodoType, createInputType: CreateTodoInput });
+registerKavoGraphQLTypes(Todo, { itemType: TodoType, createInputType: CreateTodoInput });
 
-@Crud(Todo)
+@Kavo(Todo)
 @Controller("todos")
 class TodoController {}
 

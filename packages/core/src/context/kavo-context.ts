@@ -16,7 +16,7 @@ import type { TransactionContext } from "../persistence/transaction-manager.js";
 export type StateKey<T> = symbol & { readonly __stateType?: T };
 
 /** Typed per-request state bag for custom handlers to pass data. */
-export interface CrudContextState {
+export interface KavoContextState {
   get<T>(key: StateKey<T>): T | undefined;
   set<T>(key: StateKey<T>, value: T): void;
   has(key: StateKey<unknown>): boolean;
@@ -26,7 +26,7 @@ export interface CrudContextState {
  * The per-request context threaded through the whole pipeline —
  * one object carrying identity, resolved config, and request-scoped state.
  */
-export interface CrudContext<Entity = unknown> {
+export interface KavoContext<Entity = unknown> {
   readonly entityName: string;
   readonly operation: OperationId;
   readonly config: ResolvedEntityConfig<Entity>;
@@ -41,5 +41,5 @@ export interface CrudContext<Entity = unknown> {
   /** Parsed, validated query — read operations only; `null` for writes. */
   readonly query: NormalizedQueryContext<Entity> | null;
   readonly correlationId: string;
-  readonly state: CrudContextState;
+  readonly state: KavoContextState;
 }

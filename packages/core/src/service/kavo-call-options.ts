@@ -7,10 +7,10 @@ import type { TransactionContext } from "../persistence/transaction-manager.js";
  * Overrides are parameters for this one call; configuration is immutable
  * after bootstrap and there is no runtime mutation API.
  */
-export interface CrudCallOptions {
+export interface KavoCallOptions {
   /** Join an existing transaction (the explicit `{ ctx }` parameter). */
   readonly transaction?: TransactionContext;
-  /** Caller identity to expose on `CrudContext.principal`. */
+  /** Caller identity to expose on `KavoContext.principal`. */
   readonly principal?: unknown;
   /** Per-call settings overrides (e.g. a one-off `pagination.count`). */
   readonly settings?: DeepPartial<KavoSettings>;

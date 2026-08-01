@@ -1,4 +1,4 @@
-import type { CrudContext, EntityId, EntityMetadata, NormalizedQueryContext, RepositoryAdapter } from "@kavo/core";
+import type { KavoContext, EntityId, EntityMetadata, NormalizedQueryContext, RepositoryAdapter } from "@kavo/core";
 import { NotFoundException } from "@kavo/core";
 
 /** Test entity: plain class, fields initialized so shapes exist at runtime. */
@@ -107,6 +107,6 @@ export class InMemoryUserAdapter implements RepositoryAdapter<User> {
   }
 }
 
-export function contextStub(): CrudContext<User> {
-  return {} as CrudContext<User>;
+export function contextStub(): KavoContext<User> {
+  return {} as KavoContext<User>;
 }

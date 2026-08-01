@@ -1,10 +1,10 @@
 import { Controller } from "@nestjs/common";
-import { Crud } from "@kavo/nest";
-import type { CrudContext, OperationHandler } from "@kavo/core";
+import { Kavo } from "@kavo/nest";
+import type { KavoContext, OperationHandler } from "@kavo/core";
 import { expectTypeOf } from "vitest";
 
 /**
- * Type-level acceptance tests for `@Crud`.
+ * Type-level acceptance tests for `@Kavo`.
  *
  * Before the decorator was generic its config parameter was
  * `EntityConfig<object>`, so *nothing* inside a controller's config was
@@ -36,12 +36,12 @@ class TodoItemDto {
 // is the assignment that needed a cast while `config` was `EntityConfig<object>`.
 const complete: OperationHandler<Todo> = {
   async execute(_input, context) {
-    expectTypeOf(context).toEqualTypeOf<CrudContext<Todo>>();
+    expectTypeOf(context).toEqualTypeOf<KavoContext<Todo>>();
     return null;
   },
 };
 
-@Crud(Todo, {
+@Kavo(Todo, {
   dto: { create: CreateTodoDto, item: TodoItemDto },
   allowlists: { filterable: ["title", "done"], sortable: ["title"] },
   operations: {
@@ -54,19 +54,19 @@ class TodosController {}
 void TodosController;
 
 // Zero-config decoration stays zero-config.
-@Crud(Todo)
+@Kavo(Todo)
 @Controller("bare-todos")
 class BareController {}
 void BareController;
 
 // @ts-expect-error — a misspelled allowlist field is now a compile error.
-@Crud(Todo, { allowlists: { filterable: ["titel"] } })
+@Kavo(Todo, { allowlists: { filterable: ["titel"] } })
 @Controller("typo-todos")
 class TypoController {}
 void TypoController;
 
 // @ts-expect-error — an unknown standard operation id is rejected.
-@Crud(Todo, { operations: { findAll: false } })
+@Kavo(Todo, { operations: { findAll: false } })
 @Controller("unknown-op-todos")
 class UnknownOperationController {}
 void UnknownOperationController;
@@ -78,13 +78,13 @@ class Invoice {
 // A handler for a *structurally compatible* entity is still accepted — that
 // is ordinary structural typing, not a hole: anything valid for `Todo` is
 // valid for a shape `Todo` satisfies.
-@Crud(Todo, { operations: { updateOne: { handler: {} as OperationHandler<{ title: string }> } } })
+@Kavo(Todo, { operations: { updateOne: { handler: {} as OperationHandler<{ title: string }> } } })
 @Controller("compatible-handler-todos")
 class CompatibleHandlerController {}
 void CompatibleHandlerController;
 
 // @ts-expect-error — a handler for an unrelated entity does not fit.
-@Crud(Todo, { operations: { updateOne: { handler: {} as OperationHandler<Invoice> } } })
+@Kavo(Todo, { operations: { updateOne: { handler: {} as OperationHandler<Invoice> } } })
 @Controller("wrong-entity-todos")
 class WrongEntityController {}
 void WrongEntityController;

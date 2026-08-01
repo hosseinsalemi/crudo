@@ -11,7 +11,7 @@ import type { StandardOperationId } from "../operations/operation.js";
  * One allowlist key's raw configuration: either the explicit set of paths
  * to allow, or `{ exclude }` — every own column except the ones named.
  * `exclude` is resolved against the entity's own columns at bootstrap
- * (`resolveAllowlists`), never evaluated eagerly here — the `@Crud(...)`
+ * (`resolveAllowlists`), never evaluated eagerly here — the `@Kavo(...)`
  * config object is built at class-decoration time, before any ORM metadata
  * exists (ADR-0013), so there is nothing to resolve `exclude` against yet.
  */

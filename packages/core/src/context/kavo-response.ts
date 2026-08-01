@@ -7,7 +7,7 @@ import type { OperationId } from "../operations/operation.js";
  * `item` for `*One` results and `list` for `findMany`; both are `null`
  * for void results (`deleteOne`, `purgeOne`).
  */
-export interface CrudResponse<ItemDto = unknown, ListDto = ItemDto> {
+export interface KavoResponse<ItemDto = unknown, ListDto = ItemDto> {
   readonly operation: OperationId;
   readonly item: ItemDto | null;
   readonly list: ListResultDto<ListDto> | null;

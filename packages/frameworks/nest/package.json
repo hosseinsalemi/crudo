@@ -1,7 +1,7 @@
 {
   "name": "@kavo/nest",
   "version": "0.5.0",
-  "description": "Kavo NestJS binding — @Crud decorator, registry-driven route generation, problem-details exception filter, Swagger integration.",
+  "description": "Kavo NestJS binding — @Kavo decorator, registry-driven route generation, problem-details exception filter, Swagger integration.",
   "license": "MIT",
   "repository": {
     "type": "git",

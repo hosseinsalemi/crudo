@@ -1,13 +1,13 @@
 ---
 name: quick-start
-description: Fastest path to a working Kavo API in a brand-new project — npm install list, minimal tsconfig, a single plain entity (no DTOs), and a zero-config @Crud controller over SQLite. Use when scaffolding a new Kavo app from scratch or answering "how do I get started with Kavo" questions.
+description: Fastest path to a working Kavo API in a brand-new project — npm install list, minimal tsconfig, a single plain entity (no DTOs), and a zero-config @Kavo controller over SQLite. Use when scaffolding a new Kavo app from scratch or answering "how do I get started with Kavo" questions.
 ---
 
 # Quick start — new project, SQLite + Nest + TypeORM only
 
 The fastest working slice: one entity, one controller, zero DTOs, an
 on-disk SQLite file. No Postgres, no GraphQL, no bulk — add those later
-from the other skills (`crud-decorator`, `global-config`, `dto-slots`,
+from the other skills (`kavo-decorator`, `global-config`, `dto-slots`,
 `graphql-binding`) once this runs. Swagger docs are one optional step,
 covered at the end (§9).
 
@@ -106,16 +106,16 @@ unregistered, every DTO slot derives straight from the entity (see
 response is every readable column. Add explicit DTO classes later, only
 once you actually need to narrow a shape.
 
-## 5. One controller — zero-config `@Crud`
+## 5. One controller — zero-config `@Kavo`
 
 `src/cat/cat.controller.ts`:
 
 ```ts
 import { Controller } from "@nestjs/common";
-import { Crud } from "@kavo/nest";
+import { Kavo } from "@kavo/nest";
 import { Cat } from "./cat.entity.js";
 
-@Crud(Cat)
+@Kavo(Cat)
 @Controller("cats")
 export class CatController {}
 ```
@@ -168,7 +168,7 @@ export class AppModule {}
 `KavoModule.forRootAsync` builds the Kavo root instance and registers the
 problem-details exception filter app-wide — nothing else to add for errors
 to come back as RFC 9457 JSON (see `error-handling`). A plain Nest
-`controllers:` array is all `@Crud` classes ever need; there's no separate
+`controllers:` array is all `@Kavo` classes ever need; there's no separate
 per-entity registration step.
 
 ## 7. `src/main.ts`
@@ -201,7 +201,7 @@ curl "localhost:3000/cats?filter[age][gte]=1&sort=-age"
 
 ## 9. Add Swagger/OpenAPI docs (optional)
 
-One extra install, no `@Crud` config needed — every generated route
+One extra install, no `@Kavo` config needed — every generated route
 documents itself automatically once `@nestjs/swagger` is present:
 
 ```bash
@@ -236,8 +236,8 @@ hand-written `@ApiQuery()`/`@ApiOperation()`) is in the `swagger` skill.
 ## Where to go next
 
 - More than one entity, or entities that relate to each other → add each
-  to the same `entities: [...]` array and give each its own `@Crud`
-  controller; relation config is in `crud-decorator`.
+  to the same `entities: [...]` array and give each its own `@Kavo`
+  controller; relation config is in `kavo-decorator`.
 - Narrowing request/response shapes with real DTO classes → `dto-slots`.
 - App-wide defaults (pagination limits, disabling an operation everywhere)
   → `global-config`.

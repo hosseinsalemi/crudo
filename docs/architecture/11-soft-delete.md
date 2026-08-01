@@ -34,7 +34,7 @@ with neither costs nothing.
 
 Resolution runs at every settings scope, so an operation or a single call
 may narrow it (`operations: { deleteOne: { softDelete: { strategy: "hard" } } }`),
-and the result rides on `CrudContext.config.softDelete`. Adapters branch
+and the result rides on `KavoContext.config.softDelete`. Adapters branch
 on that object — they never re-derive the decision.
 
 ## 2. Operations

@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { ConfigurationException, createKavo } from "@kavo/core";
 import { graphql, GraphQLInt, GraphQLNonNull, GraphQLObjectType, GraphQLString } from "graphql";
-import { registerCrudGraphQLTypes, resolveCrudGraphQLSchema } from "@kavo/graphql";
+import { registerKavoGraphQLTypes, resolveKavoGraphQLSchema } from "@kavo/graphql";
 import { InMemoryTodoAdapter, Todo, todoMetadata } from "./support/todo-fixture.js";
 
 /**
- * `resolveCrudGraphQLSchema` is the host-agnostic half of the discovery
- * pipeline `@kavo/nest`'s `BaseCrudGraphQLController` uses — this proves it
+ * `resolveKavoGraphQLSchema` is the host-agnostic half of the discovery
+ * pipeline `@kavo/nest`'s `BaseKavoGraphQLController` uses — this proves it
  * directly, with a plain array standing in for a host's own entity
  * registry and a plain `Map` standing in for a host's DI container, so the
  * test never has to touch Nest at all.
  */
-describe("resolveCrudGraphQLSchema", () => {
+describe("resolveKavoGraphQLSchema", () => {
   const TodoType = new GraphQLObjectType({
     name: "Todo",
     fields: {
@@ -23,14 +23,14 @@ describe("resolveCrudGraphQLSchema", () => {
   it("skips entities with no registered GraphQL types and resolves the rest via the caller's callback", async () => {
     class Unregistered {}
 
-    registerCrudGraphQLTypes(Todo, { itemType: TodoType });
+    registerKavoGraphQLTypes(Todo, { itemType: TodoType });
 
     const adapter = new InMemoryTodoAdapter();
     adapter.rows.push({ id: 1, title: "discovered", done: false });
     const todoService = createKavo().createCrud(Todo, undefined, { adapter, metadata: todoMetadata });
 
     const services = new Map<unknown, unknown>([[Todo, todoService]]);
-    const schema = resolveCrudGraphQLSchema(
+    const schema = resolveKavoGraphQLSchema(
       [{ entity: Unregistered }, { entity: Todo }],
       (entity) => services.get(entity) as never,
     );
@@ -45,7 +45,7 @@ describe("resolveCrudGraphQLSchema", () => {
   it("fails fast at schema-build time when no entity registered any GraphQL types", () => {
     class Unregistered {}
 
-    expect(() => resolveCrudGraphQLSchema([{ entity: Unregistered }], () => ({}) as never)).toThrow(
+    expect(() => resolveKavoGraphQLSchema([{ entity: Unregistered }], () => ({}) as never)).toThrow(
       ConfigurationException,
     );
   });
