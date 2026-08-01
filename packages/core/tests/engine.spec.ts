@@ -97,6 +97,17 @@ describe("KavoEngine pipeline", () => {
     expect(counted.total).toBe(1);
   });
 
+  it("honors a per-call defaultSort override for one request only", async () => {
+    const { crud, adapter } = makeCrud();
+    await crud.findMany(undefined, {
+      settings: { query: { defaultSort: [{ field: "name", direction: "asc" }] } },
+    });
+    expect(adapter.lastQuery?.sort).toEqual([{ field: "name", direction: "asc" }]);
+
+    await crud.findMany();
+    expect(adapter.lastQuery?.sort).toEqual([]);
+  });
+
   it("raises OperationDisabledException for operations off by default", async () => {
     const { crud } = makeCrud();
     // `restoreOne` stays off until the entity config declares soft delete.

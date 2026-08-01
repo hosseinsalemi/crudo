@@ -15,6 +15,9 @@ export const BUILT_IN_DEFAULTS: KavoSettings = Object.freeze({
   query: Object.freeze({
     maxFilterDepth: 3,
     maxInValues: 100,
+    // Unset: today's no-`sort`-means-no-`ORDER BY` behavior is unchanged
+    // for apps that don't declare a default.
+    defaultSort: Object.freeze([]),
   }),
   errors: Object.freeze({
     exposeInternals: false,

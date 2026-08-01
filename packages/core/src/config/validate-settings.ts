@@ -40,6 +40,31 @@ export function validateSettings(entityName: string, settings: KavoSettings): vo
   positiveInt("query.maxFilterDepth", settings.query.maxFilterDepth);
   positiveInt("query.maxInValues", settings.query.maxInValues);
 
+  if (!Array.isArray(settings.query.defaultSort)) {
+    throw new ConfigurationException(
+      entityName,
+      "query.defaultSort",
+      `expected an array, got ${JSON.stringify(settings.query.defaultSort)}`,
+    );
+  }
+  for (const [index, entry] of settings.query.defaultSort.entries()) {
+    const path = `query.defaultSort[${index}]`;
+    if (typeof entry !== "object" || entry === null || typeof entry.field !== "string" || entry.field.length === 0) {
+      throw new ConfigurationException(
+        entityName,
+        path,
+        `expected { field: string, direction: "asc" | "desc" }, got ${JSON.stringify(entry)}`,
+      );
+    }
+    if (entry.direction !== "asc" && entry.direction !== "desc") {
+      throw new ConfigurationException(
+        entityName,
+        `${path}.direction`,
+        `expected "asc" or "desc", got ${JSON.stringify(entry.direction)}`,
+      );
+    }
+  }
+
   bool("errors.exposeInternals", settings.errors.exposeInternals);
 
   positiveInt("relations.maxIncludeDepth", settings.relations.maxIncludeDepth);

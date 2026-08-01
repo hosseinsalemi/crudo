@@ -124,6 +124,54 @@ describe("resolveEntityConfig — bootstrap", () => {
     // Unconfigured filterable still derives in full.
     expect(config.allowlists.filterable).toContain("status");
   });
+
+  it("resolves an entity-scope defaultSort", () => {
+    const config = resolveEntityConfig(
+      userMetadata,
+      { query: { defaultSort: [{ field: "createdAt", direction: "desc" }] } },
+      undefined,
+    );
+    expect(config.settings.query.defaultSort).toEqual([{ field: "createdAt", direction: "desc" }]);
+  });
+
+  it("lets an operation override the entity-scope defaultSort", () => {
+    const config = resolveEntityConfig(
+      userMetadata,
+      {
+        query: { defaultSort: [{ field: "createdAt", direction: "desc" }] },
+        operations: { findMany: { query: { defaultSort: [{ field: "name", direction: "asc" }] } } },
+      },
+      undefined,
+    );
+    expect(config.settingsFor("findMany").query.defaultSort).toEqual([{ field: "name", direction: "asc" }]);
+    expect(config.settingsFor("findOne").query.defaultSort).toEqual([{ field: "createdAt", direction: "desc" }]);
+  });
+
+  it("rejects an entity-scope defaultSort field outside the sortable allowlist", () => {
+    expect(() =>
+      resolveEntityConfig(
+        userMetadata,
+        {
+          allowlists: { sortable: ["name"] },
+          query: { defaultSort: [{ field: "email", direction: "asc" }] },
+        },
+        undefined,
+      ),
+    ).toThrowError(ConfigurationException);
+  });
+
+  it("rejects an operation-scope defaultSort field outside the sortable allowlist", () => {
+    expect(() =>
+      resolveEntityConfig(
+        userMetadata,
+        {
+          allowlists: { sortable: ["name"] },
+          operations: { findMany: { query: { defaultSort: [{ field: "email", direction: "asc" }] } } },
+        },
+        undefined,
+      ),
+    ).toThrowError(ConfigurationException);
+  });
 });
 
 describe("User fixture sanity", () => {

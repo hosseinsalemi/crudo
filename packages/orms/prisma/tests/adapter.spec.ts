@@ -196,6 +196,24 @@ describe("PrismaRepositoryAdapter — query translation", () => {
     expect(list.items).toHaveLength(0);
   });
 
+  it("applies the configured defaultSort when the caller supplies no sort", async () => {
+    await seed();
+    const withDefault = kavo.createCrud(Author, {
+      query: { defaultSort: [{ field: "age", direction: "asc" }] },
+    }) as DefaultKavoService<Author>;
+    const list = await withDefault.findMany();
+    expect(list.items.map((a) => (a as Author).name)).toEqual(["Joan", "Ada", "Alan", "Grace"]);
+  });
+
+  it("lets a caller-supplied sort override the configured defaultSort", async () => {
+    await seed();
+    const withDefault = kavo.createCrud(Author, {
+      query: { defaultSort: [{ field: "age", direction: "asc" }] },
+    }) as DefaultKavoService<Author>;
+    const list = await withDefault.findMany({ sort: [{ field: "age", direction: "desc" }] });
+    expect(list.items.map((a) => (a as Author).name)).toEqual(["Grace", "Alan", "Ada", "Joan"]);
+  });
+
   it("skips the count query when counting is disabled", async () => {
     await seed();
     const list = await authors.findMany(undefined, { settings: { pagination: { count: false } } });
