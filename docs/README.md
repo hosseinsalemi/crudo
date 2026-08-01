@@ -28,5 +28,4 @@ These documents and the [ADRs](internals/adr/) are authoritative.
 
 ## Reference
 
-- [glossary.md](glossary.md) — one canonical name per concept
 - [adr/](internals/adr/) — architecture decision records, referenced elsewhere instead of re-arguing
