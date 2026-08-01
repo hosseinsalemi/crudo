@@ -39,10 +39,8 @@ Push this branch and create or update its PR. Notes: **$ARGUMENTS**
 
 4. **Create the PR, or update it if one already exists** (see the context
    above):
-
    - **No PR yet** — `gh pr create`. Use `--draft` if the user asked for a draft
      or if anything non-blocking is still open. The description should say:
-
      - **What** changed and **why**, in a short paragraph — not a file list.
      - `Closes #<n>` for the issue, so the merge closes it automatically.
      - **Public API impact** — barrel changes, and whether they are breaking.

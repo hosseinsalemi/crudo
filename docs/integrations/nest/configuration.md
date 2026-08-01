@@ -18,7 +18,9 @@ A field you don't set at a given scope just falls through to the next one down. 
 KavoModule.forRootAsync({
   useFactory: () => ({
     infrastructure: createInfrastructure(dataSource),
-    defaults: {/* KavoSettings, see below */},
+    defaults: {
+      /* KavoSettings, see below */
+    },
     paginationStrategies: [],
   }),
   provideServices: true,
@@ -28,7 +30,7 @@ KavoModule.forRootAsync({
 
 | Field                  | Type                                    | What it does                                                                                                                                                                                                        |
 | ---------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `infrastructure`       | `KavoInfrastructure`                    | Where entity metadata and the repository adapter come from — `createInfrastructure(dataSource)` or `createInfrastructure(client, opts)`. Required for any `@Kavo` route to actually run.               |
+| `infrastructure`       | `KavoInfrastructure`                    | Where entity metadata and the repository adapter come from — `createInfrastructure(dataSource)` or `createInfrastructure(client, opts)`. Required for any `@Kavo` route to actually run.                            |
 | `defaults`             | `DeepPartial<KavoSettings>`             | App-wide settings, one level below the built-in defaults and above every entity's own config. See **Settings fields** below for what's in `KavoSettings`.                                                           |
 | `paginationStrategies` | `readonly PaginationStrategy[]`         | Registers custom pagination strategies beyond the built-in `"offset"`, so `pagination.strategy` can name one of these instead.                                                                                      |
 | `useFactory`           | `(...args) => KavoModuleOptions`        | (`forRootAsync` only) Builds the options object, e.g. after awaiting `dataSource.initialize()`.                                                                                                                     |

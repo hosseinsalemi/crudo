@@ -29,7 +29,6 @@ or private.
 
 3. **Write the issue.** Keep it short and concrete — this gets read once by a
    planner:
-
    - **Title** — imperative, specific (`Add cursor pagination strategy`, not
      `Pagination improvements`).
    - **Context** — why this is worth doing, in two or three sentences.

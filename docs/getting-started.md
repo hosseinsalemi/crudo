@@ -77,7 +77,9 @@ import { createInfrastructure } from "@kavo/typeorm";
 import { DataSource } from "typeorm";
 import { BookController } from "./book.controller.js";
 
-const dataSource = await new DataSource({/* ...your TypeORM connection options... */}).initialize();
+const dataSource = await new DataSource({
+  /* ...your TypeORM connection options... */
+}).initialize();
 
 @Module({
   imports: [

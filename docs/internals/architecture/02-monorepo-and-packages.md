@@ -87,7 +87,6 @@ Two independent enforcement layers:
    reverse — ADR-0016.
 
    Two properties of that rule set are load-bearing and easy to lose:
-
    - **Both spellings are matched.** A workspace package specifier does not
      resolve to a path for dependency-cruiser, so a path-only rule silently
      misses `from "@kavo/nest"` — the spelling anyone would actually write.
