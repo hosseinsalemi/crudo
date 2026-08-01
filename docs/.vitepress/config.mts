@@ -14,6 +14,7 @@ export default defineConfig({
     ["meta", { property: "og:title", content: "Kavo" }],
     ["meta", { property: "og:description", content: "A production-grade CRUD framework for TypeScript" }],
     ["meta", { name: "theme-color", content: "#7c5cff" }],
+    ["link", { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" }],
   ],
 
   themeConfig: {
