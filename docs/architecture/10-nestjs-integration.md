@@ -3,7 +3,7 @@
 `@kavo/nest` turns one decorator into a full CRUD controller:
 
 ```ts
-@Crud(UserEntity)
+@Kavo(UserEntity)
 @Controller("users")
 export class UserController {}
 ```
@@ -17,14 +17,14 @@ boundary) — infrastructure arrives through DI.
 - **`KavoModule.forRoot(options)`** (global): creates the Kavo root
   instance (`createKavo` skin — `defaults` passes through untouched),
   registers the problem-details exception filter app-wide (`APP_FILTER`),
-  exposes `KAVO_INSTANCE`, and registers `KavoCrudBinder`. **`forRootAsync`**
+  exposes `KAVO_INSTANCE`, and registers `KavoBinder`. **`forRootAsync`**
   resolves the options via `useFactory`/`inject` — the checkpoint app uses
   it to wait for the `DataSource` before building
   `createTypeOrmInfrastructure(dataSource)`.
-- **`KavoCrudBinder`** (`onModuleInit`, internal): uses `@nestjs/core`'s
-  `DiscoveryService` to find every `@Crud`-decorated controller already in
+- **`KavoBinder`** (`onModuleInit`, internal): uses `@nestjs/core`'s
+  `DiscoveryService` to find every `@Kavo`-decorated controller already in
   the app's module graph and assigns `kavo.createCrud(entity, config)`
-  directly onto `this[CRUD_SERVICE_PROPERTY]` — bootstrap happens here,
+  directly onto `this[KAVO_SERVICE_PROPERTY]` — bootstrap happens here,
   once per controller. This is what makes a plain Nest `controllers:` array
   (in `AppModule` or anywhere else) sufficient on its own; no explicit
   per-entity registration is needed for the generated route methods, which
@@ -32,16 +32,16 @@ boundary) — infrastructure arrives through DI.
 - **`KavoModule.forFeature(controllers)`**: registers the controllers
   (redundant if they're already in some module's `controllers:` array) and
   additionally provides the entity's service under
-  `getCrudServiceToken(Entity)` as a real DI provider. Reach for this only
+  `getKavoServiceToken(Entity)` as a real DI provider. Reach for this only
   when some class needs to constructor-inject that token itself — a
   resolution that happens at instantiation time, before `onModuleInit` has
-  run, so it can't rely on the binder. A non-`@Crud` class fails fast with
-  a `ConfigurationException`. Inside a `@Crud`-decorated class itself,
-  prefer `boundCrudService(this)` over constructor injection — the binder
+  run, so it can't rely on the binder. A non-`@Kavo` class fails fast with
+  a `ConfigurationException`. Inside a `@Kavo`-decorated class itself,
+  prefer `boundKavoService(this)` over constructor injection — the binder
   has already bound it by the time any request arrives.
 - **`KavoModule.forFeature()`** (no arguments): the same DI-provider half
-  of `forFeature`, but for every `@Crud`-decorated class the process has
-  seen so far, read from the decoration-time registry `@Crud` itself
+  of `forFeature`, but for every `@Kavo`-decorated class the process has
+  seen so far, read from the decoration-time registry `@Kavo` itself
   populates — no controller list, and no `controllers:` field in the
   returned module (the caller already put them in an ordinary Nest
   `controllers:` array). This is what lets a normal app get constructor
@@ -51,7 +51,7 @@ boundary) — infrastructure arrives through DI.
   per-entity, so which config would win is otherwise silently ambiguous.
   Scoped to the whole process rather than one app's module graph, which is
   exactly why `@kavo/nest`'s own tests — many differently-configured
-  `@Crud(Todo, ...)` classes declared across one file's test modules —
+  `@Kavo(Todo, ...)` classes declared across one file's test modules —
   always pass `forFeature` an explicit array instead.
 - **`{ provideServices: true }`** on `forRoot`/`forRootAsync` folds the
   no-argument `forFeature()` in directly — the same providers, merged into
@@ -60,7 +60,7 @@ boundary) — infrastructure arrives through DI.
 
 **Singleton services, deliberately:** the engine threads every
 per-request concern (principal, transaction, query, correlation id,
-state) through `CrudContext`, so request-scoped providers would buy
+state) through `KavoContext`, so request-scoped providers would buy
 nothing and cost per-request instantiation of the whole graph.
 
 ## 2. Route generation (registry-driven, decoration-time)
@@ -93,7 +93,7 @@ purge route.
 
 **Global `defaults.operations.<id>` (issue #38, ADR-0015) is not seen
 here.** `KavoModule.forRootAsync`'s `defaults` resolves only once its
-factory runs, which is always _after_ `@Crud` has already decorated
+factory runs, which is always _after_ `@Kavo` has already decorated
 every controller and generated its routes (ADR-0012) — there is no
 value to read yet at the moment this table's decision is made. A route
 an entity doesn't disable itself therefore still generates, even under
@@ -116,7 +116,7 @@ manual-method-wins: the decorated method still gets the registry's route
 identical to what a generated route would carry — only the function
 backing it is the decorated method itself, not `makeHandler`'s generated
 one. `operationId` defaults to the method's own name, the same inference
-manual-method-wins already uses. Resolution order in the `@Crud` loop is
+manual-method-wins already uses. Resolution order in the `@Kavo` loop is
 override map → manual-method-wins → generate, so a decorated method never
 falls through to plain name-matching.
 
@@ -126,17 +126,17 @@ decorators to whatever sits at that property — split into an
 `applyRouteDecorators` step shared by both paths. For an override, Kavo
 skips installing a function and applies that same step to the existing,
 hand-written method; Nest dispatches to it directly at request time, with
-no engine or `CrudEngine` involvement in the indirection.
+no engine or `KavoEngine` involvement in the indirection.
 
 The decorated method typically delegates to default behavior via the
-entity's bound `DefaultCrudService`, reachable as `boundCrudService(this)`
+entity's bound `DefaultKavoService`, reachable as `boundKavoService(this)`
 (`this.base.createOne(dto)`), the same "base" pattern config-level
 overrides get through `context` inside a plain `OperationHandler`.
 
 Because Kavo owns the param wiring, the decorated method must accept
 parameters in the same fixed position a generated route would — reads:
 `(id?, query)`; writes: `(id?, body)` — and must not declare its own
-`@Param`/`@Query`/`@Body`: `@Crud` checks for existing Nest route-argument
+`@Param`/`@Query`/`@Body`: `@Kavo` checks for existing Nest route-argument
 metadata on the method and fails at decoration time (ADR-0012's only
 moment) rather than let the two decorations collide silently. The same
 fail-fast rule covers a duplicate override target (two methods claiming
@@ -165,26 +165,26 @@ the rare caller wiring a query param manually outside this fixed position;
 the common case needs neither.
 
 **Fully custom, registry-independent routes** (issue #26) are a separate,
-simpler path that needs no `@Crud` involvement at all — the only way to
+simpler path that needs no `@Kavo` involvement at all — the only way to
 add an action with no operation identity of its own, since `EntityConfig`
 has no surface for registering a new operation id. The decoration-time
 loop only visits methods two ways: manual-method-wins (name matches a
 registry operation id) and the `@Override` map (name registered via
 `@Override`). A method matching neither — carrying its own native
 `@Get`/`@Post`/etc. decorator and its own `@Param`/`@Query`/`@Body` — is
-never inspected by `@Crud`; it is an ordinary Nest controller method that
-happens to live on a `@Crud`-decorated class. The only Kavo-specific
+never inspected by `@Kavo`; it is an ordinary Nest controller method that
+happens to live on a `@Kavo`-decorated class. The only Kavo-specific
 piece it typically wants is the entity's bound service, reachable the
-same way an `@Override`'d method reaches it — `boundCrudService(this)`,
-which reads the property `KavoCrudBinder` already bound at
+same way an `@Override`'d method reaches it — `boundKavoService(this)`,
+which reads the property `KavoBinder` already bound at
 `onModuleInit`:
 
 ```ts
 @Controller("users")
-@Crud(User)
+@Kavo(User)
 export class UserController {
-  private get base(): DefaultCrudService<User> {
-    return boundCrudService<User>(this);
+  private get base(): DefaultKavoService<User> {
+    return boundKavoService<User>(this);
   }
 
   @Get(":id/summary")
@@ -200,7 +200,7 @@ handlers use, without any of the registry machinery around it: no
 generated method/path/status from config, no `@Override`-supplied
 Swagger metadata, no automatic param wiring — the method owns all of
 that itself, exactly as it would on a plain Nest controller with no
-`@Crud` in the picture. Reach for `@Override` when the action is one of
+`@Kavo` in the picture. Reach for `@Override` when the action is one of
 the standard operations and should keep getting its route/Swagger/param
 metadata generated from config while only its implementation changes;
 reach for a plain native-decorated method for anything else — an action

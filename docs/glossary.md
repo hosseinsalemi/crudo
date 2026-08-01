@@ -7,7 +7,7 @@ themselves (prefixes, casing, suffixes) live in the Conventions section of
 
 | Term                   | Meaning                                                                                                                                       | Not called                      |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| **Entity**             | The ORM-mapped domain class a Crud instance is built for.                                                                                     | model, record                   |
+| **Entity**             | The ORM-mapped domain class a Kavo instance is built for.                                                                                     | model, record                   |
 | **Operation**          | One named unit of dispatch (`createOne`, `findMany`, custom ids). Always names its cardinality: `<verb>One` / `<verb>Many`.                   | action, endpoint, method        |
 | **Standard operation** | One of the built-in CRUD operations shipped as default registry entries.                                                                      | default operation               |
 | **Custom operation**   | A developer-registered operation with its own input/output DTOs.                                                                              | custom action                   |
@@ -15,8 +15,8 @@ themselves (prefixes, casing, suffixes) live in the Conventions section of
 | **Handler**            | The execution unit of one operation (`OperationHandler.execute`).                                                                             | resolver, executor              |
 | **Adapter**            | An ORM-facing implementation of core persistence contracts (`TypeOrmRepositoryAdapter`, `PrismaRepositoryAdapter`). Named for what it adapts. | driver, provider                |
 | **Reader / Writer**    | The read half (`EntityReader`) and write half (`EntityWriter`) of an adapter; `RepositoryAdapter` is both.                                    | repository, DAO                 |
-| **Engine**             | The core pipeline that runs the request lifecycle (`CrudEngine`).                                                                             | runtime, kernel                 |
-| **Context**            | The per-request object threaded through the pipeline (`CrudContext`).                                                                         | request state                   |
+| **Engine**             | The core pipeline that runs the request lifecycle (`KavoEngine`).                                                                             | runtime, kernel                 |
+| **Context**            | The per-request object threaded through the pipeline (`KavoContext`).                                                                         | request state                   |
 | **Query context**      | Caller-facing query input (`QueryContext`) or its validated normalized form (`NormalizedQueryContext`).                                       | search, criteria                |
 | **Filter AST**         | The provider-independent expression tree (`FilterExpression`) built from wire filters.                                                        | where clause                    |
 | **Wire token**         | The camelCase operator spelling on the query string (`eq`, `notIn`); the AST uses SCREAMING_SNAKE.                                            | alias                           |
@@ -29,7 +29,7 @@ themselves (prefixes, casing, suffixes) live in the Conventions section of
 | **Bulk**               | The feature term for batch operations (config key `bulk`, `/bulk` routes, `BulkResultDto`). Never a method prefix — methods are `*Many`.      | batch (in API names)            |
 | **Settings**           | The layered config values (`KavoSettings`) merged through the precedence chain.                                                               | options (reserved for per-call) |
 | **Resolved config**    | The frozen per-entity merge result (`ResolvedEntityConfig`), computed once at bootstrap.                                                      | effective config                |
-| **Per-call options**   | The last precedence link, passed as parameters (`CrudCallOptions`) — never config writes.                                                     | overrides object                |
+| **Per-call options**   | The last precedence link, passed as parameters (`KavoCallOptions`) — never config writes.                                                     | overrides object                |
 | **Principal**          | The authenticated caller carried opaquely on the context.                                                                                     | user, actor                     |
 | **Problem details**    | The RFC 9457 error document (`ProblemDetailsDto`) all errors serialize to.                                                                    | error response                  |
 | **Error code**         | The stable `KAVO_*` string identifying an error kind; API surface.                                                                            | error type                      |

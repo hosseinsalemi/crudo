@@ -7,7 +7,7 @@ leaves; nothing existing changes.
 ## 1. Hierarchy
 
 ```
-KavoException (abstract; implements the CrudException contract)
+KavoException (abstract; implements the KavoExceptionShape contract)
 ├─ QueryValidationException     carries issues[] → errors[] extension
 ├─ NotFoundException
 ├─ ConflictException
@@ -22,7 +22,7 @@ KavoException (abstract; implements the CrudException contract)
 
 Every leaf binds exactly one catalog code; status, title, and the English
 message template come from the catalog, so an exception cannot disagree
-with it. Downstream layers program against the `CrudException` shape;
+with it. Downstream layers program against the `KavoExceptionShape` contract;
 `@kavo/nest`'s filter uses the base class only as its catch token.
 
 ## 2. Error-code catalog

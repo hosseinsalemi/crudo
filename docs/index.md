@@ -115,7 +115,7 @@ export class BooksController {
     </div>
 
 ```ts
-@Crud(Book)
+@Kavo(Book)
 @Controller("books")
 export class BooksController {}
 ```

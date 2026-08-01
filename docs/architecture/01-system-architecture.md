@@ -21,14 +21,14 @@ flowchart TB
     end
 
     subgraph nest["@kavo/nest — framework binding"]
-        N1["@Crud decorator + KavoModule"]
+        N1["@Kavo decorator + KavoModule"]
         N2[Route generation from operation registry]
         N3[Exception filter → problem details]
         N4[Swagger integration]
     end
 
     subgraph core["@kavo/core — the hub (zero dependencies)"]
-        E["CrudEngine (request lifecycle)"]
+        E["KavoEngine (request lifecycle)"]
         Q[Query model: filter AST, pagination, sort, fields]
         D[DTO resolution + serialization]
         CF[Layered configuration]
@@ -53,7 +53,7 @@ flowchart TB
 Both outer packages depend on `@kavo/core`; core depends on nothing. The
 adapter reaches the engine only through contracts it implements
 (`RepositoryAdapter`), and the framework binding reaches it only through
-contracts it consumes (`CrudService`, `OperationRegistry`). This is
+contracts it consumes (`KavoService`, `OperationRegistry`). This is
 strict dependency inversion: core owns every contract; the edges own the
 technology.
 
@@ -82,7 +82,7 @@ references — an illegal import fails CI, not code review.
 | --------------- | --------------------------------------------------------------------------------------- | ---------------------------- |
 | `@kavo/core`    | Contracts, type system, engine, query model, DTO resolution, config merging, exceptions | anything (zero runtime deps) |
 | `@kavo/typeorm` | `RepositoryAdapter`/`FilterBuilder` over TypeORM; error mapping; relation loading       | NestJS, `@kavo/nest`         |
-| `@kavo/nest`    | `@Crud` decorator, module wiring, route generation, exception filter, Swagger           | TypeORM, `@kavo/typeorm`     |
+| `@kavo/nest`    | `@Kavo` decorator, module wiring, route generation, exception filter, Swagger           | TypeORM, `@kavo/typeorm`     |
 
 ORM independence inside core is a structural discipline even though only
 TypeORM is built — it is what keeps the core clean.
@@ -116,14 +116,14 @@ skeleton shippable without stubbing later features as hacks.
 | `types/`         | `EntityId`, `FieldPath`, shared type utilities                                                               |
 | `query/`         | Filter AST, pagination, sort, field selection, lenient + normalized query contexts, parser/builder contracts |
 | `dto/`           | The six DTO slots, resolution contract, list + bulk envelopes                                                |
-| `errors/`        | `CrudException`, stable error codes, problem-details shape                                                   |
+| `errors/`        | `KavoExceptionShape`, stable error codes, problem-details shape                                              |
 | `config/`        | Settings schema, scope inputs, frozen resolved config                                                        |
 | `operations/`    | Operation ids, handler contract, dispatch registry                                                           |
 | `relations/`     | Relation descriptors/registry, include tree/resolver                                                         |
-| `context/`       | `CrudContext` + transport-agnostic request/response envelopes                                                |
+| `context/`       | `KavoContext` + transport-agnostic request/response envelopes                                                |
 | `serialization/` | `Serializer` / `Deserializer`                                                                                |
 | `persistence/`   | Reader/writer/adapter contracts, transaction manager                                                         |
-| `service/`       | `CrudService`, per-call options                                                                              |
+| `service/`       | `KavoService`, per-call options                                                                              |
 
 ## 6. Design patterns, and why
 
@@ -134,15 +134,15 @@ pattern; classes that merely resemble one are not in the table.
 
 | Pattern                       | Implemented in                                                                                                                                                                                                                                                                                                            | ADR                                                                                                                       | Why over the alternative                                                                                                                                                                                                                                                                   |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Template Method**           | `CrudEngine.execute`/`run` (`core/src/engine/crud-engine.ts`)                                                                                                                                                                                                                                                             | —                                                                                                                         | One fixed stage order with swappable stage internals beats a free-form middleware chain: ordering bugs become impossible, and the pipeline stays inspectable. Variability comes from injected collaborators, not subclass overrides — `run` is `private` and nothing extends `CrudEngine`. |
-| **Strategy**                  | `PaginationStrategy` (`core/src/query/pagination-strategies.ts`), `Serializer`/`Deserializer` (`core/src/serialization/`), `ErrorHandler` (`core/src/errors/default-error-handler.ts`), `OperationHandler` (`core/src/engine/built-in-handlers.ts`), `IncludeResolver` (`core/src/relations/default-include-resolver.ts`) | —                                                                                                                         | Open/Closed: new behavior = new implementation of a core contract, never an engine edit. Each is a core-declared interface with a `Default*`/built-in implementation, injected through `CrudEngineDependencies`.                                                                           |
+| **Template Method**           | `KavoEngine.execute`/`run` (`core/src/engine/kavo-engine.ts`)                                                                                                                                                                                                                                                             | —                                                                                                                         | One fixed stage order with swappable stage internals beats a free-form middleware chain: ordering bugs become impossible, and the pipeline stays inspectable. Variability comes from injected collaborators, not subclass overrides — `run` is `private` and nothing extends `KavoEngine`. |
+| **Strategy**                  | `PaginationStrategy` (`core/src/query/pagination-strategies.ts`), `Serializer`/`Deserializer` (`core/src/serialization/`), `ErrorHandler` (`core/src/errors/default-error-handler.ts`), `OperationHandler` (`core/src/engine/built-in-handlers.ts`), `IncludeResolver` (`core/src/relations/default-include-resolver.ts`) | —                                                                                                                         | Open/Closed: new behavior = new implementation of a core contract, never an engine edit. Each is a core-declared interface with a `Default*`/built-in implementation, injected through `KavoEngineDependencies`.                                                                           |
 | **Registry (dispatch table)** | `DefaultOperationRegistry` + `createOperationRegistry` (`core/src/operations/default-operation-registry.ts`)                                                                                                                                                                                                              | [0006](../adr/0006-registry-driven-operations.md), [0007](../adr/0007-module-augmentable-operation-metadata.md)           | One mechanism, several behaviors, for built-in and overridden operations; route generation reads the same table, so features get routes for free.                                                                                                                                          |
 | **Composition Root**          | `createKavo`/`createCrud` (`core/src/kavo.ts`); framework-layer roots in `nest/src/kavo.module.ts` and `typeorm/src/infrastructure.ts`                                                                                                                                                                                    | —                                                                                                                         | Every `new` in the object graph happens once at bootstrap, so resolution order is a single readable function and the result can be frozen; no service locator, and no per-request construction.                                                                                            |
-| **Adapter**                   | `TypeOrmRepositoryAdapter` (`typeorm/src/typeorm-repository-adapter.ts`) against core's `RepositoryAdapter`; `CrudInfrastructure` (`metadataFor` + `adapterFor`) supplies adapter _and_ metadata as one family                                                                                                            | [0001](../adr/0001-clean-architecture-core-owns-contracts.md), [0011](../adr/0011-entity-metadata-infrastructure-seam.md) | Core states persistence in its own vocabulary and the ORM package translates, which is what lets core keep zero runtime dependencies (ADR-0005) and stay testable with an in-memory fake.                                                                                                  |
+| **Adapter**                   | `TypeOrmRepositoryAdapter` (`typeorm/src/typeorm-repository-adapter.ts`) against core's `RepositoryAdapter`; `KavoInfrastructure` (`metadataFor` + `adapterFor`) supplies adapter _and_ metadata as one family                                                                                                            | [0001](../adr/0001-clean-architecture-core-owns-contracts.md), [0011](../adr/0011-entity-metadata-infrastructure-seam.md) | Core states persistence in its own vocabulary and the ORM package translates, which is what lets core keep zero runtime dependencies (ADR-0005) and stay testable with an in-memory fake.                                                                                                  |
 | **Specification**             | Filter AST (`core/src/query/filter.ts`)                                                                                                                                                                                                                                                                                   | —                                                                                                                         | Composable, provider-independent query trees that each adapter translates once, instead of per-ORM query fragments leaking upward. Composition only — the AST is pure data with no evaluation method; evaluation is the adapter's job (next row).                                          |
 | **Interpreter**               | `FilterTranslator.toBrackets` (`typeorm/src/filter-translator.ts`)                                                                                                                                                                                                                                                        | —                                                                                                                         | The AST is walked into `QueryBuilder` calls; keeps translation local to the adapter.                                                                                                                                                                                                       |
-| **Dependency Injection**      | `CrudEngineDependencies` (`core/src/engine/crud-engine.ts`); container wiring only in `nest/src/kavo.module.ts`                                                                                                                                                                                                           | —                                                                                                                         | Core receives its collaborators; only the framework binding knows the container.                                                                                                                                                                                                           |
-| **Facade**                    | `DefaultCrudService` (`core/src/service/default-crud-service.ts`)                                                                                                                                                                                                                                                         | —                                                                                                                         | One narrow, typed entry point over engine + registry + config machinery; its methods are sugar over the same `CrudRequest` envelope the generated routes build.                                                                                                                            |
+| **Dependency Injection**      | `KavoEngineDependencies` (`core/src/engine/kavo-engine.ts`); container wiring only in `nest/src/kavo.module.ts`                                                                                                                                                                                                           | —                                                                                                                         | Core receives its collaborators; only the framework binding knows the container.                                                                                                                                                                                                           |
+| **Facade**                    | `DefaultKavoService` (`core/src/service/default-kavo-service.ts`)                                                                                                                                                                                                                                                         | —                                                                                                                         | One narrow, typed entry point over engine + registry + config machinery; its methods are sugar over the same `KavoRequest` envelope the generated routes build.                                                                                                                            |
 
 Rejected: Active Record (couples entities to persistence — kills ORM
 independence), event/hook bus (removed from v6 scope; would be a second
@@ -156,7 +156,7 @@ the one-AST discipline).
 ```mermaid
 sequenceDiagram
     participant C as Nest route (generated)
-    participant E as CrudEngine
+    participant E as KavoEngine
     participant D as Deserializer
     participant A as TypeOrmRepositoryAdapter
     participant S as Serializer
@@ -175,7 +175,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant C as Nest route
-    participant E as CrudEngine
+    participant E as KavoEngine
     participant P as FilterParser
     participant A as Adapter
     participant S as Serializer
@@ -198,7 +198,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant C as Nest route
-    participant E as CrudEngine
+    participant E as KavoEngine
     participant A as Adapter
     C->>E: execute("updateOne", id, body)
     E->>E: resolve + deserialize(body, UpdateDto)
@@ -215,7 +215,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant C as Nest route
-    participant E as CrudEngine
+    participant E as KavoEngine
     participant A as Adapter
     C->>E: execute("deleteOne", id)
     E->>A: delete(id, ctx)

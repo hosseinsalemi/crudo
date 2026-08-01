@@ -17,7 +17,7 @@ conventions in [`CLAUDE.md`](CLAUDE.md) are normative.
 | [`@kavo/core`](packages/core)                 | Contracts, type system, engine — zero runtime dependencies       |
 | [`@kavo/typeorm`](packages/orms/typeorm)      | TypeORM adapter (`RepositoryAdapter` implementation)             |
 | [`@kavo/prisma`](packages/orms/prisma)        | Prisma adapter (`RepositoryAdapter` implementation)              |
-| [`@kavo/nest`](packages/frameworks/nest)      | NestJS binding (`@Crud` decorator, route generation)             |
+| [`@kavo/nest`](packages/frameworks/nest)      | NestJS binding (`@Kavo` decorator, route generation)             |
 | [`@kavo/graphql`](packages/protocols/graphql) | Host-agnostic GraphQL schema binding over a `createCrud` service |
 
 Design docs, glossary, and ADRs live in [`docs`](docs).
@@ -38,7 +38,7 @@ pnpm add @kavo/typeorm typeorm reflect-metadata
 # Prisma adapter
 pnpm add @kavo/prisma @prisma/client
 
-# NestJS binding (the @Crud decorator and route generation)
+# NestJS binding (the @Kavo decorator and route generation)
 pnpm add @kavo/nest @nestjs/common @nestjs/core reflect-metadata rxjs
 # optional, for OpenAPI schema generation:
 pnpm add @nestjs/swagger
@@ -54,7 +54,7 @@ TypeORM app wired up with all four packages.
 ## Claude Code skills
 
 If you use Claude Code, [`extensions`](extensions) has nine
-ready-made skills covering `@Crud()`, global config, the query grammar,
+ready-made skills covering `@Kavo()`, global config, the query grammar,
 DTOs, errors, soft delete, Swagger, and GraphQL — published as a plugin via
 this repo's own marketplace:
 

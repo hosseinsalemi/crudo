@@ -2,7 +2,7 @@
 
 `@kavo/graphql` (`packages/protocols/graphql`) builds a `GraphQLSchema`
 over an existing `createCrud` service. Every resolver is a direct call
-into the same `DefaultCrudService`/engine pipeline REST binds to — there
+into the same `DefaultKavoService`/engine pipeline REST binds to — there
 is no parallel request path, no second copy of filter/sort/pagination
 validation, and no separate error handling. `@kavo/nest` (`packages/frameworks/nest`)
 depends on `@kavo/graphql` to provide a ready-made Nest controller; the
@@ -21,9 +21,9 @@ to `@kavo/graphql` itself.
 ## 2. Building one entity's schema
 
 ```ts
-import { createCrudGraphQLSchema } from "@kavo/graphql";
+import { createKavoGraphQLSchema } from "@kavo/graphql";
 
-const schema = createCrudGraphQLSchema({
+const schema = createKavoGraphQLSchema({
   name: "Owner",
   service: ownerService, // whatever createCrud(Owner, ...) returned
   itemType: OwnerType, // hand-written GraphQLObjectType
@@ -52,7 +52,7 @@ Every field this produces:
 Each mutation is opt-in per entity — omit the option and the field never
 reaches the schema. This does **not** read the entity's `OperationRegistry`
 to check what REST actually has enabled: setting `restoreOne: true` here
-for an entity whose `@Crud` config disables `restoreOne` still puts the
+for an entity whose `@Kavo` config disables `restoreOne` still puts the
 field in the schema, and it throws `OperationDisabledException` at resolve
 time, the same way calling the REST route would. Keeping the two in sync
 is the caller's job today — reading the registry directly is real,
@@ -78,16 +78,16 @@ scoped follow-up work (tracked as a GraphQL issue), not implemented here.
 ## 3. Multiple entities on one schema
 
 ```ts
-import { mergeCrudGraphQLSchemas } from "@kavo/graphql";
+import { mergeKavoGraphQLSchemas } from "@kavo/graphql";
 
-const schema = mergeCrudGraphQLSchemas([
+const schema = mergeKavoGraphQLSchemas([
   { name: "Owner", service: ownerService, itemType: OwnerType, createInputType: CreateOwnerInput },
   { name: "Cat", service: catService, itemType: CatType, createInputType: CreateCatInput },
 ]);
 ```
 
 Field names are namespaced by each entity's own `name`, so entries never
-collide. `mergeCrudGraphQLSchemas` throws `ConfigurationException` if the
+collide. `mergeKavoGraphQLSchemas` throws `ConfigurationException` if the
 result would have zero `Query` fields (an empty binding list) — an empty
 `Query` type is invalid GraphQL, and graphql-js would otherwise only
 report that on the first request, deep inside `graphql()`'s own schema
@@ -98,49 +98,49 @@ names the actual fix.
 
 Hand-listing every entity at the call site (as in §3) works, but doesn't
 scale past a couple of entities and needs updating every time one is
-added. `registerCrudGraphQLTypes`/`getCrudGraphQLTypes` is a small,
-process-wide registry — the GraphQL counterpart of `@kavo/nest`'s `@Crud`
+added. `registerKavoGraphQLTypes`/`getKavoGraphQLTypes` is a small,
+process-wide registry — the GraphQL counterpart of `@kavo/nest`'s `@Kavo`
 registry — so an entity declares its GraphQL types once, next to its
 DTOs:
 
 ```ts
 // owner.graphql-types.ts
-registerCrudGraphQLTypes(Owner, { itemType: OwnerType, createInputType: CreateOwnerInput });
+registerKavoGraphQLTypes(Owner, { itemType: OwnerType, createInputType: CreateOwnerInput });
 ```
 
-`resolveCrudGraphQLSchema` (`discovery.ts`) is the host-agnostic pipeline
+`resolveKavoGraphQLSchema` (`discovery.ts`) is the host-agnostic pipeline
 that ties this together: given a list of `{ entity }` refs and a
 `resolveService(entity)` callback, it looks up each entity's registered
-types, skips any entity with none (opt-in, not implied by `@Crud` alone),
+types, skips any entity with none (opt-in, not implied by `@Kavo` alone),
 and merges the rest. Two things are deliberately left to the caller,
 supplied per host:
 
-- **How to enumerate `@Crud` entities** — `@kavo/nest`'s
-  `getCrudEntities()`, a plain array a future Express/Fastify/Next.js app
+- **How to enumerate `@Kavo` entities** — `@kavo/nest`'s
+  `getKavoEntities()`, a plain array a future Express/Fastify/Next.js app
   builds by hand, or any other host's own registry.
 - **How to resolve one entity's bound service** — `@kavo/nest`'s
-  `ModuleRef` + `getCrudServiceToken`, a plain `Map`, or whatever DI
+  `ModuleRef` + `getKavoServiceToken`, a plain `Map`, or whatever DI
   container that host uses.
 
-This is what makes the exact same `resolveCrudGraphQLSchema` call work
-from `@kavo/nest`'s `BaseCrudGraphQLController` today and from a future
+This is what makes the exact same `resolveKavoGraphQLSchema` call work
+from `@kavo/nest`'s `BaseKavoGraphQLController` today and from a future
 host binding without either package importing the other (ADR-0016).
 
 ## 5. The Nest binding
 
 `@kavo/nest` (`packages/frameworks/nest/src/graphql/`) supplies the two
-Nest-specific pieces `resolveCrudGraphQLSchema` needs and nothing else:
+Nest-specific pieces `resolveKavoGraphQLSchema` needs and nothing else:
 
-- **`BaseCrudGraphQLController`** (abstract): `onModuleInit` calls
-  `resolveCrudGraphQLSchema(getCrudEntities(), (entity) =>
-this.moduleRef.get(getCrudServiceToken(entity), { strict: false }))`
+- **`BaseKavoGraphQLController`** (abstract): `onModuleInit` calls
+  `resolveKavoGraphQLSchema(getKavoEntities(), (entity) =>
+this.moduleRef.get(getKavoServiceToken(entity), { strict: false }))`
   and stores the result; `execute(query, variables)` runs one operation
   against it. A concrete controller adds `@Controller`/`@Post` and calls
   `execute`:
 
   ```ts
   @Controller("graphql")
-  export class GraphQLController extends BaseCrudGraphQLController {
+  export class GraphQLController extends BaseKavoGraphQLController {
     // Nest reads constructor-injection metadata off the concrete class,
     // not an inherited one — this constructor must be declared even
     // though it only forwards to `super`.
@@ -185,7 +185,7 @@ guarantee only holds if nothing `@kavo/nest`'s always-loaded module graph
 (`index.ts`, `kavo.module.ts`) reaches at import time ever statically
 imports `@kavo/graphql` or `graphql`. A static top-level `import` is
 resolved eagerly, so a single one anywhere in that graph — even several
-files deep — makes `import { Crud } from "@kavo/nest"` itself crash with
+files deep — makes `import { Kavo } from "@kavo/nest"` itself crash with
 a raw `ERR_MODULE_NOT_FOUND` whenever `graphql` isn't installed, for
 every app, whether or not it ever sets `KavoModule`'s `graphql` option.
 This was a real bug in this package's first version, caught by asking
@@ -204,13 +204,13 @@ package, or a second protocol binding for `@kavo/express`/`@kavo/fastify`):
   `ConfigurationException` on failure instead of leaking the raw
   module-resolution error.
 - Only `import type { ... } from "graphql"` appears at the top of
-  `base-crud-graphql.controller.ts` — type-only imports are fully erased
+  `base-kavo-graphql.controller.ts` — type-only imports are fully erased
   by `tsc` (`isolatedModules`/`verbatimModuleSyntax`, `tsconfig.base.json`),
   so they cost nothing at runtime and never require the package to be
   installed, only present at _compile_ time (always true for a workspace
   package like `@kavo/graphql`).
 - `loadGraphQL()` is only ever called from code a consumer reaches by
-  opting in — `BaseCrudGraphQLController.onModuleInit`/`execute` — never
+  opting in — `BaseKavoGraphQLController.onModuleInit`/`execute` — never
   from `index.ts` or `kavo.module.ts` directly. Those two files only
   reference the _types_ and the plain functions/classes around GraphQL
   (`createDefaultGraphQLController`, `DEFAULT_GRAPHQL_PATH`), none of
@@ -224,7 +224,7 @@ CommonJS. `@kavo/graphql` is Kavo's own package, built as ESM
 (`tsconfig.base.json`'s `"module": "Node16"` + `"type": "module"`), and
 Node cannot `require()` an ES module synchronously — only a dynamic
 `import()` (necessarily async) works for lazily loading an ESM package.
-`BaseCrudGraphQLController.onModuleInit`/`execute` are `async` for
+`BaseKavoGraphQLController.onModuleInit`/`execute` are `async` for
 exactly this reason; a future binding lazily loading another first-party
 ESM package should expect the same.
 

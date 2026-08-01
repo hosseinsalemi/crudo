@@ -22,7 +22,7 @@ its own payload shape, or callers need to `instanceof`/catch it distinctly.
 
 1. **The class** — a new leaf under `KavoException`
    (`packages/core/src/errors/`), named `*Exception`. It implements the
-   `CrudException` contract; downstream layers (including `@kavo/nest`'s
+   `KavoExceptionShape` contract; downstream layers (including `@kavo/nest`'s
    filter) program against that shape, never the concrete class, so don't
    add fields the base contract can't express without extending the contract
    itself.
@@ -50,8 +50,8 @@ its own payload shape, or callers need to `instanceof`/catch it distinctly.
 
 ## What you don't touch
 
-`toProblemDetails` and the `@kavo/nest` filter are generic over the base
-`CrudException` shape — a new leaf needs no changes there. If adding your
+`toProblemDetails` and the `@kavo/nest` filter are generic over the
+`KavoExceptionShape` contract — a new leaf needs no changes there. If adding your
 exception seems to require touching the serializer or the filter, the new
 class is missing something the contract already provides; fix the class, not
 the generic machinery.

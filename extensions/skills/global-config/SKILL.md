@@ -9,8 +9,8 @@ Kavo has **one** configuration mechanism, `KavoSettings`, merged through a
 single precedence chain (`docs/architecture/08-configuration.md`):
 
 ```
-built-in defaults → global (createKavo / KavoModule.forRoot) → entity (createCrud / @Crud)
-                  → operation (operations.<id>) → per-call (CrudCallOptions)
+built-in defaults → global (createKavo / KavoModule.forRoot) → entity (createCrud / @Kavo)
+                  → operation (operations.<id>) → per-call (KavoCallOptions)
 ```
 
 Global scope is the app's one place to state a default once instead of
@@ -40,7 +40,7 @@ KavoModule.forRootAsync({
 
 ```ts
 interface KavoModuleOptions {
-  infrastructure?: CrudInfrastructure; // e.g. createTypeOrmInfrastructure(dataSource)
+  infrastructure?: KavoInfrastructure; // e.g. createTypeOrmInfrastructure(dataSource)
   defaults?: DeepPartial<KavoSettings>; // passed through untouched to createKavo
   paginationStrategies?: readonly PaginationStrategy[];
 }
@@ -49,9 +49,9 @@ interface KavoModuleOptions {
 `forRoot(options)` takes the object directly; `forRootAsync(options)` resolves
 it via `useFactory`/`inject` (needed to wait for a `DataSource`, etc.). Both
 also accept `{ provideServices: true }`, which additionally provides
-`getCrudServiceToken(Entity)` for every `@Crud` class seen so far — only
-needed when some class constructor-injects its own service; a `@Crud` class
-itself should use `boundCrudService(this)` instead. In plain core (no Nest),
+`getKavoServiceToken(Entity)` for every `@Kavo` class seen so far — only
+needed when some class constructor-injects its own service; a `@Kavo` class
+itself should use `boundKavoService(this)` instead. In plain core (no Nest),
 the same object is `createKavo(options).createCrud(Entity, config?)`.
 
 ## Built-in defaults (`BUILT_IN_DEFAULTS`, `core/src/config/defaults.ts`)
@@ -70,14 +70,14 @@ the same object is `createKavo(options).createCrud(Entity, config?)`.
 | `bulk.mode` / `maxBatchSize`                     | `"atomic"` / 500         | reserved (bulk is not built)                                           |
 
 Setting any of these under `defaults` in `createKavo`/`KavoModule.forRoot`
-applies it app-wide; an entity's own `@Crud(Entity, config)` (or
+applies it app-wide; an entity's own `@Kavo(Entity, config)` (or
 `operations.<id>` on it) still wins over the global value.
 
 ## `operations.<id>` global default — the one caveat (ADR-0015)
 
 At global scope, `operations` is a plain boolean map
 (`Partial<Record<StandardOperationId, boolean>>`) and merges like any other
-key. But **route generation in `@kavo/nest` never sees it**: `@Crud` builds
+key. But **route generation in `@kavo/nest` never sees it**: `@Kavo` builds
 routes at class-decoration time, which always runs _before_
 `KavoModule.forRootAsync`'s factory resolves `defaults` — there is nothing to
 read yet. So:
@@ -89,7 +89,7 @@ read yet. So:
   answers `405 KAVO_OPERATION_DISABLED` — never a silent success, never a
   bare 404.
 - An app that wants the route itself gone still has to say so per entity
-  (`operations: { restoreOne: false }` in that entity's own `@Crud` config).
+  (`operations: { restoreOne: false }` in that entity's own `@Kavo` config).
 
 This only affects `@kavo/nest`; plain `@kavo/core` callers going through
 `kavo.createCrud(...)` see the global default applied directly, with no route

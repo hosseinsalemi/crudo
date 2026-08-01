@@ -45,14 +45,14 @@ Four packages in a strict hub-and-spoke topology (`pnpm-workspace.yaml`):
 
 - **`@kavo/core`** (`packages/core`) — all contracts, the type system, and the request engine. **Zero runtime dependencies** and imports nothing (ADR-0005). It has no knowledge of TypeORM or Nest.
 - **`@kavo/typeorm`** (`packages/orms/typeorm`) — implements core's `RepositoryAdapter` and feeds core's entity-metadata seam from TypeORM metadata. `typeorm` is a peer dependency.
-- **`@kavo/nest`** (`packages/frameworks/nest`) — the `@Crud` decorator and NestJS route generation.
-- **`@kavo/graphql`** (`packages/protocols/graphql`) — host-framework-agnostic GraphQL schema binding: builds a schema over a `createCrud` service, delegating every resolver to the same engine REST uses. Depends only on `@kavo/core` and the `graphql` peer; `@kavo/nest` optionally wires it in (`BaseCrudGraphQLController`) via DI, never via a direct import.
+- **`@kavo/nest`** (`packages/frameworks/nest`) — the `@Kavo` decorator and NestJS route generation.
+- **`@kavo/graphql`** (`packages/protocols/graphql`) — host-framework-agnostic GraphQL schema binding: builds a schema over a `createCrud` service, delegating every resolver to the same engine REST uses. Depends only on `@kavo/core` and the `graphql` peer; `@kavo/nest` optionally wires it in (`BaseKavoGraphQLController`) via DI, never via a direct import.
 
 These boundaries are **mechanically enforced** by `.dependency-cruiser.cjs`, not just convention: core may import nothing, adapters/protocol bindings/framework bindings import the `@kavo/core` barrel only (no deep imports), and spokes never import each other directly — they meet only through Nest's DI container. An illegal import fails `pnpm depcruise` (part of `pnpm check`), not code review.
 
 ### The request pipeline (the spine)
 
-`CrudEngine.execute` (`packages/core/src/engine/crud-engine.ts`) is a Template Method over one lifecycle, and nearly every stage is a swappable seam:
+`KavoEngine.execute` (`packages/core/src/engine/kavo-engine.ts`) is a Template Method over one lifecycle, and nearly every stage is a swappable seam:
 
 ```
 operation resolution → config resolution → DTO resolution → deserialization →
@@ -67,17 +67,17 @@ Nothing is special-cased per verb. Operations come from an **operation registry*
 
 ### Route generation is registry-driven and happens at decoration time
 
-`@Crud(Entity, config?)` (`packages/frameworks/nest/src/crud.decorator.ts`) builds the same operation registry the engine uses and generates one route per **enabled** entry at class-definition time (the only moment Nest's router scan can see the methods). Notable rules:
+`@Kavo(Entity, config?)` (`packages/frameworks/nest/src/kavo.decorator.ts`) builds the same operation registry the engine uses and generates one route per **enabled** entry at class-definition time (the only moment Nest's router scan can see the methods). Notable rules:
 
 - Disabled operations get no route; custom operations get their route from `meta.routes`; `meta.routes.enabled: false` keeps an operation service-only.
 - **Manual-method-wins**: a hand-written controller method whose name matches an operation id suppresses that generated route.
 - The bound service arrives later via property injection (`forFeature` provider), not through the constructor.
 
-Standard operations delegate to the typed `DefaultCrudService` surface; custom operations go through `service.engine.execute(...)` — one pipeline either way. HTTP query strings arrive as flat bracket keys wrapped in a `WireQuery` marker so the full parse-and-coerce pipeline runs; programmatic callers pass a typed `QueryContext` (normalized without coercion).
+Standard operations delegate to the typed `DefaultKavoService` surface; custom operations go through `service.engine.execute(...)` — one pipeline either way. HTTP query strings arrive as flat bracket keys wrapped in a `WireQuery` marker so the full parse-and-coerce pipeline runs; programmatic callers pass a typed `QueryContext` (normalized without coercion).
 
 ### Wiring an app
 
-See `packages/examples/src/app.module.ts`: `KavoModule.forRootAsync({ provideServices: true, useFactory: () => ({ infrastructure: createTypeOrmInfrastructure(dataSource), defaults: {...} }) })` is the app's only Kavo import — the `@Crud` controllers just go in `AppModule`'s own `controllers: [...]` array. `KavoModule`'s discovery binder (`DiscoveryService`, `onModuleInit`) finds them there and binds each entity's service, no registration needed; `provideServices: true` additionally provides `getCrudServiceToken(Entity)` as a real DI provider for every `@Crud`-decorated class the process has seen, which `AddressController` needs for its constructor-injected `base` (a fully custom route wants it typed as an ordinary constructor param). That's the same thing the standalone no-arg `KavoModule.forFeature()` does, folded into one call; `forFeature([...])` with an explicit array also still exists. Both no-arg forms are process-wide, so `@kavo/nest`'s own tests (many differently-configured `@Crud` classes over one entity in one file) always pass `forFeature` an explicit array instead. The app is what hands Nest its infrastructure — the packages never import each other.
+See `packages/examples/src/app.module.ts`: `KavoModule.forRootAsync({ provideServices: true, useFactory: () => ({ infrastructure: createTypeOrmInfrastructure(dataSource), defaults: {...} }) })` is the app's only Kavo import — the `@Kavo` controllers just go in `AppModule`'s own `controllers: [...]` array. `KavoModule`'s discovery binder (`DiscoveryService`, `onModuleInit`) finds them there and binds each entity's service, no registration needed; `provideServices: true` additionally provides `getKavoServiceToken(Entity)` as a real DI provider for every `@Kavo`-decorated class the process has seen, which `AddressController` needs for its constructor-injected `base` (a fully custom route wants it typed as an ordinary constructor param). That's the same thing the standalone no-arg `KavoModule.forFeature()` does, folded into one call; `forFeature([...])` with an explicit array also still exists. Both no-arg forms are process-wide, so `@kavo/nest`'s own tests (many differently-configured `@Kavo` classes over one entity in one file) always pass `forFeature` an explicit array instead. The app is what hands Nest its infrastructure — the packages never import each other.
 
 ## Conventions (normative)
 

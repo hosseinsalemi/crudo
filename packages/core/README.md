@@ -14,14 +14,14 @@ src/
 ├─ types/          EntityId, FieldPath, shared type utilities
 ├─ query/          Filter AST, pagination, sort, field selection, contexts
 ├─ dto/            DTO slots, list envelope, bulk envelope
-├─ errors/         CrudException, error codes, problem details
+├─ errors/         KavoExceptionShape, error codes, problem details
 ├─ config/         Settings schema, global/entity config, resolved config
 ├─ operations/     Operation ids, handler contract, registry
 ├─ relations/      Relation registry, include tree, include resolver
-├─ context/        CrudContext, CrudRequest, CrudResponse
+├─ context/        KavoContext, KavoRequest, KavoResponse
 ├─ serialization/  Serializer, Deserializer
 ├─ persistence/    EntityReader/Writer, RepositoryAdapter, soft delete, transactions
-├─ service/        CrudService, per-call options
+├─ service/        KavoService, per-call options
 └─ index.ts        Explicit named barrel — the public API surface
 ```
 

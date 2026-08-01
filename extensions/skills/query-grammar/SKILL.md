@@ -12,7 +12,7 @@ normalized in `core/src/query/` (`DefaultFilterParser`, `QueryNormalizer`,
 consumer as-is. Full source: `docs/architecture/05-query-grammar.md`
 (operators/grammar) and `docs/architecture/12-relations-and-includes.md`
 (includes). What an entity _allows_ through these params is configured via
-`allowlists`/`relations` on `@Crud` — see the `crud-decorator` skill.
+`allowlists`/`relations` on `@Kavo` — see the `kavo-decorator` skill.
 
 ## Filtering — `filter[field][operator]=value`
 
@@ -125,7 +125,7 @@ the entity's inclusion allowlist (`relations.edges.<name>.includable`) is a
 400, never a silent omission. Full detail — per-edge `strategy`
 (`join`/`batch`/`auto`), depth/node budgets, the pagination-correctness
 guarantee for joined to-many relations, cycle guard, soft-delete interplay,
-and relation writes — is in the `crud-decorator` skill's "relations" section
+and relation writes — is in the `kavo-decorator` skill's "relations" section
 and `docs/architecture/12-relations-and-includes.md`.
 
 ## Soft delete — `withDeleted=true`

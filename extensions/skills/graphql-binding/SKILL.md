@@ -7,7 +7,7 @@ description: Reference for @kavo/graphql and its Nest binding — building a sch
 
 `@kavo/graphql` (`packages/protocols/graphql`) builds a `GraphQLSchema` over
 an existing `createCrud` service. Every resolver calls directly into the
-same `DefaultCrudService`/engine pipeline REST binds to — no parallel
+same `DefaultKavoService`/engine pipeline REST binds to — no parallel
 request path, no second copy of filter/sort/pagination validation, no
 separate error handling. Full detail:
 `docs/architecture/13-graphql-binding.md` (and ADR-0016 for the
@@ -20,9 +20,9 @@ package-boundary rationale).
 ## One entity
 
 ```ts
-import { createCrudGraphQLSchema } from "@kavo/graphql";
+import { createKavoGraphQLSchema } from "@kavo/graphql";
 
-const schema = createCrudGraphQLSchema({
+const schema = createKavoGraphQLSchema({
   name: "Owner",
   service: ownerService, // whatever createCrud(Owner, ...) returned
   itemType: OwnerType, // hand-written GraphQLObjectType
@@ -46,8 +46,8 @@ const schema = createCrudGraphQLSchema({
 | `Mutation.restoreOwner: Owner`              | `restoreOne: true` |
 | `Mutation.purgeOwner: Boolean`              | `purgeOne: true`   |
 
-**These flags do not cross-check REST's `@Crud` config.** Setting
-`restoreOne: true` here for an entity whose `@Crud` config disables
+**These flags do not cross-check REST's `@Kavo` config.** Setting
+`restoreOne: true` here for an entity whose `@Kavo` config disables
 `restoreOne` still adds the field to the schema — it throws
 `OperationDisabledException` at _resolve_ time instead, same as calling the
 REST route would. Keeping the two declarations in sync is your job today.
@@ -67,9 +67,9 @@ REST route would. Keeping the two declarations in sync is your job today.
 ## Multiple entities on one schema
 
 ```ts
-import { mergeCrudGraphQLSchemas } from "@kavo/graphql";
+import { mergeKavoGraphQLSchemas } from "@kavo/graphql";
 
-const schema = mergeCrudGraphQLSchemas([
+const schema = mergeKavoGraphQLSchemas([
   { name: "Owner", service: ownerService, itemType: OwnerType, createInputType: CreateOwnerInput },
   { name: "Cat", service: catService, itemType: CatType, createInputType: CreateCatInput },
 ]);
@@ -88,12 +88,12 @@ types once, next to its DTOs:
 
 ```ts
 // owner.graphql-types.ts
-registerCrudGraphQLTypes(Owner, { itemType: OwnerType, createInputType: CreateOwnerInput });
+registerKavoGraphQLTypes(Owner, { itemType: OwnerType, createInputType: CreateOwnerInput });
 ```
 
-`resolveCrudGraphQLSchema` (host-agnostic) then takes a list of `{ entity }`
+`resolveKavoGraphQLSchema` (host-agnostic) then takes a list of `{ entity }`
 refs and a `resolveService(entity)` callback, looks up each entity's
-registered types (skipping any with none — opt-in, not implied by `@Crud`
+registered types (skipping any with none — opt-in, not implied by `@Kavo`
 alone), and merges the rest.
 
 ## The Nest binding
@@ -104,7 +104,7 @@ Two ways to mount it, pick one per app/path — never both:
 
    ```ts
    @Controller("graphql")
-   export class GraphQLController extends BaseCrudGraphQLController {
+   export class GraphQLController extends BaseKavoGraphQLController {
      constructor(moduleRef: ModuleRef) {
        super(moduleRef);
      } // must be declared
@@ -124,7 +124,7 @@ Two ways to mount it, pick one per app/path — never both:
 
 `graphql` is an **optional peer** of `@kavo/nest` — it's lazy-loaded
 (`loadGraphQL()`, dynamic `import()`) so an app that never touches GraphQL
-never needs it installed, and `import { Crud } from "@kavo/nest"` never
+never needs it installed, and `import { Kavo } from "@kavo/nest"` never
 crashes on a missing `graphql` package regardless of whether `KavoModule`'s
 `graphql` option is set.
 

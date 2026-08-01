@@ -4,7 +4,7 @@ One layered model, one schema (`KavoSettings`), one precedence chain:
 
 ```
 built-in defaults → global (createKavo) → entity (createCrud)
-                  → operation (operations.<id>) → per-call (CrudCallOptions)
+                  → operation (operations.<id>) → per-call (KavoCallOptions)
 ```
 
 ## 1. Schema and built-in defaults
@@ -68,7 +68,7 @@ deep-frozen `ResolvedEntityConfig`: entity-scope settings, precomputed
 per-operation views behind `settingsFor(operation)`, resolved allowlists
 (explicit or derived from own scalar columns), the cached `DtoResolver`,
 and the relation registry. There is no runtime mutation API — per-call
-overrides (`CrudCallOptions.settings`) are merged as _parameters_ onto
+overrides (`KavoCallOptions.settings`) are merged as _parameters_ onto
 the operation view inside the engine, validated, and discarded with the
 request.
 
@@ -78,7 +78,7 @@ request.
 **entity, the key path, and the offending value**
 (`Invalid configuration for entity 'User' at 'pagination.maxLimit':
 expected a positive integer, got -1`). The same bar applies to unknown
-pagination strategies, missing infrastructure, non-`@Crud` controllers in
+pagination strategies, missing infrastructure, non-`@Kavo` controllers in
 `forFeature`, and custom-operation id collisions.
 
 ## 5. Root factory and framework skin

@@ -8,8 +8,8 @@ routes, and grammar memorized instead of guessing from source.
 
 | Skill             | Covers                                                                              |
 | ----------------- | ----------------------------------------------------------------------------------- |
-| `quick-start`     | New project from scratch — install, minimal entity, zero-config `@Crud`             |
-| `crud-decorator`  | `@Crud(Entity, config?)` — routes, `EntityConfig`, allowlists, relations, overrides |
+| `quick-start`     | New project from scratch — install, minimal entity, zero-config `@Kavo`             |
+| `kavo-decorator`  | `@Kavo(Entity, config?)` — routes, `EntityConfig`, allowlists, relations, overrides |
 | `global-config`   | `KavoSettings` precedence chain, `KavoModule.forRoot`/`createKavo` wiring           |
 | `query-grammar`   | The `filter`/`sort`/`fields`/pagination/`include` wire grammar                      |
 | `dto-slots`       | The six optional DTO slots and entity-derived defaults                              |

@@ -32,7 +32,7 @@ sortable,selectable}` (`packages/core/src/config/entity-config.ts`,
    `packages/core/src/config/validate-settings.ts`,
    `packages/core/src/config/defaults.ts`, and the problem-details serializer
    (`packages/core/src/errors/problem-details-serializer.ts`,
-   `packages/core/src/errors/crud-exception.ts`) — internal error detail
+   `packages/core/src/errors/kavo-exception-shape.ts`) — internal error detail
    (stack traces, raw driver errors, adapter-internal identifiers) must be
    gated behind `exposeInternals` and default to off. A new exception path or
    serializer branch that always includes internal detail is a finding.
@@ -43,7 +43,7 @@ sortable,selectable}` (`packages/core/src/config/entity-config.ts`,
    anyway is a finding.
 5. **Include-path depth and target-entity leakage.** ADR-0008's recursion cap
    and the per-relation allowlist exist to stop an attacker walking an
-   unbounded relation graph or reaching an entity with no `@Crud` exposure at
+   unbounded relation graph or reaching an entity with no `@Kavo` exposure at
    all. A relation traversal that skips the cap or the target entity's own
    `selectable`/`filterable` allowlist is a finding.
 6. **Adapter-level injection.** In `packages/orms/typeorm`, any raw SQL
