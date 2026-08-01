@@ -126,4 +126,4 @@ Two rules make this work:
 
 ## Where to read more
 
-`docs/getting-started.md` and `docs/integrations.md` are the adopter-facing front door; `docs/internals/` holds the design docs, `glossary.md`, and ADRs (`adr/0001`…`0017`) — one ADR per load-bearing decision. `docs/internals/architecture/` mirrors the packages (query grammar, error handling, engine, TypeORM adapter, Nest integration, soft delete, relations). ADRs are referenced by name in code comments; read the referenced ADR before changing the behavior it governs.
+`docs/getting-started.md`, `docs/using-the-api.md`, and `docs/integrations/nest/` (per-ORM wiring plus the full `@Kavo`/`KavoModule` configuration reference) are the adopter-facing front door; `docs/internals/` holds the design docs and ADRs (`adr/0001`…`0017`) — one ADR per load-bearing decision. `docs/internals/architecture/` mirrors the packages (query grammar, error handling, engine, TypeORM adapter, Nest integration, soft delete, relations). ADRs are referenced by name in code comments; read the referenced ADR before changing the behavior it governs.

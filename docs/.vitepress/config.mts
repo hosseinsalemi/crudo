@@ -46,7 +46,15 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: "Getting started", link: "/getting-started" },
-      { text: "Integrations", link: "/integrations" },
+      {
+        text: "Integrations",
+        items: [
+          { text: "Nest + TypeORM", link: "/integrations/nest/typeorm" },
+          { text: "Nest + Prisma", link: "/integrations/nest/prisma" },
+          { text: "Nest configuration", link: "/integrations/nest/configuration" },
+        ],
+      },
+      { text: "Using the API", link: "/using-the-api" },
     ],
 
     version,
@@ -56,8 +64,20 @@ export default defineConfig({
         text: "Guide",
         items: [
           { text: "Getting started", link: "/getting-started" },
-          { text: "Integrations", link: "/integrations" },
-          { text: "Glossary", link: "/glossary" },
+          { text: "Using the API", link: "/using-the-api" },
+        ],
+      },
+      {
+        text: "Integrations",
+        items: [
+          {
+            text: "Nest",
+            items: [
+              { text: "TypeORM", link: "/integrations/nest/typeorm" },
+              { text: "Prisma", link: "/integrations/nest/prisma" },
+              { text: "Configuration", link: "/integrations/nest/configuration" },
+            ],
+          },
         ],
       },
       {
