@@ -553,34 +553,18 @@ GET /books
 </style>
 
 <div class="config-section">
-  <p class="config-title">Configure at the scope that fits</p>
-  <p class="config-subtitle">One layered model, one schema — override only what changes, at the scope where it changes.</p>
-  <div class="config-chain">
-    <div class="config-step">
-      <span class="config-step-label">Global</span>
-      <code class="config-step-code">createKavo({ defaults })</code>
-      <span class="config-step-desc">App-wide pagination limits, error exposure, soft-delete strategy.</span>
-    </div>
-    <span class="config-arrow">→</span>
-    <div class="config-step">
-      <span class="config-step-label">Entity</span>
-      <code class="config-step-code">createCrud(Book, config)</code>
-      <span class="config-step-desc">Per-entity allowlists, DTOs, relation edges.</span>
-    </div>
-    <span class="config-arrow">→</span>
-    <div class="config-step">
-      <span class="config-step-label">Operation</span>
-      <code class="config-step-code">operations.deleteOne</code>
-      <span class="config-step-desc">Enable, disable, or tune one operation on one entity.</span>
-    </div>
-    <span class="config-arrow">→</span>
-    <div class="config-step">
-      <span class="config-step-label">Per-call</span>
-      <code class="config-step-code">CrudCallOptions</code>
-      <span class="config-step-desc">A single request overrides everything above it.</span>
-    </div>
-  </div>
-  <p class="config-note">Nearer scope replaces farther scope, key by key — an override supplies only what it changes.</p>
+  <p class="config-title">Customize it to fit your needs</p>
+  <p class="config-subtitle">Every setting is optional at every scope — start with the defaults and override only where your app needs to differ.</p>
+  <p class="config-scopes">
+    <span>Global</span>
+    <span class="config-sep">→</span>
+    <span>Entity</span>
+    <span class="config-sep">→</span>
+    <span>Operation</span>
+    <span class="config-sep">→</span>
+    <span>Per-call</span>
+  </p>
+  <p class="config-note">No config at all still works — built-in defaults cover every setting until you decide to change one.</p>
 </div>
 
 <style scoped>
@@ -603,70 +587,22 @@ GET /books
   color: var(--vp-c-text-2);
 }
 
-.config-chain {
+.config-scopes {
   display: flex;
-  align-items: stretch;
+  flex-wrap: wrap;
+  align-items: baseline;
   justify-content: center;
-  gap: 12px;
-  max-width: 1000px;
-  margin: 0 auto;
-}
-
-@media (max-width: 900px) {
-  .config-chain {
-    flex-direction: column;
-    align-items: stretch;
-  }
-}
-
-.config-step {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 18px 16px;
-  text-align: left;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 12px;
-  background: var(--vp-c-bg-soft);
-  min-width: 0;
-}
-
-.config-step-label {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--vp-c-brand-1);
-}
-
-.config-step-code {
+  gap: 10px;
+  margin: 0;
   font-family: var(--vp-font-family-mono);
-  font-size: 12.5px;
-  color: var(--vp-c-text-1);
-  white-space: nowrap;
-  overflow-x: auto;
-}
-
-.config-step-desc {
-  font-size: 12.5px;
-  line-height: 1.5;
+  font-size: 15px;
+  font-weight: 500;
   color: var(--vp-c-text-2);
 }
 
-.config-arrow {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.config-sep {
   color: var(--vp-c-text-3);
-  font-size: 16px;
-}
-
-@media (max-width: 900px) {
-  .config-arrow {
-    transform: rotate(90deg);
-    padding: 2px 0;
-  }
+  font-size: 13px;
 }
 
 .config-note {
