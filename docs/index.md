@@ -260,7 +260,7 @@ export class BooksController {}
 
 .before-after-col--before {
   position: relative;
-  max-height: 380px;
+  max-height: 320px;
   overflow: hidden;
 }
 
