@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: Kavo
-  text: Generate APIs from your models
-  tagline: Define an entity once and get a complete REST CRUD API with filtering, sorting, pagination, and generated routes.
+  text: Turn models into APIs
+  tagline: Define an entity once and get a complete REST and GraphQL CRUD API with filtering, sorting, pagination, and generated routes.
   actions:
     - theme: brand
       text: Get started
