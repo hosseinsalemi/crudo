@@ -116,3 +116,8 @@
 .dark .VPNavBar.home .DocSearch-Button:hover {
   background-color: rgba(255, 255, 255, 0.1);
 }
+
+.vp-doc [class*="language-"]:hover > button.copy + span.lang,
+.vp-doc [class*="language-"] > button.copy:focus + span.lang {
+  opacity: 1;
+}
