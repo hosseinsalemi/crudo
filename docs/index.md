@@ -8,7 +8,7 @@ hero:
   actions:
     - theme: brand
       text: Get started
-      link: /architecture/01-system-architecture
+      link: /getting-started
     - theme: alt
       text: GitHub
       link: https://github.com/kavo-labs/kavo
