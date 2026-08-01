@@ -25,7 +25,9 @@ kavo/
    ├─ protocols/
    │  └─ graphql/             # @kavo/graphql
    │     └─ src/index.ts
-   ├─ examples/               # reference application
+   ├─ examples/               # reference applications, one per framework+ORM pairing
+   │  └─ nest-typeorm/        # @kavo/example-nest-typeorm
+   │     └─ src/index.ts
    └─ docs/                   # this documentation
 ```
 
@@ -90,7 +92,7 @@ Two independent enforcement layers:
      resolve to a path for dependency-cruiser, so a path-only rule silently
      misses `from "@kavo/nest"` — the spelling anyone would actually write.
      The rules match the bare specifier as well as the relative path.
-     `packages/examples` is in scope too: it is the reference app.
+     `packages/examples/*` is in scope too: those are the reference apps.
    - **`tests/` is cruised, not exempt.** Test files were once excluded
      entirely, which left the boundary convention-only exactly where fixture
      sharing tempts a shortcut. A test file may import its own package's

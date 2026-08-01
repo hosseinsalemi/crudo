@@ -1,6 +1,6 @@
 {
   // Typecheck-only project for `tests/` — see packages/core/tsconfig.tests.json.
-  "extends": "../../tsconfig.base.json",
+  "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
     "declaration": false,
@@ -10,9 +10,9 @@
     "useDefineForClassFields": false,
     "types": ["node"],
     "paths": {
-      "@kavo/core": ["../core/src/index.ts"],
-      "@kavo/typeorm": ["../orms/typeorm/src/index.ts"],
-      "@kavo/nest": ["../frameworks/nest/src/index.ts"]
+      "@kavo/core": ["../../core/src/index.ts"],
+      "@kavo/typeorm": ["../../orms/typeorm/src/index.ts"],
+      "@kavo/nest": ["../../frameworks/nest/src/index.ts"]
     }
   },
   "include": ["tests"]

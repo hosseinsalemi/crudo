@@ -41,17 +41,17 @@ importers:
 
   packages/core: {}
 
-  packages/examples:
+  packages/examples/nest-typeorm:
     dependencies:
       '@kavo/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../core
       '@kavo/nest':
         specifier: workspace:*
-        version: link:../frameworks/nest
+        version: link:../../frameworks/nest
       '@kavo/typeorm':
         specifier: workspace:*
-        version: link:../orms/typeorm
+        version: link:../../orms/typeorm
       '@nestjs/common':
         specifier: ^11.0.0
         version: 11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2)

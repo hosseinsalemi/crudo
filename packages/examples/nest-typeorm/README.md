@@ -1,4 +1,4 @@
-# examples
+# nest-typeorm
 
 The checkpoint app: a small Pet domain served over HTTP by the real stack
 — `@Kavo(...)`-generated NestJS routes → CRUD engine → `@kavo/typeorm` →
@@ -17,7 +17,7 @@ database below unchanged.
 No setup required — an in-memory database is created fresh on every run.
 
 ```bash
-pnpm build && pnpm --filter @kavo/examples start
+pnpm build && pnpm --filter @kavo/example-nest-typeorm start
 # → http://localhost:3000/cats   (Swagger at /docs)
 ```
 
@@ -28,7 +28,7 @@ with connection settings hardcoded to match a single local container:
 
 ```bash
 docker run --rm -e POSTGRES_PASSWORD=kavo -e POSTGRES_DB=kavo -p 5432:5432 postgres:18-alpine
-pnpm build && pnpm --filter @kavo/examples start:postgres
+pnpm build && pnpm --filter @kavo/example-nest-typeorm start:postgres
 # → http://localhost:3000/cats   (Swagger at /docs)
 ```
 
