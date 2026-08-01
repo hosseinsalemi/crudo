@@ -9,4 +9,4 @@ export { TypeOrmRepositoryAdapter } from "./typeorm-repository-adapter.js";
 export { FilterTranslator } from "./filter-translator.js";
 export { buildEntityMetadata } from "./metadata.js";
 export { mapDriverError } from "./error-mapping.js";
-export { createTypeOrmKavo, createTypeOrmInfrastructure } from "./infrastructure.js";
+export { createTypeOrmKavo, createInfrastructure } from "./infrastructure.js";

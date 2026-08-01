@@ -51,7 +51,7 @@ export interface EntityMetadata<Entity = unknown> {
 /**
  * What a Kavo root instance needs from an ORM integration: metadata and a
  * repository adapter per entity. `@kavo/typeorm` exports
- * `createTypeOrmInfrastructure(dataSource)`; a test can hand in an
+ * `createInfrastructure(dataSource)`; a test can hand in an
  * in-memory fake. Passed to `createKavo` once — individual `createCrud`
  * calls may still override the adapter per entity.
  */

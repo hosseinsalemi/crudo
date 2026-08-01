@@ -43,7 +43,7 @@ export class BookController {}
 // app.module.ts
 import { Module } from "@nestjs/common";
 import { KavoModule } from "@kavo/nest";
-import { createTypeOrmInfrastructure } from "@kavo/typeorm";
+import { createInfrastructure } from "@kavo/typeorm";
 import { DataSource } from "typeorm";
 import { Book } from "./book.entity.js";
 import { BookController } from "./book.controller.js";
@@ -57,7 +57,7 @@ const dataSource = await new DataSource({
 @Module({
   imports: [
     KavoModule.forRoot({
-      infrastructure: createTypeOrmInfrastructure(dataSource),
+      infrastructure: createInfrastructure(dataSource),
     }),
   ],
   controllers: [BookController],
@@ -65,4 +65,4 @@ const dataSource = await new DataSource({
 export class AppModule {}
 ```
 
-`createTypeOrmInfrastructure(dataSource)` derives both Kavo's entity metadata and its repository adapter from the `DataSource`'s own TypeORM metadata — nothing to declare twice.
+`createInfrastructure(dataSource)` derives both Kavo's entity metadata and its repository adapter from the `DataSource`'s own TypeORM metadata — nothing to declare twice.

@@ -37,7 +37,7 @@ export class BookController {}
 // app.module.ts
 import { Module } from "@nestjs/common";
 import { KavoModule } from "@kavo/nest";
-import { createPrismaInfrastructure } from "@kavo/prisma";
+import { createInfrastructure } from "@kavo/prisma";
 import { PrismaClient, Prisma } from "@prisma/client";
 import { Book } from "./book.entity.js";
 import { BookController } from "./book.controller.js";
@@ -47,7 +47,7 @@ const prisma = new PrismaClient();
 @Module({
   imports: [
     KavoModule.forRoot({
-      infrastructure: createPrismaInfrastructure(prisma, {
+      infrastructure: createInfrastructure(prisma, {
         datamodel: Prisma.dmmf.datamodel,
         entities: [Book],
       }),

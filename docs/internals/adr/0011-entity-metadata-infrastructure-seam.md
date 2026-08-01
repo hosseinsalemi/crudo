@@ -15,7 +15,7 @@ metadata, and core must not import an ORM (ADR-0001, ADR-0005).
 Core defines an ORM-independent description —
 `EntityMetadata`/`FieldMetadata` (`core/src/metadata/`) — and a
 `KavoInfrastructure` contract (`metadataFor` + `adapterFor` per entity).
-Adapter packages implement it (`createTypeOrmInfrastructure(dataSource)`
+Adapter packages implement it (`createInfrastructure(dataSource)`
 translates TypeORM metadata); `createKavo` receives it once, and
 `createCrud` may override per entity (`runtime.adapter`/`runtime.metadata`),
 which is also the unit-test path (in-memory fakes, no ORM).

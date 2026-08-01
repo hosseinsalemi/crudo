@@ -1,6 +1,6 @@
 import { Module, type DynamicModule } from "@nestjs/common";
 import { KavoModule } from "@kavo/nest";
-import { createTypeOrmInfrastructure } from "@kavo/typeorm";
+import { createInfrastructure } from "@kavo/typeorm";
 import type { DataSource } from "typeorm";
 import { DATA_SOURCE, DatabaseModule, type PostgresOptions } from "./database.module.js";
 import { OwnerController } from "./owner/owner.controller.js";
@@ -33,7 +33,7 @@ export class AppModule {
           // far, with no separate call or list to keep in sync.
           provideServices: true,
           useFactory: (dataSource: DataSource) => ({
-            infrastructure: createTypeOrmInfrastructure(dataSource),
+            infrastructure: createInfrastructure(dataSource),
             defaults: {
               pagination: { defaultLimit: 20, maxLimit: 100 },
               errors: { exposeInternals: false },

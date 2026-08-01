@@ -20,7 +20,7 @@ boundary) — infrastructure arrives through DI.
   exposes `KAVO_INSTANCE`, and registers `KavoBinder`. **`forRootAsync`**
   resolves the options via `useFactory`/`inject` — the checkpoint app uses
   it to wait for the `DataSource` before building
-  `createTypeOrmInfrastructure(dataSource)`.
+  `createInfrastructure(dataSource)`.
 - **`KavoBinder`** (`onModuleInit`, internal): uses `@nestjs/core`'s
   `DiscoveryService` to find every `@Kavo`-decorated controller already in
   the app's module graph and assigns `kavo.createCrud(entity, config)`

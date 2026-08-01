@@ -140,7 +140,7 @@ you're past this quick start.
 ```ts
 import { Module } from "@nestjs/common";
 import { KavoModule } from "@kavo/nest";
-import { createTypeOrmInfrastructure } from "@kavo/typeorm";
+import { createInfrastructure } from "@kavo/typeorm";
 import { DataSource } from "typeorm";
 import { Cat } from "./cat/cat.entity.js";
 import { CatController } from "./cat/cat.controller.js";
@@ -156,7 +156,7 @@ import { CatController } from "./cat/cat.controller.js";
           synchronize: true, // fine for a quick start; use migrations for anything real
         }).initialize();
 
-        return { infrastructure: createTypeOrmInfrastructure(dataSource) };
+        return { infrastructure: createInfrastructure(dataSource) };
       },
     }),
   ],

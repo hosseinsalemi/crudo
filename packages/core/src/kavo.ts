@@ -25,7 +25,7 @@ import { STANDARD_OPERATIONS } from "./operations/default-operation-registry.js"
 /**
  * Root-factory options. `GlobalConfig.defaults` is the
  * framework-scope link of the precedence chain; `infrastructure` is how an
- * ORM package plugs in (`createTypeOrmInfrastructure(dataSource)`) without
+ * ORM package plugs in (`createInfrastructure(dataSource)`) without
  * core ever importing it.
  */
 export interface KavoOptions extends GlobalConfig {
@@ -89,7 +89,7 @@ export function createKavo(options: KavoOptions = {}): KavoInstance {
           entity.name,
           "infrastructure",
           "no metadata source: pass `infrastructure` to createKavo " +
-            "(e.g. createTypeOrmInfrastructure(dataSource) from " +
+            "(e.g. createInfrastructure(dataSource) from " +
             "@kavo/typeorm) or `runtime.metadata` to createCrud",
         );
       }

@@ -73,7 +73,7 @@ GET /books?filter[author][eq]=Tolkien&sort=-title&limit=10&offset=0
 // app.module.ts
 import { Module } from "@nestjs/common";
 import { KavoModule } from "@kavo/nest";
-import { createTypeOrmInfrastructure } from "@kavo/typeorm";
+import { createInfrastructure } from "@kavo/typeorm";
 import { DataSource } from "typeorm";
 import { BookController } from "./book.controller.js";
 
@@ -82,7 +82,7 @@ const dataSource = await new DataSource({/* ...your TypeORM connection options..
 @Module({
   imports: [
     KavoModule.forRoot({
-      infrastructure: createTypeOrmInfrastructure(dataSource),
+      infrastructure: createInfrastructure(dataSource),
     }),
   ],
   controllers: [BookController],

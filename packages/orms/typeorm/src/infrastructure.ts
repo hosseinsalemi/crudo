@@ -17,7 +17,7 @@ import { TypeOrmRepositoryAdapter } from "./typeorm-repository-adapter.js";
  * derivation and adapter construction are bootstrap work, not
  * per-request work).
  */
-export function createTypeOrmInfrastructure(dataSource: DataSource): KavoInfrastructure {
+export function createInfrastructure(dataSource: DataSource): KavoInfrastructure {
   const metadataCache = new Map<ClassRef, EntityMetadata>();
   const adapterCache = new Map<ClassRef, RepositoryAdapter>();
 
@@ -52,6 +52,6 @@ export function createTypeOrmKavo(
 ): KavoInstance {
   return createKavo({
     ...options,
-    infrastructure: createTypeOrmInfrastructure(dataSource),
+    infrastructure: createInfrastructure(dataSource),
   });
 }

@@ -54,7 +54,7 @@ function isGeneratedField(field: PrismaField): boolean {
  * name→class registry that lets a relation's target model name resolve
  * back to *its* marker class; TypeORM gets this for free from
  * `DataSource#entities`, Prisma has no equivalent, so
- * `createPrismaInfrastructure` collects it explicitly (see
+ * `createInfrastructure` collects it explicitly (see
  * `docs/adr/0017-prisma-marker-classes-and-entity-registry.md`).
  */
 export function buildEntityMetadata<Entity extends object>(
@@ -129,7 +129,7 @@ function relationDescriptor(
           ownerModelName,
           field.name,
           `Relation '${field.name}' targets Prisma model '${field.type}', but no marker class for it was ` +
-            `registered with createPrismaInfrastructure's 'entities' list`,
+            `registered with createInfrastructure's 'entities' list`,
         );
       }
       return target;

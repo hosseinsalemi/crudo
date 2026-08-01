@@ -15,7 +15,7 @@ column — composite keys rejected at bootstrap), scalar columns with
 `FieldKind` + nullability + generated flags (`isGenerated`, create/
 update/delete-date, version columns), enum members, and relation
 descriptors (`includable: false` always — ORM metadata supplies shape,
-never permission). `createTypeOrmInfrastructure(dataSource)` packages
+never permission). `createInfrastructure(dataSource)` packages
 metadata + adapters, cached per entity; `createTypeOrmKavo` is the
 zero-config sugar.
 

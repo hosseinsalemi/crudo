@@ -43,9 +43,9 @@ export interface PrismaInfrastructureOptions {
  * The Prisma implementation of core's infrastructure seam: metadata and
  * adapters derived from one Prisma Client, cached per entity (metadata
  * derivation and adapter construction are bootstrap work, not per-request
- * work) — same shape as `@kavo/typeorm`'s `createTypeOrmInfrastructure`.
+ * work) — same shape as `@kavo/typeorm`'s `createInfrastructure`.
  */
-export function createPrismaInfrastructure(
+export function createInfrastructure(
   prismaClient: PrismaClientLike,
   options: PrismaInfrastructureOptions,
 ): KavoInfrastructure {
@@ -89,6 +89,6 @@ export function createPrismaKavo(
   const { datamodel, entities, caseInsensitiveFilters, ...kavoOptions } = options;
   return createKavo({
     ...kavoOptions,
-    infrastructure: createPrismaInfrastructure(prismaClient, { datamodel, entities, caseInsensitiveFilters }),
+    infrastructure: createInfrastructure(prismaClient, { datamodel, entities, caseInsensitiveFilters }),
   });
 }

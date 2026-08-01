@@ -17,7 +17,7 @@ types, erased at compile time — so this adapter cannot get an entity's
 `@Entity()` classes. Callers declare one empty **marker class** per
 model, matched to Prisma's DMMF by name (`class Author {}` ↔
 `model Author { … }`), and register every marker class with
-`createPrismaInfrastructure`'s `entities` list — the registry a relation's
+`createInfrastructure`'s `entities` list — the registry a relation's
 target model name resolves back to its class through, since Prisma
 supplies no such registry either. Full rationale in ADR-0017.
 

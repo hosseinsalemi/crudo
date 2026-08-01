@@ -35,7 +35,7 @@ identity `createCrud` needs. `buildEntityMetadata` looks it up by
 `entity.name` against `datamodel.models`; a name mismatch is a bootstrap
 `ConfigurationException`, not a silent no-op.
 
-Because Prisma has no built-in registry, `createPrismaInfrastructure`
+Because Prisma has no built-in registry, `createInfrastructure`
 takes an explicit `entities: readonly ClassRef[]` — every marker class
 the Kavo root will ever see — alongside `datamodel`. A relation's target
 model name resolves back to _its_ marker class through a `name → class`
@@ -50,7 +50,7 @@ relation targets.
 
 - Setting up `@kavo/prisma` costs one extra declaration TypeORM users
   don't pay: a marker class per model, plus registering all of them with
-  `createPrismaInfrastructure`/`createPrismaKavo`. This is the actual
+  `createInfrastructure`/`createPrismaKavo`. This is the actual
   price of Prisma not generating classes — no cheaper option preserves
   `ClassRef` as core's entity identity without changing core itself.
 - A marker class may declare fields (`class Author { id!: number; … }`)

@@ -6,7 +6,7 @@ import type { KavoInfrastructure, KavoSettings, DeepPartial, PaginationStrategy 
  * tree, passed through untouched.
  *
  * `infrastructure` arrives from the application (e.g.
- * `createTypeOrmInfrastructure(dataSource)`), not from an `orm: "typeorm"`
+ * `createInfrastructure(dataSource)`), not from an `orm: "typeorm"`
  * string: `@kavo/nest` must not import ORM adapters (adapters reach Nest
  * via DI, not imports), and an explicit
  * object keeps the door open for any adapter without a registry of names.
