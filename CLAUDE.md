@@ -84,7 +84,7 @@ See `packages/examples/src/app.module.ts`: `KavoModule.forRootAsync({ provideSer
 - **DTO slots** are bare verbs: `create`, `update`, `patch`, `query`, `item`, `list` (because `createOne`/`createMany` share the `create` DTO).
 - **DTO classes**: request bodies are `<Verb><Entity>Dto` (`CreateUserDto`); query/response shapes are `<Entity><Slot>Dto` (`UserItemDto`, `UserListDto`). Every wire-crossing shape carries the `Dto` suffix; behavioral contracts (services, adapters, registries) never do.
 - **Operations** are camelCase and always name cardinality: `<verb>One` / `<verb>Many`. "Bulk" is the feature term (config key `bulk`, `/bulk` routes, `BulkResultDto`), never a method prefix.
-- **Filter operators**: AST enum in `SCREAMING_SNAKE` (`EQ`…`IS_NOT_NULL`); wire tokens in camelCase (`eq`…`isNotNull`), exact-case matched. The mapping table in `docs/architecture/05-query-grammar.md` is the single source of truth.
+- **Filter operators**: AST enum in `SCREAMING_SNAKE` (`EQ`…`IS_NOT_NULL`); wire tokens in camelCase (`eq`…`isNotNull`), exact-case matched. The mapping table in `docs/internals/architecture/05-query-grammar.md` is the single source of truth.
 - **Envelope fields**: `items`, `limit`, `offset`, `total`, `meta` — the default pagination wire params use the same `limit`/`offset` names, so request and response mirror each other.
 - **Factories** are `create*` (`createKavo`, `createCrud`). **Data access**: `EntityReader` (reads) + `EntityWriter` (writes); `RepositoryAdapter` is both, and adapters are named for what they adapt (`TypeOrmRepositoryAdapter`).
 - **Exceptions**: `*Exception` classes with stable `KAVO_SNAKE_CASE` codes.
@@ -126,4 +126,4 @@ Two rules make this work:
 
 ## Where to read more
 
-`docs/` holds the design docs, `glossary.md`, and ADRs (`adr/0001`…`0014`) — one ADR per load-bearing decision. `docs/architecture/` mirrors the packages (query grammar, error handling, engine, TypeORM adapter, Nest integration, soft delete, relations). ADRs are referenced by name in code comments; read the referenced ADR before changing the behavior it governs.
+`docs/getting-started.md`, `docs/using-the-api.md`, and `docs/integrations/nest/` (per-ORM wiring plus the full `@Kavo`/`KavoModule` configuration reference) are the adopter-facing front door; `docs/internals/` holds the design docs and ADRs (`adr/0001`…`0017`) — one ADR per load-bearing decision. `docs/internals/architecture/` mirrors the packages (query grammar, error handling, engine, TypeORM adapter, Nest integration, soft delete, relations). ADRs are referenced by name in code comments; read the referenced ADR before changing the behavior it governs.
