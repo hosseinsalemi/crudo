@@ -8,6 +8,7 @@ export default defineConfig({
   srcExclude: ["README.md"],
   cleanUrls: true,
   ignoreDeadLinks: [/CLAUDE(\.md)?$/],
+  appearance: "dark",
 
   head: [
     ["meta", { property: "og:title", content: "Kavo" }],
