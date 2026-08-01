@@ -23,7 +23,8 @@ const hero = frontmatter.value.hero ?? {};
 
 .top-badge {
   display: inline-flex;
-  margin-bottom: 12px;
+  margin-top: 5px;
+  margin-bottom: 5px;
 }
 
 .VPHero.has-image .top-badge {
@@ -112,8 +113,8 @@ const hero = frontmatter.value.hero ?? {};
 
 @media (min-width: 960px) {
   .tagline {
-    line-height: 30px;
-    font-size: 22px;
+    line-height: 28px;
+    font-size: 20px;
   }
 
   .VPHero.has-image .tagline {
