@@ -62,6 +62,7 @@ jobs:
           (cd packages/core && pnpm pack --pack-destination $TARBALL_DIR)
           (cd packages/orms/typeorm && pnpm pack --pack-destination $TARBALL_DIR)
           (cd packages/orms/prisma && pnpm pack --pack-destination $TARBALL_DIR)
+          (cd packages/orms/mongoose && pnpm pack --pack-destination $TARBALL_DIR)
           (cd packages/frameworks/nest && pnpm pack --pack-destination $TARBALL_DIR)
           (cd packages/protocols/graphql && pnpm pack --pack-destination $TARBALL_DIR)
 
@@ -101,6 +102,16 @@ jobs:
             echo "$NAME@$VERSION already published, skipping"
           else
             npm publish $TARBALL_DIR/kavo-prisma-*.tgz --access public
+          fi
+
+      - name: Publish @kavo/mongoose
+        run: |
+          NAME=$(node -p "require('./packages/orms/mongoose/package.json').name")
+          VERSION=$(node -p "require('./packages/orms/mongoose/package.json').version")
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "$NAME@$VERSION already published, skipping"
+          else
+            npm publish $TARBALL_DIR/kavo-mongoose-*.tgz --access public
           fi
 
       - name: Publish @kavo/nest
