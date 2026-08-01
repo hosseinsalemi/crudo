@@ -27,10 +27,10 @@
 
 <script setup lang="ts">
 const routes = [
-  { method: "GET", path: "/books" },
+  { method: "QUERY", path: "/books" },
   { method: "POST", path: "/books" },
   { method: "GET", path: "/books/:id" },
-  { method: "PATCH", path: "/books/:id" },
+  { method: "PUT", path: "/books/:id" },
   { method: "DELETE", path: "/books/:id" },
   { method: "PATCH", path: "/books/:id/restore" },
 ];
@@ -170,6 +170,11 @@ const routes = [
   background: rgba(51, 201, 192, 0.14);
 }
 
+.method-query {
+  color: #4da8ff;
+  background: rgba(77, 168, 255, 0.14);
+}
+
 .method-post {
   color: var(--vp-c-brand-1);
   background: var(--vp-c-brand-soft);
@@ -178,6 +183,11 @@ const routes = [
 .method-patch {
   color: #ffbd2e;
   background: rgba(255, 189, 46, 0.14);
+}
+
+.method-put {
+  color: #ff8fab;
+  background: rgba(255, 143, 171, 0.14);
 }
 
 .method-delete {
