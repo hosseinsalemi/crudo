@@ -1,0 +1,39 @@
+{
+  "name": "@kavo/mongoose",
+  "version": "0.6.0",
+  "description": "Kavo Mongoose adapter — implements @kavo/core's RepositoryAdapter over Mongoose models.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kavo-labs/kavo.git",
+    "directory": "packages/orms/mongoose"
+  },
+  "homepage": "https://github.com/kavo-labs/kavo/tree/main/packages/orms/mongoose#readme",
+  "type": "module",
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@kavo/core": "workspace:^"
+  },
+  "peerDependencies": {
+    "mongoose": "^7.0.0 || ^8.0.0"
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "^10.1.4",
+    "mongoose": "^8.9.5"
+  }
+}
