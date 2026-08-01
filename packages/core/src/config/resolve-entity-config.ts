@@ -133,7 +133,7 @@ function resolveAllowlists<Entity extends object>(
  * time — but here, at bootstrap, so a misconfigured default fails fast
  * instead of surfacing as a broken `ORDER BY` on the first request.
  */
-function validateDefaultSort<Entity>(
+export function validateDefaultSort<Entity>(
   scope: string,
   settings: KavoSettings,
   allowlists: ResolvedQueryAllowlists<Entity>,

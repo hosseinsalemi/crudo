@@ -90,9 +90,12 @@ merge. Each entry is `{ field, direction }` (the same shape as a parsed
 `Sort`), resolved through the full precedence chain like every other
 setting, so it can be set globally, per entity, per operation, or per call.
 Fields are checked against the same sortable allowlist client-supplied
-`sort` fields are checked against, but at **bootstrap** (`resolveEntityConfig`)
-rather than request time, so a typo in a default fails fast instead of
-producing a broken `ORDER BY` on the first request. Doc 05 covers the
+`sort` fields are checked against, but as soon as the value is set rather
+than when a request uses it: at **bootstrap** (`resolveEntityConfig`) for
+global/entity/operation scope, and when a per-call override is merged
+(`KavoEngine.configViewFor`) for per-call scope — so a bad default fails
+fast at the scope that introduced it instead of producing a broken
+`ORDER BY` on the first request that hits it. Doc 05 covers the
 request-time semantics (client `sort` vs. this fallback).
 
 ## 5. Root factory and framework skin

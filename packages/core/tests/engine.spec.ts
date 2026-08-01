@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { NotFoundException, OperationDisabledException, createKavo, toProblemDetails } from "@kavo/core";
+import {
+  ConfigurationException,
+  NotFoundException,
+  OperationDisabledException,
+  createKavo,
+  toProblemDetails,
+} from "@kavo/core";
 import { InMemoryUserAdapter, User, userMetadata } from "./support/user-fixture.js";
 
 function makeCrud(config?: Parameters<ReturnType<typeof createKavo>["createCrud"]>[1]) {
@@ -106,6 +112,15 @@ describe("KavoEngine pipeline", () => {
 
     await crud.findMany();
     expect(adapter.lastQuery?.sort).toEqual([]);
+  });
+
+  it("rejects a per-call defaultSort field outside the sortable allowlist", async () => {
+    const { crud } = makeCrud();
+    await expect(
+      crud.findMany(undefined, {
+        settings: { query: { defaultSort: [{ field: "notAColumn", direction: "asc" }] } },
+      }),
+    ).rejects.toBeInstanceOf(ConfigurationException);
   });
 
   it("raises OperationDisabledException for operations off by default", async () => {

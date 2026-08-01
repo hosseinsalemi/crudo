@@ -268,9 +268,10 @@ function parseWithDeleted<Entity>(
 }
 
 /**
- * `config.settings.query.defaultSort` — bootstrap-validated against the
- * sortable allowlist (`resolve-entity-config.ts`), so it's applied here
- * as-is rather than re-checked per request.
+ * `config.settings.query.defaultSort` — validated against the sortable
+ * allowlist wherever it's set (`resolveEntityConfig` at bootstrap for
+ * entity/operation scope, `KavoEngine.configViewFor` for per-call scope),
+ * so it's applied here as-is rather than re-checked per request.
  */
 function defaultSortOf<Entity>(config: ResolvedEntityConfig<Entity>): readonly Sort<Entity>[] {
   return config.settings.query.defaultSort as unknown as readonly Sort<Entity>[];

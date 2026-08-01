@@ -147,8 +147,22 @@ describe("resolveEntityConfig — bootstrap", () => {
     expect(config.settingsFor("findOne").query.defaultSort).toEqual([{ field: "createdAt", direction: "desc" }]);
   });
 
+  it("applies the precedence chain global -> entity for defaultSort", () => {
+    const config = resolveEntityConfig(
+      userMetadata,
+      { query: { defaultSort: [{ field: "name", direction: "asc" }] } },
+      { query: { defaultSort: [{ field: "createdAt", direction: "desc" }] } },
+    );
+    expect(config.settings.query.defaultSort).toEqual([{ field: "name", direction: "asc" }]); // entity beats global
+
+    const globalOnly = resolveEntityConfig(userMetadata, undefined, {
+      query: { defaultSort: [{ field: "createdAt", direction: "desc" }] },
+    });
+    expect(globalOnly.settings.query.defaultSort).toEqual([{ field: "createdAt", direction: "desc" }]);
+  });
+
   it("rejects an entity-scope defaultSort field outside the sortable allowlist", () => {
-    expect(() =>
+    try {
       resolveEntityConfig(
         userMetadata,
         {
@@ -156,12 +170,16 @@ describe("resolveEntityConfig — bootstrap", () => {
           query: { defaultSort: [{ field: "email", direction: "asc" }] },
         },
         undefined,
-      ),
-    ).toThrowError(ConfigurationException);
+      );
+      expect.unreachable();
+    } catch (error) {
+      expect((error as ConfigurationException).code).toBe("KAVO_CONFIG_INVALID");
+      expect((error as ConfigurationException).detail).toContain("email");
+    }
   });
 
   it("rejects an operation-scope defaultSort field outside the sortable allowlist", () => {
-    expect(() =>
+    try {
       resolveEntityConfig(
         userMetadata,
         {
@@ -169,8 +187,12 @@ describe("resolveEntityConfig — bootstrap", () => {
           operations: { findMany: { query: { defaultSort: [{ field: "email", direction: "asc" }] } } },
         },
         undefined,
-      ),
-    ).toThrowError(ConfigurationException);
+      );
+      expect.unreachable();
+    } catch (error) {
+      expect((error as ConfigurationException).code).toBe("KAVO_CONFIG_INVALID");
+      expect((error as ConfigurationException).detail).toContain("email");
+    }
   });
 });
 

@@ -37,6 +37,10 @@ describe("QueryNormalizer — wire params", () => {
     expect(clamped.pagination.limit).toBe(100);
   });
 
+  it("issues no sort at all when neither the client nor config supplies one", () => {
+    expect(normalizer.normalizeWire({}, config).sort).toEqual([]);
+  });
+
   it("rejects malformed pagination values", () => {
     const issues = issuesOf(() => normalizer.normalizeWire({ limit: "abc" }, config));
     expect(issues[0]).toMatchObject({
@@ -101,6 +105,25 @@ describe("QueryNormalizer — wire params", () => {
     expect(normalizer.normalizeWire({}, defaulted).sort).toEqual([{ field: "createdAt", direction: "desc" }]);
   });
 
+  it("applies a multi-field defaultSort in priority order", () => {
+    const defaulted = resolveEntityConfig(
+      userMetadata,
+      {
+        query: {
+          defaultSort: [
+            { field: "createdAt", direction: "desc" },
+            { field: "id", direction: "asc" },
+          ],
+        },
+      },
+      undefined,
+    );
+    expect(normalizer.normalizeWire({}, defaulted).sort).toEqual([
+      { field: "createdAt", direction: "desc" },
+      { field: "id", direction: "asc" },
+    ]);
+  });
+
   it("lets a client-supplied sort override the configured defaultSort outright", () => {
     const defaulted = resolveEntityConfig(
       userMetadata,
@@ -123,6 +146,10 @@ describe("QueryNormalizer — programmatic input", () => {
     );
     expect(query.filter.root).toMatchObject({ value: 18 });
     expect(query.pagination).toEqual({ limit: 5, offset: 0 });
+  });
+
+  it("issues no sort at all when neither the caller nor config supplies one", () => {
+    expect(normalizer.normalizeInput({}, config).sort).toEqual([]);
   });
 
   it("enforces allowlists identically to the wire path", () => {
