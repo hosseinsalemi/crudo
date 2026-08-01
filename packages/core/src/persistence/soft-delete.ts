@@ -35,7 +35,8 @@ export interface SoftDeletable {
  * branch on one object instead of re-deriving the decision.
  */
 export type ResolvedSoftDelete =
-  { readonly strategy: "hard"; readonly field: null } | { readonly strategy: "soft"; readonly field: string };
+  | { readonly strategy: "hard"; readonly field: null }
+  | { readonly strategy: "soft"; readonly field: string };
 
 /** The zero-cost answer for everything that isn't soft-deletable. */
 export const HARD_DELETE: ResolvedSoftDelete = Object.freeze({
