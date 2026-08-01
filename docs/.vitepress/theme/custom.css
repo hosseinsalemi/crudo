@@ -107,3 +107,12 @@
 .VPFooter {
   border-top: none !important;
 }
+
+.dark .VPNavBar.home .DocSearch-Button {
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.dark .VPNavBar.home .DocSearch-Button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
