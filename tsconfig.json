@@ -6,6 +6,6 @@
     { "path": "packages/orms/prisma" },
     { "path": "packages/frameworks/nest" },
     { "path": "packages/protocols/graphql" },
-    { "path": "packages/examples/nest-typeorm" }
+    { "path": "examples/nest-typeorm" }
   ]
 }
