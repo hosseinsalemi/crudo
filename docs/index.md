@@ -438,6 +438,109 @@ export class BooksController {}
 }
 </style>
 
+<div class="query-section">
+  <p class="query-title">The query grammar, on the wire</p>
+  <p class="query-subtitle">Filtering, sorting, pagination, and includes — all driven by the query string, no extra code.</p>
+  <div class="query-demo">
+    <div class="query-demo-col">
+      <span class="query-demo-label">Request</span>
+
+```http
+GET /books
+  ?filter[status][eq]=published
+  &filter[publishedAt][gte]=2020-01-01
+  &sort=-publishedAt
+  &include=author
+  &limit=2
+```
+
+  </div>
+  <div class="query-demo-col">
+    <span class="query-demo-label">Response</span>
+
+```json
+{
+  "items": [
+    {
+      "id": 42,
+      "title": "The Left Hand of Darkness",
+      "status": "published",
+      "author": { "id": 7, "name": "Ursula K. Le Guin" }
+    },
+    {
+      "id": 41,
+      "title": "Kindred",
+      "status": "published",
+      "author": { "id": 3, "name": "Octavia E. Butler" }
+    }
+  ],
+  "limit": 2,
+  "offset": 0,
+  "total": 128
+}
+```
+
+  </div>
+  </div>
+</div>
+
+<style scoped>
+.query-section {
+  margin: 64px 0;
+  text-align: center;
+}
+
+.query-title {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--vp-c-text-1);
+}
+
+.query-subtitle {
+  margin: 0 0 28px;
+  font-size: 14.5px;
+  color: var(--vp-c-text-2);
+}
+
+.query-demo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+@media (max-width: 719px) {
+  .query-demo {
+    grid-template-columns: 1fr;
+  }
+}
+
+.query-demo-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.query-demo-label {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--vp-c-text-3);
+  padding-left: 2px;
+}
+
+.query-demo-col :deep(div[class*='language-']) {
+  margin: 0;
+  border-radius: 12px;
+  flex: 1;
+}
+</style>
+
 <div class="stack-section">
   <p class="stack-title">Works With Your Stack</p>
   <p class="stack-subtitle">First-class support for the tools you already use.</p>
