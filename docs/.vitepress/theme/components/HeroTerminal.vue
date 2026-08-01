@@ -7,7 +7,7 @@
       <span class="hero-terminal-file">books.controller.ts</span>
     </div>
 
-    <pre class="hero-terminal-code"><code><span class="tok-dec">@Crud</span>(<span class="tok-cls">Book</span>)
+    <pre class="hero-terminal-code"><code><span class="tok-dec">@Kavo</span>(<span class="tok-cls">Book</span>)
 <span class="tok-dec">@Controller</span>(<span class="tok-str">"books"</span>)
 <span class="tok-kw">export class</span> <span class="tok-cls">BooksController</span> {}<span class="hero-terminal-cursor"></span></code></pre>
 
