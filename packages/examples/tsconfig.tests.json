@@ -12,6 +12,7 @@
     "paths": {
       "@kavo/core": ["../core/src/index.ts"],
       "@kavo/typeorm": ["../orms/typeorm/src/index.ts"],
+      "@kavo/mongoose": ["../orms/mongoose/src/index.ts"],
       "@kavo/nest": ["../frameworks/nest/src/index.ts"]
     }
   },

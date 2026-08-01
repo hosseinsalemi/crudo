@@ -46,6 +46,9 @@ importers:
       '@kavo/core':
         specifier: workspace:*
         version: link:../core
+      '@kavo/mongoose':
+        specifier: workspace:*
+        version: link:../orms/mongoose
       '@kavo/nest':
         specifier: workspace:*
         version: link:../frameworks/nest
@@ -67,6 +70,9 @@ importers:
       better-sqlite3:
         specifier: ^13.0.2
         version: 13.0.2
+      mongoose:
+        specifier: ^8.9.5
+        version: 8.24.2
       pg:
         specifier: ^8.13.0
         version: 8.22.0
@@ -89,6 +95,9 @@ importers:
       '@types/supertest':
         specifier: ^7.2.1
         version: 7.2.1
+      mongodb-memory-server:
+        specifier: ^10.1.4
+        version: 10.4.3
       supertest:
         specifier: ^7.0.0
         version: 7.2.2

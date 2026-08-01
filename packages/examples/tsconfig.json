@@ -9,5 +9,10 @@
     "useDefineForClassFields": false
   },
   "include": ["src"],
-  "references": [{ "path": "../core" }, { "path": "../orms/typeorm" }, { "path": "../frameworks/nest" }]
+  "references": [
+    { "path": "../core" },
+    { "path": "../orms/typeorm" },
+    { "path": "../orms/mongoose" },
+    { "path": "../frameworks/nest" }
+  ]
 }
