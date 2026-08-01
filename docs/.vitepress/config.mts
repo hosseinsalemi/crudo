@@ -1,5 +1,7 @@
 import { defineConfig } from "vitepress";
 
+const hostname = "https://kavo.js.org";
+
 export default defineConfig({
   title: "Kavo",
   description: "A production-grade CRUD framework for TypeScript",
@@ -10,12 +12,31 @@ export default defineConfig({
   ignoreDeadLinks: [/CLAUDE(\.md)?$/],
   appearance: "dark",
 
+  sitemap: {
+    hostname,
+  },
+
   head: [
+    ["meta", { property: "og:type", content: "website" }],
+    ["meta", { property: "og:site_name", content: "Kavo" }],
     ["meta", { property: "og:title", content: "Kavo" }],
     ["meta", { property: "og:description", content: "A production-grade CRUD framework for TypeScript" }],
+    ["meta", { name: "twitter:card", content: "summary" }],
+    ["meta", { name: "twitter:title", content: "Kavo" }],
+    ["meta", { name: "twitter:description", content: "A production-grade CRUD framework for TypeScript" }],
     ["meta", { name: "theme-color", content: "#7c5cff" }],
     ["link", { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" }],
   ],
+
+  transformHead({ pageData }) {
+    const path = pageData.relativePath.replace(/(^|\/)index\.md$/, "$1").replace(/\.md$/, "");
+    const url = `${hostname}/${path}`;
+
+    return [
+      ["link", { rel: "canonical", href: url }],
+      ["meta", { property: "og:url", content: url }],
+    ];
+  },
 
   themeConfig: {
     nav: [{ text: "Guide", link: "/architecture/01-system-architecture" }],
