@@ -175,6 +175,7 @@ const bubbles = Array.from({ length: 34 }, (_, i) => ({
   left: 0;
   width: 200%;
   animation: drift-wave linear infinite;
+  filter: drop-shadow(0 0 30px rgba(255, 255, 255, 0.05));
 }
 
 .wave-back {
@@ -232,6 +233,18 @@ const bubbles = Array.from({ length: 34 }, (_, i) => ({
 @media (max-width: 768px) {
   .bubble {
     display: none;
+  }
+
+  .wave-back {
+    height: 30%;
+  }
+
+  .wave-mid {
+    height: 22%;
+  }
+
+  .wave-front {
+    height: 16%;
   }
 }
 </style>
