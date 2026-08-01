@@ -25,7 +25,8 @@
 }
 
 .VPHero .name {
-  font-size: clamp(4.5rem, 6vw + 3rem, 9.5rem);
+  font-size: clamp(2.75rem, 6vw + 1.5rem, 90px);
+  font-weight: 200;
   line-height: 1;
 }
 
@@ -35,12 +36,13 @@
 }
 
 .VPHero.has-image .name {
-  font-size: clamp(2.75rem, 4vw + 1.5rem, 4.5rem);
+  font-size: clamp(2.75rem, 6vw + 1.5rem, 90px);
+  font-weight: 200;
 }
 
 .VPHero.has-image .text {
   font-size: clamp(1.75rem, 2vw + 1.1rem, 2.75rem);
-  line-height: 1.2;
+  line-height: 1.1;
 }
 
 .VPHero.has-image .image-container {
