@@ -17,7 +17,9 @@ kavo/
    ├─ orms/
    │  ├─ typeorm/             # @kavo/typeorm
    │  │  └─ src/index.ts
-   │  └─ prisma/              # @kavo/prisma
+   │  ├─ prisma/              # @kavo/prisma
+   │  │  └─ src/index.ts
+   │  └─ mongoose/            # @kavo/mongoose
    │     └─ src/index.ts
    ├─ frameworks/
    │  └─ nest/                # @kavo/nest
@@ -32,10 +34,13 @@ kavo/
 The `orms/`, `frameworks/`, and `protocols/` parent folders keep the door
 open for future adapters, host framework bindings (Express, Fastify,
 Next.js, …), and wire protocols (gRPC, …) without implying any get built
-ahead of real work landing (ADR-0002, ADR-0016). `@kavo/prisma` is the
-second `orms/*` adapter, alongside `@kavo/typeorm` — see ADR-0017 for the
-one place its design departs from the TypeORM adapter's shape (marker
-classes standing in for Prisma's lack of runtime entity classes).
+ahead of real work landing (ADR-0002, ADR-0016). `@kavo/prisma` and
+`@kavo/mongoose` are the second and third `orms/*` adapters, alongside
+`@kavo/typeorm` — see ADR-0017 for the one place Prisma's design departs
+from the TypeORM adapter's shape (marker classes standing in for Prisma's
+lack of runtime entity classes), and ADR-0018 for Mongoose's two (a model
+is already the entity identity, and `ObjectId` converts at the adapter
+boundary rather than widening core's `EntityId`).
 
 ## 2. Responsibility statements
 
@@ -52,6 +57,10 @@ classes standing in for Prisma's lack of runtime entity classes).
   translation, error mapping), and is bound by the same rule — no NestJS,
   no `@kavo/nest`. See ADR-0017 for how it substitutes for the runtime
   entity classes Prisma doesn't generate.
+- **`@kavo/mongoose`** exists to translate core's persistence contracts to
+  Mongoose (same shape again: adapter, filter translation, error mapping),
+  under the same no-framework rule. See ADR-0018 and doc 15 for the two
+  places a document store diverges from a relational one.
 - **`@kavo/nest`** exists to bind Kavo to NestJS (module, decorator,
   route generation, exception filter, Swagger). It can't depend on TypeORM
   or `@kavo/typeorm` — it sees persistence only as an injected
@@ -131,7 +140,7 @@ dual ESM+CJS output is a future deliverable.
 ## 6. Build strategy
 
 `tsc -b` against the solution file: incremental (`.tsbuildinfo`),
-project-reference-ordered (core → typeorm/prisma/nest), each package emitting
+project-reference-ordered (core → typeorm/prisma/mongoose/nest), each package emitting
 `dist/` with declarations + declaration maps. Consumers inside the
 workspace resolve `@kavo/*` via pnpm workspace links to the built
 `dist`, exactly as external consumers will.
@@ -148,14 +157,15 @@ publish order) are future work.
 
 ## 8. Dependency classification (decided now, executed later)
 
-| Package         | `dependencies`                | `peerDependencies`                                                         |
-| --------------- | ----------------------------- | -------------------------------------------------------------------------- |
-| `@kavo/core`    | — (none, ever)                | —                                                                          |
-| `@kavo/typeorm` | `@kavo/core`                  | `typeorm`                                                                  |
-| `@kavo/prisma`  | `@kavo/core`                  | `@prisma/client`                                                           |
-| `@kavo/graphql` | `@kavo/core`                  | `graphql`                                                                  |
-| `@kavo/nest`    | `@kavo/core`, `@kavo/graphql` | `@nestjs/common`, `@nestjs/core`, `graphql` (+ `@nestjs/swagger` optional) |
+| Package          | `dependencies`                | `peerDependencies`                                                         |
+| ---------------- | ----------------------------- | -------------------------------------------------------------------------- |
+| `@kavo/core`     | — (none, ever)                | —                                                                          |
+| `@kavo/typeorm`  | `@kavo/core`                  | `typeorm`                                                                  |
+| `@kavo/prisma`   | `@kavo/core`                  | `@prisma/client`                                                           |
+| `@kavo/mongoose` | `@kavo/core`                  | `mongoose`                                                                 |
+| `@kavo/graphql`  | `@kavo/core`                  | `graphql`                                                                  |
+| `@kavo/nest`     | `@kavo/core`, `@kavo/graphql` | `@nestjs/common`, `@nestjs/core`, `graphql` (+ `@nestjs/swagger` optional) |
 
 Peers, not dependencies, because the consumer's app owns the TypeORM/Prisma/
-Nest instance — a second copy via a nested dependency would fracture
+Mongoose/Nest instance — a second copy via a nested dependency would fracture
 `instanceof` checks and DI tokens.

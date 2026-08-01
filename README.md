@@ -1,7 +1,7 @@
 # Kavo
 
 A production-grade CRUD framework for TypeScript: define an entity once
-(via TypeORM or Prisma) and get the full REST CRUD surface — filtering, sorting,
+(via TypeORM, Prisma, or Mongoose) and get the full REST CRUD surface — filtering, sorting,
 pagination, nested includes, field selection, optional per-operation DTOs,
 transactions, and problem-details errors — behind generated NestJS routes,
 configurable at global, entity, operation, and per-call scope.
@@ -17,6 +17,7 @@ conventions in [`CLAUDE.md`](CLAUDE.md) are normative.
 | [`@kavo/core`](packages/core)                 | Contracts, type system, engine — zero runtime dependencies       |
 | [`@kavo/typeorm`](packages/orms/typeorm)      | TypeORM adapter (`RepositoryAdapter` implementation)             |
 | [`@kavo/prisma`](packages/orms/prisma)        | Prisma adapter (`RepositoryAdapter` implementation)              |
+| [`@kavo/mongoose`](packages/orms/mongoose)    | Mongoose adapter (`RepositoryAdapter` implementation)            |
 | [`@kavo/nest`](packages/frameworks/nest)      | NestJS binding (`@Kavo` decorator, route generation)             |
 | [`@kavo/graphql`](packages/protocols/graphql) | Host-agnostic GraphQL schema binding over a `createCrud` service |
 
@@ -25,8 +26,8 @@ Design docs, glossary, and ADRs live in [`docs`](docs).
 ## Install
 
 `@kavo/core` has zero runtime dependencies; `@kavo/typeorm`, `@kavo/prisma`,
-`@kavo/nest`, and `@kavo/graphql` each need their ORM/framework/protocol as
-a peer dependency:
+`@kavo/mongoose`, `@kavo/nest`, and `@kavo/graphql` each need their
+ORM/framework/protocol as a peer dependency:
 
 ```bash
 # core contracts and engine — always required
@@ -37,6 +38,9 @@ pnpm add @kavo/typeorm typeorm reflect-metadata
 
 # Prisma adapter
 pnpm add @kavo/prisma @prisma/client
+
+# Mongoose adapter
+pnpm add @kavo/mongoose mongoose
 
 # NestJS binding (the @Kavo decorator and route generation)
 pnpm add @kavo/nest @nestjs/common @nestjs/core reflect-metadata rxjs

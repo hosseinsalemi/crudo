@@ -745,6 +745,7 @@ GET /books
   <div class="stack-badges">
     <span class="stack-badge">TypeORM</span>
     <span class="stack-badge">Prisma</span>
+    <span class="stack-badge">Mongoose</span>
     <span class="stack-badge">NestJS</span>
     <span class="stack-badge">GraphQL</span>
   </div>

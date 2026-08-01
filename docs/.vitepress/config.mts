@@ -76,6 +76,7 @@ export default defineConfig({
           { text: "Relations and includes", link: "/architecture/12-relations-and-includes" },
           { text: "GraphQL binding", link: "/architecture/13-graphql-binding" },
           { text: "Prisma adapter", link: "/architecture/14-prisma-adapter" },
+          { text: "Mongoose adapter", link: "/architecture/15-mongoose-adapter" },
         ],
       },
       {
@@ -117,6 +118,10 @@ export default defineConfig({
           {
             text: "0017 — Prisma marker classes and entity registry",
             link: "/adr/0017-prisma-marker-classes-and-entity-registry",
+          },
+          {
+            text: "0018 — Mongoose models are entity identities",
+            link: "/adr/0018-mongoose-models-are-entity-identities",
           },
         ],
       },

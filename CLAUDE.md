@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What Kavo is
 
-A production-grade CRUD framework for TypeScript: define an entity once (via TypeORM) and get the full REST CRUD surface — filtering, sorting, pagination, nested includes, field selection, optional per-operation DTOs, transactions, and problem-details errors — behind generated NestJS routes, configurable at global → entity → operation → per-call scope.
+A production-grade CRUD framework for TypeScript: define an entity once (via TypeORM, Prisma, or Mongoose) and get the full REST CRUD surface — filtering, sorting, pagination, nested includes, field selection, optional per-operation DTOs, transactions, and problem-details errors — behind generated NestJS routes, configurable at global → entity → operation → per-call scope.
 
 The authoritative sources are `docs/` (architecture notes and ADRs) and the **Conventions** section below, which is normative — naming deviations are review findings. Consult the governing ADR before changing behavior it covers, rather than inventing behavior.
 
@@ -34,17 +34,19 @@ Because the build compiles `src` only, each package also has a `tsconfig.tests.j
 
 ## Architecture
 
-Four packages in a strict hub-and-spoke topology (`pnpm-workspace.yaml`):
+Five packages in a strict hub-and-spoke topology (`pnpm-workspace.yaml`):
 
 ```
 @kavo/nest ──▶ @kavo/core ◀── @kavo/typeorm
-                   ▲
-                   │
-              @kavo/graphql
+                 ▲  ▲  ▲
+                 │  │  └───── @kavo/prisma
+       @kavo/graphql  └────── @kavo/mongoose
 ```
 
 - **`@kavo/core`** (`packages/core`) — all contracts, the type system, and the request engine. **Zero runtime dependencies** and imports nothing (ADR-0005). It has no knowledge of TypeORM or Nest.
 - **`@kavo/typeorm`** (`packages/orms/typeorm`) — implements core's `RepositoryAdapter` and feeds core's entity-metadata seam from TypeORM metadata. `typeorm` is a peer dependency.
+- **`@kavo/prisma`** (`packages/orms/prisma`) — the same seams over a Prisma Client delegate, fed from Prisma's DMMF. Needs caller-declared marker classes as entity identities (ADR-0017). `@prisma/client` is a peer dependency.
+- **`@kavo/mongoose`** (`packages/orms/mongoose`) — the same seams over a Mongoose model, fed from `schema.paths`. A Mongoose model _is_ the entity identity, so nothing is declared twice, and `ObjectId` converts to a hex string at the adapter boundary (ADR-0018). `mongoose` is a peer dependency.
 - **`@kavo/nest`** (`packages/frameworks/nest`) — the `@Kavo` decorator and NestJS route generation.
 - **`@kavo/graphql`** (`packages/protocols/graphql`) — host-framework-agnostic GraphQL schema binding: builds a schema over a `createCrud` service, delegating every resolver to the same engine REST uses. Depends only on `@kavo/core` and the `graphql` peer; `@kavo/nest` optionally wires it in (`BaseKavoGraphQLController`) via DI, never via a direct import.
 
