@@ -9,26 +9,26 @@ kavo/
 ├─ tsconfig.base.json         # shared strict compiler options
 ├─ tsconfig.json              # solution file: project-reference graph
 ├─ .dependency-cruiser.cjs    # mechanical boundary enforcement
-└─ packages/
-   ├─ core/                   # @kavo/core
-   │  ├─ src/{types,query,dto,errors,config,operations,
-   │  │       relations,context,serialization,persistence,service}/
-   │  └─ src/index.ts         # explicit named barrel
-   ├─ orms/
-   │  ├─ typeorm/             # @kavo/typeorm
-   │  │  └─ src/index.ts
-   │  └─ prisma/              # @kavo/prisma
-   │     └─ src/index.ts
-   ├─ frameworks/
-   │  └─ nest/                # @kavo/nest
-   │     └─ src/index.ts
-   ├─ protocols/
-   │  └─ graphql/             # @kavo/graphql
-   │     └─ src/index.ts
-   ├─ examples/               # reference applications, one per framework+ORM pairing
-   │  └─ nest-typeorm/        # @kavo/example-nest-typeorm
-   │     └─ src/index.ts
-   └─ docs/                   # this documentation
+├─ packages/
+│  ├─ core/                   # @kavo/core
+│  │  ├─ src/{types,query,dto,errors,config,operations,
+│  │  │       relations,context,serialization,persistence,service}/
+│  │  └─ src/index.ts         # explicit named barrel
+│  ├─ orms/
+│  │  ├─ typeorm/             # @kavo/typeorm
+│  │  │  └─ src/index.ts
+│  │  └─ prisma/              # @kavo/prisma
+│  │     └─ src/index.ts
+│  ├─ frameworks/
+│  │  └─ nest/                # @kavo/nest
+│  │     └─ src/index.ts
+│  └─ protocols/
+│     └─ graphql/             # @kavo/graphql
+│        └─ src/index.ts
+├─ examples/                  # reference applications, one per framework+ORM pairing
+│  └─ nest-typeorm/           # @kavo/example-nest-typeorm
+│     └─ src/index.ts
+└─ docs/                      # this documentation
 ```
 
 The `orms/`, `frameworks/`, and `protocols/` parent folders keep the door
@@ -92,7 +92,7 @@ Two independent enforcement layers:
      resolve to a path for dependency-cruiser, so a path-only rule silently
      misses `from "@kavo/nest"` — the spelling anyone would actually write.
      The rules match the bare specifier as well as the relative path.
-     `packages/examples/*` is in scope too: those are the reference apps.
+     `examples/*` is in scope too: those are the reference apps.
    - **`tests/` is cruised, not exempt.** Test files were once excluded
      entirely, which left the boundary convention-only exactly where fixture
      sharing tempts a shortcut. A test file may import its own package's

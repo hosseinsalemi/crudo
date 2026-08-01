@@ -3,4 +3,4 @@ packages:
   - packages/orms/*
   - packages/frameworks/*
   - packages/protocols/*
-  - packages/examples/*
+  - examples/*

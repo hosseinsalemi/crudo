@@ -205,7 +205,7 @@ the standard operations and should keep getting its route/Swagger/param
 metadata generated from config while only its implementation changes;
 reach for a plain native-decorated method for anything else — an action
 with no operation identity of its own needs none of that generated
-machinery. `packages/examples/nest-typeorm/src/address/address.controller.ts`'s
+machinery. `examples/nest-typeorm/src/address/address.controller.ts`'s
 `normalizePostalCode` and `validatePostalCode` both take the plain
 native-decorated path.
 
@@ -243,4 +243,4 @@ grammar wiring, problem-details mapping, disabled operations,
 manual-method-wins, custom + service-only operations, the service token,
 the soft-delete routes, relation includes, and the
 Swagger body/hint schemas. The full-stack path (Nest → engine → TypeORM → SQLite) is the
-checkpoint app's suite in `packages/examples/nest-typeorm`.
+checkpoint app's suite in `examples/nest-typeorm`.

@@ -23,7 +23,7 @@ export interface PostgresOptions {
  * One `DataSource` for the whole app. `forRoot()` (no argument) defaults to
  * an in-memory SQLite database, keeping the demo (and its e2e suite)
  * dependency-free; `forRoot(postgres)` switches the same app to a real
- * Postgres instance instead — see `packages/examples/nest-typeorm/README.md` for the
+ * Postgres instance instead — see `examples/nest-typeorm/README.md` for the
  * `docker run` used locally, and `tests/app-postgres.e2e.spec.ts` for how
  * the e2e suite self-provisions one via Testcontainers.
  *
