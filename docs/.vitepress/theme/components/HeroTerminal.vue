@@ -189,6 +189,14 @@ const routes = [
   color: var(--vp-c-text-2);
 }
 
+@media (max-width: 959px) {
+  .hero-terminal {
+    margin-top: 70px;
+    margin-bottom: 100px;
+    text-align: left;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hero-terminal-cursor {
     animation: none;
