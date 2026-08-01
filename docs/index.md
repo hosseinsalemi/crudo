@@ -511,6 +511,7 @@ GET /books
   max-width: 900px;
   margin: 0 auto;
   text-align: left;
+  min-width: 0;
 }
 
 @media (max-width: 719px) {
@@ -523,6 +524,7 @@ GET /books
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
 }
 
 .query-demo-label {
@@ -538,6 +540,15 @@ GET /books
   margin: 0;
   border-radius: 12px;
   flex: 1;
+  min-width: 0;
+}
+
+.query-demo-col :deep(pre) {
+  overflow-x: auto;
+}
+
+.query-demo-col :deep(button.copy) {
+  display: none;
 }
 </style>
 
