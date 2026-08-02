@@ -114,6 +114,24 @@ describe("MongooseRepositoryAdapter — soft delete", () => {
     expect(await tickets.findOne(id, { withDeleted: true } as never)).toMatchObject({ _id: id });
   });
 
+  it("shows only deleted documents under onlyDeleted, live documents excluded", async () => {
+    const deletedId = await newTicket("T-deleted");
+    await newTicket("T-live");
+    await tickets.deleteOne(deletedId);
+
+    const list = await tickets.findMany({ onlyDeleted: true });
+    expect(list.items).toMatchObject([{ _id: deletedId }]);
+    expect(list.total).toBe(1);
+    expect(await tickets.findOne(deletedId, { onlyDeleted: true } as never)).toMatchObject({ _id: deletedId });
+  });
+
+  it("rejects withDeleted and onlyDeleted set together", async () => {
+    const error = await rejectionOf(tickets.findMany({ withDeleted: true, onlyDeleted: true }));
+    expect(error).toMatchObject({
+      issues: [{ field: "onlyDeleted", code: "KAVO_QUERY_CONFLICTING_PARAMS" }],
+    });
+  });
+
   it("keeps updates away from deleted documents", async () => {
     const id = await newTicket();
     await tickets.deleteOne(id);
@@ -207,5 +225,14 @@ describe("MongooseRepositoryAdapter — configured marker field", () => {
 
     expect(await invoices.restoreOne(created._id)).toMatchObject({ _id: created._id, archivedAt: null });
     expect((await invoices.findMany()).items).toHaveLength(1);
+  });
+
+  it("shows only deleted documents under onlyDeleted over an ordinary field", async () => {
+    const deleted = (await invoices.createOne({ number: "INV-deleted" } as never)) as Invoice;
+    await invoices.createOne({ number: "INV-live" } as never);
+    await invoices.deleteOne(deleted._id);
+
+    const list = await invoices.findMany({ onlyDeleted: true });
+    expect(list.items).toMatchObject([{ _id: deleted._id }]);
   });
 });

@@ -76,7 +76,12 @@ export class MongooseRepositoryAdapter<Entity extends object> implements Reposit
     context: KavoContext<Entity>,
   ): Promise<Entity | null> {
     try {
-      const where = this.scopeToLive({ [this.idField]: { $eq: id } }, context, query?.withDeleted ?? false);
+      const where = this.scopeToLive(
+        { [this.idField]: { $eq: id } },
+        context,
+        query?.withDeleted ?? false,
+        query?.onlyDeleted ?? false,
+      );
       const row = await this.model.findOne(where, null, this.readOptions(this.buildPopulate(query?.include ?? {})));
       return row === null || row === undefined ? null : (toPlainResult(row) as Entity);
     } catch (error) {
@@ -121,7 +126,12 @@ export class MongooseRepositoryAdapter<Entity extends object> implements Reposit
   }
 
   private buildWhere(query: NormalizedQueryContext<Entity>, context: KavoContext<Entity>): MongoWhere {
-    return this.scopeToLive(translateFilter(query.filter, this.filterOptions), context, query.withDeleted);
+    return this.scopeToLive(
+      translateFilter(query.filter, this.filterOptions),
+      context,
+      query.withDeleted,
+      query.onlyDeleted,
+    );
   }
 
   private readOptions(populate: readonly PopulateSpec[] | undefined, sort?: Record<string, 1 | -1>) {
@@ -172,9 +182,19 @@ export class MongooseRepositoryAdapter<Entity extends object> implements Reposit
 
   // ── Soft delete ──────────────────────────────────────────────────────
 
-  private scopeToLive(where: MongoWhere, context: KavoContext<Entity>, withDeleted: boolean): MongoWhere {
+  private scopeToLive(
+    where: MongoWhere,
+    context: KavoContext<Entity>,
+    withDeleted: boolean,
+    onlyDeleted = false,
+  ): MongoWhere {
     const softDelete = context.config.softDelete;
-    if (softDelete.strategy !== "soft" || withDeleted) return where;
+    if (softDelete.strategy !== "soft") return where;
+    if (onlyDeleted) {
+      const deleted = { [softDelete.field]: { $ne: null } };
+      return Object.keys(where).length === 0 ? deleted : { $and: [where, deleted] };
+    }
+    if (withDeleted) return where;
     const live = { [softDelete.field]: { $eq: null } };
     if (Object.keys(where).length === 0) return live;
     return { $and: [where, live] };
