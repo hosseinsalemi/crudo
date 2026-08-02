@@ -8,6 +8,7 @@ import type { KavoControllerMetadata } from "./kavo.decorator.js";
 import { getRegisteredKavoControllers } from "./kavo.decorator.js";
 import { KavoExceptionFilter } from "./kavo-exception.filter.js";
 import { createDefaultGraphQLController, DEFAULT_GRAPHQL_PATH } from "./graphql/default-graphql.controller.js";
+import { createDefaultMcpController, DEFAULT_MCP_PATH } from "./mcp/default-mcp.controller.js";
 import {
   KAVO_INSTANCE,
   KAVO_MODULE_OPTIONS,
@@ -23,6 +24,15 @@ function graphqlPathFrom(option: KavoGraphQLOption | undefined): string | undefi
   if (option === undefined || option === false) return undefined;
   if (option === true) return DEFAULT_GRAPHQL_PATH;
   return option.path ?? DEFAULT_GRAPHQL_PATH;
+}
+
+/** `mcp: true` mounts the default controller at `POST /mcp`; `{ path }` mounts it at `POST <path>` instead. */
+export type KavoMcpOption = boolean | { readonly path?: string };
+
+function mcpPathFrom(option: KavoMcpOption | undefined): string | undefined {
+  if (option === undefined || option === false) return undefined;
+  if (option === true) return DEFAULT_MCP_PATH;
+  return option.path ?? DEFAULT_MCP_PATH;
 }
 
 export interface KavoModuleAsyncOptions extends Pick<ModuleMetadata, "imports"> {
@@ -49,6 +59,19 @@ export interface KavoModuleAsyncOptions extends Pick<ModuleMetadata, "imports"> 
    * `provideServices` itself is left unset.
    */
   graphql?: KavoGraphQLOption;
+  /**
+   * Mounts a default MCP controller — every `@Kavo` entity's full standard
+   * toolset (`@kavo/mcp`, no per-entity opt-in), collected into one
+   * toolset served over the MCP Streamable HTTP transport, with no
+   * controller of your own to write. `true` mounts it at `POST /mcp`;
+   * `{ path: "api/mcp" }` mounts it there instead. Implies
+   * `provideServices` (the toolset's handlers need every entity's service
+   * as a DI provider to look up via `ModuleRef`, the same requirement
+   * `BaseKavoMcpController` always has) even if `provideServices` itself
+   * is left unset. Runs stateless — see `createDefaultMcpController`'s doc
+   * comment.
+   */
+  mcp?: KavoMcpOption;
 }
 
 /**
@@ -88,16 +111,25 @@ export interface KavoModuleAsyncOptions extends Pick<ModuleMetadata, "imports"> 
 @Module({})
 export class KavoModule {
   static forRoot(
-    options: KavoModuleOptions & { provideServices?: boolean; graphql?: KavoGraphQLOption } = {},
+    options: KavoModuleOptions & {
+      provideServices?: boolean;
+      graphql?: KavoGraphQLOption;
+      mcp?: KavoMcpOption;
+    } = {},
   ): DynamicModule {
-    const { provideServices, graphql, ...kavoOptions } = options;
+    const { provideServices, graphql, mcp, ...kavoOptions } = options;
     const graphqlPath = graphqlPathFrom(graphql);
-    const serviceProviders = provideServices === true || graphqlPath !== undefined ? providersFromRegistry() : [];
+    const mcpPath = mcpPathFrom(mcp);
+    const serviceProviders =
+      provideServices === true || graphqlPath !== undefined || mcpPath !== undefined ? providersFromRegistry() : [];
     return {
       module: KavoModule,
       global: true,
       imports: [DiscoveryModule],
-      controllers: graphqlPath !== undefined ? [createDefaultGraphQLController(graphqlPath)] : [],
+      controllers: [
+        ...(graphqlPath !== undefined ? [createDefaultGraphQLController(graphqlPath)] : []),
+        ...(mcpPath !== undefined ? [createDefaultMcpController(mcpPath)] : []),
+      ],
       providers: [
         { provide: KAVO_MODULE_OPTIONS, useValue: kavoOptions },
         {
@@ -115,13 +147,19 @@ export class KavoModule {
 
   static forRootAsync(options: KavoModuleAsyncOptions): DynamicModule {
     const graphqlPath = graphqlPathFrom(options.graphql);
+    const mcpPath = mcpPathFrom(options.mcp);
     const serviceProviders =
-      options.provideServices === true || graphqlPath !== undefined ? providersFromRegistry() : [];
+      options.provideServices === true || graphqlPath !== undefined || mcpPath !== undefined
+        ? providersFromRegistry()
+        : [];
     return {
       module: KavoModule,
       global: true,
       imports: [DiscoveryModule, ...(options.imports ?? [])],
-      controllers: graphqlPath !== undefined ? [createDefaultGraphQLController(graphqlPath)] : [],
+      controllers: [
+        ...(graphqlPath !== undefined ? [createDefaultGraphQLController(graphqlPath)] : []),
+        ...(mcpPath !== undefined ? [createDefaultMcpController(mcpPath)] : []),
+      ],
       providers: [
         {
           provide: KAVO_MODULE_OPTIONS,

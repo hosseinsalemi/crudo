@@ -9,5 +9,5 @@
     "useDefineForClassFields": false
   },
   "include": ["src"],
-  "references": [{ "path": "../../core" }, { "path": "../../protocols/graphql" }]
+  "references": [{ "path": "../../core" }, { "path": "../../protocols/graphql" }, { "path": "../../protocols/mcp" }]
 }

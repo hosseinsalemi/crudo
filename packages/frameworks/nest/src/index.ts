@@ -14,11 +14,12 @@
  */
 export { Kavo, getKavoEntities, type KavoControllerMetadata } from "./kavo.decorator.js";
 export { Override, type OverrideMetadata } from "./override.decorator.js";
-export { KavoModule, type KavoModuleAsyncOptions, type KavoGraphQLOption } from "./kavo.module.js";
+export { KavoModule, type KavoModuleAsyncOptions, type KavoGraphQLOption, type KavoMcpOption } from "./kavo.module.js";
 export type { KavoModuleOptions } from "./kavo-options.js";
 export { KavoExceptionFilter } from "./kavo-exception.filter.js";
 export { flattenQuery } from "./flatten-query.js";
 export { enumProp, oneOfArray, type SchemaHint } from "./schema-hints.js";
 export { KAVO_INSTANCE, KAVO_MODULE_OPTIONS, getKavoServiceToken, boundKavoService } from "./tokens.js";
 export { BaseKavoGraphQLController } from "./graphql/base-kavo-graphql.controller.js";
+export { BaseKavoMcpController } from "./mcp/base-kavo-mcp.controller.js";
 export type { KavoHttpMethod, KavoRouteOptions } from "./operation-metadata.js";
