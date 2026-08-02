@@ -19,8 +19,10 @@ enough that someone else can close them.
 - The SWC vitest plugin is required: TypeORM entities and Nest DI need
   decorator metadata that esbuild cannot emit. A test that mysteriously loses
   metadata is usually a transform problem, not a logic problem.
-- Run one file: `pnpm vitest run packages/core/tests/query/filter-parser.spec.ts`.
-  Run by name: `pnpm vitest run -t "coerces numeric ids"`.
+- Run one file: `pnpm vitest run packages/core/tests/filter-parser.spec.ts`.
+  Run by name: `pnpm vitest run -t "coerces JavaScript number syntax"`. A `-t`
+  filter matching nothing skips every test and still exits 0 — check the passed
+  count, not the exit code.
 
 ## Procedure
 

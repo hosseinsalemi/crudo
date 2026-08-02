@@ -20,7 +20,7 @@ description: How to write tests for the Kavo monorepo — file placement, Vitest
 ```bash
 pnpm test                                                    # whole monorepo
 pnpm vitest run packages/core/tests/filter-parser.spec.ts    # one file
-pnpm vitest run -t "coerces numeric ids"                     # one test by name
+pnpm vitest run -t "coerces JavaScript number syntax"        # one test by name
 ```
 
 ## Reuse the fixtures

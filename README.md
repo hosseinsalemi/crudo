@@ -60,3 +60,10 @@ Fewer tokens, ship faster.
 
 Pick the ORM and framework/protocol bindings you need; `@kavo/core` has zero
 runtime dependencies.
+
+## Contributing
+
+Bug reports, issues, and pull requests are welcome.
+[`CONTRIBUTING.md`](CONTRIBUTING.md) covers getting a working checkout, the
+`pnpm check` gate every change has to pass, and the architectural invariants a
+PR needs to respect.

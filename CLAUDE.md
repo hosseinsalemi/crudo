@@ -25,7 +25,7 @@ Run a single test file or test by name:
 
 ```bash
 pnpm vitest run packages/core/tests/filter-parser.spec.ts
-pnpm vitest run -t "coerces numeric ids"
+pnpm vitest run -t "coerces JavaScript number syntax"
 ```
 
 Tests live in each package's `tests/` directory (never in `src/`, so they are not shipped in `dist/`). Vitest aliases `@kavo/*` to package `src/` directly (see `vitest.config.ts`), so tests exercise sources with no stale-`dist` hazard. The SWC vitest plugin is required — TypeORM entities and Nest DI need decorator metadata that esbuild cannot emit.
@@ -48,7 +48,7 @@ Five packages in a strict hub-and-spoke topology (`pnpm-workspace.yaml`):
 - **`@kavo/prisma`** (`packages/orms/prisma`) — the same seams over a Prisma Client delegate, fed from Prisma's DMMF. Needs caller-declared marker classes as entity identities (ADR-0017). `@prisma/client` is a peer dependency.
 - **`@kavo/mongoose`** (`packages/orms/mongoose`) — the same seams over a Mongoose model, fed from `schema.paths`. A Mongoose model _is_ the entity identity, so nothing is declared twice, and `ObjectId` converts to a hex string at the adapter boundary (ADR-0018). `mongoose` is a peer dependency.
 - **`@kavo/nest`** (`packages/frameworks/nest`) — the `@Kavo` decorator and NestJS route generation.
-- **`@kavo/graphql`** (`packages/protocols/graphql`) — host-framework-agnostic GraphQL schema binding: builds a schema over a `createCrud` service, delegating every resolver to the same engine REST uses. Depends only on `@kavo/core` and the `graphql` peer; `@kavo/nest` optionally wires it in (`BaseKavoGraphQLController`) via DI, never via a direct import.
+- **`@kavo/graphql`** (`packages/protocols/graphql`) — host-framework-agnostic GraphQL schema binding: builds a schema over a `createCrud` service, delegating every resolver to the same engine REST uses. Depends only on `@kavo/core` and the `graphql` peer, never on `@kavo/nest` — the `frameworks/* → protocols/*` edge is one-directional (ADR-0016). `@kavo/nest` is the side that imports it, to provide `BaseKavoGraphQLController`; it does so through a lazy `import("@kavo/graphql")` so the peer stays genuinely optional.
 
 These boundaries are **mechanically enforced** by `.dependency-cruiser.cjs`, not just convention: core may import nothing, adapters/protocol bindings/framework bindings import the `@kavo/core` barrel only (no deep imports), and spokes never import each other directly — they meet only through Nest's DI container. An illegal import fails `pnpm depcruise` (part of `pnpm check`), not code review.
 
