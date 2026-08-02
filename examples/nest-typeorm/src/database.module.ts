@@ -11,7 +11,7 @@ export const DATA_SOURCE = Symbol("DATA_SOURCE");
 
 const entities = [Owner, Pet, Cat, Dog, Tag, Address];
 
-export interface PostgresOptions {
+interface ConnectionOptions {
   host: string;
   port: number;
   username: string;
@@ -19,13 +19,25 @@ export interface PostgresOptions {
   database: string;
 }
 
+export interface PostgresOptions extends ConnectionOptions {
+  type: "postgres";
+}
+
+export interface MySqlOptions extends ConnectionOptions {
+  type: "mysql";
+}
+
+/** The driver a real (non-SQLite) `forRoot(...)` call picks. */
+export type SqlOptions = PostgresOptions | MySqlOptions;
+
 /**
  * One `DataSource` for the whole app. `forRoot()` (no argument) defaults to
  * an in-memory SQLite database, keeping the demo (and its e2e suite)
- * dependency-free; `forRoot(postgres)` switches the same app to a real
- * Postgres instance instead — see `examples/nest-typeorm/README.md` for the
- * `docker run` used locally, and `tests/app-postgres.e2e.spec.ts` for how
- * the e2e suite self-provisions one via Testcontainers.
+ * dependency-free; `forRoot(sql)` switches the same app to a real Postgres
+ * or MySQL instance instead, picked by `sql.type` — see
+ * `examples/nest-typeorm/README.md` for the `docker run` used locally for
+ * each, and `tests/app-postgres.e2e.spec.ts` / `tests/app-mysql.e2e.spec.ts`
+ * for how the e2e suite self-provisions one via Testcontainers.
  *
  * Global so `DATA_SOURCE` is injectable straight into any `@Kavo`
  * controller (e.g. `AddressController`'s `@Override`'d methods), not just
@@ -35,17 +47,16 @@ export interface PostgresOptions {
 @Global()
 @Module({})
 export class DatabaseModule {
-  static forRoot(postgres?: PostgresOptions): DynamicModule {
+  static forRoot(sql?: SqlOptions): DynamicModule {
     return {
       module: DatabaseModule,
       providers: [
         {
           provide: DATA_SOURCE,
           useFactory: async (): Promise<DataSource> => {
-            const dataSource = postgres
+            const dataSource = sql
               ? new DataSource({
-                  type: "postgres",
-                  ...postgres,
+                  ...sql,
                   entities,
                   synchronize: true,
                 })

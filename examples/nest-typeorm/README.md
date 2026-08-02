@@ -9,8 +9,8 @@ subtypes of `Pet`; `Owner` is the relation side, and is soft-deletable.
 
 The entities, DTOs, and controllers are entirely database-agnostic through
 `@kavo/typeorm` — only `DatabaseModule`/`AppModule` (both dynamic modules,
-via `.forRoot(...)`) pick a driver, so the same app runs against either
-database below unchanged.
+via `.forRoot(...)`) pick a driver, so the same app runs against any of the
+databases below unchanged.
 
 ## SQLite (default)
 
@@ -35,9 +35,24 @@ pnpm build && pnpm --filter @kavo/example-nest-typeorm start:postgres
 The e2e suite (`tests/app-postgres.e2e.spec.ts`) needs none of this set up
 by hand — it self-provisions a Postgres container via Testcontainers and
 passes that container's connection options straight to
-`AppModule.forRoot(...)`, so `pnpm check`/`pnpm test` exercises both
+`AppModule.forRoot(...)`, so `pnpm check`/`pnpm test` exercises all three
 databases with no manual step. This does require a running Docker daemon
 wherever those commands run.
+
+## MySQL
+
+`main-mysql.ts` boots the same app against a real MySQL instance, with
+connection settings hardcoded to match a single local container:
+
+```bash
+docker run --rm -e MYSQL_ROOT_PASSWORD=kavo -e MYSQL_DATABASE=kavo -p 3306:3306 mysql:8
+pnpm build && pnpm --filter @kavo/example-nest-typeorm start:mysql
+# → http://localhost:3000/cats   (Swagger at /docs)
+```
+
+The e2e suite (`tests/app-mysql.e2e.spec.ts`) self-provisions a MySQL
+container via Testcontainers the same way the Postgres suite does — no
+manual setup, just a running Docker daemon.
 
 Try it:
 
@@ -59,11 +74,11 @@ POST   /cats                     {"name":"Kit","age":1,"owner":1}   # associate 
 ```
 
 The e2e suite in `tests/` is the executable form of the behavior spec.
-`crud-e2e.suite.ts` holds the shared assertions; `app.e2e.spec.ts`
-and `app-postgres.e2e.spec.ts` each boot the app against their own database
-and run the same suite against it — one behavioral spec, two drivers. This
-app grows into a fuller reference application (`User`, `Project`, `Task`,
-`Comment`, `Tag`).
+`crud-e2e.suite.ts` holds the shared assertions; `app.e2e.spec.ts`,
+`app-postgres.e2e.spec.ts`, and `app-mysql.e2e.spec.ts` each boot the app
+against their own database and run the same suite against it — one
+behavioral spec, three drivers. This app grows into a fuller reference
+application (`User`, `Project`, `Task`, `Comment`, `Tag`).
 
 The app consumes only public package APIs — if it ever needs a deep
 import, that is an API-surface bug in the package, not the app.
