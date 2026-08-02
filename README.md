@@ -54,6 +54,7 @@ Fewer tokens, ship faster.
 | [`@kavo/core`](packages/core)                 | Contracts, type system, and the request engine              |
 | [`@kavo/typeorm`](packages/orms/typeorm)      | TypeORM adapter                                             |
 | [`@kavo/prisma`](packages/orms/prisma)        | Prisma adapter                                              |
+| [`@kavo/mongoose`](packages/orms/mongoose)    | Mongoose adapter                                            |
 | [`@kavo/nest`](packages/frameworks/nest)      | NestJS binding — the `@Kavo` decorator and route generation |
 | [`@kavo/graphql`](packages/protocols/graphql) | Host-agnostic GraphQL schema binding                        |
 

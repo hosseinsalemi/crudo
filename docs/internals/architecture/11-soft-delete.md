@@ -32,6 +32,14 @@ such a column, otherwise the one the ORM declares
 `@kavo/typeorm`). Explicit configuration wins over detection; an entity
 with neither costs nothing.
 
+Only `@kavo/typeorm` can supply the detection half: neither Prisma nor
+Mongoose has a declaration that marks a column as the delete marker, so
+both report `softDeleteField: null` and soft delete there is _always_
+explicit `softDelete.field` configuration (ADR-0017, ADR-0018). One
+consequence is worth naming: because those adapters cannot mark the
+marker column generated the way `@kavo/typeorm` does, it stays writable
+through an ordinary update unless a DTO excludes it — see doc 15 §7.
+
 Resolution runs at every settings scope, so an operation or a single call
 may narrow it (`operations: { deleteOne: { softDelete: { strategy: "hard" } } }`),
 and the result rides on `KavoContext.config.softDelete`. Adapters branch

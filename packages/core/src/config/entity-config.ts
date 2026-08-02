@@ -16,8 +16,7 @@ import type { StandardOperationId } from "../operations/operation.js";
  * exists (ADR-0013), so there is nothing to resolve `exclude` against yet.
  */
 export type QueryFieldSelector<Entity> =
-  | readonly FieldPath<Entity>[]
-  | { readonly exclude: readonly FieldPath<Entity>[] };
+  readonly FieldPath<Entity>[] | { readonly exclude: readonly FieldPath<Entity>[] };
 
 /**
  * Security allowlists: what a request may filter, sort, and

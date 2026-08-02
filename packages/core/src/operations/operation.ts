@@ -6,14 +6,7 @@
  * without it.
  */
 export type StandardOperationId =
-  | "createOne"
-  | "findOne"
-  | "findMany"
-  | "updateOne"
-  | "patchOne"
-  | "deleteOne"
-  | "restoreOne"
-  | "purgeOne";
+  "createOne" | "findOne" | "findMany" | "updateOne" | "patchOne" | "deleteOne" | "restoreOne" | "purgeOne";
 
 /**
  * Any operation id — standard or custom. The `string & {}`

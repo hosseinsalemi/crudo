@@ -6,7 +6,8 @@
  *
  *   @kavo/nest ──▶ @kavo/core ◀── @kavo/typeorm
  *                       ▲
- *                       └── @kavo/prisma
+ *                       ├── @kavo/prisma
+ *                       └── @kavo/mongoose
  *
  * `@kavo/core` imports nothing. Adapters and framework bindings import the
  * core barrel only — deep imports are not API. An illegal import fails CI
@@ -53,6 +54,18 @@ module.exports = {
       to: { path: "^(packages/frameworks|@kavo/nest)" },
     },
     {
+      name: "mongoose-only-imports-core",
+      severity: "error",
+      comment:
+        "@kavo/mongoose may depend on @kavo/core and the mongoose peer — " +
+        "never on @kavo/nest (ADR-0002). Both spellings are matched: a " +
+        "workspace package specifier does not resolve to a path here, so a " +
+        'path-only rule would miss `from "@kavo/nest"` — the spelling ' +
+        "anyone would actually write.",
+      from: { path: "^packages/orms/mongoose/src" },
+      to: { path: "^(packages/frameworks|@kavo/nest)" },
+    },
+    {
       name: "nest-only-imports-core",
       severity: "error",
       comment:
@@ -64,7 +77,7 @@ module.exports = {
         "@kavo/nest back (ADR-0016). Package-specifier form matched too, " +
         "per the note on typeorm-only-imports-core.",
       from: { path: "^packages/frameworks/nest/src" },
-      to: { path: "^(packages/orms|@kavo/(typeorm|prisma))" },
+      to: { path: "^(packages/orms|@kavo/(typeorm|prisma|mongoose))" },
     },
     {
       name: "graphql-only-imports-core",
@@ -76,7 +89,7 @@ module.exports = {
         "same constraint as an ORM adapter). Package-specifier form matched " +
         "too, per the note on typeorm-only-imports-core.",
       from: { path: "^packages/protocols/graphql/src" },
-      to: { path: "^(packages/orms|packages/frameworks|@kavo/(typeorm|prisma|nest))" },
+      to: { path: "^(packages/orms|packages/frameworks|@kavo/(typeorm|prisma|mongoose|nest))" },
     },
     {
       name: "no-cross-package-deep-imports-core",
@@ -127,7 +140,7 @@ module.exports = {
         "core's tests may use the barrel and vitest; this keeps the part that " +
         "still matters — no adapter, no framework — enforced for them too.",
       from: { path: "^packages/core/tests" },
-      to: { path: "^(@kavo/(typeorm|nest|graphql)|packages/(orms|frameworks|protocols))" },
+      to: { path: "^(@kavo/(typeorm|prisma|mongoose|nest|graphql)|packages/(orms|frameworks|protocols))" },
     },
     {
       name: "no-circular",

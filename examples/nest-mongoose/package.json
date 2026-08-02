@@ -1,0 +1,30 @@
+{
+  "name": "@kavo/example-nest-mongoose",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Kavo reference application over NestJS + Mongoose (Blog example: a ref edge loaded by populate, a scalar array, string _ids, and soft delete).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@kavo/core": "workspace:*",
+    "@kavo/mongoose": "workspace:*",
+    "@kavo/nest": "workspace:*",
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/platform-express": "^11.0.0",
+    "@nestjs/swagger": "^11.0.0",
+    "mongoose": "^8.9.5",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "^11.0.0",
+    "@types/supertest": "^7.2.1",
+    "mongodb-memory-server": "^10.1.4",
+    "supertest": "^7.0.0"
+  }
+}

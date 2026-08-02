@@ -1,6 +1,6 @@
 # Configuration
 
-[Nest + TypeORM](/integrations/nest/typeorm) and [Nest + Prisma](/integrations/nest/prisma) cover the zero-config path. This page is the field-by-field reference for everything you can configure once zero-config isn't enough: every `@Kavo(Entity, config)` parameter, and every global setting your `KavoModule` can set.
+[Nest + TypeORM](/integrations/nest/typeorm), [Nest + Prisma](/integrations/nest/prisma), and [Nest + Mongoose](/integrations/nest/mongoose) cover the zero-config path. This page is the field-by-field reference for everything you can configure once zero-config isn't enough: every `@Kavo(Entity, config)` parameter, and every global setting your `KavoModule` can set.
 
 ## How config layers
 
@@ -18,9 +18,7 @@ A field you don't set at a given scope just falls through to the next one down. 
 KavoModule.forRootAsync({
   useFactory: () => ({
     infrastructure: createInfrastructure(dataSource),
-    defaults: {
-      /* KavoSettings, see below */
-    },
+    defaults: {/* KavoSettings, see below */},
     paginationStrategies: [],
   }),
   provideServices: true,

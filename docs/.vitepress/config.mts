@@ -51,6 +51,7 @@ export default defineConfig({
         items: [
           { text: "Nest + TypeORM", link: "/integrations/nest/typeorm" },
           { text: "Nest + Prisma", link: "/integrations/nest/prisma" },
+          { text: "Nest + Mongoose", link: "/integrations/nest/mongoose" },
           { text: "Nest configuration", link: "/integrations/nest/configuration" },
         ],
       },
@@ -75,6 +76,7 @@ export default defineConfig({
             items: [
               { text: "TypeORM", link: "/integrations/nest/typeorm" },
               { text: "Prisma", link: "/integrations/nest/prisma" },
+              { text: "Mongoose", link: "/integrations/nest/mongoose" },
               { text: "Configuration", link: "/integrations/nest/configuration" },
             ],
           },
@@ -117,6 +119,7 @@ export default defineConfig({
               { text: "Relations and includes", link: "/internals/architecture/12-relations-and-includes" },
               { text: "GraphQL binding", link: "/internals/architecture/13-graphql-binding" },
               { text: "Prisma adapter", link: "/internals/architecture/14-prisma-adapter" },
+              { text: "Mongoose adapter", link: "/internals/architecture/15-mongoose-adapter" },
             ],
           },
           {
@@ -169,6 +172,10 @@ export default defineConfig({
               {
                 text: "0017 — Prisma marker classes and entity registry",
                 link: "/internals/adr/0017-prisma-marker-classes-and-entity-registry",
+              },
+              {
+                text: "0018 — Mongoose models are entity identities",
+                link: "/internals/adr/0018-mongoose-models-are-entity-identities",
               },
             ],
           },

@@ -1,6 +1,7 @@
 # 01 — System Architecture
 
-Kavo lets a developer define an entity once (via TypeORM) and get the full
+Kavo lets a developer define an entity once (via TypeORM, Prisma, or
+Mongoose) and get the full
 CRUD surface — `createOne` … `purgeOne`, the `*Many` batch variants
 (contracted and registered, but disabled: bulk is the optional half of
 soft delete and this build dropped it) — with filtering, sorting,
@@ -8,9 +9,13 @@ pagination, nested includes, field selection, optional per-operation
 DTOs, serialization, transactions, and error handling, configurable at
 global, entity, operation, and per-call scope.
 
-v6 scope is deliberately narrow: REST only, three packages
-(`@kavo/core`, `@kavo/typeorm`, `@kavo/nest`), no validation subsystem,
-no hooks/events, no policy layer, no audit trail.
+v6 scope is deliberately narrow: no validation subsystem, no
+hooks/events, no policy layer, no audit trail. The package set has grown
+past the original three (`@kavo/core`, `@kavo/typeorm`, `@kavo/nest`) by
+adding _edges_, never widening the hub: two further ORM adapters
+(`@kavo/prisma`, `@kavo/mongoose`) and one wire protocol
+(`@kavo/graphql`), each of which cost core no change at all — which is
+the clearest evidence the seams below are real.
 
 ## 1. Layers and boundaries (C4 level 2)
 
@@ -36,10 +41,11 @@ flowchart TB
         X[Exception hierarchy + error catalog]
     end
 
-    subgraph typeorm["@kavo/typeorm — ORM adapter"]
-        T1[TypeOrmRepositoryAdapter]
-        T2[Filter AST → QueryBuilder translation]
+    subgraph adapters["ORM adapters — @kavo/typeorm · @kavo/prisma · @kavo/mongoose"]
+        T1["RepositoryAdapter implementation"]
+        T2["Filter AST → the ORM's own query form"]
         T3[Driver-error → Kavo-exception mapping]
+        T4["EntityMetadata from the ORM's own metadata"]
     end
 
     C --> N1
@@ -47,10 +53,10 @@ flowchart TB
     E --> T1
     T1 -.->|implements core contracts| E
     nest -->|imports| core
-    typeorm -->|imports| core
+    adapters -->|import| core
 ```
 
-Both outer packages depend on `@kavo/core`; core depends on nothing. The
+Every outer package depends on `@kavo/core`; core depends on nothing. An
 adapter reaches the engine only through contracts it implements
 (`RepositoryAdapter`), and the framework binding reaches it only through
 contracts it consumes (`KavoService`, `OperationRegistry`). This is
@@ -61,16 +67,22 @@ technology.
 
 ```
 @kavo/nest ──▶ @kavo/core ◀── @kavo/typeorm
-     │                                │
-     ▼ (peer)                         ▼ (peer)
-  @nestjs/*                        typeorm
+     │             ▲  ▲  ▲
+     │             │  │  └──── @kavo/prisma
+     ▼ (peer)      │  └─────── @kavo/mongoose
+  @nestjs/*   @kavo/graphql
 ```
 
 - `@kavo/core` imports **nothing** (ADR-0005).
 - `@kavo/typeorm` imports `@kavo/core` + `typeorm` (peer). Never `@kavo/nest`.
-- `@kavo/nest` imports `@kavo/core` + `@nestjs/*` (peers). Never
-  `@kavo/typeorm` — adapters enter Nest's DI container as providers;
-  the binding programs against `RepositoryAdapter` only.
+- `@kavo/prisma` imports `@kavo/core` + `@prisma/client` (peer). Same rule.
+- `@kavo/mongoose` imports `@kavo/core` + `mongoose` (peer). Same rule.
+- `@kavo/graphql` imports `@kavo/core` + `graphql` (peer) — a
+  `protocols/*` package, host-framework-agnostic (ADR-0016).
+- `@kavo/nest` imports `@kavo/core`, `@nestjs/*` (peers), and optionally
+  `@kavo/graphql`. Never an ORM adapter — adapters enter Nest's DI
+  container as providers; the binding programs against
+  `RepositoryAdapter` only.
 - Cross-package imports go through package barrels; deep imports are not API.
 
 Enforced mechanically by `.dependency-cruiser.cjs` and TS project
@@ -78,14 +90,20 @@ references — an illegal import fails CI, not code review.
 
 ## 3. Package overview
 
-| Package         | Owns                                                                                    | Must never depend on         |
-| --------------- | --------------------------------------------------------------------------------------- | ---------------------------- |
-| `@kavo/core`    | Contracts, type system, engine, query model, DTO resolution, config merging, exceptions | anything (zero runtime deps) |
-| `@kavo/typeorm` | `RepositoryAdapter`/`FilterBuilder` over TypeORM; error mapping; relation loading       | NestJS, `@kavo/nest`         |
-| `@kavo/nest`    | `@Kavo` decorator, module wiring, route generation, exception filter, Swagger           | TypeORM, `@kavo/typeorm`     |
+| Package          | Owns                                                                                    | Must never depend on         |
+| ---------------- | --------------------------------------------------------------------------------------- | ---------------------------- |
+| `@kavo/core`     | Contracts, type system, engine, query model, DTO resolution, config merging, exceptions | anything (zero runtime deps) |
+| `@kavo/typeorm`  | `RepositoryAdapter`/`FilterBuilder` over TypeORM; error mapping; relation loading       | NestJS, `@kavo/nest`         |
+| `@kavo/prisma`   | The same contracts over a Prisma Client delegate; marker classes (ADR-0017)             | NestJS, `@kavo/nest`         |
+| `@kavo/mongoose` | The same contracts over a Mongoose model; `ObjectId` conversion (ADR-0018)              | NestJS, `@kavo/nest`         |
+| `@kavo/graphql`  | `GraphQLSchema` over a `createCrud` service (ADR-0016)                                  | any ORM or framework package |
+| `@kavo/nest`     | `@Kavo` decorator, module wiring, route generation, exception filter, Swagger           | any ORM adapter              |
 
-ORM independence inside core is a structural discipline even though only
-TypeORM is built — it is what keeps the core clean.
+ORM independence inside core began as a structural discipline when only
+TypeORM existed; the Prisma and Mongoose adapters are what cashed it in.
+Neither required a single change to core — including Mongoose, whose
+`ObjectId` primary key and join-free query language are as far from
+TypeORM's model as the seam has been asked to stretch (ADR-0018).
 
 ## 4. Request lifecycle (first pass — authoritative version in doc 7)
 

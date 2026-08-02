@@ -2,7 +2,7 @@
 
 Kavo turns your ORM entities into a full REST CRUD API. Define the entity once, add one decorator, and you get create, read, update, delete, filtering, sorting, pagination, nested includes, and field selection — with no hand-written controller methods.
 
-Today Kavo supports NestJS as the framework, over either TypeORM or Prisma as the ORM. This guide uses Nest + TypeORM as its example stack; see [Nest + Prisma](/integrations/nest/prisma) for the Prisma equivalent.
+Today Kavo supports NestJS as the framework, over TypeORM, Prisma, or Mongoose as the ORM. This guide uses Nest + TypeORM as its example stack; see [Nest + Prisma](/integrations/nest/prisma) and [Nest + Mongoose](/integrations/nest/mongoose) for the equivalents.
 
 ## Install
 
@@ -77,9 +77,7 @@ import { createInfrastructure } from "@kavo/typeorm";
 import { DataSource } from "typeorm";
 import { BookController } from "./book.controller.js";
 
-const dataSource = await new DataSource({
-  /* ...your TypeORM connection options... */
-}).initialize();
+const dataSource = await new DataSource({/* ...your TypeORM connection options... */}).initialize();
 
 @Module({
   imports: [

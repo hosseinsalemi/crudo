@@ -108,6 +108,15 @@ registrations of the same entity — one per route, each with its own
 strategy — exactly as `blogs` and `joinedBlogs` do in
 `packages/orms/typeorm/tests/includes.spec.ts`.
 
+The join/batch distinction is a _SQL_ concern, and only `@kavo/typeorm`
+acts on it. Prisma's `include` and Mongoose's `populate` both resolve a
+relation as their own separate, internally batched query — never a
+row-multiplying join — so a to-many include cannot disturb root
+pagination there regardless of the strategy core resolved. Both adapters
+therefore ignore `IncludeNode.strategy` entirely (doc 14 §3, doc 15 §3);
+core still resolves it, because the contract is the same everywhere and
+an adapter that _does_ join needs the answer.
+
 A many-to-many edge is nothing special here: metadata maps
 `isManyToMany` to cardinality `"many"` exactly like `isOneToMany`, so it
 gets the same `batch` default and the same distinct-roots pagination

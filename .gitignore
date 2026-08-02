@@ -1,5 +1,6 @@
 node_modules/
 dist/
+.claude/worktrees/
 .vitepress/cache/
 *.tsbuildinfo
 .DS_Store
