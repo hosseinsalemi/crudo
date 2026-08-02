@@ -783,9 +783,11 @@ GET /books
 .equation-frame {
   max-width: 940px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 28px;
   border: 1px solid var(--vp-c-divider);
-  border-radius: 16px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, var(--vp-c-bg-soft) 0%, var(--vp-c-bg) 100%);
+  box-shadow: 0 8px 24px -18px rgba(0, 0, 0, 0.3);
 }
 
 .equation {
@@ -814,7 +816,7 @@ GET /books
   padding: 18px 20px;
   border: 1px solid var(--vp-c-divider);
   border-radius: 12px;
-  background: var(--vp-c-bg-soft);
+  background: var(--vp-c-bg);
   text-align: left;
 }
 
