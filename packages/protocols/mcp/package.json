@@ -1,0 +1,38 @@
+{
+  "name": "@kavo/mcp",
+  "version": "0.6.0",
+  "description": "Kavo MCP binding — exposes a createCrud service's standard operations as MCP tools, delegating every call to the same engine REST uses.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kavo-labs/kavo.git",
+    "directory": "packages/protocols/mcp"
+  },
+  "homepage": "https://github.com/kavo-labs/kavo/tree/main/packages/protocols/mcp#readme",
+  "type": "module",
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@kavo/core": "workspace:^"
+  },
+  "peerDependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  }
+}
