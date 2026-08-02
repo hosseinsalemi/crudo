@@ -28,9 +28,11 @@
   },
   "dependencies": {
     "@kavo/core": "workspace:^",
-    "@kavo/graphql": "workspace:^"
+    "@kavo/graphql": "workspace:^",
+    "@kavo/mcp": "workspace:^"
   },
   "peerDependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
     "@nestjs/common": "^10.0.0 || ^11.0.0",
     "@nestjs/core": "^10.0.0 || ^11.0.0",
     "@nestjs/swagger": "^8.0.0 || ^11.0.0",
@@ -39,6 +41,9 @@
     "rxjs": "^7.8.0"
   },
   "peerDependenciesMeta": {
+    "@modelcontextprotocol/sdk": {
+      "optional": true
+    },
     "@nestjs/swagger": {
       "optional": true
     },
@@ -47,6 +52,7 @@
     }
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",

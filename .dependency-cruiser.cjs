@@ -69,11 +69,12 @@ module.exports = {
       name: "nest-only-imports-core",
       severity: "error",
       comment:
-        "@kavo/nest may depend on @kavo/core, the @nestjs/* peers, and " +
-        "@kavo/graphql (its optional GraphQL glue, `BaseCrudGraphQLController`)" +
-        " — never on an ORM adapter (ADR-0002). Adapters reach Nest's " +
-        "container via DI, not via imports. The graphql-only-imports-core " +
-        "rule keeps this one-directional: @kavo/graphql never imports " +
+        "@kavo/nest may depend on @kavo/core, the @nestjs/* peers, and its " +
+        "protocol glue — @kavo/graphql (`BaseKavoGraphQLController`) and " +
+        "@kavo/mcp (`BaseKavoMcpController`) — never on an ORM adapter " +
+        "(ADR-0002). Adapters reach Nest's container via DI, not via " +
+        "imports. The graphql-only-imports-core / mcp-only-imports-core " +
+        "rules keep this one-directional: neither protocol package imports " +
         "@kavo/nest back (ADR-0016). Package-specifier form matched too, " +
         "per the note on typeorm-only-imports-core.",
       from: { path: "^packages/frameworks/nest/src" },
@@ -89,6 +90,19 @@ module.exports = {
         "same constraint as an ORM adapter). Package-specifier form matched " +
         "too, per the note on typeorm-only-imports-core.",
       from: { path: "^packages/protocols/graphql/src" },
+      to: { path: "^(packages/orms|packages/frameworks|@kavo/(typeorm|prisma|mongoose|nest))" },
+    },
+    {
+      name: "mcp-only-imports-core",
+      severity: "error",
+      comment:
+        "@kavo/mcp may depend on @kavo/core and the @modelcontextprotocol/sdk " +
+        "peer (types only — never imported at runtime) — never on an ORM " +
+        "adapter or a framework binding, the same protocols/* constraint " +
+        "graphql-only-imports-core enforces for @kavo/graphql (ADR-0016). " +
+        "Package-specifier form matched too, per the note on " +
+        "typeorm-only-imports-core.",
+      from: { path: "^packages/protocols/mcp/src" },
       to: { path: "^(packages/orms|packages/frameworks|@kavo/(typeorm|prisma|mongoose|nest))" },
     },
     {
@@ -140,7 +154,7 @@ module.exports = {
         "core's tests may use the barrel and vitest; this keeps the part that " +
         "still matters — no adapter, no framework — enforced for them too.",
       from: { path: "^packages/core/tests" },
-      to: { path: "^(@kavo/(typeorm|prisma|mongoose|nest|graphql)|packages/(orms|frameworks|protocols))" },
+      to: { path: "^(@kavo/(typeorm|prisma|mongoose|nest|graphql|mcp)|packages/(orms|frameworks|protocols))" },
     },
     {
       name: "no-circular",

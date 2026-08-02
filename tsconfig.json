@@ -7,6 +7,7 @@
     { "path": "packages/orms/mongoose" },
     { "path": "packages/frameworks/nest" },
     { "path": "packages/protocols/graphql" },
+    { "path": "packages/protocols/mcp" },
     { "path": "examples/nest-typeorm" },
     { "path": "examples/nest-mongoose" }
   ]

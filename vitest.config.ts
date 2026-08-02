@@ -30,6 +30,7 @@ export default defineConfig({
       "@kavo/mongoose": new URL("./packages/orms/mongoose/src/index.ts", import.meta.url).pathname,
       "@kavo/nest": new URL("./packages/frameworks/nest/src/index.ts", import.meta.url).pathname,
       "@kavo/graphql": new URL("./packages/protocols/graphql/src/index.ts", import.meta.url).pathname,
+      "@kavo/mcp": new URL("./packages/protocols/mcp/src/index.ts", import.meta.url).pathname,
     },
   },
   test: {

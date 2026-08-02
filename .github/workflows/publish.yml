@@ -27,6 +27,7 @@ jobs:
         packages/orms/mongoose
         packages/frameworks/nest
         packages/protocols/graphql
+        packages/protocols/mcp
     steps:
       - uses: actions/checkout@v7
 
