@@ -36,11 +36,12 @@ or private.
      These must be verifiable, not aspirational.
    - **Affected packages** — any combination of `@kavo/core`,
      `@kavo/typeorm`, `@kavo/prisma`, `@kavo/mongoose`, `@kavo/nest`,
-     `@kavo/graphql`, `@kavo/mcp`, and docs. That list is every workspace
-     package; cross-check it against `PACKAGE_DIRS` in
-     `.github/workflows/publish.yml` if a new one may have landed. Write
-     `None` for repo-wiring-only work (`.claude/`, `.github/`, tooling)
-     rather than leaving it blank.
+     `@kavo/graphql`, `@kavo/mcp`, and docs. That list is every **published**
+     package — `pnpm-workspace.yaml` also globs `examples/*`, which are real
+     workspace packages but private and never released. Cross-check against
+     `PACKAGE_DIRS` in `.github/workflows/publish.yml` if a new one may have
+     landed. Write `None` for repo-wiring-only work (`.claude/`, `.github/`,
+     tooling) rather than leaving it blank.
    - **Constraints** — the invariants that must survive. Check
      `docs/internals/adr/` for ones this issue touches (core purity, registry-
      driven operations, the explicit barrel, decoration-time routes, soft
