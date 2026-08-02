@@ -25,9 +25,12 @@ zero-config sugar.
 is explicit parentheses, never operator-order luck; parameters are
 numbered globally per query. Notable translations: `EQ null` → `IS NULL`;
 empty `IN` → `1 = 0` (empty `NOT IN` → `1 = 1`) since SQL `IN ()` is
-invalid; `LIKE` carries `ESCAPE '\'` (the grammar's literal-escape);
-`ILIKE` → `LOWER(col) LIKE LOWER(:v)` — portable across every driver, one
-spelling instead of a per-driver fork.
+invalid; `LIKE` carries an `ESCAPE` clause with the backslash (the
+grammar's literal-escape) bound as a parameter rather than inlined as a
+`'\'` string literal, since drivers disagree on how backslash is escaped
+inside a literal (MySQL vs. Postgres); `ILIKE` → `LOWER(col) LIKE
+LOWER(:v)` — portable across every driver, one spelling instead of a
+per-driver fork.
 
 **Relation-path conditions** (`author.name`) add one **non-selecting**
 left join per path segment with deterministic aliases (`Book__author`),

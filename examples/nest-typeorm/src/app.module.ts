@@ -2,7 +2,7 @@ import { Module, type DynamicModule } from "@nestjs/common";
 import { KavoModule } from "@kavo/nest";
 import { createInfrastructure } from "@kavo/typeorm";
 import type { DataSource } from "typeorm";
-import { DATA_SOURCE, DatabaseModule, type PostgresOptions } from "./database.module.js";
+import { DATA_SOURCE, DatabaseModule, type SqlOptions } from "./database.module.js";
 import { OwnerController } from "./owner/owner.controller.js";
 import { CatController } from "./cat/cat.controller.js";
 import { DogController } from "./dog/dog.controller.js";
@@ -15,17 +15,17 @@ import { AddressController } from "./address/address.controller.js";
  * adapters meet the framework in the DI container).
  *
  * `forRoot()` defaults to the in-memory SQLite `DatabaseModule`;
- * `forRoot(postgres)` threads the same options through to a real Postgres
- * instance instead (see `DatabaseModule`).
+ * `forRoot(sql)` threads the same options through to a real Postgres or
+ * MariaDB instance instead, picked by `sql.type` (see `DatabaseModule`).
  */
 @Module({})
 export class AppModule {
-  static forRoot(postgres?: PostgresOptions): DynamicModule {
+  static forRoot(sql?: SqlOptions): DynamicModule {
     return {
       module: AppModule,
       imports: [
         KavoModule.forRootAsync({
-          imports: [DatabaseModule.forRoot(postgres)],
+          imports: [DatabaseModule.forRoot(sql)],
           inject: [DATA_SOURCE] as never[],
           // AddressController constructor-injects its own service
           // (getKavoServiceToken), which needs a real DI provider —
