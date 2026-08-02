@@ -14,6 +14,20 @@ hero:
       link: https://github.com/kavo-labs/kavo
 ---
 
+<script setup lang="ts">
+import { ref } from "vue";
+import QueryGrammarTabs from "./.vitepress/theme/components/QueryGrammarTabs.vue";
+
+const queryGrammarTabs = [
+  { id: "filter-sort", label: "Filter & sort" },
+  { id: "includes", label: "Includes" },
+  { id: "fields", label: "Field selection" },
+  { id: "pagination", label: "Pagination" },
+  { id: "soft-delete", label: "Soft delete" },
+];
+const activeQueryGrammarTab = ref(queryGrammarTabs[0].id);
+</script>
+
 <div class="before-after">
   <p class="before-after-lead">Stop writing repetitive CRUD endpoints.</p>
   <div class="before-after-col before-after-col--before">
@@ -441,9 +455,12 @@ export class BooksController {}
 <div class="query-section">
   <p class="query-title">The query grammar, on the wire</p>
   <p class="query-subtitle">Filtering, sorting, pagination, and includes — all driven by the query string, no extra code.</p>
+  <QueryGrammarTabs v-model="activeQueryGrammarTab" :tabs="queryGrammarTabs" />
+
   <div class="query-demo">
     <div class="query-demo-col">
       <span class="query-demo-label">Request</span>
+      <div v-show="activeQueryGrammarTab === 'filter-sort'">
 
 ```http
 GET /books
@@ -455,8 +472,46 @@ GET /books
 ```
 
   </div>
-  <div class="query-demo-col">
-    <span class="query-demo-label">Response</span>
+      <div v-show="activeQueryGrammarTab === 'includes'">
+
+```http
+GET /books/42
+  ?include=author,reviews.user
+```
+
+  </div>
+      <div v-show="activeQueryGrammarTab === 'fields'">
+
+```http
+GET /books
+  ?fields=id,title,status
+  &fields[author]=id,name
+```
+
+  </div>
+      <div v-show="activeQueryGrammarTab === 'pagination'">
+
+```http
+GET /books
+  ?sort=title
+  &limit=25
+  &offset=50
+```
+
+  </div>
+      <div v-show="activeQueryGrammarTab === 'soft-delete'">
+
+```http
+GET /books
+  ?withDeleted=true
+  &filter[status][eq]=archived
+```
+
+  </div>
+    </div>
+    <div class="query-demo-col">
+      <span class="query-demo-label">Response</span>
+      <div v-show="activeQueryGrammarTab === 'filter-sort'">
 
 ```json
 {
@@ -481,6 +536,74 @@ GET /books
 ```
 
   </div>
+      <div v-show="activeQueryGrammarTab === 'includes'">
+
+```json
+{
+  "id": 42,
+  "title": "The Left Hand of Darkness",
+  "author": { "id": 7, "name": "Ursula K. Le Guin" },
+  "reviews": [
+    {
+      "id": 101,
+      "rating": 5,
+      "user": { "id": 3, "name": "Alex Chen" }
+    }
+  ]
+}
+```
+
+  </div>
+      <div v-show="activeQueryGrammarTab === 'fields'">
+
+```json
+{
+  "items": [
+    { "id": 42, "title": "The Left Hand of Darkness", "status": "published" },
+    { "id": 41, "title": "Kindred", "status": "published" }
+  ],
+  "limit": 20,
+  "offset": 0,
+  "total": 128
+}
+```
+
+  </div>
+      <div v-show="activeQueryGrammarTab === 'pagination'">
+
+```json
+{
+  "items": [
+    { "id": 63, "title": "Annihilation", "status": "published" },
+    { "id": 88, "title": "Binti", "status": "published" }
+  ],
+  "limit": 25,
+  "offset": 50,
+  "total": 128
+}
+```
+
+  </div>
+      <div v-show="activeQueryGrammarTab === 'soft-delete'">
+
+```json
+{
+  "items": [
+    {
+      "id": 17,
+      "title": "The Dispossessed",
+      "status": "archived",
+      "deletedAt": "2026-03-14T09:22:00.000Z"
+    }
+  ],
+  "limit": 20,
+  "offset": 0,
+  "total": 1
+}
+```
+
+  </div>
+    </div>
   </div>
 </div>
 
@@ -545,6 +668,7 @@ GET /books
 
 .query-demo-col :deep(pre) {
   overflow-x: auto;
+  font-size: 15px;
 }
 
 .query-demo-col :deep(button.copy) {
