@@ -62,6 +62,33 @@ function isGeneratedField(path: string, schemaType: MongooseSchemaTypeLike, time
 }
 
 /**
+ * A path the schema author marked `select: false` — Mongoose's own way of
+ * saying "never return this", the idiomatic home of a password hash or an
+ * API key.
+ *
+ * Such a path is left out of the entity description entirely, the same way
+ * the version key is. That is deliberately stronger than hiding it from
+ * responses, because the alternative leaks it two ways:
+ *
+ * - reads are `lean`, so Mongoose applies the projection and the value is
+ *   absent from the body — but the *predicate* still runs server-side, so
+ *   an allowlisted `filter[apiKey][like]=sk_live_9%` is a blind
+ *   character-at-a-time extraction oracle for a value that never appears;
+ * - `create` returns the hydrated document Mongoose built, and `select` is
+ *   a query projection that does not apply there, so a `POST` would echo a
+ *   server-generated secret that no `GET` ever returns.
+ *
+ * Excluding it closes both, at the cost of Kavo not managing the path at
+ * all: it is not readable, writable, filterable, or sortable. An app that
+ * needs to *write* one (a password on registration) does so through a
+ * custom operation or the model directly — which is the safe default when
+ * the schema has already declared the value un-returnable.
+ */
+function isHiddenField(schemaType: MongooseSchemaTypeLike): boolean {
+  return schemaType.options?.select === false;
+}
+
+/**
  * The target model name of a `ref` path, or `undefined` when the path is not
  * a relation edge.
  *
@@ -126,6 +153,11 @@ export function buildEntityMetadata<Entity extends object>(
     // entirely — which also keeps it out of derived DTOs and, because the
     // default serializer projects onto these fields, out of every response.
     if (path === versionKey) continue;
+
+    // `select: false` — the schema author already declared this value
+    // un-returnable, so Kavo does not describe it at all. See
+    // `isHiddenField` for why hiding it from responses alone is not enough.
+    if (isHiddenField(schemaType)) continue;
 
     // Mongoose *flattens* a nested object literal — `{ address: { city:
     // String } }` becomes the paths `address.city`, `address.zip`, with no

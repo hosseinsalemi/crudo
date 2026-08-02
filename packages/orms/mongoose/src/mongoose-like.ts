@@ -52,6 +52,12 @@ export interface MongooseSchemaTypeOptions {
   /** `true` on `_id`: Mongoose generates the value. */
   readonly auto?: unknown;
   readonly default?: unknown;
+  /**
+   * `false` marks a path Mongoose never returns unless asked for by name —
+   * where a password hash or API key lives. Kavo leaves such paths out of
+   * the entity description entirely (see `isHiddenField` in `metadata.ts`).
+   */
+  readonly select?: unknown;
 }
 
 /** Custom `timestamps` field names (`{ createdAt: "created_at" }`). */
