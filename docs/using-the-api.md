@@ -82,7 +82,7 @@ Comma-separated dot-paths, merged into one tree. Only relations the entity marks
 GET /books?withDeleted=true
 ```
 
-Opts back into seeing soft-deleted rows on a read that would otherwise exclude them. Rejected outright on an entity that isn't soft-deletable, rather than silently ignored — see [Getting started's soft delete section](/getting-started#soft-delete).
+Opts back into seeing soft-deleted rows on a read that would otherwise exclude them. `?onlyDeleted=true` narrows the other way — only soft-deleted rows, for a "trash" view. Both are rejected outright on an entity that isn't soft-deletable, and setting both together is rejected as a conflicting combination, rather than either being silently ignored — see [Getting started's soft delete section](/getting-started#soft-delete).
 
 ## The response envelope
 
