@@ -4,7 +4,7 @@ layout: home
 hero:
   name: Kavo
   text: Turn models into APIs
-  tagline: Define an entity once and get a complete REST and GraphQL CRUD API with filtering, sorting, pagination, and generated routes.
+  tagline: Define an entity once and get a complete REST, GraphQL, and MCP CRUD API with filtering, sorting, pagination, and generated routes. Vibe code it in minutes, on a fraction of the tokens.
   actions:
     - theme: brand
       text: Get started
@@ -452,6 +452,193 @@ export class BooksController {}
 }
 </style>
 
+<div class="mcp-section">
+  <p class="mcp-title">Expose your API to agents with MCP</p>
+  <p class="mcp-subtitle">The same engine behind REST and GraphQL exposes every entity as an MCP toolset — no second registry, no hand-written schemas.</p>
+
+  <div class="mcp-window">
+    <div class="mcp-window-header">
+      <span class="mcp-window-dot mcp-window-dot--red"></span>
+      <span class="mcp-window-dot mcp-window-dot--yellow"></span>
+      <span class="mcp-window-dot mcp-window-dot--green"></span>
+      <span class="mcp-window-title">MCP client</span>
+    </div>
+    <div class="mcp-window-body">
+      <div class="mcp-turn mcp-turn--user">
+        <span class="mcp-turn-tag">You</span>
+        <p class="mcp-turn-text">Archive book #42 and tell me who wrote it.</p>
+      </div>
+      <div class="mcp-call">
+        <span class="mcp-call-tag">call</span>
+        <span class="mcp-call-name">book.patchOne</span>
+        <span class="mcp-call-args">{ id: 42, status: "archived" }</span>
+      </div>
+      <div class="mcp-result">{ "id": 42, "status": "archived" }</div>
+      <div class="mcp-call">
+        <span class="mcp-call-tag">call</span>
+        <span class="mcp-call-name">book.findOne</span>
+        <span class="mcp-call-args">{ id: 42, include: "author" }</span>
+      </div>
+      <div class="mcp-result">{ "author": { "name": "Ursula K. Le Guin" } }</div>
+      <div class="mcp-turn mcp-turn--agent">
+        <span class="mcp-turn-tag mcp-turn-tag--agent">Agent</span>
+        <p class="mcp-turn-text">Done — Book #42 is archived. It was written by Ursula K. Le Guin.</p>
+      </div>
+    </div>
+  </div>
+
+  <p class="mcp-note">Every standard operation, for every <code>@Kavo</code> entity, unconditionally — an agent gets the same filtering, pagination, and soft-delete semantics a REST or GraphQL client does, because it calls the same engine.</p>
+</div>
+
+<style scoped>
+.mcp-section {
+  margin: 64px 0;
+  text-align: center;
+}
+
+.mcp-title {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--vp-c-text-1);
+}
+
+.mcp-subtitle {
+  margin: 0 0 28px;
+  font-size: 14.5px;
+  color: var(--vp-c-text-2);
+}
+
+.mcp-window {
+  max-width: 620px;
+  margin: 0 auto;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--vp-code-block-bg);
+  text-align: left;
+  box-shadow: 0 12px 32px -20px rgba(0, 0, 0, 0.4);
+}
+
+.mcp-window-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--vp-c-divider);
+}
+
+.mcp-window-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.mcp-window-dot--red {
+  background: #ff5f56;
+}
+
+.mcp-window-dot--yellow {
+  background: #ffbd2e;
+}
+
+.mcp-window-dot--green {
+  background: #27c93f;
+}
+
+.mcp-window-title {
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--vp-c-text-3);
+}
+
+.mcp-window-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 20px 22px;
+}
+
+.mcp-turn-tag {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--vp-c-text-3);
+  margin-bottom: 4px;
+}
+
+.mcp-turn-tag--agent {
+  color: var(--vp-c-brand-1);
+}
+
+.mcp-turn-text {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--vp-c-text-1);
+}
+
+.mcp-call {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--vp-c-brand-1) 40%, var(--vp-c-divider));
+  background: var(--vp-c-brand-soft);
+}
+
+.mcp-call-tag {
+  font-family: var(--vp-font-family-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--vp-c-brand-1);
+  opacity: 0.8;
+}
+
+.mcp-call-name {
+  font-family: var(--vp-font-family-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--vp-c-brand-1);
+}
+
+.mcp-call-args {
+  font-family: var(--vp-font-family-mono);
+  font-size: 12px;
+  color: var(--vp-c-text-2);
+}
+
+.mcp-result {
+  margin-left: 12px;
+  padding: 6px 12px;
+  border-left: 2px solid var(--vp-c-divider);
+  font-family: var(--vp-font-family-mono);
+  font-size: 12px;
+  color: var(--vp-c-text-3);
+}
+
+.mcp-note {
+  max-width: 640px;
+  margin: 24px auto 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--vp-c-text-3);
+}
+
+.mcp-note code {
+  font-size: 12px;
+}
+</style>
+
 <div class="query-section">
   <p class="query-title">The query grammar, on the wire</p>
   <p class="query-subtitle">Filtering, sorting, pagination, and includes — all driven by the query string, no extra code.</p>
@@ -884,6 +1071,7 @@ GET /books
     <span class="stack-badge">Mongoose</span>
     <span class="stack-badge">NestJS</span>
     <span class="stack-badge">GraphQL</span>
+    <span class="stack-badge">MCP</span>
   </div>
 </div>
 
@@ -913,7 +1101,7 @@ GET /books
   justify-content: center;
   gap: 10px;
   margin: 24px auto 0;
-  max-width: 480px;
+  max-width: 300px;
 }
 
 .stack-badge {
