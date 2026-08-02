@@ -457,15 +457,7 @@ export class BooksController {}
   <p class="mcp-title">Expose your API to agents with MCP</p>
   <p class="mcp-subtitle">The same engine behind REST and GraphQL exposes every entity as an MCP toolset — no second registry, no hand-written schemas.</p>
 
-  <div class="mcp-window">
-    <div class="mcp-window-header">
-      <span class="mcp-window-dot mcp-window-dot--red"></span>
-      <span class="mcp-window-dot mcp-window-dot--yellow"></span>
-      <span class="mcp-window-dot mcp-window-dot--green"></span>
-      <span class="mcp-window-title">MCP client</span>
-    </div>
-    <McpChatDemo />
-  </div>
+  <McpChatDemo />
 
   <p class="mcp-note">Every standard operation, for every <code>@Kavo</code> entity, unconditionally — an agent gets the same filtering, pagination, and soft-delete semantics a REST or GraphQL client does, because it calls the same engine.</p>
 </div>
@@ -488,51 +480,6 @@ export class BooksController {}
   margin: 0 0 28px;
   font-size: 14.5px;
   color: var(--vp-c-text-2);
-}
-
-.mcp-window {
-  max-width: 620px;
-  margin: 0 auto;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--vp-code-block-bg);
-  text-align: left;
-  box-shadow: 0 12px 32px -20px rgba(0, 0, 0, 0.4);
-}
-
-.mcp-window-header {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 11px 14px;
-  border-bottom: 1px solid var(--vp-c-divider);
-}
-
-.mcp-window-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.mcp-window-dot--red {
-  background: #ff5f56;
-}
-
-.mcp-window-dot--yellow {
-  background: #ffbd2e;
-}
-
-.mcp-window-dot--green {
-  background: #27c93f;
-}
-
-.mcp-window-title {
-  margin-left: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--vp-c-text-3);
 }
 
 .mcp-note {
