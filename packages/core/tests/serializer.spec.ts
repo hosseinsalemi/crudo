@@ -20,6 +20,7 @@ const EMPTY_QUERY = {
   fields: { root: null, relations: {} },
   include: {},
   withDeleted: false,
+  onlyDeleted: false,
   count: true,
 };
 

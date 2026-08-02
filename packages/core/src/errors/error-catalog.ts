@@ -56,6 +56,11 @@ export const ERROR_CATALOG = {
     title: "Unsupported query parameter",
     message: "Query parameter '{param}' is not supported: {reason}",
   },
+  KAVO_QUERY_CONFLICTING_PARAMS: {
+    status: 400,
+    title: "Conflicting query parameters",
+    message: "Query parameters '{param}' and '{other}' cannot be used together: {reason}",
+  },
   KAVO_NOT_FOUND: {
     status: 404,
     title: "Not found",

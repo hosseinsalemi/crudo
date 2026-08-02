@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { QueryNormalizer, resolveEntityConfig } from "@kavo/core";
 import { userMetadata } from "./support/user-fixture.js";
+import { accountMetadata } from "./support/account-fixture.js";
 import { issuesOf } from "./support/query-issues.js";
 
 const config = resolveEntityConfig(userMetadata, undefined, undefined);
 const normalizer = new QueryNormalizer(userMetadata);
+
+const softDeletableConfig = resolveEntityConfig(accountMetadata, undefined, undefined);
+const softDeletableNormalizer = new QueryNormalizer(accountMetadata);
 
 describe("QueryNormalizer — wire params", () => {
   it("normalizes the full reference query", () => {
@@ -131,6 +135,53 @@ describe("QueryNormalizer — wire params", () => {
       undefined,
     );
     expect(normalizer.normalizeWire({ sort: "name" }, defaulted).sort).toEqual([{ field: "name", direction: "asc" }]);
+  });
+});
+
+describe("QueryNormalizer — onlyDeleted", () => {
+  it("rejects onlyDeleted=true when the entity is not soft-deletable (wire)", () => {
+    const issues = issuesOf(() => normalizer.normalizeWire({ onlyDeleted: "true" }, config));
+    expect(issues[0]).toMatchObject({ field: "onlyDeleted", code: "KAVO_QUERY_UNSUPPORTED_PARAM" });
+  });
+
+  it("rejects onlyDeleted=true when the entity is not soft-deletable (programmatic)", () => {
+    const issues = issuesOf(() => normalizer.normalizeInput({ onlyDeleted: true }, config));
+    expect(issues[0]).toMatchObject({ field: "onlyDeleted", code: "KAVO_QUERY_UNSUPPORTED_PARAM" });
+  });
+
+  it("accepts onlyDeleted=true on a soft-deletable entity (wire)", () => {
+    const query = softDeletableNormalizer.normalizeWire({ onlyDeleted: "true" }, softDeletableConfig);
+    expect(query.onlyDeleted).toBe(true);
+    expect(query.withDeleted).toBe(false);
+  });
+
+  it("accepts onlyDeleted=true on a soft-deletable entity (programmatic)", () => {
+    const query = softDeletableNormalizer.normalizeInput({ onlyDeleted: true }, softDeletableConfig);
+    expect(query.onlyDeleted).toBe(true);
+    expect(query.withDeleted).toBe(false);
+  });
+
+  it("rejects withDeleted and onlyDeleted set together (wire)", () => {
+    const issues = issuesOf(() =>
+      softDeletableNormalizer.normalizeWire({ withDeleted: "true", onlyDeleted: "true" }, softDeletableConfig),
+    );
+    expect(issues).toContainEqual(
+      expect.objectContaining({ field: "onlyDeleted", code: "KAVO_QUERY_CONFLICTING_PARAMS" }),
+    );
+  });
+
+  it("rejects withDeleted and onlyDeleted set together (programmatic)", () => {
+    const issues = issuesOf(() =>
+      softDeletableNormalizer.normalizeInput({ withDeleted: true, onlyDeleted: true }, softDeletableConfig),
+    );
+    expect(issues).toContainEqual(
+      expect.objectContaining({ field: "onlyDeleted", code: "KAVO_QUERY_CONFLICTING_PARAMS" }),
+    );
+  });
+
+  it("rejects a non-boolean onlyDeleted value", () => {
+    const issues = issuesOf(() => softDeletableNormalizer.normalizeWire({ onlyDeleted: "yes" }, softDeletableConfig));
+    expect(issues[0]).toMatchObject({ field: "onlyDeleted", code: "KAVO_QUERY_INVALID_VALUE" });
   });
 });
 
