@@ -31,9 +31,17 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(async () => {
-  if (app !== undefined) await app.close();
-  await mongoose.disconnect();
-  if (server !== undefined) await server.stop();
+  // Same reason as the container spec: an `app.close()` rejection must not
+  // strand the connection or the `mongod` process behind it.
+  try {
+    if (app !== undefined) await app.close();
+  } finally {
+    try {
+      await mongoose.disconnect();
+    } finally {
+      if (server !== undefined) await server.stop();
+    }
+  }
 });
 
 registerCrudE2eSuite(() => app);
