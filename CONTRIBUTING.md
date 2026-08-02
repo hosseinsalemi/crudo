@@ -64,14 +64,20 @@ pnpm check
 
 It runs, in order:
 
-| Step        | Command                         | What it enforces                                    |
-| ----------- | ------------------------------- | --------------------------------------------------- |
-| `generate`  | Prisma client + fixture schema  | `@kavo/prisma`'s test fixtures exist                |
-| `build`     | `tsc -b`                        | Every package's `src` compiles (project references) |
-| `typecheck` | `tsc -p **/tsconfig.tests.json` | Tests compile, including the type-level tests       |
-| `depcruise` | `dependency-cruiser`            | Package boundaries (see [Invariants](#invariants))  |
-| `lint`      | `oxlint`                        | Lint rules over `packages` and `examples`           |
-| `test`      | `vitest run`                    | The whole suite                                     |
+| Step        | Command                        | What it enforces                                    |
+| ----------- | ------------------------------ | --------------------------------------------------- |
+| `generate`  | Prisma client + fixture schema | `@kavo/prisma`'s test fixtures exist                |
+| `build`     | `tsc -b`                       | Every package's `src` compiles (project references) |
+| `typecheck` | one `tsc -p` per project       | Tests compile, including the type-level tests       |
+| `depcruise` | `dependency-cruiser`           | Package boundaries (see [Invariants](#invariants))  |
+| `lint`      | `oxlint`                       | Lint rules over `packages` and `examples`           |
+| `test`      | `vitest run`                   | The whole suite                                     |
+
+Note that `typecheck` is a hand-maintained list — the root script names each
+project's `tsconfig.tests.json` explicitly, with no glob and no discovery. **If
+you add a package, or add a first `tests/` directory to one, append it to the
+root `typecheck` script yourself**, or its tests are silently never typechecked
+and the `*.test-d.ts` guarantee below does not hold for it.
 
 **The gate is never worked around.** A red `pnpm check` is not shipped, and a
 test is never weakened, skipped, or narrowed to make it pass. If a change makes
@@ -91,9 +97,14 @@ pnpm format:check  # what CI actually runs
 The full suite is `pnpm test`. While iterating, narrow it:
 
 ```bash
-pnpm vitest run packages/core/tests/filter-parser.spec.ts   # one file
-pnpm vitest run -t "coerces numeric ids"                    # one test by name
+pnpm vitest run packages/core/tests/filter-parser.spec.ts          # one file
+pnpm vitest run -t "coerces JavaScript number syntax"              # one test by name
 ```
+
+`-t` is a substring match against the test title, and a filter that matches
+nothing **skips every test and still exits 0**. A green run is only meaningful
+if the summary line shows tests actually ran — check the passed count, not the
+exit code.
 
 A few things about the test setup that are easy to trip over:
 
@@ -134,9 +145,10 @@ Plus, not published:
   marketplace.
 - `docs/` — the VitePress site, and the internal design docs and ADRs.
 
-`@kavo/core` is the hub. Every spoke depends on core and on nothing else in the
-workspace; spokes never import each other, and meet only through the host
-framework's DI container.
+`@kavo/core` is the hub: it depends on nothing, and everything else depends on
+it. The edges are not all equivalent, though — ORM adapters and protocol
+bindings are leaves, while a framework binding is allowed one sideways edge. See
+[Invariants](#invariants) for the exact directions.
 
 ## Invariants
 
@@ -146,14 +158,31 @@ that explains why.
 - **Core imports nothing and has zero runtime dependencies** —
   [ADR-0005](docs/internals/adr/0005-core-zero-runtime-dependencies.md). Core has
   no knowledge of TypeORM, Prisma, Mongoose, or Nest.
-- **Dependency inversion is strict: spokes depend on core, core never depends on
-  an edge** — [ADR-0001](docs/internals/adr/0001-clean-architecture-core-owns-contracts.md).
-  In practice that means adapters, framework bindings, and protocol bindings
-  import the `@kavo/core` barrel only — no deep imports into another package's
-  internals, and no spoke-to-spoke imports. Spokes meet through the host
-  framework's DI container, never through a direct import. (Where those packages
-  live on disk — `orms/`, `frameworks/`, `protocols/` — is
-  [ADR-0002](docs/internals/adr/0002-package-topology.md).)
+- **Dependency inversion is strict: core never depends on an edge** —
+  [ADR-0001](docs/internals/adr/0001-clean-architecture-core-owns-contracts.md).
+  Beyond that, the allowed directions are specific, and it is worth learning them
+  precisely rather than as "nothing imports anything":
+
+  | Package kind                        | May import                         | Never imports                   |
+  | ----------------------------------- | ---------------------------------- | ------------------------------- |
+  | `@kavo/core`                        | nothing                            | anything                        |
+  | ORM adapters (`orms/*`)             | the `@kavo/core` barrel            | a framework or protocol binding |
+  | Protocol bindings (`protocols/*`)   | the `@kavo/core` barrel            | a framework binding             |
+  | Framework bindings (`frameworks/*`) | core **and its own protocol glue** | an ORM adapter                  |
+
+  So `@kavo/nest` really does import `@kavo/graphql` and `@kavo/mcp` directly —
+  that is the sanctioned `frameworks/* → protocols/*` edge from
+  [ADR-0016](docs/internals/adr/0016-graphql-protocols-package.md), and it is
+  one-directional: a protocol binding never imports `@kavo/nest` back, which is
+  what keeps it host-framework-agnostic. What is genuinely forbidden is a
+  framework binding importing an **ORM adapter** — adapters reach Nest's
+  container through DI, never through an import.
+
+  Deep imports into another package's internals are rejected in every direction;
+  packages meet at the `@kavo/core` barrel. (Where packages live on disk is
+  [ADR-0002](docs/internals/adr/0002-package-topology.md) for `orms/` and
+  `frameworks/`, and ADR-0016 for `protocols/`.)
+
 - **The core barrel is an explicit named list** —
   [ADR-0010](docs/internals/adr/0010-explicit-named-barrel.md).
   `packages/core/src/index.ts` uses no `export *`, so the public surface changes
