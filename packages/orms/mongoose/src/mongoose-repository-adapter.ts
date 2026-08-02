@@ -43,6 +43,18 @@ interface PopulateSpec {
  */
 export class MongooseRepositoryAdapter<Entity extends object> implements RepositoryAdapter<Entity> {
   private readonly model: MongooseModelLike;
+  /**
+   * Every id lookup below spells the predicate `{ [idField]: { $eq: id } }`
+   * rather than the `{ [idField]: id }` shorthand, for the same reason
+   * `translateFilter` does (see `filter-translator.ts`): the shorthand
+   * splices an *object* value in as operators, so an id arriving as
+   * `{ "$gt": "" }` would silently address "the first document" instead of
+   * one document. Nothing this package ships can produce a non-string id —
+   * Nest binds it from `@Param` — but a custom operation calling
+   * `engine.execute({ id })` with a value off a JSON body could, and a
+   * `delete`/`purge` that matched the wrong document is not a failure worth
+   * leaving to the caller's discipline.
+   */
   private readonly idField: string;
   private readonly filterOptions: FilterTranslatorOptions;
   private readonly relationNames: ReadonlySet<string>;
@@ -64,7 +76,7 @@ export class MongooseRepositoryAdapter<Entity extends object> implements Reposit
     context: KavoContext<Entity>,
   ): Promise<Entity | null> {
     try {
-      const where = this.scopeToLive({ [this.idField]: id }, context, query?.withDeleted ?? false);
+      const where = this.scopeToLive({ [this.idField]: { $eq: id } }, context, query?.withDeleted ?? false);
       const row = await this.model.findOne(where, null, this.readOptions(this.buildPopulate(query?.include ?? {})));
       return row === null || row === undefined ? null : (toPlainResult(row) as Entity);
     } catch (error) {
@@ -191,7 +203,7 @@ export class MongooseRepositoryAdapter<Entity extends object> implements Reposit
     context: KavoContext<Entity>,
     withDeleted: boolean,
   ): Promise<Record<string, unknown> | null> {
-    const where = this.scopeToLive({ [this.idField]: id }, context, withDeleted);
+    const where = this.scopeToLive({ [this.idField]: { $eq: id } }, context, withDeleted);
     const row = await this.model.findOne(where, null, { lean: true });
     // Left as raw document data: the callers below only test the
     // delete-marker field, and anything returned to core goes through
@@ -231,7 +243,7 @@ export class MongooseRepositoryAdapter<Entity extends object> implements Reposit
    */
   private async writeExisting(id: EntityId, data: Partial<Entity>, context: KavoContext<Entity>): Promise<Entity> {
     try {
-      const where = this.scopeToLive({ [this.idField]: id }, context, false);
+      const where = this.scopeToLive({ [this.idField]: { $eq: id } }, context, false);
       const changes = data as Record<string, unknown>;
       if (Object.keys(changes).length === 0) {
         // MongoDB rejects an empty `$set`. Nothing to write is not an
@@ -264,7 +276,7 @@ export class MongooseRepositoryAdapter<Entity extends object> implements Reposit
       if (softDelete.strategy === "hard") {
         const existing = await this.byId(id, context, false);
         if (existing === null) throw this.notFound(id, context);
-        await this.model.deleteOne({ [this.idField]: id });
+        await this.model.deleteOne({ [this.idField]: { $eq: id } });
         return;
       }
       const { field } = softDelete;
@@ -276,7 +288,7 @@ export class MongooseRepositoryAdapter<Entity extends object> implements Reposit
       // stored marker tells them apart — but it no longer *decides* the
       // write, it only explains a write that matched nothing.
       const updated = await this.model.findOneAndUpdate(
-        { [this.idField]: id, [field]: { $eq: null } },
+        { [this.idField]: { $eq: id }, [field]: { $eq: null } },
         { $set: { [field]: new Date() } },
         { lean: true },
       );
@@ -300,7 +312,7 @@ export class MongooseRepositoryAdapter<Entity extends object> implements Reposit
       // actually deleted may be restored, so the predicate is part of the
       // write rather than a check that precedes it.
       const restored = await this.model.findOneAndUpdate(
-        { [this.idField]: id, [field]: { $ne: null } },
+        { [this.idField]: { $eq: id }, [field]: { $ne: null } },
         { $set: { [field]: null } },
         { new: true, lean: true },
       );
@@ -336,7 +348,7 @@ export class MongooseRepositoryAdapter<Entity extends object> implements Reposit
         const existing = await this.byId(id, context, false);
         if (existing === null) throw this.notFound(id, context);
       }
-      await this.model.deleteOne({ [this.idField]: id });
+      await this.model.deleteOne({ [this.idField]: { $eq: id } });
     } catch (error) {
       throw this.mapError(error, context, true);
     }

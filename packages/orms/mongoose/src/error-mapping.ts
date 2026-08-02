@@ -23,10 +23,29 @@ interface MongoErrorLike extends Error {
   readonly code?: unknown;
   /** Present on a `CastError`: the schema path whose value failed to cast. */
   readonly path?: unknown;
+  /** Present on a `CastError`: the value that failed to cast, as supplied. */
+  readonly stringValue?: unknown;
+  readonly value?: unknown;
 }
 
 function errorName(error: unknown): string | undefined {
   return error instanceof Error ? error.name : undefined;
+}
+
+/**
+ * The value a `CastError` rejected, rendered for the 404 message.
+ *
+ * Mongoose exposes both `value` (the raw input) and `stringValue` (the same
+ * thing already quoted for its own message text). The raw value is
+ * preferred; `stringValue`'s surrounding quotes are stripped so the id is
+ * not double-quoted once core interpolates it into `'{id}'`.
+ */
+function castValueOf(error: unknown): string {
+  const { value, stringValue } = (error ?? {}) as MongoErrorLike;
+  if (typeof value === "string") return value;
+  if (value !== undefined && value !== null) return String(value);
+  if (typeof stringValue === "string") return stringValue.replace(/^"|"$/g, "");
+  return "";
 }
 
 function serverErrorCode(error: unknown): number | undefined {
@@ -86,8 +105,13 @@ export function mapDriverError(error: unknown, context: ErrorContext, idField?: 
     const path = (error as MongoErrorLike).path;
     const field = typeof path === "string" ? path : "";
     if (idField !== undefined && field === idField) {
+      // The rejected spelling, so the message reads exactly like the 404 for
+      // a well-formed id that is simply absent. Rendering an empty id here
+      // would itself be the key-format oracle this branch exists to avoid:
+      // `… with id '' was not found` announces "that was not a valid
+      // ObjectId", while `… with id 'abc' was not found` says nothing.
       return new NotFoundException({
-        messageParams: { entity, id: "" },
+        messageParams: { entity, id: castValueOf(error) },
         context,
         cause: error,
       });
