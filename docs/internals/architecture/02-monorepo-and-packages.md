@@ -77,14 +77,14 @@ boundary rather than widening core's `EntityId`).
   build a `GraphQLSchema` over a `createCrud` service — host-framework-
   agnostic, same constraint as an ORM adapter: it depends on `@kavo/core`
   and the `graphql` peer only, never `@kavo/nest` or any other framework
-  package. See `docs/architecture/13-graphql-binding.md`.
+  package. See `docs/internals/architecture/13-graphql-binding.md`.
 - **`@kavo/mcp`** (`packages/protocols/mcp`, ADR-0016) exists to expose a
   `createCrud` service's standard operations as MCP tools — the same
   `protocols/*` shape and constraint as `@kavo/graphql`: `@kavo/core`
   only, plus the `@modelcontextprotocol/sdk` peer for types (never
   imported at runtime by `@kavo/mcp` itself — `@kavo/nest`'s zero-config
   default controller is the one place the SDK actually runs, lazily — see
-  doc 14, §6). See `docs/architecture/14-mcp-binding.md`.
+  doc 14, §6). See `docs/internals/architecture/14-mcp-binding.md`.
 
 Every package earns its place: core is the hub, and every other package
 adapts exactly one external technology or protocol — an ORM, a host

@@ -157,6 +157,16 @@ controller deliberately never enters. A hand-written concrete class
 (previous bullet) and this flag are alternatives — pick one per app, never
 both at the same path.
 
+**No auth guard of its own.** `createDefaultMcpController` carries no
+guard, interceptor, or other route-level protection — same as
+`createDefaultGraphQLController`. A guard attached to an entity's
+`@Kavo`-decorated REST controller does not extend to this route: `mcp:
+true` mounts a separate, unguarded `POST /mcp` exposing every entity's
+full standard toolset — including every write operation — to anyone who
+can reach it, regardless of what protects the REST side. A consumer
+needing auth on the MCP surface writes their own controller extending
+`BaseKavoMcpController` (previous bullet) instead and leaves `mcp` unset.
+
 This is the one place `@kavo/nest` genuinely runs
 `@modelcontextprotocol/sdk` at runtime (§5).
 

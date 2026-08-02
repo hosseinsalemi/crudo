@@ -33,6 +33,16 @@ export const DEFAULT_MCP_PATH = "mcp";
  * `transport.handleRequest` writes to directly; `@kavo/nest` does not
  * attempt to support a non-Node-http platform adapter (e.g. Fastify's raw
  * request/response) for this controller.
+ *
+ * Carries no auth guard, interceptor, or other route-level protection of
+ * its own — same as `createDefaultGraphQLController`. A guard attached to
+ * an entity's `@Kavo`-decorated REST controller does **not** extend to
+ * this controller; it is a separate, unguarded route exposing that
+ * entity's full write surface (`createOne`/`updateOne`/`deleteOne`/etc.)
+ * to anyone who can reach `path`. A consumer wanting auth, a different
+ * method, or a different transport writes their own controller extending
+ * `BaseKavoMcpController` instead and leaves `mcp` unset — this factory
+ * and a custom controller are alternatives, never both at once.
  */
 export function createDefaultMcpController(path: string = DEFAULT_MCP_PATH): Type<BaseKavoMcpController> {
   @Controller(path)
