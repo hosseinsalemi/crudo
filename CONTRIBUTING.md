@@ -32,6 +32,11 @@ They start their own containers and need no manual database setup, but they do
 need a Docker daemon the current user can talk to. Without one, `pnpm check`
 fails in those suites.
 
+Network access matters too, at least on a cold checkout: `@kavo/mongoose`'s unit
+tests and the `nest-mongoose` example use `mongodb-memory-server`, which
+downloads a `mongod` binary on first use and caches it. On a restricted network
+that download fails with an error that has nothing to do with Docker.
+
 ## Getting set up
 
 ```bash
@@ -92,6 +97,12 @@ pnpm prettify      # writes formatting fixes
 pnpm format:check  # what CI actually runs
 ```
 
+One thing the gate does **not** cover: CI installs with
+`pnpm install --frozen-lockfile` _before_ running it, and neither `pnpm check`
+nor `pnpm format:check` validates `pnpm-lock.yaml`. If you add, remove, or bump
+a dependency, commit the regenerated lockfile — otherwise CI fails at the install
+step, before the gate you verified locally ever runs.
+
 ## Running tests
 
 The full suite is `pnpm test`. While iterating, narrow it:
@@ -101,10 +112,15 @@ pnpm vitest run packages/core/tests/filter-parser.spec.ts          # one file
 pnpm vitest run -t "coerces JavaScript number syntax"              # one test by name
 ```
 
-`-t` is a substring match against the test title, and a filter that matches
-nothing **skips every test and still exits 0**. A green run is only meaningful
-if the summary line shows tests actually ran — check the passed count, not the
-exit code.
+`-t` takes a **regular expression** (`--testNamePattern`), matched unanchored
+against the full test name. A plain string therefore behaves like a substring
+search, but a title copied verbatim from a spec file that contains `(`, `)`,
+`[`, `.`, `+`, or `|` will not match itself — escape those or pick a plainer
+fragment.
+
+Either way, a filter that matches nothing **skips every test and still exits 0**.
+A green run is only meaningful if the summary line shows tests actually ran —
+check the passed count, not the exit code.
 
 A few things about the test setup that are easy to trip over:
 
@@ -163,12 +179,16 @@ that explains why.
   Beyond that, the allowed directions are specific, and it is worth learning them
   precisely rather than as "nothing imports anything":
 
-  | Package kind                        | May import                         | Never imports                   |
-  | ----------------------------------- | ---------------------------------- | ------------------------------- |
-  | `@kavo/core`                        | nothing                            | anything                        |
-  | ORM adapters (`orms/*`)             | the `@kavo/core` barrel            | a framework or protocol binding |
-  | Protocol bindings (`protocols/*`)   | the `@kavo/core` barrel            | a framework binding             |
-  | Framework bindings (`frameworks/*`) | core **and its own protocol glue** | an ORM adapter                  |
+  | Package kind                        | May import                         | Never imports                   | Blocked by                     |
+  | ----------------------------------- | ---------------------------------- | ------------------------------- | ------------------------------ |
+  | `@kavo/core`                        | nothing                            | anything                        | `core-imports-nothing`         |
+  | ORM adapters (`orms/*`)             | the `@kavo/core` barrel            | a framework or protocol binding | `<orm>-only-imports-core`\*    |
+  | Protocol bindings (`protocols/*`)   | the `@kavo/core` barrel            | a framework binding             | `<protocol>-only-imports-core` |
+  | Framework bindings (`frameworks/*`) | core **and its own protocol glue** | an ORM adapter                  | `nest-only-imports-core`       |
+
+  \* The adapter rules currently block only framework packages. An adapter
+  importing a _protocol_ package would pass `pnpm depcruise` today — it is
+  still wrong, and review is what catches it.
 
   So `@kavo/nest` really does import `@kavo/graphql` and `@kavo/mcp` directly —
   that is the sanctioned `frameworks/* → protocols/*` edge from
@@ -178,8 +198,12 @@ that explains why.
   framework binding importing an **ORM adapter** — adapters reach Nest's
   container through DI, never through an import.
 
-  Deep imports into another package's internals are rejected in every direction;
-  packages meet at the `@kavo/core` barrel. (Where packages live on disk is
+  Packages meet at the `@kavo/core` barrel rather than reaching into each
+  other's `src/`. Two rules enforce that around core specifically —
+  `no-cross-package-deep-imports-core` (an edge deep-importing core) and
+  `no-cross-package-deep-imports-adapters` (core deep-importing an edge) — so an
+  edge-to-edge deep import is convention held up by review, not by the gate.
+  (Where packages live on disk is
   [ADR-0002](docs/internals/adr/0002-package-topology.md) for `orms/` and
   `frameworks/`, and ADR-0016 for `protocols/`.)
 
@@ -197,10 +221,11 @@ that explains why.
   Class-definition time is the only moment Nest's router scan can see generated
   methods.
 
-The first two are checked mechanically by `.dependency-cruiser.cjs` — an illegal
-import fails `pnpm depcruise`, which is part of `pnpm check`. It will name the
-violated rule (`core-imports-nothing`, `nest-only-imports-core`,
-`no-cross-package-deep-imports-core`, and so on).
+The first two are checked by `.dependency-cruiser.cjs` — an illegal import fails
+`pnpm depcruise`, which is part of `pnpm check`, and the error names the violated
+rule. Read that file before assuming a boundary is machine-checked: as the two
+notes above show, its coverage is deliberately narrower than the invariants it
+supports, so a green `depcruise` is not proof a change respects them.
 
 The others are checked in review. Before changing behavior an ADR governs, read
 that ADR — several are referenced by name from code comments.
