@@ -61,13 +61,15 @@ const activeQueryGrammarTab = ref(queryGrammarTabs[0].id);
       <span>GraphQL</span>
     </span>
   </div>
+  <p class="tool-logos-title">Works with your stack</p>
 </div>
 
 <style scoped>
 .tool-logos-section {
   margin: 75px 0 50px;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
 }
 
 .tool-logos {
@@ -75,6 +77,16 @@ const activeQueryGrammarTab = ref(queryGrammarTabs[0].id);
   flex-wrap: wrap;
   justify-content: center;
   gap: 10px;
+}
+
+.tool-logos-title {
+  margin: 25px 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--vp-c-text-3);
+  opacity: 0.5;
 }
 
 .tool-chip {
@@ -982,59 +994,5 @@ GET /books
 
 .layer-note code {
   font-size: 12px;
-}
-</style>
-
-<div class="stack-section">
-  <p class="stack-title">Works With Your Stack</p>
-  <p class="stack-subtitle">First-class support for the tools you already use.</p>
-  <div class="stack-badges">
-    <span class="stack-badge">TypeORM</span>
-    <span class="stack-badge">Prisma</span>
-    <span class="stack-badge">Mongoose</span>
-    <span class="stack-badge">NestJS</span>
-    <span class="stack-badge">GraphQL</span>
-    <span class="stack-badge">MCP</span>
-  </div>
-</div>
-
-<style scoped>
-.stack-section {
-  margin: 64px 0;
-  text-align: center;
-}
-
-.stack-title {
-  margin: 0 0 6px;
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--vp-c-text-1);
-}
-
-.stack-subtitle {
-  margin: 0;
-  font-size: 14.5px;
-  color: var(--vp-c-text-2);
-}
-
-.stack-badges {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
-  margin: 24px auto 0;
-  max-width: 300px;
-}
-
-.stack-badge {
-  padding: 7px 16px;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 999px;
-  font-family: var(--vp-font-family-mono);
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--vp-c-text-2);
-  background: var(--vp-c-bg-soft);
 }
 </style>
