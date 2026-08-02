@@ -58,22 +58,22 @@ describe("BaseKavoMcpController", () => {
         .sort(),
     ).toEqual(
       [
-        "todo_createOne",
-        "todo_deleteOne",
-        "todo_findMany",
-        "todo_findOne",
-        "todo_patchOne",
-        "todo_purgeOne",
-        "todo_restoreOne",
-        "todo_updateOne",
+        "todo.createOne",
+        "todo.deleteOne",
+        "todo.findMany",
+        "todo.findOne",
+        "todo.patchOne",
+        "todo.purgeOne",
+        "todo.restoreOne",
+        "todo.updateOne",
       ].sort(),
     );
 
-    const created = await toolset.run("todo_createOne", { title: "from mcp", done: false });
+    const created = await toolset.run("todo.createOne", { title: "from mcp", done: false });
     expect(created.isError).toBeUndefined();
     expect(JSON.parse((created.content[0] as { text: string }).text)).toMatchObject({ title: "from mcp" });
 
-    const fetched = await toolset.run("todo_findOne", { id: 1 });
+    const fetched = await toolset.run("todo.findOne", { id: 1 });
     expect(JSON.parse((fetched.content[0] as { text: string }).text)).toMatchObject({ title: "from mcp" });
   });
 
@@ -88,7 +88,7 @@ describe("BaseKavoMcpController", () => {
     await app.init();
 
     const toolset = app.get(McpToolset);
-    const result = await toolset.run("todo_findOne", { id: 999 });
+    const result = await toolset.run("todo.findOne", { id: 999 });
     expect(result.isError).toBe(true);
     expect((result.content[0] as { text: string }).text).toContain("KAVO_NOT_FOUND");
   });

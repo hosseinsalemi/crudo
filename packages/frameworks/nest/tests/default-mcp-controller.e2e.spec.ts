@@ -48,14 +48,14 @@ describe("KavoModule.forRoot({ mcp: true })", () => {
     const toolNames = (listed.body.result.tools as { name: string }[]).map((tool) => tool.name).sort();
     expect(toolNames).toEqual(
       [
-        "todo_createOne",
-        "todo_deleteOne",
-        "todo_findMany",
-        "todo_findOne",
-        "todo_patchOne",
-        "todo_purgeOne",
-        "todo_restoreOne",
-        "todo_updateOne",
+        "todo.createOne",
+        "todo.deleteOne",
+        "todo.findMany",
+        "todo.findOne",
+        "todo.patchOne",
+        "todo.purgeOne",
+        "todo.restoreOne",
+        "todo.updateOne",
       ].sort(),
     );
 
@@ -63,7 +63,7 @@ describe("KavoModule.forRoot({ mcp: true })", () => {
       jsonrpc: "2.0",
       id: 2,
       method: "tools/call",
-      params: { name: "todo_createOne", arguments: { title: "from mcp http", done: false } },
+      params: { name: "todo.createOne", arguments: { title: "from mcp http", done: false } },
     });
     expect(called.status).toBe(200);
     expect(called.body.result.isError).toBeUndefined();
@@ -86,14 +86,14 @@ describe("KavoModule.forRoot({ mcp: true })", () => {
     expect(listed.status).toBe(200);
     expect((listed.body.result.tools as { name: string }[]).map((tool) => tool.name).sort()).toEqual(
       [
-        "todo_createOne",
-        "todo_deleteOne",
-        "todo_findMany",
-        "todo_findOne",
-        "todo_patchOne",
-        "todo_purgeOne",
-        "todo_restoreOne",
-        "todo_updateOne",
+        "todo.createOne",
+        "todo.deleteOne",
+        "todo.findMany",
+        "todo.findOne",
+        "todo.patchOne",
+        "todo.purgeOne",
+        "todo.restoreOne",
+        "todo.updateOne",
       ].sort(),
     );
   });
@@ -123,7 +123,7 @@ describe("KavoModule.forRoot({ mcp: true })", () => {
       jsonrpc: "2.0",
       id: 1,
       method: "tools/call",
-      params: { name: "todo_findOne", arguments: { id: 999 } },
+      params: { name: "todo.findOne", arguments: { id: 999 } },
     });
     expect(called.status).toBe(200);
     expect(called.body.result.isError).toBe(true);
