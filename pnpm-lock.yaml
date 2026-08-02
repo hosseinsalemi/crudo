@@ -75,6 +75,9 @@ importers:
       '@nestjs/testing':
         specifier: ^11.0.0
         version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(@nestjs/platform-express@11.1.28)
+      '@testcontainers/mongodb':
+        specifier: ^12.0.4
+        version: 12.0.4
       '@types/supertest':
         specifier: ^7.2.1
         version: 7.2.1
@@ -1230,6 +1233,9 @@ packages:
   '@testcontainers/mariadb@12.0.4':
     resolution: {integrity: sha512-AdMFF4VfzBq2brV5Ol9OAx4CSrK5u0kRromNv0pSsp6LTK0JEBGyj5JysRo9CMHnsbG5X4I2jkfhAZsonUoBWw==}
 
+  '@testcontainers/mongodb@12.0.4':
+    resolution: {integrity: sha512-lVz3pCHJntsJYOyhDaWLakDCcG3CnFP9ijZ2JOFPKg8p1ysZLoU/NqNzPQdKAD4X4BeWW8h+dabW2e8XvEVmGQ==}
+
   '@testcontainers/postgresql@12.0.4':
     resolution: {integrity: sha512-a/pLU6j5lpKKAlUTPwqweqMGhOSjgTSb6HBX69TOrXn32ifU37nnQDmNFTj8ddOAw+BQL9oTRkeOxVbZkqhgZA==}
 
@@ -1718,6 +1724,9 @@ packages:
 
   commondir@1.0.1:
     resolution: {integrity: sha512-W9pAhw0ja1Edb5GVdIF1mjZw/ASI0AlShXM83UUGe2DVr5TdAPEA1OA8m/g8zWp9x6On7gqufY+FatDbC3MDQg==}
+
+  compare-versions@6.1.1:
+    resolution: {integrity: sha512-4hm4VPpIecmlg59CHXnRDnqGplJFrbLG4aFEl5vl6cK1u76ws3LLvX7ikFnTDl5vo39sjWD6AaDPYodJp/NNHg==}
 
   component-emitter@1.3.1:
     resolution: {integrity: sha512-T0+barUSQRTUQASh8bx02dl+DhF54GtIDY13Y3m9oWTklKbb3Wv974meRpeZ3lp1JpLVECWWNHC4vaG2XHXouQ==}
@@ -4149,6 +4158,16 @@ snapshots:
       - react-native-b4a
       - supports-color
 
+  '@testcontainers/mongodb@12.0.4':
+    dependencies:
+      compare-versions: 6.1.1
+      testcontainers: 12.0.4
+    transitivePeerDependencies:
+      - bare-abort-controller
+      - bare-buffer
+      - react-native-b4a
+      - supports-color
+
   '@testcontainers/postgresql@12.0.4':
     dependencies:
       testcontainers: 12.0.4
@@ -4679,6 +4698,8 @@ snapshots:
   commander@15.0.0: {}
 
   commondir@1.0.1: {}
+
+  compare-versions@6.1.1: {}
 
   component-emitter@1.3.1: {}
 

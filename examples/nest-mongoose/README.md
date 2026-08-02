@@ -19,11 +19,40 @@ pnpm build && MONGO_URL=mongodb://127.0.0.1:27017/kavo pnpm --filter @kavo/examp
 
 `MONGO_URL` defaults to `mongodb://127.0.0.1:27017/kavo`.
 
-The e2e suite (`tests/app.e2e.spec.ts`) needs none of this set up by hand — it
-provisions an in-memory MongoDB via `mongodb-memory-server`, so `pnpm check`
-exercises the full Nest → engine → Mongoose → MongoDB path with no manual
-step. (The first run downloads a `mongod` binary and caches it, so it needs
-network access once.)
+## The e2e suites
+
+Neither suite needs any of the above set up by hand, and both run the same
+assertions — `tests/crud-e2e.suite.ts` holds them, and each spec only differs
+in how it gets a `mongod` to point the default `mongoose` instance at. One
+behavioral spec, two servers, no forked assertions (the same split
+`nest-typeorm` uses for SQLite/Postgres/MariaDB).
+
+| Spec                          | Server                                                |
+| ----------------------------- | ----------------------------------------------------- |
+| `tests/app.e2e.spec.ts`       | `mongodb-memory-server` — standalone, no Docker       |
+| `tests/app-mongo.e2e.spec.ts` | Testcontainers `mongo:8` — a real, pinned replica set |
+
+The default suite keeps `pnpm check` runnable with no daemon: it downloads a
+`mongod` binary once and caches it, then runs it against an ephemeral data
+directory. What it cannot pin down is the server the app is actually deployed
+onto — it is a standalone of whatever version the tool fetches for the current
+platform.
+
+So `tests/app-mongo.e2e.spec.ts` self-provisions a pinned `mongo:8` container
+via Testcontainers and runs the identical suite against it, exactly the way
+`nest-typeorm`'s Postgres and MariaDB suites do. That needs a running Docker
+daemon wherever `pnpm check`/`pnpm test` runs. Two details are specific to
+MongoDB:
+
+- `MongoDBContainer` always starts a **single-node replica set**, and
+  `rs.initiate()` advertises that member under the container's own hostname.
+  The test connects with `directConnection: true` so the driver keeps talking
+  to the mapped port instead of chasing that unroutable address —
+  `getConnectionString()` does not set it.
+- Unique indexes are only enforced once they exist, and Mongoose builds them
+  in the background after connecting. The shared suite awaits `Model.init()`
+  before asserting that a duplicate `Author.email` is a 409, so the assertion
+  cannot race the index into existence on a cold database.
 
 ## What's different from the TypeORM app
 
@@ -52,10 +81,10 @@ keyed by `_id` rather than a numeric `id`. Filtering _across_ a relation
 (`filter[author.name]`) is refused with a 400 rather than silently matching
 nothing — MongoDB resolves dotted paths inside a document, not across a `ref`.
 
-The e2e suite deliberately does not reuse `nest-typeorm`'s
-`crud-e2e.suite.ts`: that suite is written against a numeric `id` and
-single-table inheritance, and forking its assertions would hide exactly the
-difference this app exists to show.
+This app's `crud-e2e.suite.ts` deliberately does not reuse `nest-typeorm`'s
+same-named suite: that one is written against a numeric `id` and single-table
+inheritance, and forking its assertions would hide exactly the difference this
+app exists to show.
 
 The app consumes only public package APIs — if it ever needs a deep import,
 that is an API-surface bug in the package, not the app.
