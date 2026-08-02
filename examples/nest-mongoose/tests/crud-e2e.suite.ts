@@ -41,8 +41,14 @@ export function registerCrudE2eSuite(getApp: () => INestApplication): void {
       // `autoIndex` builds them in the background after connecting, so
       // awaiting `init()` is what keeps the duplicate-key assertion below
       // from racing the index into existence on a cold database.
+      //
+      // Explicitly timed out, like every bootstrap hook in the two specs
+      // that call this: `vitest.config.ts` widens `testTimeout` but not
+      // `hookTimeout`, so the default here would be 10s — enough to abort
+      // five index builds on a runner already starting three containers,
+      // and to blame the harness for it.
       await Promise.all(Object.values(mongoose.connection.models).map((model) => model.init()));
-    });
+    }, 60_000);
 
     beforeEach(async () => {
       await Promise.all(Object.values(mongoose.connection.models).map((model) => model.deleteMany({})));

@@ -32,11 +32,14 @@ behavioral spec, two servers, no forked assertions (the same split
 | `tests/app.e2e.spec.ts`       | `mongodb-memory-server` — standalone, no Docker       |
 | `tests/app-mongo.e2e.spec.ts` | Testcontainers `mongo:8` — a real, pinned replica set |
 
-The default suite keeps `pnpm check` runnable with no daemon: it downloads a
-`mongod` binary once and caches it, then runs it against an ephemeral data
-directory. What it cannot pin down is the server the app is actually deployed
-onto — it is a standalone of whatever version the tool fetches for the current
-platform.
+The default suite is the one that runs without Docker: it downloads a `mongod`
+binary once and caches it, then runs it against an ephemeral data directory, so
+`pnpm vitest run examples/nest-mongoose/tests/app.e2e.spec.ts` exercises the
+whole stack on a machine with no daemon. (`pnpm check` as a whole still needs
+one — `nest-typeorm`'s Postgres and MariaDB suites have required it since
+before this app existed.) What the default suite cannot pin down is the server
+the app is actually deployed onto — it is a standalone of whatever version the
+tool fetches for the current platform.
 
 So `tests/app-mongo.e2e.spec.ts` self-provisions a pinned `mongo:8` container
 via Testcontainers and runs the identical suite against it, exactly the way

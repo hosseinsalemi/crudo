@@ -43,9 +43,19 @@ beforeAll(async () => {
 }, 240_000);
 
 afterAll(async () => {
-  if (app !== undefined) await app.close();
-  await mongoose.disconnect();
-  if (container !== undefined) await container.stop();
+  // Each step runs even if an earlier one rejects. A half-initialized app
+  // whose `close()` throws would otherwise strand the open socket — keeping
+  // the worker's event loop alive — and leak the container until Ryuk
+  // reaps it, turning one failed test into a hung run.
+  try {
+    if (app !== undefined) await app.close();
+  } finally {
+    try {
+      await mongoose.disconnect();
+    } finally {
+      if (container !== undefined) await container.stop();
+    }
+  }
 }, 30_000);
 
 registerCrudE2eSuite(() => app);
