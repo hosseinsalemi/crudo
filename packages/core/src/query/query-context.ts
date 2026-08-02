@@ -32,6 +32,8 @@ export interface QueryContext<Entity = unknown> {
   readonly include?: readonly IncludePath<Entity>[];
   /** Include soft-deleted rows. */
   readonly withDeleted?: boolean;
+  /** Only soft-deleted rows. Mutually exclusive with `withDeleted`. */
+  readonly onlyDeleted?: boolean;
 }
 
 /**
@@ -47,6 +49,8 @@ export interface NormalizedQueryContext<Entity = unknown> {
   /** Validated include tree; empty object when nothing is included. */
   readonly include: IncludeTree;
   readonly withDeleted: boolean;
+  /** Restrict the read to only soft-deleted rows. Mutually exclusive with `withDeleted`. */
+  readonly onlyDeleted: boolean;
   /**
    * Whether the adapter should compute `ListResultDto.total`. `false`
    * skips the count query entirely and the envelope reports `total: null`.

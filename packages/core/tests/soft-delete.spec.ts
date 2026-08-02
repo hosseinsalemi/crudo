@@ -103,6 +103,36 @@ describe("soft delete lifecycle", () => {
     });
   });
 
+  it("shows only deleted rows under onlyDeleted, and neither live nor deleted otherwise mixed in", async () => {
+    const { crud } = makeAccountCrud();
+    await crud.createOne({ name: "acme" } as never);
+    await crud.createOne({ name: "globex" } as never);
+    await crud.deleteOne(1);
+
+    const list = await crud.findMany({ onlyDeleted: true });
+    expect(list.items).toMatchObject([{ id: 1 }]);
+    expect(await crud.findOne(1, { onlyDeleted: true } as never)).toMatchObject({ id: 1 });
+    await expect(crud.findOne(2, { onlyDeleted: true } as never)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it("rejects onlyDeleted on an entity that is not soft-deletable", async () => {
+    const crud = createKavo().createCrud(User, undefined, {
+      adapter: new InMemoryUserAdapter(),
+      metadata: userMetadata,
+    });
+    await expect(crud.findMany({ onlyDeleted: true })).rejects.toMatchObject({
+      issues: [{ field: "onlyDeleted", code: "KAVO_QUERY_UNSUPPORTED_PARAM" }],
+    });
+  });
+
+  it("rejects withDeleted and onlyDeleted set together as a conflicting combination", async () => {
+    const { crud } = makeAccountCrud();
+    await crud.createOne({ name: "acme" } as never);
+    await expect(crud.findMany({ withDeleted: true, onlyDeleted: true })).rejects.toMatchObject({
+      issues: [{ field: "onlyDeleted", code: "KAVO_QUERY_CONFLICTING_PARAMS" }],
+    });
+  });
+
   it("refuses to delete an already-deleted row", async () => {
     const { crud } = makeAccountCrud();
     await crud.createOne({ name: "acme" } as never);

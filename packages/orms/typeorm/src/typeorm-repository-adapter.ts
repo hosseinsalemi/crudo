@@ -73,7 +73,7 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
   ): Promise<Entity | null> {
     try {
       const include = query?.include ?? {};
-      const qb = this.byId(id, context, query?.withDeleted ?? false);
+      const qb = this.byId(id, context, query?.withDeleted ?? false, query?.onlyDeleted ?? false);
       this.joinIncludes(qb, include, this.alias);
       const entity = await qb.getOne();
       if (entity !== null) await this.loadBatches([entity], this.entity, include);
@@ -128,7 +128,7 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
     options: { sorted?: boolean; includes?: boolean } = {},
   ): SelectQueryBuilder<Entity> {
     const qb = this.repository.createQueryBuilder(this.alias);
-    this.scopeToLive(qb, context, query.withDeleted);
+    this.scopeToLive(qb, context, query.withDeleted, query.onlyDeleted);
     const translator = new FilterTranslator(qb, this.alias);
     // Include joins first, then filters: both name joins the same way, so
     // a filter on `owner.name` reuses the selecting join instead of adding
@@ -233,25 +233,45 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
   // ── Soft delete ──────────────────────────────────────────────────────
 
   /**
-   * Exclude soft-deleted rows unless the caller opted in with
-   * `withDeleted`. Two shapes, one rule: TypeORM already excludes its own
+   * Three-way soft-delete scope: exclude deleted rows by default, include
+   * both live and deleted with `withDeleted`, or restrict to only deleted
+   * with `onlyDeleted` (mutually exclusive — validated upstream). Two
+   * marker shapes, one rule each: TypeORM already excludes its own
    * `@DeleteDateColumn` (so opting *in* is the explicit step), while an
-   * ordinary marker column needs the `IS NULL` predicate spelled out.
-   * Entities that aren't soft-deletable touch neither branch.
+   * ordinary marker column needs the `IS NULL`/`IS NOT NULL` predicate
+   * spelled out. Entities that aren't soft-deletable touch neither branch.
    */
-  private scopeToLive(qb: SelectQueryBuilder<Entity>, context: KavoContext<Entity>, withDeleted: boolean): void {
+  private scopeToLive(
+    qb: SelectQueryBuilder<Entity>,
+    context: KavoContext<Entity>,
+    withDeleted: boolean,
+    onlyDeleted = false,
+  ): void {
     const softDelete = context.config.softDelete;
     if (softDelete.strategy !== "soft") return;
     if (softDelete.field === this.deleteDateColumn) {
+      if (onlyDeleted) {
+        qb.withDeleted().andWhere(`${this.alias}.${softDelete.field} IS NOT NULL`);
+        return;
+      }
       if (withDeleted) qb.withDeleted();
+      return;
+    }
+    if (onlyDeleted) {
+      qb.andWhere(`${this.alias}.${softDelete.field} IS NOT NULL`);
       return;
     }
     if (!withDeleted) qb.andWhere(`${this.alias}.${softDelete.field} IS NULL`);
   }
 
-  private byId(id: EntityId, context: KavoContext<Entity>, withDeleted: boolean): SelectQueryBuilder<Entity> {
+  private byId(
+    id: EntityId,
+    context: KavoContext<Entity>,
+    withDeleted: boolean,
+    onlyDeleted = false,
+  ): SelectQueryBuilder<Entity> {
     const qb = this.repository.createQueryBuilder(this.alias).where(`${this.alias}.${this.idField} = :id`, { id });
-    this.scopeToLive(qb, context, withDeleted);
+    this.scopeToLive(qb, context, withDeleted, onlyDeleted);
     return qb;
   }
 

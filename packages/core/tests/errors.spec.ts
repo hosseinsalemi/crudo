@@ -33,6 +33,7 @@ const CATALOG: Readonly<Record<CatalogedErrorCode, { status: number; title: stri
   KAVO_QUERY_INVALID_VALUE: { status: 400, title: "Invalid query value" },
   KAVO_QUERY_LIMIT_EXCEEDED: { status: 400, title: "Query limit exceeded" },
   KAVO_QUERY_UNSUPPORTED_PARAM: { status: 400, title: "Unsupported query parameter" },
+  KAVO_QUERY_CONFLICTING_PARAMS: { status: 400, title: "Conflicting query parameters" },
   KAVO_NOT_FOUND: { status: 404, title: "Not found" },
   KAVO_CONFLICT: { status: 409, title: "Conflict" },
   KAVO_ALREADY_DELETED: { status: 409, title: "Already deleted" },

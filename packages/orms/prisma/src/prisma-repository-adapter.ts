@@ -57,7 +57,12 @@ export class PrismaRepositoryAdapter<Entity extends object> implements Repositor
     context: KavoContext<Entity>,
   ): Promise<Entity | null> {
     try {
-      const where = this.scopeToLive({ [this.idField]: id }, context, query?.withDeleted ?? false);
+      const where = this.scopeToLive(
+        { [this.idField]: id },
+        context,
+        query?.withDeleted ?? false,
+        query?.onlyDeleted ?? false,
+      );
       const include = this.buildInclude(query?.include ?? {});
       const row = await this.delegate.findFirst({ where, ...(include && { include }) });
       return (row as Entity | null) ?? null;
@@ -92,7 +97,12 @@ export class PrismaRepositoryAdapter<Entity extends object> implements Repositor
     try {
       // A dedicated count — never fetch-then-length: the engine only calls
       // this when `query.count` is true, so `total: null` costs zero queries.
-      const where = this.scopeToLive(translateFilter(query.filter, this.filterOptions), context, query.withDeleted);
+      const where = this.scopeToLive(
+        translateFilter(query.filter, this.filterOptions),
+        context,
+        query.withDeleted,
+        query.onlyDeleted,
+      );
       return await this.delegate.count({ ...(where && { where }) });
     } catch (error) {
       throw mapDriverError(error, errorContext(context));
@@ -100,7 +110,12 @@ export class PrismaRepositoryAdapter<Entity extends object> implements Repositor
   }
 
   private buildFindArgs(query: NormalizedQueryContext<Entity>, context: KavoContext<Entity>): Record<string, unknown> {
-    const where = this.scopeToLive(translateFilter(query.filter, this.filterOptions), context, query.withDeleted);
+    const where = this.scopeToLive(
+      translateFilter(query.filter, this.filterOptions),
+      context,
+      query.withDeleted,
+      query.onlyDeleted,
+    );
     const orderBy = query.sort.map((sort) => nestOrderBy(sort.field as string, sort.direction));
     const include = this.buildInclude(query.include);
     return {
@@ -142,9 +157,15 @@ export class PrismaRepositoryAdapter<Entity extends object> implements Repositor
     where: PrismaWhere | undefined,
     context: KavoContext<Entity>,
     withDeleted: boolean,
+    onlyDeleted = false,
   ): PrismaWhere | undefined {
     const softDelete = context.config.softDelete;
-    if (softDelete.strategy !== "soft" || withDeleted) return where;
+    if (softDelete.strategy !== "soft") return where;
+    if (onlyDeleted) {
+      const deleted = { [softDelete.field]: { not: null } };
+      return where === undefined ? deleted : { AND: [where, deleted] };
+    }
+    if (withDeleted) return where;
     const live = { [softDelete.field]: null };
     if (where === undefined) return live;
     return { AND: [where, live] };

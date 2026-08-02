@@ -52,7 +52,9 @@ export class QueryNormalizer<Entity = unknown> {
   ): NormalizedQueryContext<Entity> {
     const issues: QueryIssueDto[] = [];
 
-    const withDeleted = parseWithDeleted(rawParams["withDeleted"], config, issues);
+    const withDeleted = parseSoftDeleteFlag("withDeleted", rawParams["withDeleted"], config, issues);
+    const onlyDeleted = parseSoftDeleteFlag("onlyDeleted", rawParams["onlyDeleted"], config, issues);
+    if (withDeleted && onlyDeleted) issues.push(conflictingSoftDeleteFlagsIssue());
 
     let filter: Filter<Entity> = { root: null };
     try {
@@ -88,6 +90,7 @@ export class QueryNormalizer<Entity = unknown> {
       fields,
       include,
       withDeleted,
+      onlyDeleted,
       count: config.settings.pagination.count,
     };
   }
@@ -104,7 +107,9 @@ export class QueryNormalizer<Entity = unknown> {
   ): NormalizedQueryContext<Entity> {
     const issues: QueryIssueDto[] = [];
     const input = query ?? {};
-    const withDeleted = parseWithDeleted(input.withDeleted, config, issues);
+    const withDeleted = parseSoftDeleteFlag("withDeleted", input.withDeleted, config, issues);
+    const onlyDeleted = parseSoftDeleteFlag("onlyDeleted", input.onlyDeleted, config, issues);
+    if (withDeleted && onlyDeleted) issues.push(conflictingSoftDeleteFlagsIssue());
 
     const root = input.filter ?? null;
     if (root !== null) {
@@ -152,6 +157,7 @@ export class QueryNormalizer<Entity = unknown> {
       fields,
       include,
       withDeleted,
+      onlyDeleted,
       count: config.settings.pagination.count,
     };
   }
@@ -233,12 +239,16 @@ function parseIncludePaths(raw: unknown, issues: QueryIssueDto[]): readonly stri
 }
 
 /**
- * `withDeleted`: opt out of the default exclusion of
- * soft-deleted rows. Asking for it on an entity that resolves to a hard
- * delete strategy is rejected rather than silently ignored — a client
- * that thinks it is seeing deleted rows should be told it is not.
+ * `withDeleted` / `onlyDeleted`: opt out of the default exclusion of
+ * soft-deleted rows, or narrow a read to only them. Asking for either on an
+ * entity that resolves to a hard delete strategy is rejected rather than
+ * silently ignored — a client that thinks it is seeing deleted rows should
+ * be told it is not. Setting both together is a separate conflict check
+ * (see {@link conflictingSoftDeleteFlagsIssue}), since each is individually
+ * valid on a soft-deletable entity.
  */
-function parseWithDeleted<Entity>(
+function parseSoftDeleteFlag<Entity>(
+  field: "withDeleted" | "onlyDeleted",
   raw: unknown,
   config: ResolvedEntityConfig<Entity>,
   issues: QueryIssueDto[],
@@ -248,23 +258,34 @@ function parseWithDeleted<Entity>(
   }
   if (raw !== true && raw !== "true" && raw !== "1") {
     issues.push({
-      field: "withDeleted",
+      field,
       code: "KAVO_QUERY_INVALID_VALUE",
-      detail: `Value '${String(raw)}' for field 'withDeleted' is not a valid boolean.`,
+      detail: `Value '${String(raw)}' for field '${field}' is not a valid boolean.`,
     });
     return false;
   }
   if (config.softDelete.strategy !== "soft") {
     issues.push({
-      field: "withDeleted",
+      field,
       code: "KAVO_QUERY_UNSUPPORTED_PARAM",
       detail:
-        `Query parameter 'withDeleted' is not supported: ` +
+        `Query parameter '${field}' is not supported: ` +
         `${config.entityName} is not soft-deletable, so no rows are excluded.`,
     });
     return false;
   }
   return true;
+}
+
+/** `withDeleted=true` and `onlyDeleted=true` together is a contradiction: "everything" vs. "only the deleted". */
+function conflictingSoftDeleteFlagsIssue(): QueryIssueDto {
+  return {
+    field: "onlyDeleted",
+    code: "KAVO_QUERY_CONFLICTING_PARAMS",
+    detail:
+      "Query parameters 'withDeleted' and 'onlyDeleted' cannot be used together: " +
+      "'withDeleted' includes both live and deleted rows, while 'onlyDeleted' restricts to deleted rows only.",
+  };
 }
 
 /**

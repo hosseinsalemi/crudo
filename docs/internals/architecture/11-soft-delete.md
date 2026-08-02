@@ -74,11 +74,25 @@ an entity that is not soft-deletable the parameter is **rejected**
 (`KAVO_QUERY_UNSUPPORTED_PARAM`) rather than ignored: a client that
 believes it is seeing deleted rows should be told it is not.
 
-In `@kavo/typeorm` the flag translates two ways, because a marker column
+`onlyDeleted=true` is the third state: instead of widening the default
+exclusion, it narrows a read to _only_ soft-deleted rows (a "trash" view).
+It is parsed and validated the same way as `withDeleted` — rejected with
+`KAVO_QUERY_UNSUPPORTED_PARAM` on an entity that isn't soft-deletable — and
+`findMany`/`count` honor it identically on both wire and programmatic
+paths. Setting `withDeleted=true` and `onlyDeleted=true` together is a
+contradiction ("everything" vs. "only the deleted") and is rejected with
+`KAVO_QUERY_CONFLICTING_PARAMS` rather than one silently winning.
+
+In `@kavo/typeorm` both flags translate two ways, because a marker column
 is not always the ORM's own: for a `@DeleteDateColumn`, TypeORM already
-excludes deleted rows and the adapter opts in with `.withDeleted()`; for
-an ordinary column named through config, the adapter adds
-`<alias>.<field> IS NULL` itself.
+excludes deleted rows, so the adapter opts in with `.withDeleted()` for
+`withDeleted`, or with `.withDeleted()` plus `<alias>.<field> IS NOT NULL`
+for `onlyDeleted`; for an ordinary column named through config, the
+adapter adds `<alias>.<field> IS NULL` (default) or
+`<alias>.<field> IS NOT NULL` (`onlyDeleted`) itself. `@kavo/prisma` and
+`@kavo/mongoose` have no ORM-declared marker column at all (ADR-0017,
+ADR-0018), so both flags are always the same plain field-predicate over
+the configured `softDelete.field`.
 
 ## 4. Edges
 
