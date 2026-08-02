@@ -122,17 +122,24 @@ export class FilterTranslator<Entity extends ObjectLiteral> implements FilterBui
         return;
       }
       case "LIKE":
-        // `\` is the documented literal-escape for `%`/`_`.
-        where.where(`${column} LIKE :${parameter} ESCAPE '\\'`, {
+        // `\` is the documented literal-escape for `%`/`_`. Bound as a
+        // parameter rather than inlined as a `'\'` string literal: MySQL's
+        // default `sql_mode` treats backslash as its own in-string escape
+        // character, so a literal `'\'` there is an unterminated string
+        // (syntax error), while Postgres takes it literally. A bound
+        // parameter sidesteps each driver's own string-literal escaping.
+        where.where(`${column} LIKE :${parameter} ESCAPE :${parameter}Escape`, {
           [parameter]: value,
+          [`${parameter}Escape`]: "\\",
         });
         return;
       case "ILIKE":
         // Portable case-insensitive match. Postgres has native ILIKE, but
         // LOWER() LIKE LOWER() behaves identically across every TypeORM
         // driver; one spelling beats a per-driver fork.
-        where.where(`LOWER(${column}) LIKE LOWER(:${parameter}) ESCAPE '\\'`, {
+        where.where(`LOWER(${column}) LIKE LOWER(:${parameter}) ESCAPE :${parameter}Escape`, {
           [parameter]: value,
+          [`${parameter}Escape`]: "\\",
         });
         return;
       case "BETWEEN": {

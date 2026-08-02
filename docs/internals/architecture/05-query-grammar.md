@@ -66,9 +66,14 @@ fields:     root: [id, name, email]
   spellings mean what they read as.
 - **`like` / `ilike`:** never auto-wrap wildcards — callers pass `%`
   explicitly. Literal `%` and `_` are escaped with a backslash (`\%`,
-  `\_`); the adapter emits the matching `ESCAPE '\'` clause. `ilike` is
-  translated portably (`LOWER(col) LIKE LOWER(:v)`), identical on every
-  driver. Both operators apply to string columns only.
+  `\_`); the adapter emits the matching `ESCAPE` clause, with the
+  backslash bound as a query parameter rather than inlined as a `'\'`
+  string literal (drivers disagree on how backslash is escaped inside a
+  literal — MySQL's default `sql_mode` treats it as its own in-string
+  escape character, Postgres does not — so a parameter is the portable
+  spelling). `ilike` is translated portably (`LOWER(col) LIKE
+LOWER(:v)`), identical on every driver. Both operators apply to string
+  columns only.
 - **Relation-path filtering:** dot notation
   (`filter[profile.city][eq]=Helsinki`), permitted only for paths on the
   filterable allowlist. Relation-path filters **restrict root rows** (a
