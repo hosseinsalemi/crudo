@@ -35,14 +35,14 @@ describe("crudTools", () => {
     const { bindings } = setup();
     expect(bindings.map((binding) => binding.tool.name).sort()).toEqual(
       [
-        "todo_createOne",
-        "todo_deleteOne",
-        "todo_findMany",
-        "todo_findOne",
-        "todo_patchOne",
-        "todo_purgeOne",
-        "todo_restoreOne",
-        "todo_updateOne",
+        "todo.createOne",
+        "todo.deleteOne",
+        "todo.findMany",
+        "todo.findOne",
+        "todo.patchOne",
+        "todo.purgeOne",
+        "todo.restoreOne",
+        "todo.updateOne",
       ].sort(),
     );
   });
@@ -50,7 +50,7 @@ describe("crudTools", () => {
   it("runs createOne then findOne through the same engine, returning JSON text content", async () => {
     const { bindings } = setup();
 
-    const created = await find(bindings, "todo_createOne").handler({ title: "write tests", done: false });
+    const created = await find(bindings, "todo.createOne").handler({ title: "write tests", done: false });
     expect(created.isError).toBeUndefined();
     expect(JSON.parse((created.content[0] as { text: string }).text)).toEqual({
       id: 1,
@@ -58,7 +58,7 @@ describe("crudTools", () => {
       done: false,
     });
 
-    const fetched = await find(bindings, "todo_findOne").handler({ id: 1 });
+    const fetched = await find(bindings, "todo.findOne").handler({ id: 1 });
     expect(JSON.parse((fetched.content[0] as { text: string }).text)).toMatchObject({ id: 1, title: "write tests" });
   });
 
@@ -66,7 +66,7 @@ describe("crudTools", () => {
     const { adapter, bindings } = setup();
     adapter.rows.push({ id: 1, title: "a", done: false }, { id: 2, title: "b", done: true });
 
-    const result = await find(bindings, "todo_findMany").handler({
+    const result = await find(bindings, "todo.findMany").handler({
       limit: 1,
       offset: 1,
       sort: ["-title"],
@@ -84,13 +84,13 @@ describe("crudTools", () => {
     const { adapter, bindings } = setup();
     adapter.rows.push({ id: 1, title: "before", done: false });
 
-    const updated = await find(bindings, "todo_updateOne").handler({ id: 1, title: "after", done: true });
+    const updated = await find(bindings, "todo.updateOne").handler({ id: 1, title: "after", done: true });
     expect(JSON.parse((updated.content[0] as { text: string }).text)).toMatchObject({ title: "after", done: true });
 
-    const patched = await find(bindings, "todo_patchOne").handler({ id: 1, done: false });
+    const patched = await find(bindings, "todo.patchOne").handler({ id: 1, done: false });
     expect(JSON.parse((patched.content[0] as { text: string }).text)).toMatchObject({ done: false });
 
-    const deleted = await find(bindings, "todo_deleteOne").handler({ id: 1 });
+    const deleted = await find(bindings, "todo.deleteOne").handler({ id: 1 });
     expect(JSON.parse((deleted.content[0] as { text: string }).text)).toEqual({ deleted: true });
     expect(adapter.rows).toHaveLength(0);
   });
@@ -98,7 +98,7 @@ describe("crudTools", () => {
   it("maps a KavoException (not found) to an isError tool result instead of throwing", async () => {
     const { bindings } = setup();
 
-    const result = await find(bindings, "todo_findOne").handler({ id: 999 });
+    const result = await find(bindings, "todo.findOne").handler({ id: 999 });
 
     expect(result.isError).toBe(true);
     expect((result.content[0] as { text: string }).text).toContain("KAVO_NOT_FOUND");
@@ -108,7 +108,7 @@ describe("crudTools", () => {
     const { adapter, bindings } = setup();
     adapter.rows.push({ id: 1, title: "a", done: false });
 
-    const restored = await find(bindings, "todo_restoreOne").handler({ id: 1 });
+    const restored = await find(bindings, "todo.restoreOne").handler({ id: 1 });
     expect(restored.isError).toBe(true);
   });
 
@@ -124,13 +124,13 @@ describe("crudTools", () => {
 
     const bindings = crudTools({ name: "Note", service });
 
-    const restored = await find(bindings, "note_restoreOne").handler({ id: created.id });
+    const restored = await find(bindings, "note.restoreOne").handler({ id: created.id });
     expect(JSON.parse((restored.content[0] as { text: string }).text)).toMatchObject({
       id: created.id,
       text: "keep me",
     });
 
-    const purged = await find(bindings, "note_purgeOne").handler({ id: created.id });
+    const purged = await find(bindings, "note.purgeOne").handler({ id: created.id });
     expect(JSON.parse((purged.content[0] as { text: string }).text)).toEqual({ purged: true });
     expect(adapter.rows).toHaveLength(0);
   });

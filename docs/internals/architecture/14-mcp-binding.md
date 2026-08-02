@@ -36,19 +36,19 @@ the full standard set, unconditionally:
 
 | Tool               | Args                                              |
 | ------------------ | ------------------------------------------------- |
-| `owner_findOne`    | `{ id }`                                          |
-| `owner_findMany`   | `{ limit?, offset?, sort?, filter? }`             |
-| `owner_createOne`  | any fields (forwarded straight to the create DTO) |
-| `owner_updateOne`  | `{ id, ...anyFields }`                            |
-| `owner_patchOne`   | `{ id, ...anyFields }`                            |
-| `owner_deleteOne`  | `{ id }`                                          |
-| `owner_restoreOne` | `{ id }`                                          |
-| `owner_purgeOne`   | `{ id }`                                          |
+| `owner.findOne`    | `{ id }`                                          |
+| `owner.findMany`   | `{ limit?, offset?, sort?, filter? }`             |
+| `owner.createOne`  | any fields (forwarded straight to the create DTO) |
+| `owner.updateOne`  | `{ id, ...anyFields }`                            |
+| `owner.patchOne`   | `{ id, ...anyFields }`                            |
+| `owner.deleteOne`  | `{ id }`                                          |
+| `owner.restoreOne` | `{ id }`                                          |
+| `owner.purgeOne`   | `{ id }`                                          |
 
 This mirrors how `@Kavo` itself enables every standard operation by
 default: no hand-authored per-entity JSON Schema to keep in sync, and no
 `OperationRegistry` cross-check either — an entity that never declared
-soft delete still gets `owner_restoreOne`/`owner_purgeOne` tools, and
+soft delete still gets `owner.restoreOne`/`owner.purgeOne` tools, and
 calling either surfaces `OperationDisabledException` as a normal `isError`
 result (§3), exactly like calling the equivalent disabled REST route
 would. `createOne`/`updateOne`/`patchOne`'s `inputSchema` is deliberately
@@ -81,7 +81,7 @@ programmatic `QueryContext` surface, not REST's wire-string/camelCase form.
 
 **Update/patch args are flat, not wrapped.** GraphQL's mutations take `(id,
 input)` as two separate arguments because GraphQL has native argument
-lists; an MCP tool call takes one JSON object, so `owner_updateOne`'s
+lists; an MCP tool call takes one JSON object, so `owner.updateOne`'s
 `inputSchema` merges `id` directly into the DTO schema's own `properties`/
 `required` instead of nesting the DTO under an `input` key — one flat
 object a caller fills in once.

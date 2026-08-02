@@ -36,7 +36,7 @@ export interface KavoMcpToolBinding {
 
 /** One entity's MCP binding options. */
 export interface KavoMcpToolsOptions<Entity extends object, Id extends EntityId, CreateDto, UpdateDto, PatchDto> {
-  /** Singular, capitalized entity name — becomes the `<lowerName>_<operation>` tool name prefix. */
+  /** Singular, capitalized entity name — becomes the `<lowerName>.<operation>` tool name prefix. */
   readonly name: string;
   readonly service: BoundKavoService<Entity, Id, CreateDto, UpdateDto, PatchDto>;
 }
@@ -116,12 +116,12 @@ export function crudTools<Entity extends object, Id extends EntityId, CreateDto,
 
   return [
     {
-      tool: { name: `${prefix}_findOne`, description: `Find one ${name} by id.`, inputSchema: idOnlySchema },
+      tool: { name: `${prefix}.findOne`, description: `Find one ${name} by id.`, inputSchema: idOnlySchema },
       handler: (args) => guarded(() => service.findOne(args["id"] as Id)),
     },
     {
       tool: {
-        name: `${prefix}_findMany`,
+        name: `${prefix}.findMany`,
         description: `List ${name} records, with optional pagination, sort, and filter.`,
         inputSchema: objectSchema(
           {
@@ -144,12 +144,12 @@ export function crudTools<Entity extends object, Id extends EntityId, CreateDto,
         ),
     },
     {
-      tool: { name: `${prefix}_createOne`, description: `Create a new ${name}.`, inputSchema: freeformObjectSchema },
+      tool: { name: `${prefix}.createOne`, description: `Create a new ${name}.`, inputSchema: freeformObjectSchema },
       handler: (args) => guarded(() => service.createOne(args as CreateDto)),
     },
     {
       tool: {
-        name: `${prefix}_updateOne`,
+        name: `${prefix}.updateOne`,
         description: `Replace an existing ${name} by id.`,
         inputSchema: idAndFreeformSchema,
       },
@@ -160,7 +160,7 @@ export function crudTools<Entity extends object, Id extends EntityId, CreateDto,
     },
     {
       tool: {
-        name: `${prefix}_patchOne`,
+        name: `${prefix}.patchOne`,
         description: `Partially update an existing ${name} by id.`,
         inputSchema: idAndFreeformSchema,
       },
@@ -170,7 +170,7 @@ export function crudTools<Entity extends object, Id extends EntityId, CreateDto,
       },
     },
     {
-      tool: { name: `${prefix}_deleteOne`, description: `Delete a ${name} by id.`, inputSchema: idOnlySchema },
+      tool: { name: `${prefix}.deleteOne`, description: `Delete a ${name} by id.`, inputSchema: idOnlySchema },
       handler: (args) =>
         guarded(async () => {
           await service.deleteOne(args["id"] as Id);
@@ -179,7 +179,7 @@ export function crudTools<Entity extends object, Id extends EntityId, CreateDto,
     },
     {
       tool: {
-        name: `${prefix}_restoreOne`,
+        name: `${prefix}.restoreOne`,
         description: `Restore a soft-deleted ${name} by id.`,
         inputSchema: idOnlySchema,
       },
@@ -187,7 +187,7 @@ export function crudTools<Entity extends object, Id extends EntityId, CreateDto,
     },
     {
       tool: {
-        name: `${prefix}_purgeOne`,
+        name: `${prefix}.purgeOne`,
         description: `Permanently delete a soft-deleted ${name} by id.`,
         inputSchema: idOnlySchema,
       },

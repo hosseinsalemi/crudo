@@ -19,10 +19,10 @@ describe("resolveKavoMcpTools", () => {
     const services = new Map<unknown, unknown>([[Todo, todoService]]);
     const bindings = resolveKavoMcpTools([{ entity: Todo }], (entity) => services.get(entity) as never);
 
-    expect(bindings.map((binding) => binding.tool.name)).toContain("todo_findOne");
+    expect(bindings.map((binding) => binding.tool.name)).toContain("todo.findOne");
     expect(bindings.map((binding) => binding.tool.name)).toHaveLength(8);
 
-    const findOne = bindings.find((binding) => binding.tool.name === "todo_findOne");
+    const findOne = bindings.find((binding) => binding.tool.name === "todo.findOne");
     const result = await findOne!.handler({ id: 1 });
     expect(JSON.parse((result.content[0] as { text: string }).text)).toMatchObject({ title: "discovered" });
   });
