@@ -28,21 +28,38 @@ GET /books?filter[pages][gte]=200&filter[pages][lt]=500
 | Is null               | `isNull`     | `filter[deletedAt][isNull]=true`                   |
 | Is not null           | `isNotNull`  | `filter[deletedAt][isNotNull]=true`                |
 
-Wire tokens are exact-case (`gte`, not `GTE`) — a misspelled or wrong-case operator is a 400, not silently ignored. `like`/`ilike` never auto-wrap wildcards; pass `%` yourself.
+Wire tokens are exact-case (`gte`, not `GTE`) — a misspelled or wrong-case operator is a 400, not silently ignored. `like`/`ilike` never auto-wrap wildcards; pass `%` yourself, and escape any literal `%`/`_` in the value with a backslash. Both apply to string columns only.
+
+`in`/`notIn` also accept the repeated-key form instead of a comma list, which is friendlier to URL-building libraries:
+
+```
+GET /books?filter[status][in][]=active&filter[status][in][]=pending
+```
+
+`between` takes exactly two comma-separated bounds. `isNull`/`isNotNull` are boolean-valued — `isNull=false` means the same thing as `isNotNull=true`, so pick whichever reads better.
 
 Only fields on the entity's `filterable` allowlist can be filtered on — see [Configuration](/integrations/nest/configuration#allowlists) for how to configure that list. Anything outside it is a 400, never a silent no-op.
 
-**OR / nested logic** uses the same bracket grammar:
+**OR / NOT / nested logic** uses the same bracket grammar and can be nested arbitrarily deep (up to `query.maxFilterDepth`, default 3):
 
 ```
 GET /books?filter[or][0][author][eq]=Tolkien&filter[or][1][author][eq]=Herbert
+GET /books?filter[not][status][eq]=banned
 ```
 
-**Relation-path filtering** uses dot notation and restricts root rows without loading the related collection:
+For anything the bracket grammar gets awkward at, `filter` also accepts one JSON-encoded value as a full-power escape hatch. It parses into exactly the same filter tree as the bracket form, so the two are interchangeable — and if both are present on a request, they AND together:
+
+```
+GET /books?filter={"or":[{"author":{"eq":"Tolkien"}},{"not":{"status":{"eq":"banned"}}}]}
+```
+
+**Relation-path filtering** uses dot notation and restricts root rows without loading the related collection — it never filters *what's inside* an included relation, only which root rows come back:
 
 ```
 GET /books?filter[author.country][eq]=UK
 ```
+
+**Limits** guard every request, configurable per scope: `query.maxFilterDepth` (default 3) caps how deeply `or`/`not` can nest, `query.maxInValues` (default 100) caps `in`/`notIn` array length, and `pagination.maxLimit` (default 100) caps page size. Filter/sort/fields/pagination violations on one request are collected together and reported in a single response — see [Errors](#errors) below.
 
 ## Sorting
 
@@ -59,6 +76,8 @@ GET /books?limit=20&offset=40
 ```
 
 The default strategy is flat `limit`/`offset` (0-based) — the same field names the response envelope reports back, so request and response mirror each other. A missing `limit` falls back to `pagination.defaultLimit`; a `limit` above `pagination.maxLimit` is clamped, not rejected.
+
+A 1-indexed page-based alternative is also built in — `page[number]`/`page[size]` — for entities configured to use it (see [Configuration](/integrations/nest/configuration)). It normalizes to the same `limit`/`offset` internally, so the response envelope always reports `limit`/`offset` either way.
 
 ## Field selection
 
