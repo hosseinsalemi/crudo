@@ -17,6 +17,7 @@ hero:
 <script setup lang="ts">
 import { ref } from "vue";
 import QueryGrammarTabs from "./.vitepress/theme/components/QueryGrammarTabs.vue";
+import McpChatDemo from "./.vitepress/theme/components/McpChatDemo.vue";
 
 const queryGrammarTabs = [
   { id: "filter-sort", label: "Filter & sort" },
@@ -463,28 +464,7 @@ export class BooksController {}
       <span class="mcp-window-dot mcp-window-dot--green"></span>
       <span class="mcp-window-title">MCP client</span>
     </div>
-    <div class="mcp-window-body">
-      <div class="mcp-turn mcp-turn--user">
-        <span class="mcp-turn-tag">You</span>
-        <p class="mcp-turn-text">Archive book #42 and tell me who wrote it.</p>
-      </div>
-      <div class="mcp-call">
-        <span class="mcp-call-tag">call</span>
-        <span class="mcp-call-name">book.patchOne</span>
-        <span class="mcp-call-args">{ id: 42, status: "archived" }</span>
-      </div>
-      <div class="mcp-result">{ "id": 42, "status": "archived" }</div>
-      <div class="mcp-call">
-        <span class="mcp-call-tag">call</span>
-        <span class="mcp-call-name">book.findOne</span>
-        <span class="mcp-call-args">{ id: 42, include: "author" }</span>
-      </div>
-      <div class="mcp-result">{ "author": { "name": "Ursula K. Le Guin" } }</div>
-      <div class="mcp-turn mcp-turn--agent">
-        <span class="mcp-turn-tag mcp-turn-tag--agent">Agent</span>
-        <p class="mcp-turn-text">Done — Book #42 is archived. It was written by Ursula K. Le Guin.</p>
-      </div>
-    </div>
+    <McpChatDemo />
   </div>
 
   <p class="mcp-note">Every standard operation, for every <code>@Kavo</code> entity, unconditionally — an agent gets the same filtering, pagination, and soft-delete semantics a REST or GraphQL client does, because it calls the same engine.</p>
@@ -552,77 +532,6 @@ export class BooksController {}
   margin-left: 6px;
   font-size: 12px;
   font-weight: 500;
-  color: var(--vp-c-text-3);
-}
-
-.mcp-window-body {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 18px 20px 22px;
-}
-
-.mcp-turn-tag {
-  display: inline-block;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--vp-c-text-3);
-  margin-bottom: 4px;
-}
-
-.mcp-turn-tag--agent {
-  color: var(--vp-c-brand-1);
-}
-
-.mcp-turn-text {
-  margin: 0;
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: var(--vp-c-text-1);
-}
-
-.mcp-call {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--vp-c-brand-1) 40%, var(--vp-c-divider));
-  background: var(--vp-c-brand-soft);
-}
-
-.mcp-call-tag {
-  font-family: var(--vp-font-family-mono);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: var(--vp-c-brand-1);
-  opacity: 0.8;
-}
-
-.mcp-call-name {
-  font-family: var(--vp-font-family-mono);
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--vp-c-brand-1);
-}
-
-.mcp-call-args {
-  font-family: var(--vp-font-family-mono);
-  font-size: 12px;
-  color: var(--vp-c-text-2);
-}
-
-.mcp-result {
-  margin-left: 12px;
-  padding: 6px 12px;
-  border-left: 2px solid var(--vp-c-divider);
-  font-family: var(--vp-font-family-mono);
-  font-size: 12px;
   color: var(--vp-c-text-3);
 }
 
