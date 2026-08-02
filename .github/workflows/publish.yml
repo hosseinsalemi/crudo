@@ -15,6 +15,18 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TARBALL_DIR: /tmp/kavo-tarballs
+      # Published in dependency order (core before its dependents) even
+      # though publish-time order has no functional effect on npm — it
+      # mirrors the package graph per ADR-0004 lockstep versioning. Single
+      # source of truth for "which packages get released" — add a new
+      # package here only.
+      PACKAGE_DIRS: >-
+        packages/core
+        packages/orms/typeorm
+        packages/orms/prisma
+        packages/orms/mongoose
+        packages/frameworks/nest
+        packages/protocols/graphql
     steps:
       - uses: actions/checkout@v7
 
@@ -58,81 +70,27 @@ jobs:
       # pointing at this repo + this workflow file.
       - name: Pack packages
         run: |
-          mkdir -p $TARBALL_DIR
-          (cd packages/core && pnpm pack --pack-destination $TARBALL_DIR)
-          (cd packages/orms/typeorm && pnpm pack --pack-destination $TARBALL_DIR)
-          (cd packages/orms/prisma && pnpm pack --pack-destination $TARBALL_DIR)
-          (cd packages/orms/mongoose && pnpm pack --pack-destination $TARBALL_DIR)
-          (cd packages/frameworks/nest && pnpm pack --pack-destination $TARBALL_DIR)
-          (cd packages/protocols/graphql && pnpm pack --pack-destination $TARBALL_DIR)
+          mkdir -p "$TARBALL_DIR"
+          for dir in $PACKAGE_DIRS; do
+            (cd "$dir" && pnpm pack --pack-destination "$TARBALL_DIR")
+          done
 
-      # Published in dependency order (core before its dependents) even
-      # though publish-time order has no functional effect on npm — it
-      # mirrors the package graph per ADR-0004 lockstep versioning.
-      #
       # Each publish is skipped if that exact name@version is already on
       # the registry, so re-running the job after a partial failure (one
       # package published, a later one failing) doesn't die re-publishing
       # what already succeeded — npm publish itself is not idempotent.
-      - name: Publish @kavo/core
+      - name: Publish packages
         run: |
-          NAME=$(node -p "require('./packages/core/package.json').name")
-          VERSION=$(node -p "require('./packages/core/package.json').version")
-          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
-            echo "$NAME@$VERSION already published, skipping"
-          else
-            npm publish $TARBALL_DIR/kavo-core-*.tgz --access public
-          fi
-
-      - name: Publish @kavo/typeorm
-        run: |
-          NAME=$(node -p "require('./packages/orms/typeorm/package.json').name")
-          VERSION=$(node -p "require('./packages/orms/typeorm/package.json').version")
-          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
-            echo "$NAME@$VERSION already published, skipping"
-          else
-            npm publish $TARBALL_DIR/kavo-typeorm-*.tgz --access public
-          fi
-
-      - name: Publish @kavo/prisma
-        run: |
-          NAME=$(node -p "require('./packages/orms/prisma/package.json').name")
-          VERSION=$(node -p "require('./packages/orms/prisma/package.json').version")
-          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
-            echo "$NAME@$VERSION already published, skipping"
-          else
-            npm publish $TARBALL_DIR/kavo-prisma-*.tgz --access public
-          fi
-
-      - name: Publish @kavo/mongoose
-        run: |
-          NAME=$(node -p "require('./packages/orms/mongoose/package.json').name")
-          VERSION=$(node -p "require('./packages/orms/mongoose/package.json').version")
-          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
-            echo "$NAME@$VERSION already published, skipping"
-          else
-            npm publish $TARBALL_DIR/kavo-mongoose-*.tgz --access public
-          fi
-
-      - name: Publish @kavo/nest
-        run: |
-          NAME=$(node -p "require('./packages/frameworks/nest/package.json').name")
-          VERSION=$(node -p "require('./packages/frameworks/nest/package.json').version")
-          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
-            echo "$NAME@$VERSION already published, skipping"
-          else
-            npm publish $TARBALL_DIR/kavo-nest-*.tgz --access public
-          fi
-
-      - name: Publish @kavo/graphql
-        run: |
-          NAME=$(node -p "require('./packages/protocols/graphql/package.json').name")
-          VERSION=$(node -p "require('./packages/protocols/graphql/package.json').version")
-          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
-            echo "$NAME@$VERSION already published, skipping"
-          else
-            npm publish $TARBALL_DIR/kavo-graphql-*.tgz --access public
-          fi
+          for dir in $PACKAGE_DIRS; do
+            NAME=$(node -p "require('./$dir/package.json').name")
+            VERSION=$(node -p "require('./$dir/package.json').version")
+            TARBALL_PREFIX=$(echo "$NAME" | sed 's/^@//; s/\//-/')
+            if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+              echo "$NAME@$VERSION already published, skipping"
+            else
+              npm publish "$TARBALL_DIR/$TARBALL_PREFIX"-*.tgz --access public
+            fi
+          done
 
       # Only runs once every publish above succeeded. Attaches the exact
       # published tarballs as release assets and lets GitHub generate the
