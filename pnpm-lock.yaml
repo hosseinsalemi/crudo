@@ -39,22 +39,63 @@ importers:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@22.20.1)(vite@7.3.6(@types/node@22.20.1)(jiti@2.7.0)(yaml@2.9.0))
 
-  packages/core: {}
-
-  packages/examples:
+  examples/nest-mongoose:
     dependencies:
       '@kavo/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../packages/core
       '@kavo/mongoose':
         specifier: workspace:*
-        version: link:../orms/mongoose
+        version: link:../../packages/orms/mongoose
       '@kavo/nest':
         specifier: workspace:*
-        version: link:../frameworks/nest
+        version: link:../../packages/frameworks/nest
+      '@nestjs/common':
+        specifier: ^11.0.0
+        version: 11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: ^11.0.0
+        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/platform-express':
+        specifier: ^11.0.0
+        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)
+      '@nestjs/swagger':
+        specifier: ^11.0.0
+        version: 11.4.6(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(reflect-metadata@0.2.2)
+      mongoose:
+        specifier: ^8.9.5
+        version: 8.24.2
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
+      rxjs:
+        specifier: ^7.8.1
+        version: 7.8.2
+    devDependencies:
+      '@nestjs/testing':
+        specifier: ^11.0.0
+        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(@nestjs/platform-express@11.1.28)
+      '@types/supertest':
+        specifier: ^7.2.1
+        version: 7.2.1
+      mongodb-memory-server:
+        specifier: ^10.1.4
+        version: 10.4.3
+      supertest:
+        specifier: ^7.0.0
+        version: 7.2.2
+
+  examples/nest-typeorm:
+    dependencies:
+      '@kavo/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@kavo/nest':
+        specifier: workspace:*
+        version: link:../../packages/frameworks/nest
       '@kavo/typeorm':
         specifier: workspace:*
-        version: link:../orms/typeorm
+        version: link:../../packages/orms/typeorm
       '@nestjs/common':
         specifier: ^11.0.0
         version: 11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -70,9 +111,6 @@ importers:
       better-sqlite3:
         specifier: ^13.0.2
         version: 13.0.2
-      mongoose:
-        specifier: ^8.9.5
-        version: 8.24.2
       pg:
         specifier: ^8.13.0
         version: 8.22.0
@@ -95,12 +133,11 @@ importers:
       '@types/supertest':
         specifier: ^7.2.1
         version: 7.2.1
-      mongodb-memory-server:
-        specifier: ^10.1.4
-        version: 10.4.3
       supertest:
         specifier: ^7.0.0
         version: 7.2.2
+
+  packages/core: {}
 
   packages/frameworks/nest:
     dependencies:

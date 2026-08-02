@@ -57,7 +57,7 @@ function serverErrorCode(error: unknown): number | undefined {
  * **Why other cast failures are a 400.** A `CastError` on a non-id path
  * means a supplied value could not be interpreted as that path's declared
  * type — precisely the "coercion failure" `KAVO_QUERY_INVALID_VALUE` names
- * in `docs/architecture/06-error-handling.md`. Core coerces query values
+ * in `docs/internals/architecture/06-error-handling.md`. Core coerces query values
  * against entity metadata before an adapter ever sees them, so in practice
  * this catches values whose MongoDB type is finer than core's coarse
  * `FieldKind` (an `ObjectId` reference field being the common one).

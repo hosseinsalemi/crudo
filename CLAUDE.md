@@ -65,7 +65,7 @@ Nothing is special-cased per verb. Operations come from an **operation registry*
 
 ### Composition root
 
-`createKavo(options).createCrud(Entity, config?, runtime?)` (`packages/core/src/kavo.ts`) is the **only** way entities enter the system. All resolution (config precedence merge, DTO derivation, registry construction) happens at that call — bootstrap — and the result is frozen after. Core needs an explicit `infrastructure` (adapter + metadata); `@kavo/typeorm`'s `createTypeOrmInfrastructure(dataSource)` / `createTypeOrmKavo` is the sugar that derives both from a `DataSource`.
+`createKavo(options).createCrud(Entity, config?, runtime?)` (`packages/core/src/kavo.ts`) is the **only** way entities enter the system. All resolution (config precedence merge, DTO derivation, registry construction) happens at that call — bootstrap — and the result is frozen after. Core needs an explicit `infrastructure` (adapter + metadata); `@kavo/typeorm`'s `createInfrastructure(dataSource)` / `createTypeOrmKavo` is the sugar that derives both from a `DataSource`.
 
 ### Route generation is registry-driven and happens at decoration time
 
@@ -79,14 +79,14 @@ Standard operations delegate to the typed `DefaultKavoService` surface; custom o
 
 ### Wiring an app
 
-See `packages/examples/src/app.module.ts`: `KavoModule.forRootAsync({ provideServices: true, useFactory: () => ({ infrastructure: createTypeOrmInfrastructure(dataSource), defaults: {...} }) })` is the app's only Kavo import — the `@Kavo` controllers just go in `AppModule`'s own `controllers: [...]` array. `KavoModule`'s discovery binder (`DiscoveryService`, `onModuleInit`) finds them there and binds each entity's service, no registration needed; `provideServices: true` additionally provides `getKavoServiceToken(Entity)` as a real DI provider for every `@Kavo`-decorated class the process has seen, which `AddressController` needs for its constructor-injected `base` (a fully custom route wants it typed as an ordinary constructor param). That's the same thing the standalone no-arg `KavoModule.forFeature()` does, folded into one call; `forFeature([...])` with an explicit array also still exists. Both no-arg forms are process-wide, so `@kavo/nest`'s own tests (many differently-configured `@Kavo` classes over one entity in one file) always pass `forFeature` an explicit array instead. The app is what hands Nest its infrastructure — the packages never import each other.
+See `examples/nest-typeorm/src/app.module.ts`: `KavoModule.forRootAsync({ provideServices: true, useFactory: () => ({ infrastructure: createInfrastructure(dataSource), defaults: {...} }) })` is the app's only Kavo import — the `@Kavo` controllers just go in `AppModule`'s own `controllers: [...]` array. `KavoModule`'s discovery binder (`DiscoveryService`, `onModuleInit`) finds them there and binds each entity's service, no registration needed; `provideServices: true` additionally provides `getKavoServiceToken(Entity)` as a real DI provider for every `@Kavo`-decorated class the process has seen, which `AddressController` needs for its constructor-injected `base` (a fully custom route wants it typed as an ordinary constructor param). That's the same thing the standalone no-arg `KavoModule.forFeature()` does, folded into one call; `forFeature([...])` with an explicit array also still exists. Both no-arg forms are process-wide, so `@kavo/nest`'s own tests (many differently-configured `@Kavo` classes over one entity in one file) always pass `forFeature` an explicit array instead. The app is what hands Nest its infrastructure — the packages never import each other.
 
 ## Conventions (normative)
 
 - **DTO slots** are bare verbs: `create`, `update`, `patch`, `query`, `item`, `list` (because `createOne`/`createMany` share the `create` DTO).
 - **DTO classes**: request bodies are `<Verb><Entity>Dto` (`CreateUserDto`); query/response shapes are `<Entity><Slot>Dto` (`UserItemDto`, `UserListDto`). Every wire-crossing shape carries the `Dto` suffix; behavioral contracts (services, adapters, registries) never do.
 - **Operations** are camelCase and always name cardinality: `<verb>One` / `<verb>Many`. "Bulk" is the feature term (config key `bulk`, `/bulk` routes, `BulkResultDto`), never a method prefix.
-- **Filter operators**: AST enum in `SCREAMING_SNAKE` (`EQ`…`IS_NOT_NULL`); wire tokens in camelCase (`eq`…`isNotNull`), exact-case matched. The mapping table in `docs/architecture/05-query-grammar.md` is the single source of truth.
+- **Filter operators**: AST enum in `SCREAMING_SNAKE` (`EQ`…`IS_NOT_NULL`); wire tokens in camelCase (`eq`…`isNotNull`), exact-case matched. The mapping table in `docs/internals/architecture/05-query-grammar.md` is the single source of truth.
 - **Envelope fields**: `items`, `limit`, `offset`, `total`, `meta` — the default pagination wire params use the same `limit`/`offset` names, so request and response mirror each other.
 - **Factories** are `create*` (`createKavo`, `createCrud`). **Data access**: `EntityReader` (reads) + `EntityWriter` (writes); `RepositoryAdapter` is both, and adapters are named for what they adapt (`TypeOrmRepositoryAdapter`).
 - **Exceptions**: `*Exception` classes with stable `KAVO_SNAKE_CASE` codes.
@@ -128,4 +128,4 @@ Two rules make this work:
 
 ## Where to read more
 
-`docs/` holds the design docs, `glossary.md`, and ADRs (`adr/0001`…`0014`) — one ADR per load-bearing decision. `docs/architecture/` mirrors the packages (query grammar, error handling, engine, TypeORM adapter, Nest integration, soft delete, relations). ADRs are referenced by name in code comments; read the referenced ADR before changing the behavior it governs.
+`docs/getting-started.md`, `docs/using-the-api.md`, and `docs/integrations/nest/` (per-ORM wiring plus the full `@Kavo`/`KavoModule` configuration reference) are the adopter-facing front door; `docs/internals/` holds the design docs and ADRs (`adr/0001`…`0018`) — one ADR per load-bearing decision. `docs/internals/architecture/` mirrors the packages (query grammar, error handling, engine, TypeORM adapter, Nest integration, soft delete, relations). ADRs are referenced by name in code comments; read the referenced ADR before changing the behavior it governs.

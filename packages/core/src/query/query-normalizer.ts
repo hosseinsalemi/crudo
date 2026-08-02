@@ -61,7 +61,8 @@ export class QueryNormalizer<Entity = unknown> {
       collectIssues(error, issues);
     }
 
-    const sort = parseSort(rawParams["sort"], config, issues);
+    const clientSort = parseSort(rawParams["sort"], config, issues);
+    const sort = clientSort.length > 0 ? clientSort : defaultSortOf(config);
     const fields = parseFields(rawParams, config, issues);
     const include = this.resolveIncludes(parseIncludePaths(rawParams["include"], issues), fields, config, issues);
 
@@ -110,10 +111,11 @@ export class QueryNormalizer<Entity = unknown> {
       validateExpression(root, config, issues);
     }
 
-    const sort = input.sort ?? [];
-    for (const entry of sort) {
+    const clientSort = input.sort ?? [];
+    for (const entry of clientSort) {
       requireAllowlisted(entry.field as string, config.allowlists.sortable, "sorting", issues);
     }
+    const sort = clientSort.length > 0 ? clientSort : defaultSortOf(config);
 
     const { root: rootFields, relations: relationFields } = collapseFieldSelection<Entity>(input.fields, issues);
     if (rootFields != null) {
@@ -263,6 +265,16 @@ function parseWithDeleted<Entity>(
     return false;
   }
   return true;
+}
+
+/**
+ * `config.settings.query.defaultSort` — validated against the sortable
+ * allowlist wherever it's set (`resolveEntityConfig` at bootstrap for
+ * entity/operation scope, `KavoEngine.configViewFor` for per-call scope),
+ * so it's applied here as-is rather than re-checked per request.
+ */
+function defaultSortOf<Entity>(config: ResolvedEntityConfig<Entity>): readonly Sort<Entity>[] {
+  return config.settings.query.defaultSort as unknown as readonly Sort<Entity>[];
 }
 
 function parseSort<Entity>(

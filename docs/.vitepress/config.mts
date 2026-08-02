@@ -44,84 +44,140 @@ export default defineConfig({
   },
 
   themeConfig: {
-    nav: [{ text: "Guide", link: "/architecture/01-system-architecture" }],
+    nav: [
+      { text: "Getting started", link: "/getting-started" },
+      {
+        text: "Integrations",
+        items: [
+          { text: "Nest + TypeORM", link: "/integrations/nest/typeorm" },
+          { text: "Nest + Prisma", link: "/integrations/nest/prisma" },
+          { text: "Nest + Mongoose", link: "/integrations/nest/mongoose" },
+          { text: "Nest configuration", link: "/integrations/nest/configuration" },
+        ],
+      },
+      { text: "Using the API", link: "/using-the-api" },
+    ],
 
     version,
 
     sidebar: [
       {
-        text: "Blueprint",
+        text: "Guide",
         items: [
-          { text: "System architecture", link: "/architecture/01-system-architecture" },
-          { text: "Monorepo and packages", link: "/architecture/02-monorepo-and-packages" },
-          { text: "Core contracts and type system", link: "/architecture/03-core-contracts-and-type-system" },
+          { text: "Getting started", link: "/getting-started" },
+          { text: "Using the API", link: "/using-the-api" },
         ],
       },
       {
-        text: "Walking skeleton",
+        text: "Integrations",
         items: [
-          { text: "DTO system", link: "/architecture/04-dto-system" },
-          { text: "Query grammar", link: "/architecture/05-query-grammar" },
-          { text: "Error handling", link: "/architecture/06-error-handling" },
-          { text: "CRUD engine", link: "/architecture/07-crud-engine" },
-          { text: "Configuration", link: "/architecture/08-configuration" },
-          { text: "TypeORM adapter", link: "/architecture/09-typeorm-adapter" },
-          { text: "NestJS integration", link: "/architecture/10-nestjs-integration" },
+          {
+            text: "Nest",
+            items: [
+              { text: "TypeORM", link: "/integrations/nest/typeorm" },
+              { text: "Prisma", link: "/integrations/nest/prisma" },
+              { text: "Mongoose", link: "/integrations/nest/mongoose" },
+              { text: "Configuration", link: "/integrations/nest/configuration" },
+            ],
+          },
         ],
       },
       {
-        text: "Core features",
-        items: [
-          { text: "Soft delete", link: "/architecture/11-soft-delete" },
-          { text: "Relations and includes", link: "/architecture/12-relations-and-includes" },
-          { text: "GraphQL binding", link: "/architecture/13-graphql-binding" },
-          { text: "Prisma adapter", link: "/architecture/14-prisma-adapter" },
-          { text: "Mongoose adapter", link: "/architecture/15-mongoose-adapter" },
-        ],
-      },
-      {
-        text: "Reference",
-        items: [{ text: "Glossary", link: "/glossary" }],
-      },
-      {
-        text: "ADRs",
+        text: "For contributors",
         collapsed: true,
         items: [
           {
-            text: "0001 — Clean architecture, core owns contracts",
-            link: "/adr/0001-clean-architecture-core-owns-contracts",
-          },
-          { text: "0002 — Package topology", link: "/adr/0002-package-topology" },
-          { text: "0003 — pnpm, plain scripts, tsc build", link: "/adr/0003-pnpm-plain-scripts-tsc-build" },
-          { text: "0004 — Lockstep versioning", link: "/adr/0004-lockstep-versioning" },
-          { text: "0005 — Core zero runtime dependencies", link: "/adr/0005-core-zero-runtime-dependencies" },
-          { text: "0006 — Registry-driven operations", link: "/adr/0006-registry-driven-operations" },
-          {
-            text: "0007 — Module-augmentable operation metadata",
-            link: "/adr/0007-module-augmentable-operation-metadata",
-          },
-          { text: "0008 — Field-path recursion cap", link: "/adr/0008-field-path-recursion-cap" },
-          { text: "0009 — Problem-details error shape", link: "/adr/0009-problem-details-error-shape" },
-          { text: "0010 — Explicit named barrel", link: "/adr/0010-explicit-named-barrel" },
-          { text: "0011 — Entity-metadata infrastructure seam", link: "/adr/0011-entity-metadata-infrastructure-seam" },
-          { text: "0012 — Decoration-time route generation", link: "/adr/0012-decoration-time-route-generation" },
-          {
-            text: "0013 — Config-declared soft-delete operations",
-            link: "/adr/0013-config-declared-soft-delete-operations",
-          },
-          { text: "0014 — Associate by id, not deep writes", link: "/adr/0014-associate-by-id-not-deep-writes" },
-          {
-            text: "0015 — Global operation defaults are engine-only",
-            link: "/adr/0015-global-operation-defaults-are-engine-only",
-          },
-          { text: "0016 — GraphQL protocols package", link: "/adr/0016-graphql-protocols-package" },
-          {
-            text: "0017 — Prisma marker classes and entity registry",
-            link: "/adr/0017-prisma-marker-classes-and-entity-registry",
+            text: "Blueprint",
+            collapsed: true,
+            items: [
+              { text: "System architecture", link: "/internals/architecture/01-system-architecture" },
+              { text: "Monorepo and packages", link: "/internals/architecture/02-monorepo-and-packages" },
+              {
+                text: "Core contracts and type system",
+                link: "/internals/architecture/03-core-contracts-and-type-system",
+              },
+            ],
           },
           {
-            text: "0018 — Mongoose models are entity identities",
-            link: "/adr/0018-mongoose-models-are-entity-identities",
+            text: "Walking skeleton",
+            collapsed: true,
+            items: [
+              { text: "DTO system", link: "/internals/architecture/04-dto-system" },
+              { text: "Query grammar", link: "/internals/architecture/05-query-grammar" },
+              { text: "Error handling", link: "/internals/architecture/06-error-handling" },
+              { text: "CRUD engine", link: "/internals/architecture/07-crud-engine" },
+              { text: "Configuration", link: "/internals/architecture/08-configuration" },
+              { text: "TypeORM adapter", link: "/internals/architecture/09-typeorm-adapter" },
+              { text: "NestJS integration", link: "/internals/architecture/10-nestjs-integration" },
+            ],
+          },
+          {
+            text: "Core features",
+            collapsed: true,
+            items: [
+              { text: "Soft delete", link: "/internals/architecture/11-soft-delete" },
+              { text: "Relations and includes", link: "/internals/architecture/12-relations-and-includes" },
+              { text: "GraphQL binding", link: "/internals/architecture/13-graphql-binding" },
+              { text: "Prisma adapter", link: "/internals/architecture/14-prisma-adapter" },
+              { text: "Mongoose adapter", link: "/internals/architecture/15-mongoose-adapter" },
+            ],
+          },
+          {
+            text: "ADRs",
+            collapsed: true,
+            items: [
+              {
+                text: "0001 — Clean architecture, core owns contracts",
+                link: "/internals/adr/0001-clean-architecture-core-owns-contracts",
+              },
+              { text: "0002 — Package topology", link: "/internals/adr/0002-package-topology" },
+              {
+                text: "0003 — pnpm, plain scripts, tsc build",
+                link: "/internals/adr/0003-pnpm-plain-scripts-tsc-build",
+              },
+              { text: "0004 — Lockstep versioning", link: "/internals/adr/0004-lockstep-versioning" },
+              {
+                text: "0005 — Core zero runtime dependencies",
+                link: "/internals/adr/0005-core-zero-runtime-dependencies",
+              },
+              { text: "0006 — Registry-driven operations", link: "/internals/adr/0006-registry-driven-operations" },
+              {
+                text: "0007 — Module-augmentable operation metadata",
+                link: "/internals/adr/0007-module-augmentable-operation-metadata",
+              },
+              { text: "0008 — Field-path recursion cap", link: "/internals/adr/0008-field-path-recursion-cap" },
+              { text: "0009 — Problem-details error shape", link: "/internals/adr/0009-problem-details-error-shape" },
+              { text: "0010 — Explicit named barrel", link: "/internals/adr/0010-explicit-named-barrel" },
+              {
+                text: "0011 — Entity-metadata infrastructure seam",
+                link: "/internals/adr/0011-entity-metadata-infrastructure-seam",
+              },
+              {
+                text: "0012 — Decoration-time route generation",
+                link: "/internals/adr/0012-decoration-time-route-generation",
+              },
+              {
+                text: "0013 — Config-declared soft-delete operations",
+                link: "/internals/adr/0013-config-declared-soft-delete-operations",
+              },
+              {
+                text: "0014 — Associate by id, not deep writes",
+                link: "/internals/adr/0014-associate-by-id-not-deep-writes",
+              },
+              {
+                text: "0015 — Global operation defaults are engine-only",
+                link: "/internals/adr/0015-global-operation-defaults-are-engine-only",
+              },
+              { text: "0016 — GraphQL protocols package", link: "/internals/adr/0016-graphql-protocols-package" },
+              {
+                text: "0017 — Prisma marker classes and entity registry",
+                link: "/internals/adr/0017-prisma-marker-classes-and-entity-registry",
+              },
+              {
+                text: "0018 — Mongoose models are entity identities",
+                link: "/internals/adr/0018-mongoose-models-are-entity-identities",
+              },
+            ],
           },
         ],
       },

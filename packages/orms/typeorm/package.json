@@ -2,7 +2,7 @@
   "name": "@kavo/typeorm",
   "version": "0.6.0",
   "description": "Kavo TypeORM adapter — implements @kavo/core's RepositoryAdapter and TransactionManager over TypeORM.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kavo-labs/kavo.git",

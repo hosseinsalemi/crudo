@@ -98,9 +98,9 @@ module.exports = {
         "Cross-package imports go through the package barrel (@kavo/core), " +
         "which is an explicit named list (ADR-0010). Deep imports into " +
         "another package's src are not API — matched as a relative path and " +
-        "as a `@kavo/core/...` subpath. `packages/examples` is in scope: it " +
-        "is the reference app, so an illegal import there teaches one.",
-      from: { path: "^packages/(orms|frameworks|protocols|examples)" },
+        "as a `@kavo/core/...` subpath. `examples/*` is in scope too: " +
+        "those are the reference apps, so an illegal import there teaches one.",
+      from: { path: "^(packages/(orms|frameworks|protocols)|examples)" },
       to: { path: "^(packages/core/src/.+|@kavo/core/.+)" },
     },
     {
@@ -123,10 +123,10 @@ module.exports = {
         "back-reference is the package root captured from `from`, so " +
         "same-package imports stay legal.",
       from: {
-        path: "^(packages/core|packages/examples|packages/orms/[^/]+|packages/frameworks/[^/]+|packages/protocols/[^/]+)/tests/",
+        path: "^(packages/core|packages/orms/[^/]+|packages/frameworks/[^/]+|packages/protocols/[^/]+|examples/[^/]+)/tests/",
       },
       to: {
-        path: "^(packages/core|packages/examples|packages/orms/[^/]+|packages/frameworks/[^/]+|packages/protocols/[^/]+)/(src|tests)/",
+        path: "^(packages/core|packages/orms/[^/]+|packages/frameworks/[^/]+|packages/protocols/[^/]+|examples/[^/]+)/(src|tests)/",
         pathNot: "^$1/",
       },
     },

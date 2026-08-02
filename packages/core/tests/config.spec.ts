@@ -124,6 +124,76 @@ describe("resolveEntityConfig — bootstrap", () => {
     // Unconfigured filterable still derives in full.
     expect(config.allowlists.filterable).toContain("status");
   });
+
+  it("resolves an entity-scope defaultSort", () => {
+    const config = resolveEntityConfig(
+      userMetadata,
+      { query: { defaultSort: [{ field: "createdAt", direction: "desc" }] } },
+      undefined,
+    );
+    expect(config.settings.query.defaultSort).toEqual([{ field: "createdAt", direction: "desc" }]);
+  });
+
+  it("lets an operation override the entity-scope defaultSort", () => {
+    const config = resolveEntityConfig(
+      userMetadata,
+      {
+        query: { defaultSort: [{ field: "createdAt", direction: "desc" }] },
+        operations: { findMany: { query: { defaultSort: [{ field: "name", direction: "asc" }] } } },
+      },
+      undefined,
+    );
+    expect(config.settingsFor("findMany").query.defaultSort).toEqual([{ field: "name", direction: "asc" }]);
+    expect(config.settingsFor("findOne").query.defaultSort).toEqual([{ field: "createdAt", direction: "desc" }]);
+  });
+
+  it("applies the precedence chain global -> entity for defaultSort", () => {
+    const config = resolveEntityConfig(
+      userMetadata,
+      { query: { defaultSort: [{ field: "name", direction: "asc" }] } },
+      { query: { defaultSort: [{ field: "createdAt", direction: "desc" }] } },
+    );
+    expect(config.settings.query.defaultSort).toEqual([{ field: "name", direction: "asc" }]); // entity beats global
+
+    const globalOnly = resolveEntityConfig(userMetadata, undefined, {
+      query: { defaultSort: [{ field: "createdAt", direction: "desc" }] },
+    });
+    expect(globalOnly.settings.query.defaultSort).toEqual([{ field: "createdAt", direction: "desc" }]);
+  });
+
+  it("rejects an entity-scope defaultSort field outside the sortable allowlist", () => {
+    try {
+      resolveEntityConfig(
+        userMetadata,
+        {
+          allowlists: { sortable: ["name"] },
+          query: { defaultSort: [{ field: "email", direction: "asc" }] },
+        },
+        undefined,
+      );
+      expect.unreachable();
+    } catch (error) {
+      expect((error as ConfigurationException).code).toBe("KAVO_CONFIG_INVALID");
+      expect((error as ConfigurationException).detail).toContain("email");
+    }
+  });
+
+  it("rejects an operation-scope defaultSort field outside the sortable allowlist", () => {
+    try {
+      resolveEntityConfig(
+        userMetadata,
+        {
+          allowlists: { sortable: ["name"] },
+          operations: { findMany: { query: { defaultSort: [{ field: "email", direction: "asc" }] } } },
+        },
+        undefined,
+      );
+      expect.unreachable();
+    } catch (error) {
+      expect((error as ConfigurationException).code).toBe("KAVO_CONFIG_INVALID");
+      expect((error as ConfigurationException).detail).toContain("email");
+    }
+  });
 });
 
 describe("User fixture sanity", () => {

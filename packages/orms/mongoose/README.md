@@ -19,7 +19,7 @@ Unlike `@kavo/prisma`, there is nothing to declare twice. A Mongoose model
 is already a constructor, so it _is_ the entity identity core needs, and
 `connection.models` is the registry relation `ref`s resolve through — no
 marker classes, no `entities` list. See
-`docs/adr/0018-mongoose-models-are-entity-identities.md`.
+`docs/internals/adr/0018-mongoose-models-are-entity-identities.md`.
 
 ```ts
 import mongoose, { Schema } from "mongoose";
@@ -37,7 +37,7 @@ const kavo = createMongooseKavo(mongoose.connection);
 const authors = kavo.createCrud(Author);
 ```
 
-`createMongooseInfrastructure`/`createMongooseKavo` accept anything with a
+`createInfrastructure`/`createMongooseKavo` accept anything with a
 `models` record: `mongoose`, `mongoose.connection`, or a
 `mongoose.createConnection()` handle for a multi-database app.
 
@@ -115,4 +115,4 @@ scoped to live documents:
 schema.index({ email: 1 }, { unique: true, partialFilterExpression: { deletedAt: null } });
 ```
 
-Full design notes: [`docs/architecture/15-mongoose-adapter.md`](../../../docs/architecture/15-mongoose-adapter.md).
+Full design notes: [`docs/internals/architecture/15-mongoose-adapter.md`](../../../docs/internals/architecture/15-mongoose-adapter.md).

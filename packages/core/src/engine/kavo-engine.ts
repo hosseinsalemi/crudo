@@ -16,6 +16,7 @@ import { QueryNormalizer } from "../query/query-normalizer.js";
 import { createKavoContext, randomUuid } from "../context/default-kavo-context.js";
 import { mergeSettings } from "../config/merge-settings.js";
 import { validateSettings } from "../config/validate-settings.js";
+import { validateDefaultSort } from "../config/resolve-entity-config.js";
 import { resolveSoftDelete } from "../persistence/soft-delete.js";
 import type { FindManyResult } from "./built-in-handlers.js";
 
@@ -137,7 +138,9 @@ export class KavoEngine<Entity extends object> {
     let settings: KavoSettings = base;
     if (overrides !== undefined) {
       settings = mergeSettings(base, overrides);
-      validateSettings(`${config.entityName} (per-call)`, settings);
+      const scope = `${config.entityName} (per-call)`;
+      validateSettings(scope, settings);
+      validateDefaultSort(scope, settings, config.allowlists);
     }
     if (settings === config.settings) return config;
     return {

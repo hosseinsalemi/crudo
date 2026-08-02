@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Prisma } from "@prisma/client";
 import { ConfigurationException } from "@kavo/core";
-import { buildEntityMetadata, createPrismaInfrastructure, type PrismaDatamodel } from "@kavo/prisma";
+import { buildEntityMetadata, createInfrastructure, type PrismaDatamodel } from "@kavo/prisma";
 import { newTestPrismaClient } from "./support/client.js";
 
 class Author {
@@ -84,10 +84,10 @@ describe("buildEntityMetadata — bootstrap error paths", () => {
   });
 });
 
-describe("createPrismaInfrastructure — adapter bootstrap error path", () => {
+describe("createInfrastructure — adapter bootstrap error path", () => {
   it("throws ConfigurationException when Prisma Client has no delegate for the resolved model name", () => {
     const client = newTestPrismaClient();
-    const infrastructure = createPrismaInfrastructure(client as never, {
+    const infrastructure = createInfrastructure(client as never, {
       datamodel: ghostDatamodel,
       entities: [Ghost],
     });

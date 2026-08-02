@@ -2,7 +2,7 @@
   "name": "@kavo/prisma",
   "version": "0.5.0",
   "description": "Kavo Prisma adapter — implements @kavo/core's RepositoryAdapter over Prisma Client.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kavo-labs/kavo.git",

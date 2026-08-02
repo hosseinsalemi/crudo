@@ -7,7 +7,7 @@
  * ADR-0011), while MongoDB's `_id` is a 12-byte `ObjectId`. Rather than
  * widen core for one ORM, this adapter converts at its own boundary:
  * **every `ObjectId` leaving the adapter becomes its hex string.** See
- * `docs/adr/0018-mongoose-models-are-entity-identities.md`.
+ * `docs/internals/adr/0018-mongoose-models-are-entity-identities.md`.
  *
  * The reverse direction needs no code at all. Mongoose casts query and
  * write values against the schema on the way in, so a hex string handed to

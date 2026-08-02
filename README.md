@@ -1,78 +1,62 @@
+<p align="center">
+  <img src=".github/assets/kavo.png" alt="A @Kavo-decorated BooksController generates QUERY /books, POST /books, GET /books/:id, PUT /books/:id, DELETE /books/:id, and PATCH /books/:id/restore" width="440" />
+</p>
+
+<h3 align="center">Turn models into APIs.</h3>
+
+<p align="center">
+  Define an entity once and get a complete REST and
+  GraphQL CRUD API with filtering, sorting, pagination, and generated routes.
+</p>
+
 # Kavo
 
-A production-grade CRUD framework for TypeScript: define an entity once
-(via TypeORM, Prisma, or Mongoose) and get the full REST CRUD surface — filtering, sorting,
-pagination, nested includes, field selection, optional per-operation DTOs,
-transactions, and problem-details errors — behind generated NestJS routes,
-configurable at global, entity, operation, and per-call scope.
+Define an entity once, add one decorator, and Kavo generates the rest: create,
+read, update, delete, filtering, sorting, pagination, nested includes, and
+field selection — no hand-written controller methods.
 
-The design is documented in [`docs`](docs) — the
-architecture notes and ADRs there are authoritative, and the naming
-conventions in [`CLAUDE.md`](CLAUDE.md) are normative.
+[Read documentation](https://kavo.js.org/getting-started)
 
-## Packages
-
-| Package                                       | Role                                                             |
-| --------------------------------------------- | ---------------------------------------------------------------- |
-| [`@kavo/core`](packages/core)                 | Contracts, type system, engine — zero runtime dependencies       |
-| [`@kavo/typeorm`](packages/orms/typeorm)      | TypeORM adapter (`RepositoryAdapter` implementation)             |
-| [`@kavo/prisma`](packages/orms/prisma)        | Prisma adapter (`RepositoryAdapter` implementation)              |
-| [`@kavo/mongoose`](packages/orms/mongoose)    | Mongoose adapter (`RepositoryAdapter` implementation)            |
-| [`@kavo/nest`](packages/frameworks/nest)      | NestJS binding (`@Kavo` decorator, route generation)             |
-| [`@kavo/graphql`](packages/protocols/graphql) | Host-agnostic GraphQL schema binding over a `createCrud` service |
-
-Design docs, glossary, and ADRs live in [`docs`](docs).
-
-## Install
-
-`@kavo/core` has zero runtime dependencies; `@kavo/typeorm`, `@kavo/prisma`,
-`@kavo/mongoose`, `@kavo/nest`, and `@kavo/graphql` each need their
-ORM/framework/protocol as a peer dependency:
+## Getting started
 
 ```bash
-# core contracts and engine — always required
-pnpm add @kavo/core
-
-# TypeORM adapter
-pnpm add @kavo/typeorm typeorm reflect-metadata
-
-# Prisma adapter
-pnpm add @kavo/prisma @prisma/client
-
-# Mongoose adapter
-pnpm add @kavo/mongoose mongoose
-
-# NestJS binding (the @Kavo decorator and route generation)
-pnpm add @kavo/nest @nestjs/common @nestjs/core reflect-metadata rxjs
-# optional, for OpenAPI schema generation:
-pnpm add @nestjs/swagger
-
-# GraphQL schema binding (host-framework-agnostic)
-pnpm add @kavo/graphql graphql
+pnpm add @kavo/core @kavo/nest @kavo/typeorm
 ```
 
-(`npm install` / `yarn add` work the same way.) See
-[`packages/examples`](packages/examples) for a full, runnable NestJS +
-TypeORM app wired up with all four packages.
+```ts
+@Kavo(Book)
+@Controller("books")
+export class BooksController {}
+```
 
-## Claude Code skills
+That's a full CRUD API. See [kavo.js.org/getting-started](https://kavo.js.org/getting-started)
+for the full walkthrough, including NestJS wiring and a soft-delete example.
 
-If you use Claude Code, [`extensions`](extensions) has nine
-ready-made skills covering `@Kavo()`, global config, the query grammar,
-DTOs, errors, soft delete, Swagger, and GraphQL — published as a plugin via
-this repo's own marketplace:
+## Built for agentic development
+
+Built with Claude Code, and shipped with skills so your agent moves just as
+fast. [`extensions`](extensions) has nine ready-made skills covering
+`@Kavo()`, global config, the query grammar, DTOs, errors, soft delete,
+Swagger, and GraphQL — published as a plugin via this repo's own
+marketplace:
 
 ```
 /plugin marketplace add kavo-labs/kavo
 /plugin install kavo-skills@kavo-marketplace
 ```
 
-See [`extensions`](extensions) for a manual, non-plugin install
-option.
+Fewer tokens, ship faster.
 
-## Development
+## Packages
 
-```bash
-pnpm install
-pnpm check   # tsc -b (project references) + dependency-cruiser boundaries
-```
+| Package                                       | Role                                                        |
+| --------------------------------------------- | ----------------------------------------------------------- |
+| [`@kavo/core`](packages/core)                 | Contracts, type system, and the request engine              |
+| [`@kavo/typeorm`](packages/orms/typeorm)      | TypeORM adapter                                             |
+| [`@kavo/prisma`](packages/orms/prisma)        | Prisma adapter                                              |
+| [`@kavo/mongoose`](packages/orms/mongoose)    | Mongoose adapter                                            |
+| [`@kavo/nest`](packages/frameworks/nest)      | NestJS binding — the `@Kavo` decorator and route generation |
+| [`@kavo/graphql`](packages/protocols/graphql) | Host-agnostic GraphQL schema binding                        |
+
+Pick the ORM and framework/protocol bindings you need; `@kavo/core` has zero
+runtime dependencies.

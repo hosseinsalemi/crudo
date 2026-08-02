@@ -84,6 +84,39 @@ describe("validateSettings — query limits", () => {
   it("accepts a depth and a value cap of 1", () => {
     expect(() => accept({ query: { maxFilterDepth: 1, maxInValues: 1 } })).not.toThrow();
   });
+
+  it("rejects a defaultSort that is not an array", () => {
+    for (const value of ["name", null, { field: "name", direction: "asc" }]) {
+      expectRejected({ query: { defaultSort: value } }, "query.defaultSort", value);
+    }
+  });
+
+  it("rejects a defaultSort entry missing a field or with a non-string field", () => {
+    for (const entry of [{}, { field: 1, direction: "asc" }, { direction: "asc" }]) {
+      expectRejected({ query: { defaultSort: [entry] } }, "query.defaultSort[0]", entry);
+    }
+  });
+
+  it("rejects a defaultSort entry with an invalid direction", () => {
+    expectRejected(
+      { query: { defaultSort: [{ field: "name", direction: "up" }] } },
+      "query.defaultSort[0].direction",
+      "up",
+    );
+  });
+
+  it("accepts a well-formed defaultSort", () => {
+    expect(() =>
+      accept({
+        query: {
+          defaultSort: [
+            { field: "createdAt", direction: "desc" },
+            { field: "id", direction: "asc" },
+          ],
+        },
+      }),
+    ).not.toThrow();
+  });
 });
 
 describe("validateSettings — errors", () => {

@@ -32,7 +32,7 @@ import type { MongooseConnectionLike } from "./mongoose-like.js";
  * const users = kavo.createCrud(User); // User = mongoose.model('User', schema)
  * ```
  */
-export function createMongooseInfrastructure(connection: MongooseConnectionLike): KavoInfrastructure {
+export function createInfrastructure(connection: MongooseConnectionLike): KavoInfrastructure {
   const metadataCache = new Map<ClassRef, EntityMetadata>();
   const adapterCache = new Map<ClassRef, RepositoryAdapter>();
 
@@ -70,6 +70,6 @@ export function createMongooseKavo(
 ): KavoInstance {
   return createKavo({
     ...options,
-    infrastructure: createMongooseInfrastructure(connection),
+    infrastructure: createInfrastructure(connection),
   });
 }

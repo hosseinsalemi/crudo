@@ -238,6 +238,54 @@ describe("TypeOrmRepositoryAdapter — query translation", () => {
     expect(list.items).toHaveLength(0);
   });
 
+  it("applies the configured defaultSort when the caller supplies no sort", async () => {
+    await seed();
+    const withDefault = kavo.createCrud(Author, {
+      query: { defaultSort: [{ field: "age", direction: "asc" }] },
+    }) as DefaultKavoService<Author>;
+    const list = await withDefault.findMany();
+    expect(list.items.map((a) => (a as Author).name)).toEqual(["Joan", "Ada", "Alan", "Grace"]);
+  });
+
+  it("lets a caller-supplied sort override the configured defaultSort", async () => {
+    await seed();
+    const withDefault = kavo.createCrud(Author, {
+      query: { defaultSort: [{ field: "age", direction: "asc" }] },
+    }) as DefaultKavoService<Author>;
+    const list = await withDefault.findMany({ sort: [{ field: "age", direction: "desc" }] });
+    expect(list.items.map((a) => (a as Author).name)).toEqual(["Grace", "Alan", "Ada", "Joan"]);
+  });
+
+  it("breaks ties on the second field of a multi-field defaultSort", async () => {
+    const withDefault = kavo.createCrud(Author, {
+      query: {
+        defaultSort: [
+          { field: "status", direction: "asc" },
+          { field: "name", direction: "asc" },
+        ],
+      },
+    }) as DefaultKavoService<Author>;
+    await withDefault.createOne({ email: "b@x.io", name: "Bea", age: 30, status: "active" } as never);
+    await withDefault.createOne({ email: "c@x.io", name: "Cy", age: 31, status: "active" } as never);
+    await withDefault.createOne({ email: "a@x.io", name: "Amy", age: 29, status: "active" } as never);
+    const list = await withDefault.findMany();
+    expect(list.items.map((a) => (a as Author).name)).toEqual(["Amy", "Bea", "Cy"]);
+  });
+
+  it("keeps defaultSort-ordered pages disjoint and stable across offsets", async () => {
+    await seed();
+    const withDefault = kavo.createCrud(Author, {
+      query: { defaultSort: [{ field: "age", direction: "asc" }] },
+    }) as DefaultKavoService<Author>;
+    const page1 = await withDefault.findMany({ limit: 2, offset: 0 });
+    const page2 = await withDefault.findMany({ limit: 2, offset: 2 });
+    const names1 = page1.items.map((a) => (a as Author).name);
+    const names2 = page2.items.map((a) => (a as Author).name);
+    expect(names1).toEqual(["Joan", "Ada"]);
+    expect(names2).toEqual(["Alan", "Grace"]);
+    expect(new Set([...names1, ...names2]).size).toBe(4); // disjoint, no repeats/skips
+  });
+
   it("skips the count query when counting is disabled", async () => {
     await seed();
     const list = await authors.findMany(undefined, {

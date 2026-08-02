@@ -26,7 +26,7 @@ KavoModule.forRootAsync({
   inject: [DATA_SOURCE],
   provideServices: true, // needed only if some class constructor-injects a CRUD service token
   useFactory: (dataSource: DataSource) => ({
-    infrastructure: createTypeOrmInfrastructure(dataSource),
+    infrastructure: createInfrastructure(dataSource),
     defaults: {
       pagination: { defaultLimit: 20, maxLimit: 100 },
       errors: { exposeInternals: false },
@@ -40,7 +40,7 @@ KavoModule.forRootAsync({
 
 ```ts
 interface KavoModuleOptions {
-  infrastructure?: KavoInfrastructure; // e.g. createTypeOrmInfrastructure(dataSource)
+  infrastructure?: KavoInfrastructure; // e.g. createInfrastructure(dataSource)
   defaults?: DeepPartial<KavoSettings>; // passed through untouched to createKavo
   paginationStrategies?: readonly PaginationStrategy[];
 }

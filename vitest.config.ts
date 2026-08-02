@@ -33,7 +33,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["packages/**/tests/**/*.spec.ts"],
+    include: ["packages/**/tests/**/*.spec.ts", "examples/**/tests/**/*.spec.ts"],
     exclude: ["**/node_modules/**", "**/dist/**"],
     environment: "node",
     testTimeout: 30_000,

@@ -11,6 +11,7 @@ import { validateSettings } from "./validate-settings.js";
 import { DefaultDtoResolver } from "../dto/default-dto-resolver.js";
 import { DefaultRelationRegistry } from "../relations/default-relation-registry.js";
 import { resolveSoftDelete } from "../persistence/soft-delete.js";
+import { ConfigurationException } from "../errors/exceptions.js";
 
 /**
  * Top-level settings keys — the subset of an `EntityConfig` that merges.
@@ -59,12 +60,14 @@ export function resolveEntityConfig<Entity extends object>(
   globalDefaults: DeepPartial<KavoSettings> | undefined,
 ): ResolvedEntityConfig<Entity> {
   const entityName = metadata.name;
+  const allowlists = resolveAllowlists(metadata, entityConfig);
   const entitySettings = mergeSettings(
     BUILT_IN_DEFAULTS,
     globalDefaults,
     pickSettings(entityConfig as Readonly<Record<string, unknown>> | undefined),
   );
   validateSettings(entityName, entitySettings);
+  validateDefaultSort(entityName, entitySettings, allowlists);
 
   // Per-operation settings views, precomputed for every operation that
   // declares overrides. `false` (disabled) contributes no settings — the
@@ -81,6 +84,7 @@ export function resolveEntityConfig<Entity extends object>(
     const merged = mergeSettings(entitySettings, settings);
     const scope = `${entityName}.operations.${operation}`;
     validateSettings(scope, merged);
+    validateDefaultSort(scope, merged, allowlists);
     // Resolve for its validation side effect: a per-operation scope that
     // demands soft delete on an entity without a marker field must fail at
     // bootstrap, not on the first request (the engine recomputes the
@@ -88,8 +92,6 @@ export function resolveEntityConfig<Entity extends object>(
     resolveSoftDelete(metadata, merged, scope);
     perOperation.set(operation, deepFreeze(merged));
   }
-
-  const allowlists = resolveAllowlists(metadata, entityConfig);
 
   const resolved: ResolvedEntityConfig<Entity> = {
     entityName,
@@ -123,6 +125,29 @@ function resolveAllowlists<Entity extends object>(
     sortable: resolveFieldSelector(ownColumns, configured?.sortable),
     selectable: resolveFieldSelector(ownColumns, configured?.selectable),
   });
+}
+
+/**
+ * `query.defaultSort` fields are checked against the same sortable
+ * allowlist client-supplied `sort` fields are checked against at request
+ * time — but here, at bootstrap, so a misconfigured default fails fast
+ * instead of surfacing as a broken `ORDER BY` on the first request.
+ */
+export function validateDefaultSort<Entity>(
+  scope: string,
+  settings: KavoSettings,
+  allowlists: ResolvedQueryAllowlists<Entity>,
+): void {
+  const sortable = allowlists.sortable as readonly string[];
+  for (const entry of settings.query.defaultSort) {
+    if (!sortable.includes(entry.field)) {
+      throw new ConfigurationException(
+        scope,
+        "query.defaultSort",
+        `field '${entry.field}' is not in the sortable allowlist`,
+      );
+    }
+  }
 }
 
 /**

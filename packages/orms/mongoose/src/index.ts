@@ -17,7 +17,7 @@ export {
 export { assertQueryablePath } from "./relation-paths.js";
 export { isObjectIdLike, toPlainDocument, toPlainResult } from "./plain-document.js";
 export { MongooseRepositoryAdapter } from "./mongoose-repository-adapter.js";
-export { createMongooseInfrastructure, createMongooseKavo } from "./infrastructure.js";
+export { createInfrastructure, createMongooseKavo } from "./infrastructure.js";
 export {
   isModelLike,
   type MongooseConnectionLike,

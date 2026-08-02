@@ -106,7 +106,7 @@ describe("translateFilter — LIKE and ILIKE", () => {
   });
 
   it("honours the documented backslash escape for a literal % or _", () => {
-    // docs/architecture/05-query-grammar.md: `\%` and `\_` are literals.
+    // docs/internals/architecture/05-query-grammar.md: `\%` and `\_` are literals.
     expect(likeToRegExpSource("100\\%")).toBe(`^100%${END}`);
     expect(likeToRegExpSource("a\\_b")).toBe(`^a_b${END}`);
     expect(likeToRegExpSource("a\\\\b")).toBe(`^a\\\\b${END}`);

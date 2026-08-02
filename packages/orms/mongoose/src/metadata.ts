@@ -105,7 +105,7 @@ function versionKeyOf(schema: MongooseSchemaLike): string | undefined {
  * `ref` resolve to its target. The one wrinkle is that a model's function
  * `name` is the useless `"model"`, so every name here comes from
  * `modelName` — `entity.name` is never read. See
- * `docs/adr/0018-mongoose-models-are-entity-identities.md`.
+ * `docs/internals/adr/0018-mongoose-models-are-entity-identities.md`.
  */
 export function buildEntityMetadata<Entity extends object>(
   entity: ClassRef<Entity>,
@@ -247,7 +247,7 @@ function relationDescriptor(
           ownerModelName,
           path,
           `relation '${path}' has ref '${target}', but no model named '${target}' is registered on ` +
-            `the connection passed to createMongooseInfrastructure`,
+            `the connection passed to createInfrastructure`,
         );
       }
       return model as ClassRef;

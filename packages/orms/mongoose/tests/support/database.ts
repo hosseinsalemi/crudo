@@ -9,7 +9,7 @@ import { MongoMemoryServer } from "mongodb-memory-server";
  * names are registered *per connection*, so re-declaring `Author` in a
  * second file would throw `OverwriteModelError` against the global one. It
  * also exercises the multi-database path — `connection.models` is exactly
- * what `createMongooseInfrastructure` resolves relation targets through.
+ * what `createInfrastructure` resolves relation targets through.
  */
 export interface TestDatabase {
   readonly connection: Connection;

@@ -136,7 +136,7 @@ function regexMatch(pattern: string, caseInsensitive: boolean): Record<string, u
 
 /**
  * SQL `LIKE` pattern → anchored regular-expression source, per the wire
- * grammar in `docs/architecture/05-query-grammar.md`: `%` matches any run
+ * grammar in `docs/internals/architecture/05-query-grammar.md`: `%` matches any run
  * of characters, `_` matches exactly one, and `\` escapes either back to a
  * literal (the same `ESCAPE '\'` contract `@kavo/typeorm` hands to SQL).
  *

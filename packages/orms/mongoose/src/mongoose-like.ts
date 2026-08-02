@@ -19,7 +19,7 @@
  */
 
 /**
- * What a caller passes to `createMongooseInfrastructure`: anything carrying
+ * What a caller passes to `createInfrastructure`: anything carrying
  * a model registry. Both `mongoose` and `mongoose.connection` satisfy this,
  * as does a `mongoose.createConnection()` handle.
  *

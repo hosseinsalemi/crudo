@@ -1,7 +1,7 @@
 import mongoose, { Schema } from "mongoose";
 import { expectTypeOf } from "vitest";
 import type { ClassRef } from "@kavo/core";
-import { createMongooseInfrastructure, createMongooseKavo } from "@kavo/mongoose";
+import { createInfrastructure, createMongooseKavo } from "@kavo/mongoose";
 
 /**
  * Type-level acceptance tests for the decision at the heart of this
@@ -36,9 +36,9 @@ kavo.createCrud(User);
 
 // A standalone Mongoose instance and a dedicated connection are both valid
 // registries — `models` is all the seam asks for.
-createMongooseInfrastructure(mongoose);
-createMongooseInfrastructure(mongoose.connection);
-createMongooseInfrastructure(new mongoose.Mongoose());
+createInfrastructure(mongoose);
+createInfrastructure(mongoose.connection);
+createInfrastructure(new mongoose.Mongoose());
 
 // An ordinary class is still a ClassRef, but it is not a Mongoose model —
 // that mistake is caught at runtime by `asModel`, with an error naming the
@@ -49,8 +49,8 @@ expectTypeOf(NotAModel).toExtend<ClassRef>();
 // The registry argument is not optional: an adapter with no way to resolve
 // a relation's `ref` would fail lazily instead of at the call site.
 // @ts-expect-error - a connection (or Mongoose instance) is required
-createMongooseInfrastructure();
+createInfrastructure();
 
 // A plain object is not a model registry.
 // @ts-expect-error - `models` is missing
-createMongooseInfrastructure({});
+createInfrastructure({});

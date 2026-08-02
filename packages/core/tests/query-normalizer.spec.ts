@@ -37,6 +37,10 @@ describe("QueryNormalizer — wire params", () => {
     expect(clamped.pagination.limit).toBe(100);
   });
 
+  it("issues no sort at all when neither the client nor config supplies one", () => {
+    expect(normalizer.normalizeWire({}, config).sort).toEqual([]);
+  });
+
   it("rejects malformed pagination values", () => {
     const issues = issuesOf(() => normalizer.normalizeWire({ limit: "abc" }, config));
     expect(issues[0]).toMatchObject({
@@ -91,6 +95,43 @@ describe("QueryNormalizer — wire params", () => {
     const uncounted = resolveEntityConfig(userMetadata, { pagination: { count: false } }, undefined);
     expect(normalizer.normalizeWire({}, uncounted).count).toBe(false);
   });
+
+  it("falls back to the configured defaultSort when the client supplies no sort", () => {
+    const defaulted = resolveEntityConfig(
+      userMetadata,
+      { query: { defaultSort: [{ field: "createdAt", direction: "desc" }] } },
+      undefined,
+    );
+    expect(normalizer.normalizeWire({}, defaulted).sort).toEqual([{ field: "createdAt", direction: "desc" }]);
+  });
+
+  it("applies a multi-field defaultSort in priority order", () => {
+    const defaulted = resolveEntityConfig(
+      userMetadata,
+      {
+        query: {
+          defaultSort: [
+            { field: "createdAt", direction: "desc" },
+            { field: "id", direction: "asc" },
+          ],
+        },
+      },
+      undefined,
+    );
+    expect(normalizer.normalizeWire({}, defaulted).sort).toEqual([
+      { field: "createdAt", direction: "desc" },
+      { field: "id", direction: "asc" },
+    ]);
+  });
+
+  it("lets a client-supplied sort override the configured defaultSort outright", () => {
+    const defaulted = resolveEntityConfig(
+      userMetadata,
+      { query: { defaultSort: [{ field: "createdAt", direction: "desc" }] } },
+      undefined,
+    );
+    expect(normalizer.normalizeWire({ sort: "name" }, defaulted).sort).toEqual([{ field: "name", direction: "asc" }]);
+  });
 });
 
 describe("QueryNormalizer — programmatic input", () => {
@@ -105,6 +146,10 @@ describe("QueryNormalizer — programmatic input", () => {
     );
     expect(query.filter.root).toMatchObject({ value: 18 });
     expect(query.pagination).toEqual({ limit: 5, offset: 0 });
+  });
+
+  it("issues no sort at all when neither the caller nor config supplies one", () => {
+    expect(normalizer.normalizeInput({}, config).sort).toEqual([]);
   });
 
   it("enforces allowlists identically to the wire path", () => {
@@ -124,6 +169,25 @@ describe("QueryNormalizer — programmatic input", () => {
       ),
     );
     expect(issues[0]?.code).toBe("KAVO_QUERY_INVALID_FIELD");
+  });
+
+  it("falls back to the configured defaultSort when no sort is given", () => {
+    const defaulted = resolveEntityConfig(
+      userMetadata,
+      { query: { defaultSort: [{ field: "createdAt", direction: "desc" }] } },
+      undefined,
+    );
+    expect(normalizer.normalizeInput({}, defaulted).sort).toEqual([{ field: "createdAt", direction: "desc" }]);
+  });
+
+  it("lets a caller-supplied sort override the configured defaultSort outright", () => {
+    const defaulted = resolveEntityConfig(
+      userMetadata,
+      { query: { defaultSort: [{ field: "createdAt", direction: "desc" }] } },
+      undefined,
+    );
+    const query = normalizer.normalizeInput({ sort: [{ field: "name", direction: "asc" }] }, defaulted);
+    expect(query.sort).toEqual([{ field: "name", direction: "asc" }]);
   });
 });
 

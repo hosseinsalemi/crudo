@@ -2,7 +2,7 @@
   "name": "@kavo/mongoose",
   "version": "0.6.0",
   "description": "Kavo Mongoose adapter — implements @kavo/core's RepositoryAdapter over Mongoose models.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kavo-labs/kavo.git",

@@ -21,7 +21,6 @@ anything else:
 - **PR mode**: reviews a pushed, open pull request.
 
 1. **Pick the mode:**
-
    - If `$ARGUMENTS` is a PR number, or no number was given but the context
      above shows an open PR for the current branch **and** the working tree is
      clean with nothing uncommitted beyond what that PR already contains, use
@@ -32,7 +31,6 @@ anything else:
      stop. There is nothing to review.
 
 2. **Get the code in front of you:**
-
    - **Local mode**: the diff is already on disk. Don't assume
      `git diff main...HEAD` alone tells you what changed — uncommitted work
      doesn't show up there; use `git status --short` and the working tree
@@ -68,7 +66,6 @@ anything else:
 
 4. **Run the reviewers in parallel**, in a single message. They are
    read-only and deliberately non-overlapping:
-
    - `kavo-reviewer` — correctness, engine and registry design invariants,
      package boundaries and public-API/barrel compliance, ADR/architecture-doc
      sync, and naming compliance. In PR mode, also runs `pnpm check`. Always
@@ -89,7 +86,6 @@ anything else:
 
    For each finding keep: the file and line, one sentence on the defect, the
    concrete failure scenario, and the fix. Split it into:
-
    - **Blocking** — must be fixed before this gets committed (local mode) or
      merged (PR mode).
    - **Non-blocking** — worth doing, does not gate it.
@@ -100,7 +96,6 @@ anything else:
    long list of plausible ones.
 
 7. **State the verdict plainly**:
-
    - **Local mode**: ready to commit (`/commit`), or blocked on N findings.
    - **PR mode**: ready to merge (`/merge`), or blocked on N findings.
 

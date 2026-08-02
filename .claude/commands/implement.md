@@ -101,7 +101,7 @@ after it is extra instructions or corrections to fold in during implementation.
     is `main`, there's no remote, or there are no commits; re-run
     `pnpm check` for real and stop if it's red; `git push -u origin HEAD`;
     then `gh pr create` (or update the existing PR) with what/why, `Closes
-   #<n>`, public-API impact, testing, and review notes.
+#<n>`, public-API impact, testing, and review notes.
 
     c. **Print the PR URL** and tell the user to run `/review` on it or
     `/merge` once CI and review are green.
