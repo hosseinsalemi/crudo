@@ -101,6 +101,29 @@ describe("buildEntityMetadata — fields", () => {
     expect(metadata.fields.some((field) => field.name === "__v")).toBe(false);
   });
 
+  it("keeps a `select: false` path out of the entity description entirely", () => {
+    // `select: false` is Mongoose's "never return this" — a password hash or
+    // an API key. Merely hiding it from responses is not enough: the field
+    // would still land on the filterable allowlist, and because the
+    // predicate runs in the database while the value is projected out of the
+    // body, `filter[apiKey][like]=sk_live_9%` would be a blind
+    // character-at-a-time extraction oracle.
+    const registry = newRegistry();
+    const Secretive = registry.model(
+      "Secretive",
+      new Schema({
+        email: String,
+        passwordHash: { type: String, select: false },
+        apiKey: { type: String, select: false, default: () => "generated" },
+      }),
+    );
+    const names = buildEntityMetadata(Secretive as unknown as ClassRef<object>, registry).fields.map((f) => f.name);
+
+    expect(names).toContain("email");
+    expect(names).not.toContain("passwordHash");
+    expect(names).not.toContain("apiKey");
+  });
+
   it("reports no auto-detected soft-delete field", () => {
     // Mongoose declares no @DeleteDateColumn equivalent, so soft delete is
     // always explicit `softDelete.field` configuration for this adapter.

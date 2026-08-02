@@ -11,6 +11,9 @@ import { mapDriverError } from "@kavo/mongoose";
 
 const CONTEXT = { entityName: "Book", operation: "findOne", correlationId: "c-1" };
 
+/** A well-formed ObjectId that is never inserted. */
+const ABSENT_ID = "507f1f77bcf86cd799439011";
+
 /**
  * A MongoDB server error as the driver raises it. Built structurally rather
  * than imported: `MongoServerError` lives in the `mongodb` package, which is
@@ -28,6 +31,20 @@ describe("mapDriverError — cast failures", () => {
     expect(mapped).toBeInstanceOf(NotFoundException);
     expect(mapped.code).toBe("KAVO_NOT_FOUND");
     expect(mapped.cause).toBe(error);
+  });
+
+  it("renders the rejected id, so a malformed id reads like an absent one", () => {
+    // The whole point of answering 404 here is that a malformed id must be
+    // indistinguishable from a well-formed one that isn't there. Rendering
+    // an empty id would itself be the key-format oracle: "with id ''" says
+    // "that was not an ObjectId", while "with id 'not-an-objectid'" does not.
+    const mapped = mapDriverError(new mongoose.Error.CastError("ObjectId", "not-an-objectid", "_id"), CONTEXT, "_id");
+    expect(mapped.message).toContain("not-an-objectid");
+    expect(mapped.message).not.toContain("''");
+
+    const absent = mapDriverError(new mongoose.Error.CastError("ObjectId", ABSENT_ID, "_id"), CONTEXT, "_id");
+    // Same sentence, only the id differs — no shape change to read a signal from.
+    expect(mapped.message.replace("not-an-objectid", "X")).toBe(absent.message.replace(ABSENT_ID, "X"));
   });
 
   it("answers 400 for a cast failure on any other path", () => {

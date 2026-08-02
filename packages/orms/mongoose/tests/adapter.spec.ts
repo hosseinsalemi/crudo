@@ -61,6 +61,14 @@ function defineModels(connection: TestDatabase["connection"]) {
       "Book",
       new Schema({ title: String, author: { type: Schema.Types.ObjectId, ref: "Author" } }),
     ),
+    // `select: false` is where a password hash or API key lives.
+    Account: connection.model(
+      "Account",
+      new Schema({
+        email: { type: String, required: true },
+        apiKey: { type: String, select: false, default: () => "SECRET-abc123" },
+      }),
+    ),
   };
 }
 
@@ -330,11 +338,98 @@ describe("MongooseRepositoryAdapter — schema constraints hold on every write",
     // `runValidators` is set, so without it the same body is rejected on
     // POST and accepted on PATCH.
     const created = (await authors.createOne({ email: "v1@x.io", name: "V", age: 1 } as never)) as Author;
-    await expect(authors.createOne({ email: "v2@x.io", name: "V", role: "SUPERUSER" } as never)).rejects.toBeTruthy();
 
-    await expect(authors.patchOne(created._id, { role: "SUPERUSER" } as never)).rejects.toBeTruthy();
+    // Assert the *shape* of the rejection, not merely that one happened: a
+    // bare `toBeTruthy()` here would also pass for a TypeError from a
+    // mis-shaped `findOneAndUpdate` call, which is exactly how a regression
+    // in the `runValidators` wiring would present.
+    for (const rejected of [
+      authors.createOne({ email: "v2@x.io", name: "V", role: "SUPERUSER" } as never),
+      authors.patchOne(created._id, { role: "SUPERUSER" } as never),
+    ]) {
+      const error = await rejectionOf(rejected);
+      expect(error).toBeInstanceOf(PersistenceException);
+      expect(error.code).toBe("KAVO_PERSISTENCE_FAILED");
+      // The schema refused it — not the adapter falling over on its own.
+      expect((error.cause as Error).name).toBe("ValidationError");
+    }
+
     const stored = (await authors.findOne(created._id)) as Author;
     expect(stored.role).toBe("MEMBER"); // the out-of-enum value never landed
+  });
+});
+
+describe("MongooseRepositoryAdapter — query.defaultSort", () => {
+  function withDefaultSort(direction: "asc" | "desc"): DefaultKavoService<Author> {
+    return kavo.createCrud(models.Author, {
+      query: { defaultSort: [{ field: "age", direction }] },
+    } as never) as unknown as DefaultKavoService<Author>;
+  }
+
+  it("applies the configured defaultSort when the caller supplies no sort", async () => {
+    // `buildSort` omits the `sort` key entirely for an empty list, so a
+    // regression that stopped defaultSort reaching the adapter would degrade
+    // silently to MongoDB's natural order rather than fail.
+    await seed();
+    const list = await withDefaultSort("asc").findMany();
+    expect(list.items.map((author) => (author as Author).name)).toEqual(["Joan", "Ada", "Alan", "Grace"]);
+  });
+
+  it("lets a caller-supplied sort override it outright", async () => {
+    await seed();
+    const list = await withDefaultSort("asc").findMany({ sort: [{ field: "age", direction: "desc" }] });
+    expect(list.items.map((author) => (author as Author).name)).toEqual(["Grace", "Alan", "Ada", "Joan"]);
+  });
+
+  it("keeps defaultSort-ordered pages disjoint and stable across offsets", async () => {
+    await seed();
+    const service = withDefaultSort("asc");
+    const first = await service.findMany({ limit: 2, offset: 0 });
+    const second = await service.findMany({ limit: 2, offset: 2 });
+    expect(first.items.map((author) => (author as Author).name)).toEqual(["Joan", "Ada"]);
+    expect(second.items.map((author) => (author as Author).name)).toEqual(["Alan", "Grace"]);
+  });
+});
+
+describe("MongooseRepositoryAdapter — a `select: false` path is not a Kavo field", () => {
+  interface Account {
+    _id: string;
+    email: string;
+  }
+
+  function accounts(): DefaultKavoService<Account> {
+    return kavo.createCrud(models.Account) as unknown as DefaultKavoService<Account>;
+  }
+
+  it("does not echo the secret from create, the way a read never would", async () => {
+    // `create` returns the *hydrated* document, where `select` — a query
+    // projection — does not apply. Before the field was excluded from
+    // metadata, POST returned a server-generated secret that no GET ever
+    // returns.
+    const created = await accounts().createOne({ email: "a@b.c" } as never);
+    expect(created).not.toHaveProperty("apiKey");
+
+    const listed = (await accounts().findMany()).items[0];
+    expect(listed).not.toHaveProperty("apiKey");
+
+    // It is still stored — this is about exposure, not about dropping data.
+    const raw = await models.Account.findOne({ email: "a@b.c" }).select("+apiKey").lean();
+    expect(raw?.apiKey).toBe("SECRET-abc123");
+  });
+
+  it("refuses a filter on it instead of serving a blind extraction oracle", async () => {
+    await accounts().createOne({ email: "a@b.c" } as never);
+
+    // The value never appears in a response, but an allowlisted predicate
+    // still runs in the database — so a permitted filter would leak it one
+    // character at a time. It must not be allowlisted at all.
+    const error = await rejectionOf(
+      accounts().findMany({
+        filter: { kind: "condition", field: "apiKey", operator: "LIKE", value: "SECRET-a%" },
+      } as never),
+    );
+    expect(error).toBeInstanceOf(QueryValidationException);
+    expect(error.code).toBe("KAVO_QUERY_INVALID");
   });
 });
 

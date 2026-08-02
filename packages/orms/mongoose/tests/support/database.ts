@@ -45,10 +45,16 @@ export async function ensureIndexes(...models: readonly { init(): Promise<unknow
 
 /** Capture a rejection so both its class and its stable code can be asserted. */
 export async function rejectionOf(promise: Promise<unknown>): Promise<{ code?: unknown } & Error> {
+  // The "it resolved" failure is raised *outside* the catch — thrown from
+  // inside the `try`, this function's own handler would swallow it and hand
+  // the caller a bogus error to assert against.
+  let resolved = false;
   try {
     await promise;
-    throw new Error("expected the promise to reject, but it resolved");
+    resolved = true;
   } catch (error) {
     return error as { code?: unknown } & Error;
   }
+  if (resolved) throw new Error("expected the promise to reject, but it resolved");
+  throw new Error("unreachable");
 }

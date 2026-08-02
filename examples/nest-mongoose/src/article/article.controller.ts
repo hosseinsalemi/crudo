@@ -9,7 +9,7 @@ import { CreateArticleDto, UpdateArticleDto, ArticleItemDto, ArticleListDto } fr
  * `@Kavo` is the Mongoose model itself (ADR-0018), not a mirror class.
  *
  * Routes: POST /articles, GET /articles, GET/PUT/PATCH/DELETE
- * /articles/:id, plus POST /articles/:id/restore and DELETE
+ * /articles/:id, plus PATCH /articles/:id/restore and DELETE
  * /articles/:id/purge — the two soft-delete routes appear because
  * `softDelete.field` is *declared* here (ADR-0013: route generation runs at
  * decoration time, where no ORM metadata exists, so config alone decides).
@@ -35,6 +35,6 @@ import { CreateArticleDto, UpdateArticleDto, ArticleItemDto, ArticleListDto } fr
     selectable: ["_id", "title", "status", "tags", "body", "createdAt"],
   },
   relations: { edges: { author: { includable: true } } },
-} as never)
+})
 @Controller("articles")
 export class ArticleController {}
