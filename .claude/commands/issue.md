@@ -34,10 +34,15 @@ or private.
    - **Context** — why this is worth doing, in two or three sentences.
    - **Acceptance criteria** — a checklist of what must be true when it is done.
      These must be verifiable, not aspirational.
-   - **Affected packages** — `@kavo/core`, `@kavo/typeorm`, `@kavo/nest`,
-     docs, or a combination.
+   - **Affected packages** — any combination of `@kavo/core`,
+     `@kavo/typeorm`, `@kavo/prisma`, `@kavo/mongoose`, `@kavo/nest`,
+     `@kavo/graphql`, `@kavo/mcp`, and docs. That list is every workspace
+     package; cross-check it against `PACKAGE_DIRS` in
+     `.github/workflows/publish.yml` if a new one may have landed. Write
+     `None` for repo-wiring-only work (`.claude/`, `.github/`, tooling)
+     rather than leaving it blank.
    - **Constraints** — the invariants that must survive. Check
-     `docs/adr/` for ones this issue touches (core purity, registry-
+     `docs/internals/adr/` for ones this issue touches (core purity, registry-
      driven operations, the explicit barrel, decoration-time routes, soft
      delete, and relations are common ones) and cite them by number. Also cite
      the naming conventions in `CLAUDE.md` if relevant. Cite only what
@@ -45,9 +50,12 @@ or private.
    - **Out of scope** — what this issue deliberately does not cover.
 
 4. **Label it.** Use the existing labels where they fit. See the
-   `conventions` skill for the `type:` set, and apply
-   `area:core|typeorm|nest|docs`. Create a missing label with
-   `gh label create <name>` only if it fits that scheme.
+   `conventions` skill for the `type:` set, and apply one or more of
+   `area:core|typeorm|prisma|mongoose|nest|graphql|mcp|docs`. The `area:`
+   scheme is deliberately flat — it tracks package names, not the
+   `packages/orms/*` and `packages/protocols/*` directory nesting. Create a missing label with
+   `gh label create <name>` only if it fits that scheme. Repo-wiring-only work
+   gets a `type:` label and no `area:`.
 
 5. **Show it before creating anything.** Print the full drafted issue —
    title, labels, and body exactly as they would be submitted — and stop.
