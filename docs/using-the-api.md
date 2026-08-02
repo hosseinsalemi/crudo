@@ -53,7 +53,7 @@ For anything the bracket grammar gets awkward at, `filter` also accepts one JSON
 GET /books?filter={"or":[{"author":{"eq":"Tolkien"}},{"not":{"status":{"eq":"banned"}}}]}
 ```
 
-**Relation-path filtering** uses dot notation and restricts root rows without loading the related collection — it never filters *what's inside* an included relation, only which root rows come back:
+**Relation-path filtering** uses dot notation and restricts root rows without loading the related collection — it never filters _what's inside_ an included relation, only which root rows come back:
 
 ```
 GET /books?filter[author.country][eq]=UK
