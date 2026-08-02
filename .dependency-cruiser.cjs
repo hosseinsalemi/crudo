@@ -1,17 +1,19 @@
 /**
  * Mechanical enforcement of the package boundaries defined in
- * docs/architecture/02-monorepo-and-packages.md.
+ * docs/internals/architecture/02-monorepo-and-packages.md.
  *
  * The rules here are the executable form of the dependency graph:
  *
  *   @kavo/nest ──▶ @kavo/core ◀── @kavo/typeorm
  *                       ▲
  *                       ├── @kavo/prisma
- *                       └── @kavo/mongoose
+ *                       ├── @kavo/mongoose
+ *                       ├── @kavo/graphql
+ *                       └── @kavo/mcp
  *
- * `@kavo/core` imports nothing. Adapters and framework bindings import the
- * core barrel only — deep imports are not API. An illegal import fails CI
- * here, not in code review.
+ * `@kavo/core` imports nothing. Adapters, protocol bindings and framework
+ * bindings import the core barrel only — deep imports are not API. An
+ * illegal import fails CI here, not in code review.
  */
 module.exports = {
   forbidden: [
