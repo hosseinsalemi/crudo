@@ -1,0 +1,258 @@
+/*
+ * Styles for homepage sections that mix raw HTML with markdown code fences
+ * (docs/index.md) and therefore can't be Vue SFCs — VitePress renders fenced
+ * code through markdown-it/shiki, which only runs over the markdown file
+ * itself, not component templates.
+ */
+
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin: 48px 0;
+  align-items: start;
+}
+
+@media (max-width: 719px) {
+  .before-after {
+    grid-template-columns: 1fr;
+  }
+}
+
+.before-after-lead {
+  grid-column: 1 / -1;
+  margin: 46px 0 4px;
+  text-align: center;
+  font-size: 15px;
+  color: var(--vp-c-text-2);
+}
+
+.before-after-lead strong {
+  color: var(--vp-c-text-1);
+}
+
+.before-after-col {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--vp-code-block-bg);
+}
+
+.before-after-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--vp-c-divider);
+}
+
+.before-after-label-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--vp-c-text-2);
+  letter-spacing: -0.01em;
+}
+
+.before-after-header--after .before-after-label-title {
+  color: var(--vp-c-text-1);
+}
+
+.before-after-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--vp-c-text-3);
+}
+
+.before-after-dot--after {
+  background: var(--vp-c-brand-1);
+}
+
+.before-after-count {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--vp-c-text-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.before-after-header--after .before-after-count {
+  color: var(--vp-c-brand-1);
+}
+
+.before-after-header--stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.before-after-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.before-after-subtitle {
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0 !important;
+  line-height: 20px !important;
+}
+
+.before-after-subtitle--before {
+  color: var(--vp-c-text-3);
+}
+
+.before-after-subtitle--after {
+  color: var(--vp-c-text-2);
+}
+
+.before-after-subtitle--after strong {
+  color: var(--vp-c-brand-1);
+  font-weight: 600;
+}
+
+.before-after-col div[class*="language-"] {
+  margin: 0;
+  border-radius: 0;
+}
+
+.before-after-col button.copy {
+  display: none;
+}
+
+.before-after-col--after {
+  justify-content: center;
+}
+
+.before-after-col--after div[class*="language-"] {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.before-after-col--before {
+  position: relative;
+  max-height: 320px;
+  overflow: hidden;
+}
+
+.before-after-col--before::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 72px;
+  background: linear-gradient(to bottom, transparent, var(--vp-code-block-bg));
+}
+
+.ai-section {
+  margin: 64px 0;
+  text-align: center;
+}
+
+.ai-title {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--vp-c-text-1);
+}
+
+.ai-subtitle {
+  margin: 0 0 28px;
+  font-size: 14.5px;
+  color: var(--vp-c-text-2);
+}
+
+.ai-install {
+  max-width: 480px;
+  margin: 24px auto 0;
+  text-align: left;
+}
+
+.ai-install-note {
+  margin: 10px 0 0;
+  font-size: 13.5px;
+  text-align: center;
+  color: var(--vp-c-text-3);
+}
+
+.ai-install div[class*="language-"] {
+  border-radius: 12px;
+}
+
+.query-section {
+  margin: 64px 0;
+  text-align: center;
+}
+
+.query-title {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--vp-c-text-1);
+}
+
+.query-subtitle {
+  margin: 0 0 28px;
+  font-size: 14.5px;
+  color: var(--vp-c-text-2);
+}
+
+.query-demo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: left;
+  min-width: 0;
+}
+
+@media (max-width: 719px) {
+  .query-demo {
+    grid-template-columns: 1fr;
+  }
+}
+
+.query-demo-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.query-demo-label {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--vp-c-text-3);
+  padding-left: 2px;
+}
+
+.query-demo-col div[class*="language-"] {
+  margin: 0;
+  border-radius: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.query-demo-col pre {
+  overflow-x: auto;
+  font-size: 15px;
+}
+
+.query-demo-col button.copy {
+  display: none;
+}

@@ -5,6 +5,7 @@ import HeroTerminal from "./components/HeroTerminal.vue";
 import HeroInfo from "./components/HeroInfo.vue";
 import VersionBadge from "./components/VersionBadge.vue";
 import "./custom.css";
+import "./styles/homepage-sections.css";
 
 export default {
   extends: DefaultTheme,
