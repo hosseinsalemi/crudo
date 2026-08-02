@@ -5,15 +5,20 @@
  * The rules here are the executable form of the dependency graph:
  *
  *   @kavo/nest ──▶ @kavo/core ◀── @kavo/typeorm
- *                       ▲
- *                       ├── @kavo/prisma
- *                       ├── @kavo/mongoose
- *                       ├── @kavo/graphql
- *                       └── @kavo/mcp
+ *      │                ▲
+ *      │                ├── @kavo/prisma
+ *      │                ├── @kavo/mongoose
+ *      │                ├── @kavo/graphql ◀─┐
+ *      │                └── @kavo/mcp     ◀─┤
+ *      └── the one sanctioned sideways edge ─┘
+ *          (frameworks/* → protocols/*, ADR-0016; never the reverse)
  *
- * `@kavo/core` imports nothing. Adapters, protocol bindings and framework
- * bindings import the core barrel only — deep imports are not API. An
- * illegal import fails CI here, not in code review.
+ * `@kavo/core` imports nothing. When an edge package imports core it goes
+ * through the barrel — deep imports are not API. An illegal import fails CI
+ * here, not in code review, but note the coverage is not total: an ORM
+ * adapter importing a protocol package, or one protocol importing another,
+ * passes these rules today and is caught only in review. See the footnote
+ * under CONTRIBUTING.md's boundary table.
  */
 module.exports = {
   forbidden: [
