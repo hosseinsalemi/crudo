@@ -74,7 +74,32 @@ workflow.
    If `pnpm check` fails, stop — a release never ships on a red build. Undo
    the version-file edits before stopping so `main` is left clean.
 
-5. **Confirm with the user before doing anything irreversible.** State
+5. **Verify every package already exists on the registry.** A package that has
+   never been published cannot go out through this workflow, because npm's
+   trusted publishers are configured per package on npmjs.com and a package
+   with no versions has no settings page to configure. First publishes are
+   manual, out-of-band, and have to happen **before** the tag:
+
+   ```bash
+   for dir in <PACKAGE_DIRS from step 3>; do
+     NAME=$(node -p "require('./$dir/package.json').name")
+     npm view "$NAME" version >/dev/null 2>&1 || echo "NEVER PUBLISHED: $NAME"
+   done
+   ```
+
+   If anything prints, **stop and tell the user before tagging.** Skipping this
+   is not a cosmetic risk: `publish.yml` publishes `PACKAGE_DIRS` in order and
+   `@kavo/nest` depends on `@kavo/graphql` and `@kavo/mcp` as hard
+   `dependencies`, so a late failure can leave an already-published
+   `@kavo/nest` pointing at a version of a sibling that does not exist —
+   uninstallable, and past npm's unpublish window it cannot be withdrawn.
+
+   To bootstrap one: publish it by hand, then configure its trusted publisher
+   on npmjs.com (`kavo-labs/kavo` + `publish.yml`), confirm `npm view` resolves,
+   and only then release. That first version will lack OIDC provenance; every
+   later release of it through the workflow will have it.
+
+6. **Confirm with the user before doing anything irreversible.** State
    plainly: committing and pushing straight to `main`, then pushing tag
    `vX.Y.Z`, triggers `.github/workflows/publish.yml`, which publishes every
    package in `PACKAGE_DIRS` to the public npm registry and creates a GitHub
@@ -86,19 +111,19 @@ workflow.
    `@kavo/mongoose`, `@kavo/nest`, `@kavo/graphql`, and `@kavo/mcp`, all seven
    at the same version per ADR-0004. A confirmation gate that names a subset
    understates an irreversible public release, which is a release hazard
-   rather than a cosmetic slip. Wait for an explicit go-ahead before step 6.
+   rather than a cosmetic slip. Wait for an explicit go-ahead before step 7.
 
-6. **Commit directly to `main`, then tag and push both:**
+7. **Commit directly to `main`, then tag and push both.** Stage by directory
+   rather than by enumerating packages — step 1 already refused to run on a
+   dirty tree, so the only modified files are the version bumps from step 3 and
+   the lockfile. A hardcoded list here is the same drift hazard as a hardcoded
+   list at the gate, and a worse one, because a missed package fails _green_:
+   the release commit lands without that bump, `publish.yml` only compares
+   `packages/core`'s version to the tag, and the publish loop then sees the old
+   version already on the registry and prints `already published, skipping`.
 
    ```bash
-   git add packages/core/package.json \
-           packages/orms/typeorm/package.json \
-           packages/orms/prisma/package.json \
-           packages/orms/mongoose/package.json \
-           packages/frameworks/nest/package.json \
-           packages/protocols/graphql/package.json \
-           packages/protocols/mcp/package.json \
-           pnpm-lock.yaml
+   git add packages pnpm-lock.yaml
    git commit -m "chore(release): vX.Y.Z"
    git push origin main
    git tag -a vX.Y.Z -m "vX.Y.Z"
@@ -108,7 +133,7 @@ workflow.
    The commit body should list the commit subjects since the last tag as a
    short changelog.
 
-7. **Watch the release workflow** and report the result:
+8. **Watch the release workflow** and report the result:
 
    ```bash
    gh run watch --exit-status $(gh run list --workflow=publish.yml --limit 1 --json databaseId --jq '.[0].databaseId')
@@ -118,6 +143,6 @@ workflow.
    a failed OIDC trusted-publisher match or a stale npm CLI version are the
    most likely causes.
 
-8. **Report**: the tag, the workflow run URL, the published package
+9. **Report**: the tag, the workflow run URL, the published package
    versions, and the GitHub Release URL
    (`gh release view vX.Y.Z --json url --jq .url`).
