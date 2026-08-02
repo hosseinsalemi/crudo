@@ -45,12 +45,24 @@ workflow.
    to 0, minor resets patch to 0). State the computed version and _why_
    (which commits triggered the bump level) before touching any files.
 
-3. **Apply the version, in lockstep** (ADR-0004 — [`docs/adr/0004-lockstep-versioning.md`](../../docs/adr/0004-lockstep-versioning.md)):
-   set the new version in `packages/core/package.json`,
-   `packages/orms/typeorm/package.json`,
-   `packages/frameworks/nest/package.json`, and
-   `packages/protocols/graphql/package.json`. Leave `examples/*`
-   (private, unpublished) alone.
+3. **Apply the version, in lockstep** (ADR-0004 — [`docs/internals/adr/0004-lockstep-versioning.md`](../../docs/internals/adr/0004-lockstep-versioning.md)):
+   set the new version in the `package.json` of **every** published package.
+   `PACKAGE_DIRS` in `.github/workflows/publish.yml` is the single source of
+   truth for that set — read it and bump exactly those. Today it is all seven:
+
+   | Directory                    | Package          |
+   | ---------------------------- | ---------------- |
+   | `packages/core`              | `@kavo/core`     |
+   | `packages/orms/typeorm`      | `@kavo/typeorm`  |
+   | `packages/orms/prisma`       | `@kavo/prisma`   |
+   | `packages/orms/mongoose`     | `@kavo/mongoose` |
+   | `packages/frameworks/nest`   | `@kavo/nest`     |
+   | `packages/protocols/graphql` | `@kavo/graphql`  |
+   | `packages/protocols/mcp`     | `@kavo/mcp`      |
+
+   If this table and `PACKAGE_DIRS` ever disagree, `PACKAGE_DIRS` wins — it is
+   what actually publishes — and the table is a bug to fix in the same pass.
+   Leave `examples/*` (private, unpublished) alone.
 
 4. **Regenerate the lockfile and gate:**
 
@@ -64,17 +76,28 @@ workflow.
 
 5. **Confirm with the user before doing anything irreversible.** State
    plainly: committing and pushing straight to `main`, then pushing tag
-   `vX.Y.Z`, triggers `.github/workflows/publish.yml`, which publishes
-   `@kavo/core`, `@kavo/typeorm`, `@kavo/nest`, and `@kavo/graphql` to the
-   public npm registry and creates a GitHub Release for the tag — none of
-   this is meaningfully undoable once pushed. Wait for an explicit
-   go-ahead before step 6.
+   `vX.Y.Z`, triggers `.github/workflows/publish.yml`, which publishes every
+   package in `PACKAGE_DIRS` to the public npm registry and creates a GitHub
+   Release for the tag — none of this is meaningfully undoable once pushed.
+
+   **Name every package explicitly in the prompt**, enumerated from the
+   `PACKAGE_DIRS` you read in step 3 rather than from memory or from a list
+   written here — currently `@kavo/core`, `@kavo/typeorm`, `@kavo/prisma`,
+   `@kavo/mongoose`, `@kavo/nest`, `@kavo/graphql`, and `@kavo/mcp`, all seven
+   at the same version per ADR-0004. A confirmation gate that names a subset
+   understates an irreversible public release, which is a release hazard
+   rather than a cosmetic slip. Wait for an explicit go-ahead before step 6.
 
 6. **Commit directly to `main`, then tag and push both:**
 
    ```bash
-   git add packages/core/package.json packages/orms/typeorm/package.json \
-           packages/frameworks/nest/package.json packages/protocols/graphql/package.json \
+   git add packages/core/package.json \
+           packages/orms/typeorm/package.json \
+           packages/orms/prisma/package.json \
+           packages/orms/mongoose/package.json \
+           packages/frameworks/nest/package.json \
+           packages/protocols/graphql/package.json \
+           packages/protocols/mcp/package.json \
            pnpm-lock.yaml
    git commit -m "chore(release): vX.Y.Z"
    git push origin main
