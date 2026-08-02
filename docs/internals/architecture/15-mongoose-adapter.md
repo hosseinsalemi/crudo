@@ -62,6 +62,7 @@ relation descriptors (`includable: false` always). Notable derivations:
 |                                       | no single entity for the registry to point at   |
 | `{ address: { city: String } }`       | one `json` field named `address` — see below    |
 | `__v` (the version key)               | **excluded entirely** — see below               |
+| `select: false` on any path           | **excluded entirely** — see below               |
 
 **A `ref` path is registered twice — as a relation _and_ as a field.**
 Unlike SQL, where `blogId` and `blog` are separate properties, Mongoose
@@ -94,6 +95,26 @@ Mongoose's `__v` is storage bookkeeping the caller never declared, so it
 stays out of the entity description. Because the default serializer
 projects onto `metadata.fields` (doc 04 §5), excluding it there is also
 what keeps it out of every derived DTO and every response.
+
+**`select: false` is excluded for the same reason, and it matters more.**
+That flag is Mongoose's own "never return this" — the idiomatic home of a
+password hash or an API key — so such a path is left out of the entity
+description entirely rather than merely hidden from responses. Hiding
+alone leaks it two ways. Reads are `lean`, so Mongoose applies the
+projection and the value is absent from the body, but the _predicate_ still
+runs in the database: an allowlisted `filter[apiKey][like]=sk_live_9%` is a
+blind, character-at-a-time extraction oracle for a value that never appears
+in any response. And `create` returns the hydrated document Mongoose built,
+where a query projection does not apply at all, so a `POST` would echo a
+server-generated secret that no `GET` ever returns.
+
+The cost is that Kavo does not manage the path at all — it is not readable,
+writable, filterable, or sortable. An app that needs to _write_ one (a
+password at registration) does so through a custom operation or the model
+directly, which is the right default once the schema has declared the value
+un-returnable. `@kavo/typeorm` has the same blind spot for
+`@Column({ select: false })`; the exposure is higher here only because
+`select: false` is standard Mongoose practice rather than a rarity.
 
 **Arbitrary-precision numerics cross the wire as numbers.** `BigInt` and
 `Decimal128` paths are declared `kind: "number"`, and the mapping layer
@@ -192,10 +213,19 @@ would have to strip; lean reads return plain objects, which
 `update`/`patch` are one `findOneAndUpdate` against the **live** scope, so a
 soft-deleted document is invisible to writes exactly as it is to reads, a
 missing one is reported without a separate existence check, and there is no
-read-then-write gap for a concurrent delete. `delete`/`restore`/`purge`
-_do_ read first, because "already deleted" (409) and "never existed" (404)
-are different answers and only the stored marker distinguishes them. An
-empty `$set` is skipped rather than sent, since MongoDB rejects it and
+read-then-write gap for a concurrent delete.
+
+`delete` and `restore` keep that same property: the state predicate
+(`deletedAt` null / not-null) rides **in** the `findOneAndUpdate` filter, so
+the transition is atomic and two concurrent deletes cannot both succeed.
+They read only when the write matched nothing — and then only to tell
+"already deleted" (409) from "never existed" (404), which are different
+answers that only the stored marker distinguishes. The read no longer
+_decides_ the write; it explains a miss. `purge` is the one that reads
+first, because it must confirm the marker before removing a document
+permanently.
+
+An empty `$set` is skipped rather than sent, since MongoDB rejects it and
 "nothing to write" is not an error.
 
 ## 5. Pagination & count strategy

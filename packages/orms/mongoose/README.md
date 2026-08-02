@@ -60,6 +60,16 @@ exactly like a well-formed id that isn't there.
 Mongoose's `__v` version key is excluded from the entity description
 entirely, so it never reaches a DTO or a response.
 
+So is any path declared `select: false` — Mongoose's own "never return
+this", where a password hash or API key lives. Excluding it, rather than
+just hiding it from responses, is what stops an allowlisted
+`filter[apiKey][like]=sk_live_9%` from working as a blind extraction oracle
+(the predicate runs in the database even though the value is projected out
+of the body), and stops `create` from echoing a secret that no read ever
+returns. The trade is that Kavo does not manage such a path at all — not
+readable, writable, filterable, or sortable — so write it through a custom
+operation or the model directly.
+
 ## Relation writes: explicit reference fields only
 
 Per ADR-0014 ("associate by id, not deep writes"), a relation is set by
@@ -90,10 +100,28 @@ foreignField })` is invisible to `schema.paths`, so the metadata seam
   reference id _do_ work. Closing the rest needs a core change.
 - **The soft-delete marker is writable.** Nothing in a Mongoose schema
   declares a delete column, so `deletedAt` is an ordinary field and a plain
-  `PATCH` of it will soft-delete or revive a document, bypassing
-  `deleteOne`'s already-deleted check. `@kavo/prisma` shares this; the fix
-  belongs in core. Until then, register an explicit `update`/`patch` DTO
-  that omits the marker if this matters to you.
+  `PATCH` of it will soft-delete a document, bypassing `deleteOne`'s
+  already-deleted check. It cannot _revive_ one: writes are scoped to the
+  live set, so a soft-deleted document 404s on `PUT`/`PATCH`. The marker is
+  also on the default allowlists and in the derived response DTOs, so
+  `deletedAt` is visible in zero-config responses (as it is under
+  `@kavo/typeorm`).
+
+  With `operations: { purgeOne: true }` this escalates: a client who cannot
+  reach `deleteOne` can still stamp the marker by hand and then purge, which
+  is a permanent delete —
+
+  ```
+  PATCH  /articles/:id  {"deletedAt":"2020-01-01T00:00:00Z"}   # now "deleted"
+  DELETE /articles/:id/purge                                    # gone for good
+  ```
+
+  `@kavo/prisma` shares the underlying hole (only `@kavo/typeorm` escapes
+  it, because `@DeleteDateColumn` is detectable); the fix — excluding the
+  resolved `softDelete.field` from the writable projection — belongs in
+  core. Until then, register an explicit `update`/`patch` DTO that omits the
+  marker whenever you enable `purgeOne`.
+
 - **`BigInt`/`Decimal128` are returned with JS number precision**, so a
   `Decimal128` beyond ~15 significant digits rounds. Returning them as
   strings would preserve precision but break filtering.
