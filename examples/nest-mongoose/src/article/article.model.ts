@@ -38,4 +38,15 @@ const articleSchema = new Schema(
   { timestamps: true },
 );
 
+// Every allowlisted filter/sort field wants an index, and each one is
+// compounded with the soft-delete marker because `deletedAt` is prepended to
+// the filter of every read — an index on the sort field alone would still
+// leave MongoDB scanning the live set. Without these the example is the
+// anti-pattern it should be teaching against: an endpoint that looks fine
+// over seeded rows and does a collection scan per page in production.
+articleSchema.index({ deletedAt: 1, createdAt: -1 });
+articleSchema.index({ deletedAt: 1, title: 1 });
+articleSchema.index({ deletedAt: 1, status: 1 });
+articleSchema.index({ deletedAt: 1, author: 1 });
+
 export const Article = mongoose.model(ARTICLE_MODEL, articleSchema);
