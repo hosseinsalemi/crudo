@@ -61,7 +61,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
 
 type ChatMessage =
   | { kind: "user" | "agent"; text: string }
@@ -137,7 +137,7 @@ const conversations: ChatMessage[][] = [
   ],
 ];
 
-const tabLabels = ["Archive", "Create", "Count", "Restore", "Update", "Delete", "Find"];
+const tabLabels = ["Archive", "Create", "Count", "Find", "Restore", "Update", "Delete"];
 
 const STEP_MS = 300;
 const HOLD_MS = 7000;
@@ -156,22 +156,28 @@ function tick() {
     timer = setTimeout(tick, STEP_MS);
     return;
   }
-  timer = setTimeout(() => {
-    visibleCount.value = 0;
+  timer = setTimeout(async () => {
+    // Advance the dot on its own frame first, then clear the feed — doing
+    // both in the same Vue patch lets the TransitionGroup's message-clear
+    // repaint eat the dot's crossfade, so the active dot reads as an
+    // instant flash instead of a smooth transition.
     activeConvo.value = (activeConvo.value + 1) % conversations.length;
+    await nextTick();
+    visibleCount.value = 0;
     timer = setTimeout(tick, RESET_PAUSE_MS);
   }, HOLD_MS);
 }
 
 const reduceMotion = ref(false);
 
-function selectConvo(i: number) {
+async function selectConvo(i: number) {
   clearTimeout(timer);
   activeConvo.value = i;
   if (reduceMotion.value) {
     visibleCount.value = conversations[i].length;
     return;
   }
+  await nextTick();
   visibleCount.value = 0;
   isPlaying.value = true;
   timer = setTimeout(tick, STEP_MS);
