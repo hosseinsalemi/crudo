@@ -105,6 +105,23 @@ describe("TypeOrmRepositoryAdapter — soft delete", () => {
     expect(await tickets.findOne(id, { withDeleted: true } as never)).toMatchObject({ id });
   });
 
+  it("shows only deleted rows under onlyDeleted, live rows excluded", async () => {
+    const deletedId = await newTicket("T-deleted");
+    await newTicket("T-live");
+    await tickets.deleteOne(deletedId);
+
+    const list = await tickets.findMany({ onlyDeleted: true });
+    expect(list.items).toMatchObject([{ id: deletedId }]);
+    expect(list.total).toBe(1);
+    expect(await tickets.findOne(deletedId, { onlyDeleted: true } as never)).toMatchObject({ id: deletedId });
+  });
+
+  it("rejects withDeleted and onlyDeleted set together", async () => {
+    await expect(tickets.findMany({ withDeleted: true, onlyDeleted: true })).rejects.toMatchObject({
+      issues: [{ field: "onlyDeleted", code: "KAVO_QUERY_CONFLICTING_PARAMS" }],
+    });
+  });
+
   it("keeps updates away from deleted rows", async () => {
     const id = await newTicket();
     await tickets.deleteOne(id);
@@ -160,5 +177,15 @@ describe("TypeOrmRepositoryAdapter — configured marker column", () => {
 
     expect(await invoices.restoreOne(id)).toMatchObject({ id, archivedAt: null });
     expect((await invoices.findMany()).items).toHaveLength(1);
+  });
+
+  it("shows only deleted rows under onlyDeleted over an ordinary column", async () => {
+    const deleted = await invoices.createOne({ number: "INV-deleted" } as never);
+    await invoices.createOne({ number: "INV-live" } as never);
+    const deletedId = (deleted as Invoice).id;
+    await invoices.deleteOne(deletedId);
+
+    const list = await invoices.findMany({ onlyDeleted: true });
+    expect(list.items).toMatchObject([{ id: deletedId }]);
   });
 });
