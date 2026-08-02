@@ -130,7 +130,7 @@ importers:
       '@nestjs/testing':
         specifier: ^11.0.0
         version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(@nestjs/platform-express@11.1.28)
-      '@testcontainers/mysql':
+      '@testcontainers/mariadb':
         specifier: ^12.0.4
         version: 12.0.4
       '@testcontainers/postgresql':
@@ -1227,8 +1227,8 @@ packages:
   '@swc/types@0.1.28':
     resolution: {integrity: sha512-V6Mnml8v09QALx6K0elJ7o9K/MkVDtW3t6L+7Ou/JcWtb3xwId2AH4FeOceySd2JaO87IMw4+6vSZxLm34LPbw==}
 
-  '@testcontainers/mysql@12.0.4':
-    resolution: {integrity: sha512-XZWh/L6EN8XQa5lsBdESDolDmyUA56bDgYh5SicLzzC2b4jho4lc0yA0GOOVX/bd0zK6VQK6hmDDJE+T3rFrdA==}
+  '@testcontainers/mariadb@12.0.4':
+    resolution: {integrity: sha512-AdMFF4VfzBq2brV5Ol9OAx4CSrK5u0kRromNv0pSsp6LTK0JEBGyj5JysRo9CMHnsbG5X4I2jkfhAZsonUoBWw==}
 
   '@testcontainers/postgresql@12.0.4':
     resolution: {integrity: sha512-a/pLU6j5lpKKAlUTPwqweqMGhOSjgTSb6HBX69TOrXn32ifU37nnQDmNFTj8ddOAw+BQL9oTRkeOxVbZkqhgZA==}
@@ -4140,7 +4140,7 @@ snapshots:
     dependencies:
       '@swc/counter': 0.1.3
 
-  '@testcontainers/mysql@12.0.4':
+  '@testcontainers/mariadb@12.0.4':
     dependencies:
       testcontainers: 12.0.4
     transitivePeerDependencies:

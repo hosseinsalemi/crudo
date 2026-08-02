@@ -23,20 +23,20 @@ export interface PostgresOptions extends ConnectionOptions {
   type: "postgres";
 }
 
-export interface MySqlOptions extends ConnectionOptions {
-  type: "mysql";
+export interface MariaDbOptions extends ConnectionOptions {
+  type: "mariadb";
 }
 
 /** The driver a real (non-SQLite) `forRoot(...)` call picks. */
-export type SqlOptions = PostgresOptions | MySqlOptions;
+export type SqlOptions = PostgresOptions | MariaDbOptions;
 
 /**
  * One `DataSource` for the whole app. `forRoot()` (no argument) defaults to
  * an in-memory SQLite database, keeping the demo (and its e2e suite)
  * dependency-free; `forRoot(sql)` switches the same app to a real Postgres
- * or MySQL instance instead, picked by `sql.type` — see
+ * or MariaDB instance instead, picked by `sql.type` — see
  * `examples/nest-typeorm/README.md` for the `docker run` used locally for
- * each, and `tests/app-postgres.e2e.spec.ts` / `tests/app-mysql.e2e.spec.ts`
+ * each, and `tests/app-postgres.e2e.spec.ts` / `tests/app-mariadb.e2e.spec.ts`
  * for how the e2e suite self-provisions one via Testcontainers.
  *
  * Global so `DATA_SOURCE` is injectable straight into any `@Kavo`

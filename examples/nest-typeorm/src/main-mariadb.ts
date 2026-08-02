@@ -4,8 +4,8 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module.js";
 
 // Matches the `docker run` command in examples/nest-typeorm/README.md.
-const MYSQL_OPTIONS = {
-  type: "mysql",
+const MARIADB_OPTIONS = {
+  type: "mariadb",
   host: "localhost",
   port: 3306,
   username: "root",
@@ -14,12 +14,12 @@ const MYSQL_OPTIONS = {
 } as const;
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule.forRoot(MYSQL_OPTIONS));
+  const app = await NestFactory.create(AppModule.forRoot(MARIADB_OPTIONS));
 
   const document = SwaggerModule.createDocument(
     app,
     new DocumentBuilder()
-      .setTitle("Kavo — Pet example (MySQL)")
+      .setTitle("Kavo — Pet example (MariaDB)")
       .setDescription(
         "Cats, dogs, and owners: full CRUD over HTTP with filtering, " +
           "sorting, pagination, layered config, and RFC 9457 problem-details " +

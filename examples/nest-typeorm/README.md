@@ -39,18 +39,18 @@ passes that container's connection options straight to
 databases with no manual step. This does require a running Docker daemon
 wherever those commands run.
 
-## MySQL
+## MariaDB
 
-`main-mysql.ts` boots the same app against a real MySQL instance, with
+`main-mariadb.ts` boots the same app against a real MariaDB instance, with
 connection settings hardcoded to match a single local container:
 
 ```bash
-docker run --rm -e MYSQL_ROOT_PASSWORD=kavo -e MYSQL_DATABASE=kavo -p 3306:3306 mysql:8
-pnpm build && pnpm --filter @kavo/example-nest-typeorm start:mysql
+docker run --rm -e MARIADB_ROOT_PASSWORD=kavo -e MARIADB_DATABASE=kavo -p 3306:3306 mariadb:12
+pnpm build && pnpm --filter @kavo/example-nest-typeorm start:mariadb
 # → http://localhost:3000/cats   (Swagger at /docs)
 ```
 
-The e2e suite (`tests/app-mysql.e2e.spec.ts`) self-provisions a MySQL
+The e2e suite (`tests/app-mariadb.e2e.spec.ts`) self-provisions a MariaDB
 container via Testcontainers the same way the Postgres suite does — no
 manual setup, just a running Docker daemon.
 
@@ -75,7 +75,7 @@ POST   /cats                     {"name":"Kit","age":1,"owner":1}   # associate 
 
 The e2e suite in `tests/` is the executable form of the behavior spec.
 `crud-e2e.suite.ts` holds the shared assertions; `app.e2e.spec.ts`,
-`app-postgres.e2e.spec.ts`, and `app-mysql.e2e.spec.ts` each boot the app
+`app-postgres.e2e.spec.ts`, and `app-mariadb.e2e.spec.ts` each boot the app
 against their own database and run the same suite against it — one
 behavioral spec, three drivers. This app grows into a fuller reference
 application (`User`, `Project`, `Task`, `Comment`, `Tag`).

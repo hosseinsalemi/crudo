@@ -16,7 +16,7 @@ import { AddressController } from "./address/address.controller.js";
  *
  * `forRoot()` defaults to the in-memory SQLite `DatabaseModule`;
  * `forRoot(sql)` threads the same options through to a real Postgres or
- * MySQL instance instead, picked by `sql.type` (see `DatabaseModule`).
+ * MariaDB instance instead, picked by `sql.type` (see `DatabaseModule`).
  */
 @Module({})
 export class AppModule {
