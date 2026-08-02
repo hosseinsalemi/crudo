@@ -25,7 +25,9 @@ kavo/
 │  │  └─ nest/                # @kavo/nest
 │  │     └─ src/index.ts
 │  └─ protocols/
-│     └─ graphql/             # @kavo/graphql
+│     ├─ graphql/             # @kavo/graphql
+│     │  └─ src/index.ts
+│     └─ mcp/                 # @kavo/mcp
 │        └─ src/index.ts
 ├─ examples/                  # reference applications, one per framework+ORM pairing
 │  ├─ nest-typeorm/           # @kavo/example-nest-typeorm
@@ -69,13 +71,20 @@ boundary rather than widening core's `EntityId`).
   route generation, exception filter, Swagger). It can't depend on TypeORM
   or `@kavo/typeorm` — it sees persistence only as an injected
   `RepositoryAdapter`. It may depend on a `protocols/*` package
-  (`@kavo/graphql`) to offer that protocol's glue as an add-on — see
-  ADR-0016 — but never another `frameworks/*` package.
+  (`@kavo/graphql`, `@kavo/mcp`) to offer that protocol's glue as an
+  add-on — see ADR-0016 — but never another `frameworks/*` package.
 - **`@kavo/graphql`** (`packages/protocols/graphql`, ADR-0016) exists to
   build a `GraphQLSchema` over a `createCrud` service — host-framework-
   agnostic, same constraint as an ORM adapter: it depends on `@kavo/core`
   and the `graphql` peer only, never `@kavo/nest` or any other framework
   package. See `docs/architecture/13-graphql-binding.md`.
+- **`@kavo/mcp`** (`packages/protocols/mcp`, ADR-0016) exists to expose a
+  `createCrud` service's standard operations as MCP tools — the same
+  `protocols/*` shape and constraint as `@kavo/graphql`: `@kavo/core`
+  only, plus the `@modelcontextprotocol/sdk` peer for types (never
+  imported at runtime by `@kavo/mcp` itself — `@kavo/nest`'s zero-config
+  default controller is the one place the SDK actually runs, lazily — see
+  doc 14, §6). See `docs/architecture/14-mcp-binding.md`.
 
 Every package earns its place: core is the hub, and every other package
 adapts exactly one external technology or protocol — an ORM, a host
@@ -94,8 +103,8 @@ Two independent enforcement layers:
    cycles (type-only cycles are exempt — core's contracts are mutually
    referential by design and erase at compile time). One exception to
    "no cross-edge imports": a `frameworks/*` package may depend on a
-   `protocols/*` package (`@kavo/nest` → `@kavo/graphql`), never the
-   reverse — ADR-0016.
+   `protocols/*` package (`@kavo/nest` → `@kavo/graphql`/`@kavo/mcp`), never
+   the reverse — ADR-0016.
 
    Two properties of that rule set are load-bearing and easy to lose:
    - **Both spellings are matched.** A workspace package specifier does not
@@ -160,14 +169,15 @@ publish order) are future work.
 
 ## 8. Dependency classification (decided now, executed later)
 
-| Package          | `dependencies`                | `peerDependencies`                                                         |
-| ---------------- | ----------------------------- | -------------------------------------------------------------------------- |
-| `@kavo/core`     | — (none, ever)                | —                                                                          |
-| `@kavo/typeorm`  | `@kavo/core`                  | `typeorm`                                                                  |
-| `@kavo/prisma`   | `@kavo/core`                  | `@prisma/client`                                                           |
-| `@kavo/mongoose` | `@kavo/core`                  | `mongoose`                                                                 |
-| `@kavo/graphql`  | `@kavo/core`                  | `graphql`                                                                  |
-| `@kavo/nest`     | `@kavo/core`, `@kavo/graphql` | `@nestjs/common`, `@nestjs/core`, `graphql` (+ `@nestjs/swagger` optional) |
+| Package          | `dependencies`                             | `peerDependencies`                                                                                                                 |
+| ---------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `@kavo/core`     | — (none, ever)                             | —                                                                                                                                  |
+| `@kavo/typeorm`  | `@kavo/core`                               | `typeorm`                                                                                                                          |
+| `@kavo/prisma`   | `@kavo/core`                               | `@prisma/client`                                                                                                                   |
+| `@kavo/mongoose` | `@kavo/core`                               | `mongoose`                                                                                                                         |
+| `@kavo/graphql`  | `@kavo/core`                               | `graphql`                                                                                                                          |
+| `@kavo/mcp`      | `@kavo/core`                               | `@modelcontextprotocol/sdk`                                                                                                        |
+| `@kavo/nest`     | `@kavo/core`, `@kavo/graphql`, `@kavo/mcp` | `@nestjs/common`, `@nestjs/core`, `graphql`, `@modelcontextprotocol/sdk` (+ `@nestjs/swagger`, all three protocol peers, optional) |
 
 Peers, not dependencies, because the consumer's app owns the TypeORM/Prisma/
 Mongoose/Nest instance — a second copy via a nested dependency would fracture
