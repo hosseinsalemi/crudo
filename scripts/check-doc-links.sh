@@ -89,7 +89,12 @@ link_target() {
 #    counts as live if it resolves from the repo root (how source comments and
 #    skills write it) or from the mentioning file's own directory (how a
 #    package README writes `../../docs/...`).
-hits=$(git grep -n -o -E '(https?://)?[A-Za-z0-9._/-]*docs/[A-Za-z0-9._/-]+\.md' -- . | sort -u) || hits=""
+#    This script's own spec is excluded: every `docs/<name>.md` string in it is
+#    fixture data for a throwaway repo, not a reference to this one, so it
+#    would otherwise report its own test cases as dead links. It is the single
+#    file in the tree where that is true by construction.
+hits=$(git grep -n -o -E '(https?://)?[A-Za-z0-9._/-]*docs/[A-Za-z0-9._/-]+\.md' \
+  -- . ':!tests/check-doc-links.spec.ts' | sort -u) || hits=""
 require_hits 'pass 1 (docs paths)' "$hits"
 while IFS= read -r hit; do
   file=${hit%%:*}
