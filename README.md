@@ -19,9 +19,36 @@ field selection — no hand-written controller methods.
 
 ## Getting started
 
+**pnpm**
+
 ```bash
 pnpm add @kavo/core @kavo/nest @kavo/typeorm
 ```
+
+**npm**
+
+```bash
+npm install @kavo/core @kavo/nest @kavo/typeorm
+```
+
+**yarn**
+
+```bash
+yarn add @kavo/core @kavo/nest @kavo/typeorm
+```
+
+**bun**
+
+```bash
+bun add @kavo/core @kavo/nest @kavo/typeorm
+```
+
+`@kavo/nest` expects `@nestjs/common`, `@nestjs/core`, `reflect-metadata`, and
+`rxjs` as peers, and `@kavo/typeorm` expects `typeorm` — a Nest app already has
+the first four. Kavo needs Node 20+, an ESM app, and `emitDecoratorMetadata`;
+see [Requirements](https://kavo.js.org/getting-started#requirements) and
+[Peer dependencies](https://kavo.js.org/getting-started#peer-dependencies) for
+the exact versions.
 
 ```ts
 @Kavo(Book)
@@ -57,6 +84,7 @@ Fewer tokens, ship faster.
 | [`@kavo/mongoose`](packages/orms/mongoose)    | Mongoose adapter                                            |
 | [`@kavo/nest`](packages/frameworks/nest)      | NestJS binding — the `@Kavo` decorator and route generation |
 | [`@kavo/graphql`](packages/protocols/graphql) | Host-agnostic GraphQL schema binding                        |
+| [`@kavo/mcp`](packages/protocols/mcp)         | Host-agnostic MCP binding — entities as MCP tools           |
 
 Pick the ORM and framework/protocol bindings you need; `@kavo/core` has zero
 runtime dependencies.

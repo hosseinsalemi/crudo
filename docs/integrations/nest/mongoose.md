@@ -4,9 +4,27 @@ Kavo's engine (`@kavo/core`) is ORM-agnostic — it talks to your data through a
 
 If you haven't yet, read [Getting started](/getting-started) first — this page assumes you already know what `@Kavo()` does and just needs the app-wiring.
 
-```bash
+::: code-group
+
+```bash [pnpm]
 pnpm add @kavo/core @kavo/nest @kavo/mongoose
 ```
+
+```bash [npm]
+npm install @kavo/core @kavo/nest @kavo/mongoose
+```
+
+```bash [yarn]
+yarn add @kavo/core @kavo/nest @kavo/mongoose
+```
+
+```bash [bun]
+bun add @kavo/core @kavo/nest @kavo/mongoose
+```
+
+:::
+
+`@kavo/mongoose` expects `mongoose` (`^7.0.0 || ^8.0.0`) as a peer; `@kavo/nest` expects the Nest runtime your app already has. See [Peer dependencies](/getting-started#peer-dependencies) for the full list with versions, and [Requirements](/getting-started#requirements) for the Node and TypeScript prerequisites.
 
 ## Zero-config wiring
 
