@@ -14,7 +14,7 @@ let cached: LazyMcpSdk | null | undefined;
  * default MCP controller (`createDefaultMcpController`) needs to actually
  * run a `Server` over a `StreamableHTTPServerTransport` — unlike
  * `BaseKavoMcpController`/`@kavo/mcp`, which only ever consume the SDK's
- * *types* (doc 14, §6), this file exists because the default controller is
+ * *types* (doc 16, §5), this file exists because the default controller is
  * the one place `@kavo/nest` genuinely instantiates SDK classes. Mirrors
  * `load-graphql.ts` for the identical reason: `@modelcontextprotocol/sdk`
  * is an *optional* peer, so nothing in `@kavo/nest`'s always-loaded module

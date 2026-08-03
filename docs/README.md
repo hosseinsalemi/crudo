@@ -25,9 +25,9 @@ These documents and the [ADRs](internals/adr/) are authoritative.
 - [architecture/11-soft-delete.md](internals/architecture/11-soft-delete.md) — strategy resolution, restore/purge, `withDeleted`, unique-index and cascade edges
 - [architecture/12-relations-and-includes.md](internals/architecture/12-relations-and-includes.md) — relation registry, include resolution, join/batch loading, pagination rule, write-side
 - [architecture/13-graphql-binding.md](internals/architecture/13-graphql-binding.md) — package boundary, schema construction, multi-entity schemas, the Nest binding
-- [architecture/14-mcp-binding.md](internals/architecture/14-mcp-binding.md) — package boundary, toolset construction, result shape and error mapping, the Nest binding
 - [architecture/14-prisma-adapter.md](internals/architecture/14-prisma-adapter.md) — marker classes, metadata seam, query translation, error mapping
 - [architecture/15-mongoose-adapter.md](internals/architecture/15-mongoose-adapter.md) — model identity, ObjectId conversion, populate, relation-path limits
+- [architecture/16-mcp-binding.md](internals/architecture/16-mcp-binding.md) — package boundary, toolset construction, result shape and error mapping, the Nest binding
 
 ## Reference
 

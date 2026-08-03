@@ -7,7 +7,7 @@ description: Reference for Kavo's soft delete, restore, and purge behavior — s
 
 Deleting a row can mean two things. Kavo resolves which one **per entity, at
 bootstrap**, and every layer downstream reads that one answer instead of
-re-deciding. Full detail: `docs/architecture/11-soft-delete.md`.
+re-deciding. Full detail: `docs/internals/architecture/11-soft-delete.md`.
 Wire-level `withDeleted=true` grammar is in the `query-grammar` skill;
 config precedence is in the `global-config` skill.
 

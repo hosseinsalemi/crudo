@@ -24,7 +24,7 @@ import { PrismaRepositoryAdapter } from "./prisma-repository-adapter.js";
  *   purely as `ClassRef` identity (`class Author {}` ↔ `model Author`,
  *   matched by name) — and a relation's target model name can only resolve
  *   back to *its* marker class if every marker class was registered up
- *   front. See `docs/adr/0017-prisma-marker-classes-and-entity-registry.md`.
+ *   front. See `docs/internals/adr/0017-prisma-marker-classes-and-entity-registry.md`.
  */
 export interface PrismaInfrastructureOptions {
   readonly datamodel: PrismaDatamodel;

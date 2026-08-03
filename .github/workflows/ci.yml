@@ -92,3 +92,21 @@ jobs:
       # still owns deployment.
       - name: Build docs
         run: pnpm docs:build
+
+  doc-links:
+    name: doc links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Every `docs/**.md` path mentioned by a tracked file, and every
+      # VitePress sidebar link, must resolve. Moving a docs directory leaves
+      # the mentions behind, and some of the files carrying them (package
+      # READMEs, `src/` doc comments, the adopter-facing skills in
+      # `extensions/`) ship to npm — so a dead reference is one an adopter
+      # follows. The `docs` job above cannot cover either class: VitePress
+      # only resolves links inside the pages it renders, so it never sees a
+      # reference from `packages/` and never reads the sidebar config.
+      # Needs no toolchain: pure git+sh.
+      - name: Check doc links
+        run: ./scripts/check-doc-links.sh

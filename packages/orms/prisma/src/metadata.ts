@@ -55,7 +55,7 @@ function isGeneratedField(field: PrismaField): boolean {
  * back to *its* marker class; TypeORM gets this for free from
  * `DataSource#entities`, Prisma has no equivalent, so
  * `createInfrastructure` collects it explicitly (see
- * `docs/adr/0017-prisma-marker-classes-and-entity-registry.md`).
+ * `docs/internals/adr/0017-prisma-marker-classes-and-entity-registry.md`).
  */
 export function buildEntityMetadata<Entity extends object>(
   datamodel: PrismaDatamodel,

@@ -19,6 +19,7 @@
     "format:check": "prettier --check .",
     "check": "pnpm run generate && pnpm run build && pnpm run typecheck && pnpm run depcruise && pnpm run lint && pnpm run test",
     "start": "pnpm --filter @kavo/example-nest-typeorm start",
+    "docs:links": "./scripts/check-doc-links.sh",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs"

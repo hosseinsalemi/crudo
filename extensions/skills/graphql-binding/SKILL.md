@@ -10,7 +10,7 @@ an existing `createCrud` service. Every resolver calls directly into the
 same `DefaultKavoService`/engine pipeline REST binds to — no parallel
 request path, no second copy of filter/sort/pagination validation, no
 separate error handling. Full detail:
-`docs/architecture/13-graphql-binding.md` (and ADR-0016 for the
+`docs/internals/architecture/13-graphql-binding.md` (and ADR-0016 for the
 package-boundary rationale).
 
 `@kavo/graphql` is host-framework-agnostic: it imports `@kavo/core` and the

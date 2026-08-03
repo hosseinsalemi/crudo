@@ -21,6 +21,7 @@ pnpm lint         # oxlint over packages/*, examples/*, tests/ and .github/scrip
 pnpm prettify     # prettier --write . (printWidth 120)
 pnpm format:check # prettier --check . — the separate formatting job CI runs alongside the gate
 pnpm docs:build   # vitepress build docs — a second CI gate that `check` does NOT run
+pnpm docs:links   # every `docs/**.md` reference and sidebar link resolves (a third; also not in `check`)
 ```
 
 Run a single test file or test by name:
@@ -30,7 +31,7 @@ pnpm vitest run packages/core/tests/filter-parser.spec.ts
 pnpm vitest run -t "coerces JavaScript number syntax"
 ```
 
-Tests live in each package's `tests/` directory (never in `src/`, so they are not shipped in `dist/`). The one exception is the repo-level `tests/` directory, for tests whose subject is the repo's own wiring rather than any package — `tests/release-workflow.spec.ts` gates `.github/workflows/publish.yml`. Put a test there only when it belongs to no package; it is type-checked by the root `tsconfig.tests.json`. Vitest aliases `@kavo/*` to package `src/` directly (see `vitest.config.ts`), so tests exercise sources with no stale-`dist` hazard. The SWC vitest plugin is required — TypeORM entities and Nest DI need decorator metadata that esbuild cannot emit.
+Tests live in each package's `tests/` directory (never in `src/`, so they are not shipped in `dist/`). The one exception is the repo-level `tests/` directory, for tests whose subject is the repo's own wiring rather than any package — `tests/release-workflow.spec.ts` gates `.github/workflows/publish.yml`, and `tests/check-doc-links.spec.ts` gates `scripts/check-doc-links.sh`. Put a test there only when it belongs to no package; it is type-checked by the root `tsconfig.tests.json`. Vitest aliases `@kavo/*` to package `src/` directly (see `vitest.config.ts`), so tests exercise sources with no stale-`dist` hazard. The SWC vitest plugin is required — TypeORM entities and Nest DI need decorator metadata that esbuild cannot emit.
 
 Because the build compiles `src` only, each package also has a `tsconfig.tests.json` (`noEmit`, `include: ["tests"]`, `paths` mirroring the vitest aliases) that `pnpm typecheck` runs. That is what makes the type-level acceptance tests in `packages/**/tests/types/*.test-d.ts` real: `vitest.config.ts` collects only `*.spec.ts`, so nothing in them ever executes — `expectTypeOf` assertions and `@ts-expect-error` directives are checked by `tsc` alone. An unused `@ts-expect-error` is itself an error, so those tests fail in both directions.
 

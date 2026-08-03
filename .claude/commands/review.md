@@ -55,12 +55,17 @@ anything else:
 
    ```bash
    pnpm check
+   pnpm docs:links
    ```
 
    That is build + typecheck + `depcruise` + the full test suite. If it fails,
    **stop** and report the failure output — do not proceed to review a change
    that doesn't build or pass its tests, and never weaken a test to make it
    pass.
+
+   `docs:links` is its own CI job rather than part of `pnpm check`, so run it
+   explicitly — a dead reference to a renamed doc is a review finding, and it
+   costs under a second to catch here instead of on CI.
 
    (PR mode also gets `pnpm check` coverage, via `kavo-reviewer` below.)
 

@@ -84,7 +84,7 @@ boundary rather than widening core's `EntityId`).
   only, plus the `@modelcontextprotocol/sdk` peer for types (never
   imported at runtime by `@kavo/mcp` itself — `@kavo/nest`'s zero-config
   default controller is the one place the SDK actually runs, lazily — see
-  doc 14, §6). See `docs/internals/architecture/14-mcp-binding.md`.
+  doc 16, §5). See `docs/internals/architecture/16-mcp-binding.md`.
 
 Every package earns its place: core is the hub, and every other package
 adapts exactly one external technology or protocol — an ORM, a host
@@ -144,10 +144,20 @@ packages or expensive non-tsc pipelines (a future e2e suite is the
 natural checkpoint).
 
 Root scripts: `generate`, `build` (`tsc -b`), `clean`, `typecheck`,
-`depcruise`, `lint`, `test`, `prettify`, `format:check`, `docs:build`, and
-`check` — the last runs `generate → build → typecheck → depcruise → lint →
-test` and is the verification gate. `format:check` and `docs:build` sit
-outside it, each as its own CI job.
+`depcruise`, `lint`, `test`, `prettify`, `format:check`, `docs:build`,
+`docs:links`, and `check` — the last runs `generate → build → typecheck →
+depcruise → lint → test` and is the verification gate. Three checks sit
+outside it, each as its own CI job: `format:check`, `docs:build` (VitePress,
+which resolves the links inside the pages it renders), and `docs:links`
+(`scripts/check-doc-links.sh`). The last two are complements, not overlaps —
+the docs build never sees a `docs/**.md` reference written from `packages/`
+or `extensions/`, because those are not pages, and it never reads
+`docs/.vitepress/config.mts`, because that is config rather than content. So
+a renamed doc can still leave a dead link in a package README that ships to
+npm, or a silent 404 in the published sidebar, and `docs:links` is what
+catches both. The `/implement`, `/review`, `/pr` and `/merge` commands run
+these alongside `pnpm check` locally, so none of them is a gate you only hear
+about from CI.
 
 ## 5. Public vs. internal API surface
 

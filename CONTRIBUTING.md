@@ -90,13 +90,39 @@ a test fail, either the change is wrong or the test encoded a behavior that is
 being deliberately changed — and the second case belongs in the PR description.
 
 CI runs the identical gate on three Node versions (`lts/-1`, `lts/*`,
-`current`), plus separate formatting and docs-build jobs. Before pushing:
+`current`), plus three separate jobs — formatting, a docs build, and a
+doc-link check. Before pushing:
 
 ```bash
 pnpm prettify      # writes formatting fixes
 pnpm format:check  # what CI actually runs
 pnpm docs:build    # a separate CI job gates it — see "Working on the docs"
+pnpm docs:links    # every `docs/**.md` reference and sidebar link resolves
 ```
+
+`docs:links` sits outside `pnpm check` because it needs no toolchain at all —
+it is `git grep` plus a file test (`scripts/check-doc-links.sh`), so CI can run
+it as a dependency-free job that skips `pnpm install` entirely. That is a
+reason to keep it out of the _aggregate_ command, not out of your loop: the
+`/implement`, `/review`, `/pr` and `/merge` commands all run it alongside
+`pnpm check`, because a red CI job is an expensive way to learn about a
+one-second check.
+
+It exists because a docs move leaves every mention of the old path behind, in
+skills, agent prompts, package READMEs, and `src/` doc comments — and several
+of those ship to npm, so a dead reference is one an adopter follows. The
+`docs` job does not overlap with it: VitePress only resolves links inside the
+pages it renders, so it never sees a reference written from `packages/`, and
+it never reads `docs/.vitepress/config.mts` — an extensionless sidebar entry
+left behind by a renamed page builds perfectly clean and ships a 404. Links
+written _inside_ docs prose are the docs build's job, and this script leaves
+them to it.
+
+Two rules keep it honest. If a reference is a deliberate template placeholder
+rather than a link, teach the script about it instead of deleting the check.
+And every pass must match something in this repo, so the script fails loud when
+a pass matches nothing rather than reporting success — a scanner that quietly
+stops scanning is worse than no scanner, because it still looks green.
 
 One thing the gate does **not** cover: CI installs with
 `pnpm install --frozen-lockfile` _before_ running it, and neither `pnpm check`
