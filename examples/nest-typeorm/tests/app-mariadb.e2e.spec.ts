@@ -5,6 +5,7 @@ import { Test } from "@nestjs/testing";
 import { MariaDbContainer, type StartedMariaDbContainer } from "@testcontainers/mariadb";
 import { AppModule } from "../src/app.module.js";
 import { registerCrudE2eSuite } from "./crud-e2e.suite.js";
+import { listen } from "./support/listen.js";
 
 /**
  * Same suite as `app.e2e.spec.ts`, run against a real MariaDB instead of
@@ -31,7 +32,7 @@ beforeAll(async () => {
     ],
   }).compile();
   app = moduleRef.createNestApplication();
-  await app.init();
+  await listen(app);
 }, 240_000);
 
 afterAll(async () => {

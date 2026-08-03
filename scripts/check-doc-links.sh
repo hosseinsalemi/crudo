@@ -8,14 +8,18 @@
 # an adopter follows. A one-off grep is not a guard, because nothing re-runs
 # it; this does, from CI, on every push and pull request.
 #
-# Scope, in four passes: `docs/**.md` references in any tracked file, resolved
+# Scope, in three passes: `docs/**.md` references in any tracked file, resolved
 # from the repo root or from the mentioning file; markdown links between files
 # under `docs/` written relative to the linking file — how the docs index
-# writes them; the extensionless VitePress sidebar/nav links in the config; and
-# the extensionless site-absolute links docs prose writes (`](/getting-started)`).
-# The last two are the ones VitePress's own dead-link check cannot help with —
-# it never inspects the config, and it only catches prose links at `docs:build`,
-# which runs on push to `main`, i.e. after the merge that broke them.
+# writes them; and the extensionless VitePress sidebar/nav links in the config.
+#
+# This deliberately stops where CI's `docs` job starts. That job runs
+# `pnpm docs:build` on every pull request, and VitePress resolves the links
+# inside the pages it renders — so in-prose links are its problem, not this
+# script's. What it cannot see is the other side of both boundaries: a
+# reference written from `packages/` or `extensions/` (never rendered), and
+# the sidebar config (never read as a page). Those are what the passes below
+# are for.
 #
 # Out of scope, deliberately: `#anchor` fragments (only the file is resolved),
 # and by-number citations of the form `doc NN`.
@@ -146,24 +150,6 @@ while IFS= read -r hit; do
   link_resolves "$ref" || report "$config" "$line" "$(link_target "$ref")"
 done <<<"$hits"
 
-# 4. Site-absolute links in docs prose (`[Nest + Prisma](/integrations/nest/prisma)`).
-#    Extensionless like the sidebar, so passes 1 and 2 miss them too. VitePress
-#    does catch these — but only at `docs:build`, which runs on push to `main`,
-#    so without this pass a rename merges green and breaks the deploy.
-hits=$(git grep -n -o -E '\]\(/[A-Za-z0-9._/#-]+\)' -- 'docs/**.md' | sort -u) || hits=""
-require_hits 'pass 4 (site-absolute links)' "$hits"
-while IFS= read -r hit; do
-  file=${hit%%:*}
-  rest=${hit#*:}
-  line=${rest%%:*}
-  ref=${rest#*:}
-  ref=${ref#](}
-  ref=${ref%)}
-  ref=${ref%%#*}
-  [ -n "$ref" ] || continue
-  link_resolves "$ref" || report "$file" "$line" "$(link_target "$ref")"
-done <<<"$hits"
-
 if [ "$status" -ne 0 ]; then
   echo
   echo "Dead references above. Repoint them at the real file, or add a"
@@ -171,4 +157,4 @@ if [ "$status" -ne 0 ]; then
   exit 1
 fi
 
-echo "doc links OK — every tracked docs/**.md reference and docs link resolves"
+echo "doc links OK — every tracked docs/**.md reference and sidebar link resolves"

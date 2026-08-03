@@ -13,6 +13,13 @@ import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-in
  * collects it into one toolset at `onModuleInit` (the full standard
  * toolset, unconditionally — no per-entity config), and resolves through
  * the exact `DefaultKavoService` REST binds to.
+ *
+ * The only spec in this package that still bootstraps with `app.init()`:
+ * it resolves the toolset out of the container and never makes an HTTP
+ * request, so there is no server for supertest to bind. The moment a test
+ * here issues one, switch to `listen(app)` from `./support/listen.js` —
+ * `init()` alone leaves the server unbound and hands the per-request
+ * wildcard bind of issue #91 straight back.
  */
 @Kavo(Todo)
 @Controller("todos")

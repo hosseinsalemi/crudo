@@ -90,13 +90,14 @@ a test fail, either the change is wrong or the test encoded a behavior that is
 being deliberately changed — and the second case belongs in the PR description.
 
 CI runs the identical gate on three Node versions (`lts/-1`, `lts/*`,
-`current`), plus two separate jobs — formatting, and a doc-link check. Before
-pushing:
+`current`), plus three separate jobs — formatting, a docs build, and a
+doc-link check. Before pushing:
 
 ```bash
 pnpm prettify      # writes formatting fixes
 pnpm format:check  # what CI actually runs
-pnpm docs:links    # every `docs/**.md` reference and docs link resolves
+pnpm docs:build    # a separate CI job gates it — see "Working on the docs"
+pnpm docs:links    # every `docs/**.md` reference and sidebar link resolves
 ```
 
 `docs:links` sits outside `pnpm check` because it needs no toolchain at all —
@@ -109,13 +110,13 @@ one-second check.
 
 It exists because a docs move leaves every mention of the old path behind, in
 skills, agent prompts, package READMEs, and `src/` doc comments — and several
-of those ship to npm, so a dead reference is one an adopter follows. Four
-passes, and the last two are the ones VitePress cannot help with: it never
-inspects the extensionless sidebar/nav links in `docs/.vitepress/config.mts`,
-and it only catches the site-absolute links docs prose writes
-(`](/getting-started)`) at `docs:build`, which runs on push to `main` — after
-the merge that broke them. Either way a renamed page would otherwise ship a
-silent 404.
+of those ship to npm, so a dead reference is one an adopter follows. The
+`docs` job does not overlap with it: VitePress only resolves links inside the
+pages it renders, so it never sees a reference written from `packages/`, and
+it never reads `docs/.vitepress/config.mts` — an extensionless sidebar entry
+left behind by a renamed page builds perfectly clean and ships a 404. Links
+written _inside_ docs prose are the docs build's job, and this script leaves
+them to it.
 
 Two rules keep it honest. If a reference is a deliberate template placeholder
 rather than a link, teach the script about it instead of deleting the check.
@@ -159,6 +160,15 @@ A few things about the test setup that are easy to trip over:
 - **The SWC transform is required.** TypeORM entities and Nest DI rely on
   decorator metadata, which vitest's default esbuild transform cannot emit. That
   is why `unplugin-swc` is in the vitest config — don't remove it.
+- **An e2e spec binds its app with `listen(app)`, never `app.init()`.** The
+  helper lives in each package's `tests/support/listen.ts`. `init()` leaves
+  `getHttpServer()` unbound, so supertest binds it per request — `listen(0)` on
+  the _wildcard_, then a connect to a hardcoded `127.0.0.1` — and that
+  asymmetry lets your request reach an unrelated local process that already
+  holds the port. It shows up as a parse error, a foreign 400/404/405, a socket
+  hang up, or a timeout, in roughly one run in ten. Read the request through the
+  suite's `server()` accessor rather than `app.getHttpServer()`, and never
+  "fix" a port collision with a retry, a fixed port, or a longer timeout.
 - **`*.test-d.ts` files are type-level tests and never execute.** Vitest does not
   collect them; `pnpm typecheck` is what verifies them, via each package's
   `tsconfig.tests.json`. They assert with `expectTypeOf` and `@ts-expect-error`,
@@ -337,6 +347,29 @@ pnpm docs:dev      # local dev server with hot reload
 pnpm docs:build    # production build
 pnpm docs:preview  # serve the production build
 ```
+
+`pnpm check` does not build the site, but CI does: a separate `docs` job runs
+`pnpm docs:build` on every pull request and every push to `main`. VitePress fails
+that build on dead links _between pages under `docs/`_, so a broken
+cross-reference there fails the PR rather than the Pages deploy on `main`. The
+job is deliberately not path-filtered — `docs/.vitepress/config.mts` reads
+`packages/core/package.json` at build time — so run it locally before pushing,
+docs change or not.
+
+The gate is narrower than "it checks the links", though. These four categories
+pass a green build and still need a human eye:
+
+- **Anything outside `docs/`** — this file, the root `README.md`, each package's
+  and example's `README.md` — plus `docs/README.md`, which `config.mts`
+  `srcExclude`s. VitePress never renders them, so it never sees their links.
+- **`#anchor` fragments**, even between two rendered pages. VitePress strips the
+  hash before it compares, so `/getting-started#long-gone` passes as long as
+  `getting-started` itself exists.
+- **Links in config or frontmatter rather than markdown** — the `themeConfig.nav`
+  and `sidebar` entries in `config.mts`, and the homepage's `hero.actions` in
+  `docs/index.md`. Renaming a page updates none of them, and the build stays
+  green while the site's own navigation 404s.
+- **Links pointing at `CLAUDE.md`**, which `ignoreDeadLinks` exempts.
 
 `docs/` has two audiences, and it is worth keeping them separate:
 

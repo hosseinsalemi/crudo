@@ -133,16 +133,18 @@ packages or expensive non-tsc pipelines (a future e2e suite is the
 natural checkpoint).
 
 Root scripts: `build` (`tsc -b`), `clean`, `depcruise`, and `check`
-(build + boundaries) — `pnpm check` is the verification gate. Two checks sit
-deliberately outside it, as their own CI jobs, because neither needs the
-built workspace: `format:check` (Prettier) and `docs:links`
-(`scripts/check-doc-links.sh` — every `docs/**.md` path a tracked file
-mentions, and every link into the docs site, must resolve, so a docs move
-cannot leave dead links in the package READMEs and `src/` doc comments that
-ship to npm, nor a silent 404 in the published sidebar or prose). Sitting
-outside `pnpm check` keeps those jobs install-free in CI; the `/implement`,
-`/review`, `/pr` and `/merge` commands run them alongside it locally, so
-neither is a gate you only hear about from CI.
+(build + boundaries) — `pnpm check` is the verification gate. Three checks sit
+deliberately outside it, as their own CI jobs: `format:check` (Prettier),
+`docs:build` (VitePress, which resolves the links inside the pages it
+renders), and `docs:links` (`scripts/check-doc-links.sh`). The last two are
+complements, not overlaps — the docs build never sees a `docs/**.md`
+reference written from `packages/` or `extensions/`, because those are not
+pages, and it never reads `docs/.vitepress/config.mts`, because that is
+config rather than content. So a renamed doc can still leave a dead link in a
+package README that ships to npm, or a silent 404 in the published sidebar,
+and `docs:links` is what catches both. The `/implement`, `/review`, `/pr` and
+`/merge` commands run these alongside `pnpm check` locally, so none of them
+is a gate you only hear about from CI.
 
 ## 5. Public vs. internal API surface
 
@@ -173,8 +175,15 @@ The packages form one tightly coupled contract surface — a core contract
 change almost always touches an edge package, and a single version answers
 "which adapter works with which core" permanently. Cost: occasional no-op
 version bumps for an untouched package — accepted as trivially cheap next
-to cross-package version-matrix support. Release mechanics (changesets,
-publish order) are future work.
+to cross-package version-matrix support.
+
+Release mechanics live in `.github/workflows/publish.yml`, triggered by a
+`vX.Y.Z` tag. `PACKAGE_DIRS` there is the explicit list of what gets
+released, ordered so every package publishes after the packages it depends
+on (`@kavo/nest` last), which keeps the registry internally consistent if a
+run fails partway. Lockstep itself is checked rather than assumed: a gate
+ahead of packing fails the release unless every listed package is already at
+the tag's version.
 
 ## 8. Dependency classification (decided now, executed later)
 

@@ -1,0 +1,555 @@
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+/**
+ * The release pipeline, as a set of assertions.
+ *
+ * ADR-0004 says every `@kavo/*` package ships on one version, but until now
+ * nothing enforced it: `publish.yml` compared the tag against `@kavo/core`
+ * alone, so a package left behind packed stale and was then skipped by the
+ * already-published guard — a green release that shipped one package short.
+ * That is not a hypothetical; it is how v0.6.0 left `@kavo/prisma` at 0.5.0.
+ *
+ * These tests cover three things: the state of the tree itself, the behavior
+ * of the gate script, and the workflow wiring that decides when the gate runs
+ * and in what order packages go out. The wiring part deliberately reads
+ * `publish.yml` as text — the file is the artifact under test, and a test that
+ * reimplemented its contents would pass while the real pipeline drifted.
+ */
+
+const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
+const WORKFLOW_PATH = resolve(REPO_ROOT, ".github/workflows/publish.yml");
+const PUBLISH_COMMAND_PATH = resolve(REPO_ROOT, ".claude/commands/publish.md");
+const SCRIPT_PATH = resolve(REPO_ROOT, ".github/scripts/verify-lockstep-versions.mjs");
+
+const workflow = readFileSync(WORKFLOW_PATH, "utf8");
+
+interface Manifest {
+  name?: string;
+  version?: string;
+  private?: boolean;
+  dependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
+  optionalDependencies?: Record<string, string>;
+}
+
+const manifests = new Map<string, Manifest>();
+
+function readManifest(dir: string): Manifest {
+  let manifest = manifests.get(dir);
+  if (!manifest) {
+    manifest = JSON.parse(readFileSync(resolve(REPO_ROOT, dir, "package.json"), "utf8")) as Manifest;
+    manifests.set(dir, manifest);
+  }
+  return manifest;
+}
+
+/**
+ * The entries of the `PACKAGE_DIRS: >-` folded block — the workflow's single
+ * source of truth for which packages get released.
+ */
+function readPackageDirs(source: string): string[] {
+  const lines = source.split("\n");
+  const start = lines.findIndex((line) => line.trim() === "PACKAGE_DIRS: >-");
+  if (start === -1) {
+    throw new Error("publish.yml no longer declares PACKAGE_DIRS as a folded block");
+  }
+
+  const header = lines[start]!;
+  const keyIndent = header.length - header.trimStart().length;
+  const dirs: string[] = [];
+
+  for (const line of lines.slice(start + 1)) {
+    const indent = line.length - line.trimStart().length;
+    // The block ends at the first blank or dedented line.
+    if (line.trim() === "" || indent <= keyIndent) break;
+    dirs.push(line.trim());
+  }
+
+  return dirs;
+}
+
+/** Step names in the order the job runs them. */
+function readStepNames(source: string): string[] {
+  return [...source.matchAll(/^\s*- name: (.+)$/gm)].map((match) => match[1]!.trim());
+}
+
+/**
+ * One step's whole YAML block, so assertions can cover the keys attached to a
+ * step (`if:`, `continue-on-error:`) and not just the command it runs.
+ */
+function readStepBlock(source: string, name: string): string {
+  const lines = source.split("\n");
+  const start = lines.findIndex((line) => line.trim() === `- name: ${name}`);
+  if (start === -1) throw new Error(`publish.yml has no step named "${name}"`);
+
+  const header = lines[start]!;
+  const stepIndent = header.length - header.trimStart().length;
+  const block = [header];
+
+  for (const line of lines.slice(start + 1)) {
+    const indent = line.length - line.trimStart().length;
+    if (line.trim() !== "" && indent <= stepIndent) break;
+    block.push(line);
+  }
+
+  return block.join("\n");
+}
+
+/**
+ * A step's `run:` value, normalised across YAML styles: an inline scalar and a
+ * `run: |` block holding the same single command both come back as that one
+ * command. That is what lets the gate's command be asserted by equality — the
+ * only assertion that survives ` || true`, `; exit 0` and `set +e`, none of
+ * which a substring check on the command notices.
+ */
+function readStepRun(source: string, name: string): string {
+  const block = readStepBlock(source, name);
+  const lines = block.split("\n");
+  const start = lines.findIndex((line) => /^\s*run:/.test(line));
+  if (start === -1) throw new Error(`publish.yml step "${name}" has no run: key`);
+
+  const header = lines[start]!;
+  const value = /^\s*run:[ \t]*(.*)$/.exec(header)![1]!.trim();
+  // Anything that is not a block indicator (`|`, `|-`, `>`, `>-`, `|2` …) is
+  // the command itself, written inline.
+  if (value !== "" && !/^[|>][-+]?\d*$/.test(value)) return value;
+
+  const runIndent = header.length - header.trimStart().length;
+  const body: string[] = [];
+  for (const line of lines.slice(start + 1)) {
+    const indent = line.length - line.trimStart().length;
+    if (line.trim() !== "" && indent <= runIndent) break;
+    body.push(line.trim());
+  }
+
+  return body.join("\n").trim();
+}
+
+/**
+ * A job's whole YAML block, so the keys that govern every step in it —
+ * `if:`, `continue-on-error:` — can be asserted, not just the keys on one
+ * step. A job-level `if: false` silences every step underneath it.
+ */
+function readJobBlock(source: string, name: string): string {
+  const lines = source.split("\n");
+  const start = lines.findIndex((line) => line.trimEnd() === `  ${name}:`);
+  if (start === -1) throw new Error(`publish.yml has no job named "${name}"`);
+
+  const jobIndent = lines[start]!.length - lines[start]!.trimStart().length;
+  const block = [lines[start]!];
+  for (const line of lines.slice(start + 1)) {
+    const indent = line.length - line.trimStart().length;
+    if (line.trim() !== "" && indent <= jobIndent) break;
+    block.push(line);
+  }
+
+  return block.join("\n");
+}
+
+/** The keys attached directly to a job, ignoring everything nested under them. */
+function readJobKeys(source: string, name: string): string[] {
+  const lines = readJobBlock(source, name).split("\n").slice(1);
+  const keyIndent = Math.min(
+    ...lines.filter((line) => line.trim() !== "").map((line) => line.length - line.trimStart().length),
+  );
+
+  return lines
+    .filter((line) => line.length - line.trimStart().length === keyIndent)
+    .map((line) => /^\s*([\w-]+):/.exec(line)?.[1])
+    .filter((key): key is string => key !== undefined);
+}
+
+/**
+ * The directories `pnpm-workspace.yaml` globs over, reduced to the roots a
+ * filesystem walk has to start from. Deriving them from the workspace file
+ * rather than hardcoding `packages` is what keeps the coverage assertion
+ * below honest when a package lands somewhere new.
+ */
+function readWorkspaceRoots(): string[] {
+  const source = readFileSync(resolve(REPO_ROOT, "pnpm-workspace.yaml"), "utf8");
+  const lines = source.split("\n");
+  const start = lines.findIndex((line) => line.trimEnd() === "packages:");
+  if (start === -1) {
+    throw new Error("pnpm-workspace.yaml no longer declares a `packages:` list");
+  }
+
+  const patterns: string[] = [];
+  for (const line of lines.slice(start + 1)) {
+    if (line.trim() === "") continue;
+    // Only the `packages:` list counts. Sweeping the whole file would also
+    // pick up the entries of pnpm's other top-level lists — most likely
+    // `onlyBuiltDependencies:`, which `pnpm approve-builds` writes — and
+    // then try to walk `esbuild/` as if it were a workspace root.
+    const entry = /^\s+-\s+["']?([^"'\s]+)/.exec(line);
+    if (!entry) break;
+    patterns.push(entry[1]!);
+  }
+
+  if (patterns.length === 0) {
+    throw new Error("pnpm-workspace.yaml declares an empty `packages:` list");
+  }
+
+  return [...new Set(patterns.map((pattern) => pattern.split("/")[0]!))];
+}
+
+/** Every workspace package directory under `dir`, at any nesting depth. */
+function findWorkspacePackages(dir: string): string[] {
+  const found: string[] = [];
+  for (const entry of readdirSync(resolve(REPO_ROOT, dir), { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name === "node_modules" || entry.name === "dist") continue;
+    const child = `${dir}/${entry.name}`;
+    if (existsSync(resolve(REPO_ROOT, child, "package.json"))) found.push(child);
+    else found.push(...findWorkspacePackages(child));
+  }
+  return found;
+}
+
+const packageDirs = readPackageDirs(workflow);
+
+/**
+ * The release v0.6.0 shipped `@kavo/prisma` at 0.5.0 and everything else at
+ * 0.6.0; repairing that on the registry is a separate issue, so the tree is
+ * allowed to still show it. The allowance is deliberately narrow on both
+ * axes — an exact directory *and* an exact stale version — and it expires
+ * with the release that caused it: it applies only while `@kavo/core` is
+ * still on `DRIFTED_RELEASE`.
+ *
+ * That expiry is the whole point. A blanket "prisma may lag" exception would
+ * wave through the next release repeating the exact mistake this file exists
+ * to catch (six packages bumped, prisma left behind — still one drifted
+ * directory, still matching), while *failing* a correct release that bumped
+ * all seven. Keying it to the release inverts both: once `/publish` moves the
+ * tree to the next version the allowance is gone, so prisma must come along.
+ */
+const DRIFTED_RELEASE = "0.6.0";
+const KNOWN_DRIFT: Record<string, string> = { "packages/orms/prisma": "0.5.0" };
+
+/** The directories not on `version`, minus the grandfathered v0.6.0 drift. */
+function findBehind(version: string | undefined, actual: Record<string, string | undefined>): string[] {
+  const tolerated: Record<string, string> = version === DRIFTED_RELEASE ? KNOWN_DRIFT : {};
+
+  return Object.keys(actual).filter((dir) => {
+    const found = actual[dir];
+    if (found === version) return false;
+    // A manifest with no `version` at all is drift, never a match against the
+    // allowance: `tolerated[dir]` is also undefined for every directory that
+    // is not grandfathered, so comparing the two directly would read a
+    // missing field as "in lockstep" — the one thing the gate script itself
+    // is careful to call a mismatch.
+    if (found === undefined) return true;
+    return tolerated[dir] !== found;
+  });
+}
+
+describe("lockstep versions in this repository", () => {
+  /**
+   * ADR-0004 is a property of the tree, not only of a release: checking it
+   * here means drift fails `pnpm check` on the pull request that introduces
+   * it, rather than at a tag push that cannot be cleanly undone.
+   */
+  it("keeps every package on one version, bar the drift v0.6.0 left behind", () => {
+    const version = readManifest("packages/core").version;
+    const actual = Object.fromEntries(packageDirs.map((dir) => [dir, readManifest(dir).version]));
+
+    expect(findBehind(version, actual)).toEqual([]);
+  });
+
+  it("still fails a release that leaves prisma behind, once the tree moves past v0.6.0", () => {
+    const actual = { "packages/core": "0.7.0", "packages/orms/prisma": "0.5.0" };
+
+    expect(findBehind("0.7.0", actual)).toEqual(["packages/orms/prisma"]);
+  });
+
+  it("passes a correct release that bumps prisma along with everything else", () => {
+    const actual = { "packages/core": "0.7.0", "packages/orms/prisma": "0.7.0" };
+
+    expect(findBehind("0.7.0", actual)).toEqual([]);
+  });
+
+  it("fails a package whose version field is missing entirely", () => {
+    const actual = { "packages/core": "0.6.0", "packages/protocols/mcp": undefined };
+
+    expect(findBehind("0.6.0", actual)).toEqual(["packages/protocols/mcp"]);
+  });
+
+  it("fails prisma at a stale version other than the one grandfathered", () => {
+    const actual = { "packages/core": "0.6.0", "packages/orms/prisma": "0.4.0" };
+
+    expect(findBehind("0.6.0", actual)).toEqual(["packages/orms/prisma"]);
+  });
+
+  it("fails prisma ahead of the tree as readily as behind it", () => {
+    const actual = { "packages/core": "0.6.0", "packages/orms/prisma": "0.7.0" };
+
+    expect(findBehind("0.6.0", actual)).toEqual(["packages/orms/prisma"]);
+  });
+
+  it("fails new drift even at the grandfathered version", () => {
+    const actual = { "packages/core": "0.6.0", "packages/orms/prisma": "0.5.0", "packages/protocols/mcp": "0.5.0" };
+
+    expect(findBehind("0.6.0", actual)).toEqual(["packages/protocols/mcp"]);
+  });
+});
+
+describe("publish.yml wiring", () => {
+  it("declares a non-empty PACKAGE_DIRS list of directories that exist", () => {
+    expect(packageDirs.length).toBeGreaterThan(0);
+    for (const dir of packageDirs) {
+      expect(() => readManifest(dir)).not.toThrow();
+    }
+  });
+
+  it("verifies lockstep versions before anything is packed or published", () => {
+    const steps = readStepNames(workflow);
+    const verify = steps.indexOf("Verify lockstep versions");
+    const pack = steps.indexOf("Pack packages");
+    const publish = steps.indexOf("Publish packages");
+
+    expect(verify).toBeGreaterThanOrEqual(0);
+    expect(pack).toBeGreaterThanOrEqual(0);
+    expect(publish).toBeGreaterThanOrEqual(0);
+    expect(verify).toBeLessThan(pack);
+    expect(verify).toBeLessThan(publish);
+  });
+
+  it("runs the gate script over the whole PACKAGE_DIRS list, not one package", () => {
+    // By equality, not by substring. Every way of neutering the gate leaves
+    // the command itself intact and appends to it — ` || true`, `; exit 0` —
+    // so a `toContain` on the command is exactly the assertion that misses
+    // them. `$PACKAGE_DIRS` is unquoted on purpose: word splitting is what
+    // turns the folded list into one argument per directory.
+    expect(readStepRun(workflow, "Verify lockstep versions")).toBe(
+      'node .github/scripts/verify-lockstep-versions.mjs "${GITHUB_REF_NAME#v}" $PACKAGE_DIRS',
+    );
+    expect(existsSync(SCRIPT_PATH)).toBe(true);
+  });
+
+  it("keeps the gate, and everything it guards, unconditional", () => {
+    // Three ways to reopen the v0.6.0 hole, all of which used to leave every
+    // assertion in this file green: silence the gate step, silence the whole
+    // job, or let the steps the gate protects run anyway.
+    for (const name of ["Verify lockstep versions", "Pack packages", "Publish packages"]) {
+      const step = readStepBlock(workflow, name);
+      expect(step, `${name} is conditional`).not.toContain("continue-on-error");
+      expect(step, `${name} is conditional`).not.toMatch(/^\s+if:/m);
+    }
+
+    expect(readJobKeys(workflow, "publish")).not.toContain("if");
+    expect(readJobKeys(workflow, "publish")).not.toContain("continue-on-error");
+  });
+
+  it("keeps the skip-if-already-published guard so a re-run after a partial failure completes", () => {
+    // The echo alone is not the guard — assert the condition that produces it,
+    // or deleting the `if` and leaving an unconditional echo would pass.
+    const step = readStepRun(workflow, "Publish packages");
+
+    expect(step).toMatch(/if npm view "\$NAME@\$VERSION" version .*; then/);
+    expect(step).toContain("already published, skipping");
+    expect(step).toContain("npm publish");
+  });
+
+  it("lists every package after the packages it depends on", () => {
+    const positionOf = new Map(packageDirs.map((dir, index) => [readManifest(dir).name, index]));
+
+    for (const [index, dir] of packageDirs.entries()) {
+      const manifest = readManifest(dir);
+      // Peer and optional edges count: `@kavo/graphql` is a lazily-imported
+      // optional peer in all but name, and moving it out of `dependencies`
+      // must not silently drop it from the ordering rule.
+      const edges = new Set([
+        ...Object.keys(manifest.dependencies ?? {}),
+        ...Object.keys(manifest.peerDependencies ?? {}),
+        ...Object.keys(manifest.optionalDependencies ?? {}),
+      ]);
+
+      for (const dependency of [...edges].filter((name) => name.startsWith("@kavo/"))) {
+        const dependencyIndex = positionOf.get(dependency);
+        expect(dependencyIndex, `${dependency} is missing from PACKAGE_DIRS`).toBeDefined();
+        expect(dependencyIndex, `${dir} is published before its dependency ${dependency}`).toBeLessThan(index);
+      }
+    }
+  });
+
+  it("covers exactly the publishable workspace packages", () => {
+    const publishable = readWorkspaceRoots()
+      .flatMap((root) => findWorkspacePackages(root))
+      .filter((dir) => readManifest(dir).private !== true);
+
+    expect([...packageDirs].sort()).toEqual(publishable.sort());
+  });
+
+  it("keeps /publish's package table in the order PACKAGE_DIRS publishes", () => {
+    // publish.md names PACKAGE_DIRS the authority and calls a disagreement
+    // "a bug to fix in the same pass" — this is what notices.
+    const doc = readFileSync(PUBLISH_COMMAND_PATH, "utf8");
+    const rows = [...doc.matchAll(/^\s*\|\s*`(packages\/[^`]+)`\s*\|/gm)].map((match) => match[1]!);
+
+    expect(rows).toEqual(packageDirs);
+  });
+});
+
+describe("verify-lockstep-versions", () => {
+  let fixtureRoot: string;
+
+  beforeAll(() => {
+    fixtureRoot = mkdtempSync(join(tmpdir(), "kavo-lockstep-"));
+  });
+
+  afterAll(() => {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  });
+
+  /** Writes a throwaway workspace and returns the directories, in order. */
+  function writeFixture(name: string, packages: Record<string, unknown>): { cwd: string; dirs: string[] } {
+    const cwd = join(fixtureRoot, name);
+    for (const [dir, manifest] of Object.entries(packages)) {
+      mkdirSync(join(cwd, dir), { recursive: true });
+      writeFileSync(join(cwd, dir, "package.json"), JSON.stringify(manifest));
+    }
+    return { cwd, dirs: Object.keys(packages) };
+  }
+
+  function runCheck(cwd: string, args: string[]) {
+    return spawnSync(process.execPath, [SCRIPT_PATH, ...args], { cwd, encoding: "utf8" });
+  }
+
+  it("passes when every package carries the tag's version", () => {
+    const { cwd, dirs } = writeFixture("all-aligned", {
+      "packages/core": { name: "@kavo/core", version: "0.6.0" },
+      "packages/orms/prisma": { name: "@kavo/prisma", version: "0.6.0" },
+      "packages/frameworks/nest": { name: "@kavo/nest", version: "0.6.0" },
+    });
+
+    const result = runCheck(cwd, ["0.6.0", ...dirs]);
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("all 3 packages are at 0.6.0");
+  });
+
+  // The v0.6.0 release itself: six packages bumped, @kavo/prisma left behind.
+  // The old core-only check passed this; the gate must not.
+  it("fails the release when a single package was left behind", () => {
+    const { cwd, dirs } = writeFixture("one-left-behind", {
+      "packages/core": { name: "@kavo/core", version: "0.6.0" },
+      "packages/orms/typeorm": { name: "@kavo/typeorm", version: "0.6.0" },
+      "packages/orms/prisma": { name: "@kavo/prisma", version: "0.5.0" },
+      "packages/orms/mongoose": { name: "@kavo/mongoose", version: "0.6.0" },
+      "packages/protocols/graphql": { name: "@kavo/graphql", version: "0.6.0" },
+      "packages/protocols/mcp": { name: "@kavo/mcp", version: "0.6.0" },
+      "packages/frameworks/nest": { name: "@kavo/nest", version: "0.6.0" },
+    });
+
+    const result = runCheck(cwd, ["0.6.0", ...dirs]);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("@kavo/prisma (packages/orms/prisma/package.json) is 0.5.0, expected 0.6.0");
+    expect(result.stderr).toContain("1 of 7 packages are not at 0.6.0");
+    // The packages that were bumped are not named as problems.
+    expect(result.stderr).not.toContain("@kavo/core");
+  });
+
+  it("names every mismatching package, not just the first", () => {
+    const { cwd, dirs } = writeFixture("several-left-behind", {
+      "packages/core": { name: "@kavo/core", version: "1.0.0" },
+      "packages/orms/prisma": { name: "@kavo/prisma", version: "0.5.0" },
+      "packages/protocols/mcp": { name: "@kavo/mcp", version: "0.6.0" },
+    });
+
+    const result = runCheck(cwd, ["1.0.0", ...dirs]);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("@kavo/prisma (packages/orms/prisma/package.json) is 0.5.0, expected 1.0.0");
+    expect(result.stderr).toContain("@kavo/mcp (packages/protocols/mcp/package.json) is 0.6.0, expected 1.0.0");
+    expect(result.stderr).toContain("2 of 3 packages are not at 1.0.0");
+  });
+
+  it("fails when the tag itself is ahead of every package", () => {
+    const { cwd, dirs } = writeFixture("tag-ahead", {
+      "packages/core": { name: "@kavo/core", version: "0.6.0" },
+    });
+
+    const result = runCheck(cwd, ["0.7.0", ...dirs]);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("@kavo/core (packages/core/package.json) is 0.6.0, expected 0.7.0");
+  });
+
+  it("treats a manifest with no version field as a mismatch rather than a pass", () => {
+    const { cwd, dirs } = writeFixture("no-version-field", {
+      "packages/core": { name: "@kavo/core" },
+    });
+
+    const result = runCheck(cwd, ["0.6.0", ...dirs]);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("<no version field>");
+  });
+
+  it("exits 2 when a listed directory has no manifest, instead of reading as all clear", () => {
+    const { cwd } = writeFixture("missing-manifest", {
+      "packages/core": { name: "@kavo/core", version: "0.6.0" },
+    });
+
+    const result = runCheck(cwd, ["0.6.0", "packages/core", "packages/gone"]);
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("Cannot read");
+    expect(result.stderr).toContain("packages/gone");
+  });
+
+  // One run has to report everything it knows: an operator who fixes only the
+  // unreadable directory would otherwise spend a second tag discovering the
+  // stale version the script had already seen.
+  it("reports stale versions alongside unreadable manifests in one run", () => {
+    const { cwd } = writeFixture("both-problems", {
+      "packages/core": { name: "@kavo/core", version: "0.6.0" },
+      "packages/orms/prisma": { name: "@kavo/prisma", version: "0.5.0" },
+    });
+
+    const result = runCheck(cwd, ["0.6.0", "packages/core", "packages/orms/prisma", "packages/typo"]);
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("@kavo/prisma (packages/orms/prisma/package.json) is 0.5.0, expected 0.6.0");
+    expect(result.stderr).toContain("packages/typo/package.json");
+  });
+
+  // `JSON.parse` succeeds on these, so they never reach the catch — they used
+  // to crash on the dereference instead, aborting the loop with a stack trace
+  // and hiding every package after them.
+  it.each([
+    ["null", "null"],
+    ["an array", "[]"],
+    ["a bare number", "42"],
+  ])("treats %s as an unreadable manifest rather than crashing", (label, contents) => {
+    const cwd = join(fixtureRoot, `not-an-object-${label.replace(/\W/g, "")}`);
+    mkdirSync(join(cwd, "packages/core"), { recursive: true });
+    writeFileSync(join(cwd, "packages/core/package.json"), contents);
+    mkdirSync(join(cwd, "packages/orms/prisma"), { recursive: true });
+    writeFileSync(
+      join(cwd, "packages/orms/prisma/package.json"),
+      JSON.stringify({ name: "@kavo/prisma", version: "0.5.0" }),
+    );
+
+    const result = runCheck(cwd, ["0.6.0", "packages/core", "packages/orms/prisma"]);
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("packages/core/package.json");
+    // The loop kept going: the package after the bad manifest is still named.
+    expect(result.stderr).toContain("@kavo/prisma (packages/orms/prisma/package.json) is 0.5.0, expected 0.6.0");
+  });
+
+  it("exits 2 without an expected version or any package directories", () => {
+    const { cwd } = writeFixture("no-args", {
+      "packages/core": { name: "@kavo/core", version: "0.6.0" },
+    });
+
+    expect(runCheck(cwd, ["0.6.0"]).status).toBe(2);
+    expect(runCheck(cwd, []).status).toBe(2);
+    expect(runCheck(cwd, []).stderr).toContain("usage:");
+  });
+});

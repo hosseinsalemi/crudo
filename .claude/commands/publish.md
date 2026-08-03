@@ -56,9 +56,9 @@ workflow.
    | `packages/orms/typeorm`      | `@kavo/typeorm`  |
    | `packages/orms/prisma`       | `@kavo/prisma`   |
    | `packages/orms/mongoose`     | `@kavo/mongoose` |
-   | `packages/frameworks/nest`   | `@kavo/nest`     |
    | `packages/protocols/graphql` | `@kavo/graphql`  |
    | `packages/protocols/mcp`     | `@kavo/mcp`      |
+   | `packages/frameworks/nest`   | `@kavo/nest`     |
 
    If this table and `PACKAGE_DIRS` ever disagree, `PACKAGE_DIRS` wins — it is
    what actually publishes — and the table is a bug to fix in the same pass.
@@ -88,15 +88,74 @@ workflow.
    ```
 
    If anything prints, **stop and tell the user before tagging.** Skipping this
-   is not a cosmetic risk: `publish.yml` publishes `PACKAGE_DIRS` in order and
-   `@kavo/nest` depends on `@kavo/graphql` and `@kavo/mcp` as hard
-   `dependencies`, so a late failure can leave an already-published
-   `@kavo/nest` pointing at a version of a sibling that does not exist —
-   uninstallable, and past npm's unpublish window it cannot be withdrawn.
+   is not a cosmetic risk: the run dies on the package that has no trusted
+   publisher, by which point everything ahead of it in `PACKAGE_DIRS` is
+   already public and, past npm's unpublish window, cannot be withdrawn.
+   `PACKAGE_DIRS` is ordered so that a package publishes only after the
+   packages it depends on, which at least keeps what did go out internally
+   consistent — nothing published pointing at a sibling version that does not
+   exist — but half a lockstep release is still a broken release.
 
-   To bootstrap one: publish it by hand, then configure its trusted publisher
-   on npmjs.com (`kavo-labs/kavo` + `publish.yml`), confirm `npm view` resolves,
-   and only then release. That first version will lack OIDC provenance; every
+   To bootstrap one: publish it by hand — **`pnpm pack` first, then
+   `npm publish` the resulting tarball**, exactly as `publish.yml` does:
+
+   ```bash
+   # Name the package explicitly. Do not rely on $dir/$NAME surviving the loop
+   # above — after it exits they hold the *last* PACKAGE_DIRS entry, not the
+   # one that printed NEVER PUBLISHED.
+   dir=<the PACKAGE_DIRS entry that printed NEVER PUBLISHED>
+   NAME=$(node -p "require('./$dir/package.json').name")
+   VERSION=$(node -p "require('./$dir/package.json').version")
+
+   # Build first. `dist/` is gitignored and no package defines prepack,
+   # prepare or prepublishOnly, so `pnpm pack` does not build anything on its
+   # own — CI gets away with it only because `pnpm check` runs before the Pack
+   # step. Packing an unbuilt tree ships a tarball whose "files": ["dist"]
+   # matches nothing: it publishes, it becomes latest, and every import fails.
+   pnpm install --frozen-lockfile && pnpm build || echo "BUILD FAILED — stop here"
+
+   # Pack into a fresh private directory, so the glob cannot pick up a tarball
+   # left behind by an earlier attempt.
+   TARBALL_DIR=$(mktemp -d)
+   (cd "$dir" && pnpm pack --pack-destination "$TARBALL_DIR")
+   TARBALL=$(echo "$TARBALL_DIR"/*.tgz)
+
+   # Confirm what you are about to make permanent, then publish.
+   echo "publishing $NAME@$VERSION from $TARBALL"
+   tar -tzf "$TARBALL" | grep -q "^package/dist/" || echo "NO dist/ — DO NOT PUBLISH"
+   npm publish "$TARBALL" --access public
+   ```
+
+   A bare `npm publish` from the package directory is **not** equivalent and
+   must never be used: only `pnpm pack` rewrites `workspace:^` into a real
+   semver range, so a directly-published package ships
+   `"@kavo/core": "workspace:^"` verbatim and every `npm install` of it fails
+   with `EUNSUPPORTEDPROTOCOL`. That mistake is unfixable after npm's
+   unpublish window — the version has to be superseded by the next release.
+   `@kavo/prisma@0.5.0`, `@kavo/mongoose@0.6.0` and `@kavo/graphql@0.4.0` were
+   all bootstrapped this way and none of the three can be installed. The first
+   two are still their package's `latest`, so a plain `npm install @kavo/prisma`
+   or `npm install @kavo/mongoose` fails outright today; `@kavo/graphql` was
+   rescued only because a correctly-packed `0.6.0` superseded it, which is the
+   only repair available once the unpublish window has closed.
+
+   Then configure its trusted publisher on npmjs.com (`kavo-labs/kavo` +
+   `publish.yml`) and verify the bootstrap actually resolves — `npm view` only
+   proves the version exists, not that it installs:
+
+   ```bash
+   (cd "$(mktemp -d)" && npm init -y >/dev/null && npm install "$NAME@$VERSION" --dry-run)
+   ```
+
+   Pin `@$VERSION` rather than letting it resolve `latest` — identical for a
+   genuine first publish, but correct too when this is reused to verify a
+   repair publish. Note what this does **not** prove: `--dry-run` exercises
+   resolution, which is exactly the `workspace:^` failure class above, but it
+   never unpacks the tarball, so it passes happily on a package published with
+   an empty `dist/`. The `tar -tzf` check before publishing is what covers
+   that.
+
+   Only then release. That first version will lack OIDC provenance; every
    later release of it through the workflow will have it.
 
 6. **Confirm with the user before doing anything irreversible.** State
@@ -117,10 +176,13 @@ workflow.
    rather than by enumerating packages — step 1 already refused to run on a
    dirty tree, so the only modified files are the version bumps from step 3 and
    the lockfile. A hardcoded list here is the same drift hazard as a hardcoded
-   list at the gate, and a worse one, because a missed package fails _green_:
-   the release commit lands without that bump, `publish.yml` only compares
-   `packages/core`'s version to the tag, and the publish loop then sees the old
-   version already on the registry and prints `already published, skipping`.
+   list at the gate. A missed package no longer fails _green_: step 4's
+   `pnpm check` fails on it first (`tests/release-workflow.spec.ts` asserts
+   every `PACKAGE_DIRS` package carries one version), which is the point at
+   which nothing irreversible has happened yet. `publish.yml`'s
+   `Verify lockstep versions` step is the backstop behind it, and by the time
+   that one speaks the tag is already pushed — the fix then costs a commit on
+   `main` and a re-tag.
 
    ```bash
    git add packages pnpm-lock.yaml
