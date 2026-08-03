@@ -94,9 +94,37 @@ workflow.
    `@kavo/nest` pointing at a version of a sibling that does not exist —
    uninstallable, and past npm's unpublish window it cannot be withdrawn.
 
-   To bootstrap one: publish it by hand, then configure its trusted publisher
-   on npmjs.com (`kavo-labs/kavo` + `publish.yml`), confirm `npm view` resolves,
-   and only then release. That first version will lack OIDC provenance; every
+   To bootstrap one: publish it by hand — **`pnpm pack` first, then
+   `npm publish` the resulting tarball**, exactly as `publish.yml` does:
+
+   ```bash
+   TARBALL_PREFIX=$(echo "$NAME" | sed 's/^@//; s/\//-/')
+   (cd "$dir" && pnpm pack --pack-destination /tmp/kavo-bootstrap)
+   npm publish /tmp/kavo-bootstrap/"$TARBALL_PREFIX"-*.tgz --access public
+   ```
+
+   A bare `npm publish` from the package directory is **not** equivalent and
+   must never be used: only `pnpm pack` rewrites `workspace:^` into a real
+   semver range, so a directly-published package ships
+   `"@kavo/core": "workspace:^"` verbatim and every `npm install` of it fails
+   with `EUNSUPPORTEDPROTOCOL`. That mistake is unfixable after npm's
+   unpublish window — the version has to be superseded by the next release.
+   `@kavo/prisma@0.5.0`, `@kavo/mongoose@0.6.0` and `@kavo/graphql@0.4.0` were
+   all bootstrapped this way and none of the three can be installed. The first
+   two are still their package's `latest`, so a plain `npm install @kavo/prisma`
+   or `npm install @kavo/mongoose` fails outright today; `@kavo/graphql` was
+   rescued only because a correctly-packed `0.6.0` superseded it, which is the
+   only repair available once the unpublish window has closed.
+
+   Then configure its trusted publisher on npmjs.com (`kavo-labs/kavo` +
+   `publish.yml`) and verify the bootstrap actually resolves — `npm view` only
+   proves the version exists, not that it installs:
+
+   ```bash
+   (cd "$(mktemp -d)" && npm init -y >/dev/null && npm install "$NAME" --dry-run)
+   ```
+
+   Only then release. That first version will lack OIDC provenance; every
    later release of it through the workflow will have it.
 
 6. **Confirm with the user before doing anything irreversible.** State
