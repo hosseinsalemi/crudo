@@ -58,10 +58,12 @@ Close the loop on this PR. Argument: **$ARGUMENTS**
 
    ```bash
    pnpm check
+   pnpm docs:links
    ```
 
    If `main` is broken by the merge, say so immediately and treat fixing it as
-   the next task — do not move on to another issue.
+   the next task — do not move on to another issue. `docs:links` is a separate
+   CI job, so `pnpm check` alone does not cover it.
 
 6. **Confirm the issue closed.** `Closes #<n>` in the PR body should have done
    it; if the issue is still open, close it with a comment pointing at the PR.

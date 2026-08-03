@@ -67,11 +67,16 @@ after it is extra instructions or corrections to fold in during implementation.
 
    ```bash
    pnpm check
+   pnpm docs:links
    ```
 
    That is build + typecheck + `depcruise` + the full suite. If it fails, fix
    it — do not report success over a red gate, and do not weaken a test to
    make it pass.
+
+   `docs:links` is a separate CI job rather than part of `pnpm check`, so run
+   it explicitly: it takes under a second, needs no toolchain, and catches a
+   reference to a doc that was renamed or moved.
 
 9. **Update the docs** if you changed behavior an ADR or a
    `docs/internals/architecture/` document governs. Silent divergence is a
