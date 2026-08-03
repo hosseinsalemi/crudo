@@ -51,6 +51,13 @@ pnpm build
 fixture schema is SQLite, and `packages/orms/prisma/prisma/.env` is committed
 with a working `DATABASE_URL`.
 
+What it pushes is a **template**, `prisma/template.db`, which no test opens.
+`tests/support/client.ts` copies it per client, so each spec file writes to a
+database of its own — SQLite admits one writer at a time, and one shared file
+made the suite flaky under CI load. The copies live in a scratch directory
+that `tests/support/global-setup.ts` creates per vitest run and deletes when
+the run ends.
+
 Note what it is _not_ for. `@kavo/prisma`'s own `src` never imports
 `@prisma/client` — it models the client structurally in
 `prisma-client-like.ts`, precisely so a library package does not assume the
