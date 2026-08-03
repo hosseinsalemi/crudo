@@ -56,10 +56,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Same gate as CI — a release never ships on a red build.
-      - name: Check
-        run: pnpm check
-
+      # The version guards run before `pnpm check`: they are the cheapest
+      # steps here and the most likely to fail, and there is nothing to gain
+      # from spending a full build on a tag that already cannot ship.
       - name: Verify tag matches package version
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
@@ -79,13 +78,14 @@ jobs:
       # release while it is incomplete.
       - name: Verify PACKAGE_DIRS covers every publishable package
         run: |
+          set -o pipefail
           EXPECTED=$(pnpm -r list --depth -1 --json | node -e '
+            const { relative } = require("node:path");
             let raw = "";
             process.stdin.on("data", (chunk) => (raw += chunk));
             process.stdin.on("end", () => {
-              const root = process.cwd() + "/";
               for (const pkg of JSON.parse(raw)) {
-                if (pkg.private !== true) console.log(pkg.path.replace(root, ""));
+                if (pkg.private !== true) console.log(relative(process.cwd(), pkg.path));
               }
             });
           ' | sort)
@@ -121,6 +121,11 @@ jobs:
             fi
           done
           exit $status
+
+      # Same gate as CI — a release never ships on a red build. It also
+      # builds the `dist/` that the pack step below ships.
+      - name: Check
+        run: pnpm check
 
       # `pnpm pack` (not `pnpm publish`) does the packaging: it rewrites
       # workspace:^ deps to a real semver range in the tarball. Publishing
@@ -176,16 +181,22 @@ jobs:
       # the registry, so re-running the job after a partial failure (one
       # package published, a later one failing) doesn't die re-publishing
       # what already succeeded — npm publish itself is not idempotent.
+      #
+      # The tarball is named exactly, not globbed: `pnpm pack` writes
+      # <name-with-@-and-/-flattened>-<version>.tgz, and a `<prefix>-*.tgz`
+      # glob would also match a sibling whose name extends this one
+      # (`kavo-core-*` matching a future `kavo-core-utils-…`), handing
+      # `npm publish` two paths and publishing the wrong package.
       - name: Publish packages
         run: |
           for dir in $PACKAGE_DIRS; do
             NAME=$(node -p "require('./$dir/package.json').name")
             VERSION=$(node -p "require('./$dir/package.json').version")
-            TARBALL_PREFIX=$(echo "$NAME" | sed 's/^@//; s/\//-/')
+            TARBALL="$TARBALL_DIR/$(echo "$NAME" | sed 's/^@//; s/\//-/')-$VERSION.tgz"
             if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
               echo "$NAME@$VERSION already published, skipping"
             else
-              npm publish "$TARBALL_DIR/$TARBALL_PREFIX"-*.tgz --access public
+              npm publish "$TARBALL" --access public
             fi
           done
 
