@@ -98,9 +98,30 @@ workflow.
    `npm publish` the resulting tarball**, exactly as `publish.yml` does:
 
    ```bash
-   TARBALL_PREFIX=$(echo "$NAME" | sed 's/^@//; s/\//-/')
-   (cd "$dir" && pnpm pack --pack-destination /tmp/kavo-bootstrap)
-   npm publish /tmp/kavo-bootstrap/"$TARBALL_PREFIX"-*.tgz --access public
+   # Name the package explicitly. Do not rely on $dir/$NAME surviving the loop
+   # above — after it exits they hold the *last* PACKAGE_DIRS entry, not the
+   # one that printed NEVER PUBLISHED.
+   dir=<the PACKAGE_DIRS entry that printed NEVER PUBLISHED>
+   NAME=$(node -p "require('./$dir/package.json').name")
+   VERSION=$(node -p "require('./$dir/package.json').version")
+
+   # Build first. `dist/` is gitignored and no package defines prepack,
+   # prepare or prepublishOnly, so `pnpm pack` does not build anything on its
+   # own — CI gets away with it only because `pnpm check` runs before the Pack
+   # step. Packing an unbuilt tree ships a tarball whose "files": ["dist"]
+   # matches nothing: it publishes, it becomes latest, and every import fails.
+   pnpm install --frozen-lockfile && pnpm build || echo "BUILD FAILED — stop here"
+
+   # Pack into a fresh private directory, so the glob cannot pick up a tarball
+   # left behind by an earlier attempt.
+   TARBALL_DIR=$(mktemp -d)
+   (cd "$dir" && pnpm pack --pack-destination "$TARBALL_DIR")
+   TARBALL=$(echo "$TARBALL_DIR"/*.tgz)
+
+   # Confirm what you are about to make permanent, then publish.
+   echo "publishing $NAME@$VERSION from $TARBALL"
+   tar -tzf "$TARBALL" | grep -q "^package/dist/" || echo "NO dist/ — DO NOT PUBLISH"
+   npm publish "$TARBALL" --access public
    ```
 
    A bare `npm publish` from the package directory is **not** equivalent and
@@ -121,8 +142,16 @@ workflow.
    proves the version exists, not that it installs:
 
    ```bash
-   (cd "$(mktemp -d)" && npm init -y >/dev/null && npm install "$NAME" --dry-run)
+   (cd "$(mktemp -d)" && npm init -y >/dev/null && npm install "$NAME@$VERSION" --dry-run)
    ```
+
+   Pin `@$VERSION` rather than letting it resolve `latest` — identical for a
+   genuine first publish, but correct too when this is reused to verify a
+   repair publish. Note what this does **not** prove: `--dry-run` exercises
+   resolution, which is exactly the `workspace:^` failure class above, but it
+   never unpacks the tarball, so it passes happily on a package published with
+   an empty `dist/`. The `tar -tzf` check before publishing is what covers
+   that.
 
    Only then release. That first version will lack OIDC provenance; every
    later release of it through the workflow will have it.
