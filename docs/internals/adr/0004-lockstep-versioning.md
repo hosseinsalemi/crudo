@@ -18,7 +18,8 @@ ranges between them pin the same version line.
 - "Kavo 0.4" fully identifies a consumer's setup; cross-package bugs are
   reproducible from one number.
 - Occasional no-op bumps of untouched packages — trivially cheap in an
-  automated pipeline (changesets).
+  automated pipeline (`.github/workflows/publish.yml`; changesets was
+  considered and never adopted).
 - Enforced mechanically rather than by review: before it packs anything,
   `.github/workflows/publish.yml` runs
   `.github/scripts/verify-lockstep-versions.mjs` over every package in

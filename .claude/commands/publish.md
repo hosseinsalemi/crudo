@@ -1,7 +1,7 @@
 ---
 description: Bump @kavo/* to the next lockstep version and publish via a git tag
 argument-hint: "[patch|minor|major to override auto-detection]"
-allowed-tools: Bash(git:*), Bash(pnpm:*), Bash(gh:*), Bash(node:*), Read, Grep, Glob
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(node:*), Bash(pnpm install:*), Bash(pnpm build:*), Bash(pnpm check:*), Bash(pnpm pack:*), Bash(npm view:*), Bash(tar:*), Read, Grep, Glob
 ---
 
 ## Context
@@ -125,6 +125,12 @@ workflow.
    tar -tzf "$TARBALL" | grep -q "^package/dist/" || echo "NO dist/ — DO NOT PUBLISH"
    npm publish "$TARBALL" --access public
    ```
+
+   `npm publish` is the one command here that is not pre-authorized in this
+   file's `allowed-tools`, and `pnpm` is granted per subcommand so that
+   `pnpm publish` is not either. The permission prompt is the last human gate
+   before an irreversible public write — do not widen the entry to
+   `Bash(pnpm:*)` or add `Bash(npm:*)` to get rid of it.
 
    A bare `npm publish` from the package directory is **not** equivalent and
    must never be used: only `pnpm pack` rewrites `workspace:^` into a real
