@@ -64,8 +64,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Every `docs/**.md` path mentioned by a tracked file, and every
-      # VitePress sidebar link, must resolve. Moving a docs directory leaves
+      # Every `docs/**.md` path mentioned by a tracked file, and every link
+      # into the docs site, must resolve. Moving a docs directory leaves
       # the mentions behind, and some of the files carrying them (package
       # READMEs, `src/` doc comments, the adopter-facing skills in
       # `extensions/`) ship to npm — so a dead reference is one an adopter

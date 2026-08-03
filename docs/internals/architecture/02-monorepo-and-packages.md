@@ -137,9 +137,12 @@ Root scripts: `build` (`tsc -b`), `clean`, `depcruise`, and `check`
 deliberately outside it, as their own CI jobs, because neither needs the
 built workspace: `format:check` (Prettier) and `docs:links`
 (`scripts/check-doc-links.sh` — every `docs/**.md` path a tracked file
-mentions, and every VitePress sidebar link, must resolve, so a docs move
+mentions, and every link into the docs site, must resolve, so a docs move
 cannot leave dead links in the package READMEs and `src/` doc comments that
-ship to npm, nor a silent 404 in the published sidebar).
+ship to npm, nor a silent 404 in the published sidebar or prose). Sitting
+outside `pnpm check` keeps those jobs install-free in CI; the `/implement`,
+`/review`, `/pr` and `/merge` commands run them alongside it locally, so
+neither is a gate you only hear about from CI.
 
 ## 5. Public vs. internal API surface
 

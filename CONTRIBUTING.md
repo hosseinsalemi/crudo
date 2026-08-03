@@ -96,20 +96,32 @@ pushing:
 ```bash
 pnpm prettify      # writes formatting fixes
 pnpm format:check  # what CI actually runs
-pnpm docs:links    # every `docs/**.md` reference and VitePress sidebar link resolves
+pnpm docs:links    # every `docs/**.md` reference and docs link resolves
 ```
 
-`docs:links` is not part of `pnpm check` because it needs no toolchain at all —
-it is `git grep` plus a file test (`scripts/check-doc-links.sh`), so CI runs it
-as its own dependency-free job. It exists because a docs move leaves every
-mention of the old path behind, in skills, agent prompts, package READMEs, and
-`src/` doc comments — and several of those ship to npm, so a dead reference is
-one an adopter follows. It also resolves the sidebar/nav links in
-`docs/.vitepress/config.mts`, which are extensionless and which VitePress's own
-dead-link check never looks at, so a renamed page would otherwise ship a silent
-404 (the docs build runs only on push to `main`, after the merge). If a
-reference is a deliberate template placeholder rather than a link, teach the
-script about it instead of deleting the check.
+`docs:links` sits outside `pnpm check` because it needs no toolchain at all —
+it is `git grep` plus a file test (`scripts/check-doc-links.sh`), so CI can run
+it as a dependency-free job that skips `pnpm install` entirely. That is a
+reason to keep it out of the _aggregate_ command, not out of your loop: the
+`/implement`, `/review`, `/pr` and `/merge` commands all run it alongside
+`pnpm check`, because a red CI job is an expensive way to learn about a
+one-second check.
+
+It exists because a docs move leaves every mention of the old path behind, in
+skills, agent prompts, package READMEs, and `src/` doc comments — and several
+of those ship to npm, so a dead reference is one an adopter follows. Four
+passes, and the last two are the ones VitePress cannot help with: it never
+inspects the extensionless sidebar/nav links in `docs/.vitepress/config.mts`,
+and it only catches the site-absolute links docs prose writes
+(`](/getting-started)`) at `docs:build`, which runs on push to `main` — after
+the merge that broke them. Either way a renamed page would otherwise ship a
+silent 404.
+
+Two rules keep it honest. If a reference is a deliberate template placeholder
+rather than a link, teach the script about it instead of deleting the check.
+And every pass must match something in this repo, so the script fails loud when
+a pass matches nothing rather than reporting success — a scanner that quietly
+stops scanning is worse than no scanner, because it still looks green.
 
 One thing the gate does **not** cover: CI installs with
 `pnpm install --frozen-lockfile` _before_ running it, and neither `pnpm check`
