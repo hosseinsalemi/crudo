@@ -90,7 +90,7 @@ a test fail, either the change is wrong or the test encoded a behavior that is
 being deliberately changed — and the second case belongs in the PR description.
 
 CI runs the identical gate on three Node versions (`lts/-1`, `lts/*`,
-`current`), plus a separate formatting job. Before pushing:
+`current`), plus separate formatting and docs-build jobs. Before pushing:
 
 ```bash
 pnpm prettify      # writes formatting fixes
@@ -311,6 +311,11 @@ pnpm docs:dev      # local dev server with hot reload
 pnpm docs:build    # production build
 pnpm docs:preview  # serve the production build
 ```
+
+`pnpm check` does not build the site, but CI does: a separate `docs` job runs
+`pnpm docs:build` on every pull request. VitePress fails that build on dead
+links, so a broken relative link fails the PR rather than the Pages deploy on
+`main`. Run it locally before pushing a docs change.
 
 `docs/` has two audiences, and it is worth keeping them separate:
 
