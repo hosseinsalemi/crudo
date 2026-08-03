@@ -229,7 +229,3 @@ That column alone is enough for `deleteOne` to soft-delete and for reads to hide
 - **Purge** — `@Kavo(Book, { operations: { purgeOne: true } })` turns on `DELETE /books/:id/purge`, which permanently removes an already-soft-deleted row.
 
 Both can be combined. Attempting to restore a row that isn't deleted, or purge one that is still live, returns a 409, not a silent no-op. Pass `?withDeleted=true` on a read to opt back into seeing soft-deleted rows for that request. See [Soft delete, restore & purge](/internals/architecture/11-soft-delete) for the full behavior — unique-index caveats, cascades, and what's deliberately not built (bulk restore/purge).
-
-<!-- TEMPORARY: proves the CI docs job fails on a dead link. Reverted in the next commit. -->
-
-See [the page that does not exist](/internals/architecture/07-kavo-engine) for more.
