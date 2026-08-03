@@ -3,6 +3,10 @@
 // Prisma has no equivalent of "define an entity inline in a test file", so
 // every fixture model used across tests/*.spec.ts lives in this one schema,
 // generating one shared PrismaClient the test files reuse.
+//
+// `pnpm generate` pushes this schema to `template.db`, which no test opens:
+// `tests/support/client.ts` copies it per client, so parallel spec files never
+// contend for one SQLite file (issue #101).
 generator client {
   provider = "prisma-client-js"
 }

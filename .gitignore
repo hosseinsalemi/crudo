@@ -9,3 +9,5 @@ api.rest
 docs/.vitepress/cache
 packages/orms/prisma/prisma/*.db
 packages/orms/prisma/prisma/*.db-journal
+packages/orms/prisma/prisma/*.db-wal
+packages/orms/prisma/prisma/*.db-shm
