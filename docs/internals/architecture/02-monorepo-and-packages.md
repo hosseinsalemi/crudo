@@ -199,6 +199,13 @@ run fails partway. Lockstep itself is checked rather than assumed: a gate
 ahead of packing fails the release unless every listed package is already at
 the tag's version.
 
+The artifact is checked too, between packing and publishing: no packed
+tarball may carry a `workspace:` range in any dependency field a consumer
+installs, and each must contain the entry point its own manifest declares.
+Only `pnpm pack` rewrites `workspace:^` into a real semver range and it runs
+no build, so those are the two ways a tarball reaches the registry
+uninstallable — and npm does not allow republishing a version to correct it.
+
 ## 8. Dependency classification (decided now, executed later)
 
 | Package          | `dependencies`                             | `peerDependencies`                                                                                                                 |
