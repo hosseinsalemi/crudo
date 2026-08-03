@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { newTestPrismaClient, provisionTestDatabase } from "./support/client.js";
+import { SCRATCH_ROOT_ENV } from "./support/global-setup.js";
 
 /**
  * The fixture-provisioning contract itself. Every other spec file in this
@@ -40,5 +41,17 @@ describe("test-fixture database provisioning", () => {
     const missing = join(tmpdir(), "kavo-prisma-no-such-template.db");
 
     expect(() => provisionTestDatabase(missing)).toThrow(/pnpm generate/);
+  });
+
+  it("refuses to provision outside the run's scratch root", () => {
+    // Falling back to the OS temp directory here would work, and leak a
+    // fixture database per client forever — nothing else deletes those.
+    const scratchRoot = process.env[SCRATCH_ROOT_ENV];
+    delete process.env[SCRATCH_ROOT_ENV];
+    try {
+      expect(() => provisionTestDatabase()).toThrow(new RegExp(SCRATCH_ROOT_ENV));
+    } finally {
+      if (scratchRoot !== undefined) process.env[SCRATCH_ROOT_ENV] = scratchRoot;
+    }
   });
 });

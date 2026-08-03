@@ -1,5 +1,4 @@
 import { copyFileSync, existsSync, mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PrismaClient } from "@prisma/client";
@@ -13,11 +12,13 @@ import { SCRATCH_ROOT_ENV } from "./global-setup.js";
 const TEMPLATE_DATABASE = fileURLToPath(new URL("../../prisma/template.db", import.meta.url));
 
 /**
- * SQLite spreads one database over up to three files. A finished `db push`
- * leaves a checkpointed, journal-free database behind, but copy whatever
- * sidecars do exist so a copy can never be a torn read of the template.
+ * A finished `db push` leaves a checkpointed, sidecar-free database behind,
+ * but copy whatever recovery sidecars do exist so the copy carries every
+ * committed transaction the template does. `-shm` is deliberately *not*
+ * copied: it is a derived wal-index that SQLite rebuilds on open, and a
+ * copied one can be stale enough to make SQLite skip recovering the `-wal`.
  */
-const DATABASE_FILE_SUFFIXES = ["", "-journal", "-wal", "-shm"];
+const DATABASE_FILE_SUFFIXES = ["", "-journal", "-wal"];
 
 /**
  * Copies the template database to a fresh directory under this run's scratch
@@ -29,7 +30,16 @@ export function provisionTestDatabase(templatePath: string = TEMPLATE_DATABASE):
   if (!existsSync(templatePath)) {
     throw new Error(`No Prisma test-fixture database at ${templatePath} — run \`pnpm generate\` first.`);
   }
-  const directory = mkdtempSync(join(process.env[SCRATCH_ROOT_ENV] ?? tmpdir(), "db-"));
+  // No silent fallback to the OS temp directory: a copy made outside this
+  // run's scratch root has nothing to delete it, so a missing global setup
+  // would leak a fixture database per client instead of being noticed.
+  const scratchRoot = process.env[SCRATCH_ROOT_ENV];
+  if (scratchRoot === undefined) {
+    throw new Error(
+      `${SCRATCH_ROOT_ENV} is unset — vitest's globalSetup (tests/support/global-setup.ts) did not run for this process.`,
+    );
+  }
+  const directory = mkdtempSync(join(scratchRoot, "db-"));
   const databasePath = join(directory, basename(templatePath));
   for (const suffix of DATABASE_FILE_SUFFIXES) {
     if (existsSync(`${templatePath}${suffix}`)) copyFileSync(`${templatePath}${suffix}`, `${databasePath}${suffix}`);
