@@ -38,7 +38,7 @@ const routes = [
 
 <style scoped>
 .hero-terminal {
-  width: 95%;
+  width: 100%;
   max-width: 440px;
   margin: 0 auto;
   border-radius: 12px;
