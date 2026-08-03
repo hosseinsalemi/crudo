@@ -34,13 +34,17 @@ Because the build compiles `src` only, each package also has a `tsconfig.tests.j
 
 ## Architecture
 
-Five packages in a strict hub-and-spoke topology (`pnpm-workspace.yaml`):
+Seven packages in a hub-and-spoke topology (`pnpm-workspace.yaml`), plus one sanctioned sideways edge:
 
 ```
 @kavo/nest ──▶ @kavo/core ◀── @kavo/typeorm
-                 ▲  ▲  ▲
-                 │  │  └───── @kavo/prisma
-       @kavo/graphql  └────── @kavo/mongoose
+   │            ▲ ▲ ▲ ▲
+   │            │ │ │ └───── @kavo/prisma
+   │            │ │ └─────── @kavo/mongoose
+   │            │ └───────── @kavo/mcp     ◀─┐
+   │            └─────────── @kavo/graphql ◀─┤
+   └──────────── the one sanctioned sideways edge ──┘
+                 (frameworks/* → protocols/*, ADR-0016; never the reverse)
 ```
 
 - **`@kavo/core`** (`packages/core`) — all contracts, the type system, and the request engine. **Zero runtime dependencies** and imports nothing (ADR-0005). It has no knowledge of TypeORM or Nest.
@@ -49,8 +53,13 @@ Five packages in a strict hub-and-spoke topology (`pnpm-workspace.yaml`):
 - **`@kavo/mongoose`** (`packages/orms/mongoose`) — the same seams over a Mongoose model, fed from `schema.paths`. A Mongoose model _is_ the entity identity, so nothing is declared twice, and `ObjectId` converts to a hex string at the adapter boundary (ADR-0018). `mongoose` is a peer dependency.
 - **`@kavo/nest`** (`packages/frameworks/nest`) — the `@Kavo` decorator and NestJS route generation.
 - **`@kavo/graphql`** (`packages/protocols/graphql`) — host-framework-agnostic GraphQL schema binding: builds a schema over a `createCrud` service, delegating every resolver to the same engine REST uses. Depends only on `@kavo/core` and the `graphql` peer, never on `@kavo/nest` — the `frameworks/* → protocols/*` edge is one-directional (ADR-0016). `@kavo/nest` is the side that imports it, to provide `BaseKavoGraphQLController`; it does so through a lazy `import("@kavo/graphql")` so the peer stays genuinely optional.
+- **`@kavo/mcp`** (`packages/protocols/mcp`) — host-framework-agnostic MCP binding: exposes a `createCrud` service's standard operations as MCP tools, every tool handler a direct call into the same engine REST uses. Same `protocols/*` constraint as `@kavo/graphql` — `@kavo/core` plus the `@modelcontextprotocol/sdk` peer, which it consumes for **types only**, never at runtime. That is why `@kavo/nest` imports it directly rather than lazily, to provide `BaseKavoMcpController`; the one place `@kavo/nest` actually runs the SDK is its zero-config default MCP controller, which lazy-loads it (`load-mcp-sdk.ts`).
 
-These boundaries are **mechanically enforced** by `.dependency-cruiser.cjs`, not just convention: core may import nothing, adapters/protocol bindings/framework bindings import the `@kavo/core` barrel only (no deep imports), and spokes never import each other directly — they meet only through Nest's DI container. An illegal import fails `pnpm depcruise` (part of `pnpm check`), not code review.
+Spokes mostly never meet: an ORM adapter never imports a framework or protocol binding, a protocol binding never imports a framework binding, and adapters reach Nest's container through DI rather than through an import. The exception is the sideways edge in the diagram — `frameworks/* → protocols/*` (ADR-0016) — so `@kavo/nest` really does import `@kavo/graphql` and `@kavo/mcp`, and that edge is one-directional: a protocol binding never imports `@kavo/nest` back, which is what keeps it host-framework-agnostic.
+
+Most of that is **mechanically enforced** by `.dependency-cruiser.cjs`, not just convention: core may import nothing at runtime, every edge package reaches core through the `@kavo/core` barrel rather than deep-importing its `src`, an ORM adapter may not import a framework binding, a protocol binding may not import an ORM adapter or a framework binding, and a framework binding may not import an ORM adapter. Those fail `pnpm depcruise` (part of `pnpm check`), not code review.
+
+The coverage is deliberately narrower than the invariants it supports, though. Four things are still convention, caught in review rather than by the gate: an ORM adapter importing a **protocol** package, one protocol importing another, a **type-only** import out of core (`core-imports-nothing` exempts type-only edges, but core owning its contracts does not), and an edge deep-importing another _edge_ (both deep-import rules are about core, in either direction). Read `.dependency-cruiser.cjs` and the footnote under `CONTRIBUTING.md`'s boundary table before assuming a boundary is machine-checked — a green `depcruise` is not proof a change respects them.
 
 ### The request pipeline (the spine)
 
@@ -79,7 +88,7 @@ Standard operations delegate to the typed `DefaultKavoService` surface; custom o
 
 ### Wiring an app
 
-See `examples/nest-typeorm/src/app.module.ts`: `KavoModule.forRootAsync({ provideServices: true, useFactory: () => ({ infrastructure: createInfrastructure(dataSource), defaults: {...} }) })` is the app's only Kavo import — the `@Kavo` controllers just go in `AppModule`'s own `controllers: [...]` array. `KavoModule`'s discovery binder (`DiscoveryService`, `onModuleInit`) finds them there and binds each entity's service, no registration needed; `provideServices: true` additionally provides `getKavoServiceToken(Entity)` as a real DI provider for every `@Kavo`-decorated class the process has seen, which `AddressController` needs for its constructor-injected `base` (a fully custom route wants it typed as an ordinary constructor param). That's the same thing the standalone no-arg `KavoModule.forFeature()` does, folded into one call; `forFeature([...])` with an explicit array also still exists. Both no-arg forms are process-wide, so `@kavo/nest`'s own tests (many differently-configured `@Kavo` classes over one entity in one file) always pass `forFeature` an explicit array instead. The app is what hands Nest its infrastructure — the packages never import each other.
+See `examples/nest-typeorm/src/app.module.ts`: `KavoModule.forRootAsync({ provideServices: true, useFactory: () => ({ infrastructure: createInfrastructure(dataSource), defaults: {...} }) })` is the app's only Kavo import — the `@Kavo` controllers just go in `AppModule`'s own `controllers: [...]` array. `KavoModule`'s discovery binder (`DiscoveryService`, `onModuleInit`) finds them there and binds each entity's service, no registration needed; `provideServices: true` additionally provides `getKavoServiceToken(Entity)` as a real DI provider for every `@Kavo`-decorated class the process has seen, which `AddressController` needs for its constructor-injected `base` (a fully custom route wants it typed as an ordinary constructor param). That's the same thing the standalone no-arg `KavoModule.forFeature()` does, folded into one call; `forFeature([...])` with an explicit array also still exists. Both no-arg forms are process-wide, so `@kavo/nest`'s own tests (many differently-configured `@Kavo` classes over one entity in one file) always pass `forFeature` an explicit array instead. The app is what hands Nest its infrastructure — `@kavo/nest` and the ORM adapter never import each other.
 
 ## Conventions (normative)
 
