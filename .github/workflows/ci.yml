@@ -67,8 +67,9 @@ jobs:
   docs:
     name: docs
     runs-on: ubuntu-latest
-    # The build takes ~30s; a bound turns a hung SSR render into a fast red
-    # instead of letting it sit on a runner for GitHub's 6-hour default.
+    # The build itself takes seconds; a bound turns a hung SSR render into a
+    # fast red instead of letting it sit on a runner for GitHub's 6-hour
+    # default.
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
