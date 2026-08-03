@@ -21,12 +21,13 @@ globally:
 corepack enable
 ```
 
-Docker is not optional. Three test suites provision a real database with
+Docker is not optional. Four test suites provision a real database with
 [Testcontainers](https://testcontainers.com/) rather than mocking one:
 
 - `examples/nest-typeorm/tests/app-postgres.e2e.spec.ts` — Postgres
 - `examples/nest-typeorm/tests/app-mariadb.e2e.spec.ts` — MariaDB
 - `examples/nest-mongoose/tests/app-mongo.e2e.spec.ts` — MongoDB
+- `examples/nest-mikroorm/tests/app-postgres.e2e.spec.ts` — Postgres
 
 They start their own containers and need no manual database setup, but they do
 need a Docker daemon the current user can talk to. Without one, `pnpm check`
@@ -36,6 +37,15 @@ Network access matters too, at least on a cold checkout: `@kavo/mongoose`'s unit
 tests and the `nest-mongoose` example use `mongodb-memory-server`, which
 downloads a `mongod` binary on first use and caches it. On a restricted network
 that download fails with an error that has nothing to do with Docker.
+
+One native module is pinned rather than resolved. `@kavo/mikroorm`'s tests run
+on SQLite through `@mikro-orm/better-sqlite`, which depends on
+`better-sqlite3@^11` — a range whose prebuilt binaries stop before current Node,
+so on a newer runtime it falls back to `node-gyp` and fails to compile. The root
+`package.json` therefore carries a `pnpm.overrides` entry raising _that
+dependency alone_ to `better-sqlite3@^13`, which ships prebuilds. It is scoped
+(`"@mikro-orm/better-sqlite>better-sqlite3"`) on purpose, so `@kavo/typeorm`'s
+own SQLite resolution is untouched.
 
 ## Getting set up
 
@@ -191,7 +201,7 @@ A few things about the test setup that are easy to trip over:
 
 ## How the repo is laid out
 
-Seven published packages in a strict hub-and-spoke topology:
+Eight published packages in a strict hub-and-spoke topology:
 
 | Package                                       | Path                         | Role                                       |
 | --------------------------------------------- | ---------------------------- | ------------------------------------------ |
@@ -199,13 +209,15 @@ Seven published packages in a strict hub-and-spoke topology:
 | [`@kavo/typeorm`](packages/orms/typeorm)      | `packages/orms/typeorm`      | TypeORM adapter                            |
 | [`@kavo/prisma`](packages/orms/prisma)        | `packages/orms/prisma`       | Prisma adapter                             |
 | [`@kavo/mongoose`](packages/orms/mongoose)    | `packages/orms/mongoose`     | Mongoose adapter                           |
+| [`@kavo/mikroorm`](packages/orms/mikroorm)    | `packages/orms/mikroorm`     | MikroORM adapter                           |
 | [`@kavo/nest`](packages/frameworks/nest)      | `packages/frameworks/nest`   | NestJS binding — `@Kavo`, route generation |
 | [`@kavo/graphql`](packages/protocols/graphql) | `packages/protocols/graphql` | GraphQL schema binding                     |
 | [`@kavo/mcp`](packages/protocols/mcp)         | `packages/protocols/mcp`     | MCP binding — entities as MCP tools        |
 
 Plus, not published:
 
-- `examples/` — runnable reference apps (`nest-typeorm`, `nest-mongoose`) that
+- `examples/` — runnable reference apps (`nest-typeorm`, `nest-mongoose`,
+  `nest-mikroorm`) that
   double as the e2e suites.
 - `extensions/` — Claude Code skills shipped as a plugin via this repo's own
   marketplace.
@@ -223,7 +235,7 @@ that explains why.
 
 - **Core imports nothing and has zero runtime dependencies** —
   [ADR-0005](docs/internals/adr/0005-core-zero-runtime-dependencies.md). Core has
-  no knowledge of TypeORM, Prisma, Mongoose, or Nest.
+  no knowledge of TypeORM, Prisma, Mongoose, MikroORM, or Nest.
 - **Dependency inversion is strict: core never depends on an edge** —
   [ADR-0001](docs/internals/adr/0001-clean-architecture-core-owns-contracts.md).
   Beyond that, the allowed directions are specific, and it is worth learning them

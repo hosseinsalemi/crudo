@@ -27,6 +27,7 @@ These documents and the [ADRs](internals/adr/) are authoritative.
 - [architecture/13-graphql-binding.md](internals/architecture/13-graphql-binding.md) — package boundary, schema construction, multi-entity schemas, the Nest binding
 - [architecture/14-prisma-adapter.md](internals/architecture/14-prisma-adapter.md) — marker classes, metadata seam, query translation, error mapping
 - [architecture/15-mongoose-adapter.md](internals/architecture/15-mongoose-adapter.md) — model identity, ObjectId conversion, populate, relation-path limits
+- [architecture/17-mikroorm-adapter.md](internals/architecture/17-mikroorm-adapter.md) — MetadataStorage seam, FilterQuery translation, per-operation EntityManager forks
 - [architecture/16-mcp-binding.md](internals/architecture/16-mcp-binding.md) — package boundary, toolset construction, result shape and error mapping, the Nest binding
 
 ## Reference

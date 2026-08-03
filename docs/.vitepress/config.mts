@@ -52,6 +52,7 @@ export default defineConfig({
           { text: "Nest + TypeORM", link: "/integrations/nest/typeorm" },
           { text: "Nest + Prisma", link: "/integrations/nest/prisma" },
           { text: "Nest + Mongoose", link: "/integrations/nest/mongoose" },
+          { text: "Nest + MikroORM", link: "/integrations/nest/mikroorm" },
           { text: "Nest configuration", link: "/integrations/nest/configuration" },
         ],
       },
@@ -77,6 +78,7 @@ export default defineConfig({
               { text: "TypeORM", link: "/integrations/nest/typeorm" },
               { text: "Prisma", link: "/integrations/nest/prisma" },
               { text: "Mongoose", link: "/integrations/nest/mongoose" },
+              { text: "MikroORM", link: "/integrations/nest/mikroorm" },
               { text: "Configuration", link: "/integrations/nest/configuration" },
             ],
           },
@@ -121,6 +123,7 @@ export default defineConfig({
               { text: "Prisma adapter", link: "/internals/architecture/14-prisma-adapter" },
               { text: "Mongoose adapter", link: "/internals/architecture/15-mongoose-adapter" },
               { text: "MCP binding", link: "/internals/architecture/16-mcp-binding" },
+              { text: "MikroORM adapter", link: "/internals/architecture/17-mikroorm-adapter" },
             ],
           },
           {

@@ -48,7 +48,7 @@ workflow.
 3. **Apply the version, in lockstep** (ADR-0004 — [`docs/internals/adr/0004-lockstep-versioning.md`](../../docs/internals/adr/0004-lockstep-versioning.md)):
    set the new version in the `package.json` of **every** published package.
    `PACKAGE_DIRS` in `.github/workflows/publish.yml` is the single source of
-   truth for that set — read it and bump exactly those. Today it is all seven:
+   truth for that set — read it and bump exactly those. Today it is all eight:
 
    | Directory                    | Package          |
    | ---------------------------- | ---------------- |
@@ -56,6 +56,7 @@ workflow.
    | `packages/orms/typeorm`      | `@kavo/typeorm`  |
    | `packages/orms/prisma`       | `@kavo/prisma`   |
    | `packages/orms/mongoose`     | `@kavo/mongoose` |
+   | `packages/orms/mikroorm`     | `@kavo/mikroorm` |
    | `packages/protocols/graphql` | `@kavo/graphql`  |
    | `packages/protocols/mcp`     | `@kavo/mcp`      |
    | `packages/frameworks/nest`   | `@kavo/nest`     |

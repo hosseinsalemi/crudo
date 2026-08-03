@@ -32,13 +32,17 @@ such a column, otherwise the one the ORM declares
 `@kavo/typeorm`). Explicit configuration wins over detection; an entity
 with neither costs nothing.
 
-Only `@kavo/typeorm` can supply the detection half: neither Prisma nor
-Mongoose has a declaration that marks a column as the delete marker, so
-both report `softDeleteField: null` and soft delete there is _always_
-explicit `softDelete.field` configuration (ADR-0017, ADR-0018). One
-consequence is worth naming: because those adapters cannot mark the
-marker column generated the way `@kavo/typeorm` does, it stays writable
-through an ordinary update unless a DTO excludes it — see doc 15 §7.
+Only `@kavo/typeorm` can supply the detection half: none of Prisma,
+Mongoose, or MikroORM has a declaration that marks a column as the delete
+marker, so all three report `softDeleteField: null` and soft delete there
+is _always_ explicit `softDelete.field` configuration (ADR-0017,
+ADR-0018, doc 17 §5). MikroORM comes closest — it has a soft-delete
+pattern — but it is a user-defined `@Filter`, a query concern rather than
+a column declaration, and nothing in it is detectable as "this column is
+the marker". One consequence is worth naming: because those adapters
+cannot mark the marker column generated the way `@kavo/typeorm` does, it
+stays writable through an ordinary update unless a DTO excludes it — see
+doc 15 §7.
 
 Resolution runs at every settings scope, so an operation or a single call
 may narrow it (`operations: { deleteOne: { softDelete: { strategy: "hard" } } }`),
@@ -90,9 +94,9 @@ excludes deleted rows, so the adapter opts in with `.withDeleted()` for
 for `onlyDeleted`; for an ordinary column named through config, the
 adapter adds `<alias>.<field> IS NULL` (default) or
 `<alias>.<field> IS NOT NULL` (`onlyDeleted`) itself. `@kavo/prisma` and
-`@kavo/mongoose` have no ORM-declared marker column at all (ADR-0017,
-ADR-0018), so both flags are always the same plain field-predicate over
-the configured `softDelete.field`.
+`@kavo/mongoose`, and `@kavo/mikroorm` have no ORM-declared marker column
+at all (ADR-0017, ADR-0018, doc 17 §5), so both flags are always the same
+plain field-predicate over the configured `softDelete.field`.
 
 ## 4. Edges
 

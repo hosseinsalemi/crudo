@@ -1,6 +1,6 @@
 # Configuration
 
-[Nest + TypeORM](/integrations/nest/typeorm), [Nest + Prisma](/integrations/nest/prisma), and [Nest + Mongoose](/integrations/nest/mongoose) cover the zero-config path. This page is the field-by-field reference for everything you can configure once zero-config isn't enough: every `@Kavo(Entity, config)` parameter, and every global setting your `KavoModule` can set.
+[Nest + TypeORM](/integrations/nest/typeorm), [Nest + Prisma](/integrations/nest/prisma), [Nest + Mongoose](/integrations/nest/mongoose), and [Nest + MikroORM](/integrations/nest/mikroorm) cover the zero-config path. This page is the field-by-field reference for everything you can configure once zero-config isn't enough: every `@Kavo(Entity, config)` parameter, and every global setting your `KavoModule` can set.
 
 ## How config layers
 

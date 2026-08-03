@@ -1,0 +1,287 @@
+import "reflect-metadata";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  Collection,
+  Embeddable,
+  Embedded,
+  Entity,
+  Enum,
+  ManyToOne,
+  MikroORM,
+  OneToMany,
+  PrimaryKey,
+  Property,
+} from "@mikro-orm/core";
+import { ConfigurationException, type FieldMetadata } from "@kavo/core";
+import { buildEntityMetadata } from "@kavo/mikroorm";
+import { newTestOrm } from "./support/database.js";
+
+enum Status {
+  Active = "active",
+  Banned = "banned",
+}
+
+@Entity()
+class Widget {
+  @PrimaryKey({ type: "number" })
+  id!: number;
+
+  @Property({ type: "string" })
+  name!: string;
+
+  @Property({ type: "number" })
+  count!: number;
+
+  @Property({ type: "boolean" })
+  active!: boolean;
+
+  @Property({ type: "Date" })
+  releasedOn!: Date;
+
+  @Property({ type: "json", nullable: true })
+  payload: unknown = null;
+
+  @Enum({ items: () => Status })
+  status: Status = Status.Active;
+
+  /** A column whose JavaScript representation is not its column type. */
+  @Property({ columnType: "bigint", type: "bigint" })
+  serial!: string;
+
+  @Property({ type: "Date", onCreate: () => new Date() })
+  createdAt!: Date;
+
+  @Property({ type: "Date", onUpdate: () => new Date(), nullable: true })
+  updatedAt: Date | null = null;
+
+  @Property({ type: "number", version: true })
+  version!: number;
+
+  @Property({ type: "string", persist: false })
+  computed!: string;
+
+  /** MikroORM's "never expose this" — a password hash, an API key. */
+  @Property({ type: "string", hidden: true, nullable: true })
+  secret: string | null = null;
+
+  /** Not loaded with the entity, so a filter on it would outrun the DTO. */
+  @Property({ type: "string", lazy: true, nullable: true })
+  bulky: string | null = null;
+}
+
+let orm: MikroORM;
+let byName: Record<string, FieldMetadata>;
+
+beforeAll(async () => {
+  orm = await newTestOrm([Widget]);
+  byName = Object.fromEntries(buildEntityMetadata(orm, Widget).fields.map((field) => [field.name, field]));
+});
+
+afterAll(async () => {
+  await orm.close();
+});
+
+describe("buildEntityMetadata — field kinds", () => {
+  it.each([
+    ["name", "string"],
+    ["count", "number"],
+    ["active", "boolean"],
+    ["releasedOn", "date"],
+    ["payload", "json"],
+    ["status", "enum"],
+  ])("maps %s to the %s field kind", (field, kind) => {
+    expect(byName[field]).toMatchObject({ kind });
+  });
+
+  it("follows the runtime representation, not the column type, for bigint", () => {
+    // MikroORM hands a `bigint` column to JavaScript as a string to keep
+    // precision, so `string` is what core must coerce toward — reading
+    // `number` off the column type would corrupt values past 2^53.
+    expect(byName["serial"]).toMatchObject({ kind: "string" });
+  });
+
+  it("falls back to the declared type when there is no JavaScript equivalent", () => {
+    // `JsonType`'s `runtimeType` is `"any"`, which narrows nothing; the
+    // declared type is the only thing left that says "json".
+    expect(byName["payload"]).toMatchObject({ kind: "json" });
+  });
+
+  it("carries the enum's allowed values as the coercion allowlist", () => {
+    expect(byName["status"]?.enumValues).toEqual(["active", "banned"]);
+  });
+
+  it("reports nullability from the property declaration", () => {
+    expect(byName["payload"]).toMatchObject({ nullable: true });
+    expect(byName["name"]).toMatchObject({ nullable: false });
+  });
+});
+
+describe("buildEntityMetadata — generated properties", () => {
+  it.each([
+    ["id", "an auto-increment primary key"],
+    ["createdAt", "an onCreate hook"],
+    ["updatedAt", "an onUpdate hook"],
+    ["version", "an optimistic-lock version"],
+    ["computed", "a non-persisted property"],
+  ])("marks %s generated (%s)", (field) => {
+    expect(byName[field]).toMatchObject({ generated: true });
+  });
+
+  it.each(["name", "count", "status", "payload"])("leaves %s writable by the caller", (field) => {
+    expect(byName[field]).toMatchObject({ generated: false });
+  });
+});
+
+describe("buildEntityMetadata — never-expose properties", () => {
+  it.each(["secret", "bulky"])("drops the %s property from the metadata seam entirely", (field) => {
+    // Not merely hidden from responses: excluded from `fields`, so it never
+    // reaches the derived DTOs *or* the default filterable/sortable
+    // allowlists. A column that is invisible in the body but filterable in
+    // the database is a blind extraction oracle —
+    // `filter[secret][like]=sk_live_9%` answered by the row count.
+    expect(byName[field]).toBeUndefined();
+  });
+
+  it("still exposes ordinary properties alongside them", () => {
+    expect(byName["name"]).toBeDefined();
+  });
+});
+
+describe("buildEntityMetadata — embeddables", () => {
+  it("exposes the embeddable property and drops its inner columns", async () => {
+    @Embeddable()
+    class Address {
+      @Property({ type: "string" })
+      city!: string;
+
+      @Property({ type: "string" })
+      street!: string;
+    }
+
+    @Entity()
+    class Office {
+      @PrimaryKey({ type: "number" })
+      id!: number;
+
+      @Embedded(() => Address, { object: true })
+      address = new Address();
+
+      @Embedded(() => Address, { object: false, prefix: "billing_" })
+      billing = new Address();
+    }
+
+    const embedded = await newTestOrm([Office, Address]);
+    try {
+      const fields = buildEntityMetadata(embedded, Office).fields;
+      // The addressable properties only — never MikroORM's internal child
+      // names (`address~city`, `billing_city`), which would otherwise land in
+      // derived DTOs and allowlists as unusable wire fields.
+      expect(fields.map((field) => field.name)).toEqual(["id", "address", "billing"]);
+      expect(fields.filter((field) => field.name !== "id")).toMatchObject([{ kind: "json" }, { kind: "json" }]);
+    } finally {
+      await embedded.close();
+    }
+  });
+});
+
+describe("buildEntityMetadata — relation targets", () => {
+  it("resolves a target declared by name, not just by class thunk", async () => {
+    // `@ManyToOne(() => Owner)` leaves `property.entity` a thunk, but
+    // `@ManyToOne("Owner")` — the spelling that keeps a bidirectional
+    // relation's import cycle off the runtime graph, which
+    // `.dependency-cruiser.cjs` forbids — leaves it a plain *string*.
+    // Calling it would throw, and core matches relation targets by class
+    // identity, so a string would break include projection outright.
+    @Entity()
+    class Kennel {
+      @PrimaryKey({ type: "number" })
+      id!: number;
+
+      @OneToMany("Hound", "kennel")
+      hounds = new Collection<object>(this);
+    }
+
+    @Entity()
+    class Hound {
+      @PrimaryKey({ type: "number" })
+      id!: number;
+
+      @ManyToOne("Kennel", { nullable: true })
+      kennel: object | null = null;
+    }
+
+    const named = await newTestOrm([Kennel, Hound]);
+    try {
+      expect(buildEntityMetadata(named, Hound).relations[0]!.target()).toBe(Kennel);
+      expect(buildEntityMetadata(named, Kennel).relations[0]!.target()).toBe(Hound);
+    } finally {
+      await named.close();
+    }
+  });
+});
+
+describe("buildEntityMetadata — single-table inheritance", () => {
+  it("reports inherited columns and marks the discriminator generated", async () => {
+    @Entity({ abstract: true, discriminatorColumn: "species" })
+    abstract class Beast {
+      @PrimaryKey({ type: "number" })
+      id!: number;
+
+      @Property({ type: "string" })
+      name!: string;
+    }
+
+    @Entity({ discriminatorValue: "feline" })
+    class Feline extends Beast {
+      @Property({ type: "boolean", nullable: true })
+      indoor!: boolean;
+    }
+
+    const sti = await newTestOrm([Beast, Feline]);
+    try {
+      const byField = Object.fromEntries(buildEntityMetadata(sti, Feline).fields.map((field) => [field.name, field]));
+      // The subtype's own column and the base's both surface.
+      expect(byField["name"]).toMatchObject({ kind: "string", generated: false });
+      expect(byField["indoor"]).toMatchObject({ kind: "boolean", generated: false });
+      // The discriminator is write-only bookkeeping MikroORM manages from
+      // the subtype being persisted. Marking it generated is what keeps it
+      // out of the *writable* projection: a client sending `species` for a
+      // different subtype would produce a row this entity's own repository
+      // can no longer load.
+      expect(byField["species"]).toMatchObject({ generated: true });
+    } finally {
+      await sti.close();
+    }
+  });
+});
+
+describe("buildEntityMetadata — refusals", () => {
+  it("refuses a composite primary key", async () => {
+    @Entity()
+    class Membership {
+      @PrimaryKey({ type: "number" })
+      userId!: number;
+
+      @PrimaryKey({ type: "number" })
+      groupId!: number;
+
+      @Property({ type: "string" })
+      role!: string;
+    }
+
+    const composite = await newTestOrm([Membership]);
+    try {
+      let thrown: unknown;
+      try {
+        buildEntityMetadata(composite, Membership);
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toBeInstanceOf(ConfigurationException);
+      expect((thrown as ConfigurationException).code).toBe("KAVO_CONFIG_INVALID");
+      expect((thrown as Error).message).toMatch(/requires exactly one primary key; found 2/);
+    } finally {
+      await composite.close();
+    }
+  });
+});

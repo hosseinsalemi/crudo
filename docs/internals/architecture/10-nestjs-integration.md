@@ -244,7 +244,11 @@ manual-method-wins, custom + service-only operations, the service token,
 the soft-delete routes, relation includes, and the
 Swagger body/hint schemas. The full-stack paths are the reference apps'
 suites: Nest → engine → TypeORM → SQLite/Postgres in
-`examples/nest-typeorm`, and Nest → engine → Mongoose → MongoDB in
-`examples/nest-mongoose`. The Mongoose one is what proves route generation
+`examples/nest-typeorm`, Nest → engine → Mongoose → MongoDB in
+`examples/nest-mongoose`, and Nest → engine → MikroORM → SQLite/Postgres in
+`examples/nest-mikroorm`. The Mongoose one is what proves route generation
 composes with a document store — string `_id`s, `populate`-loaded
-includes, and config-declared soft-delete routes.
+includes, and config-declared soft-delete routes. The MikroORM one serves
+the _same_ Pet domain as the TypeORM app, deliberately: running one domain
+under two SQL adapters is what shows the seam carrying its weight rather
+than the routes having been shaped around one ORM.

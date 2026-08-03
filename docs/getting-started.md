@@ -2,7 +2,7 @@
 
 Kavo turns your ORM entities into a full REST CRUD API. Define the entity once, add one decorator, and you get create, read, update, delete, filtering, sorting, pagination, nested includes, and field selection — with no hand-written controller methods.
 
-Today Kavo supports NestJS as the framework, over TypeORM, Prisma, or Mongoose as the ORM. This guide uses Nest + TypeORM as its example stack; see [Nest + Prisma](/integrations/nest/prisma) and [Nest + Mongoose](/integrations/nest/mongoose) for the equivalents.
+Today Kavo supports NestJS as the framework, over TypeORM, Prisma, Mongoose, or MikroORM as the ORM. This guide uses Nest + TypeORM as its example stack; see [Nest + Prisma](/integrations/nest/prisma), [Nest + Mongoose](/integrations/nest/mongoose), and [Nest + MikroORM](/integrations/nest/mikroorm) for the equivalents.
 
 ## Requirements
 
@@ -64,6 +64,7 @@ Kavo never bundles your framework or your ORM. Each package declares what it exp
 - **`@kavo/typeorm`** — `typeorm` (`^0.3.20 || ^1.0.0`).
 - **`@kavo/prisma`** — `@prisma/client` (`^5.0.0 || ^6.0.0`).
 - **`@kavo/mongoose`** — `mongoose` (`^7.0.0 || ^8.0.0`).
+- **`@kavo/mikroorm`** — `@mikro-orm/core` (`^6.0.0`), plus the MikroORM driver package your database needs.
 - **`@kavo/graphql`** — `graphql` (`^17.0.0`).
 - **`@kavo/mcp`** — `@modelcontextprotocol/sdk` (`^1.0.0`).
 
