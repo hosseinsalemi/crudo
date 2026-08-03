@@ -314,17 +314,27 @@ pnpm docs:preview  # serve the production build
 ```
 
 `pnpm check` does not build the site, but CI does: a separate `docs` job runs
-`pnpm docs:build` on every pull request. VitePress fails that build on dead
-links _between pages under `docs/`_, so a broken cross-reference there fails the
-PR rather than the Pages deploy on `main`. The job is deliberately not
-path-filtered — `docs/.vitepress/config.mts` reads `packages/core/package.json`
-at build time — so run it locally before pushing, docs change or not.
+`pnpm docs:build` on every pull request and every push to `main`. VitePress fails
+that build on dead links _between pages under `docs/`_, so a broken
+cross-reference there fails the PR rather than the Pages deploy on `main`. The
+job is deliberately not path-filtered — `docs/.vitepress/config.mts` reads
+`packages/core/package.json` at build time — so run it locally before pushing,
+docs change or not.
 
-The gate's reach stops at what VitePress renders, so these still need a human
-eye: links in files it never renders — everything outside `docs/` (this one, the
-root `README.md`, each package's and example's `README.md`) plus
-`docs/README.md`, which `config.mts` `srcExclude`s — and links pointing at
-`CLAUDE.md`, which `ignoreDeadLinks` exempts.
+The gate is narrower than "it checks the links", though. These four categories
+pass a green build and still need a human eye:
+
+- **Anything outside `docs/`** — this file, the root `README.md`, each package's
+  and example's `README.md` — plus `docs/README.md`, which `config.mts`
+  `srcExclude`s. VitePress never renders them, so it never sees their links.
+- **`#anchor` fragments**, even between two rendered pages. VitePress strips the
+  hash before it compares, so `/getting-started#long-gone` passes as long as
+  `getting-started` itself exists.
+- **Links in config or frontmatter rather than markdown** — the `themeConfig.nav`
+  and `sidebar` entries in `config.mts`, and the homepage's `hero.actions` in
+  `docs/index.md`. Renaming a page updates none of them, and the build stays
+  green while the site's own navigation 404s.
+- **Links pointing at `CLAUDE.md`**, which `ignoreDeadLinks` exempts.
 
 `docs/` has two audiences, and it is worth keeping them separate:
 
