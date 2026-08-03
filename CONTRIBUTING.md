@@ -90,12 +90,22 @@ a test fail, either the change is wrong or the test encoded a behavior that is
 being deliberately changed — and the second case belongs in the PR description.
 
 CI runs the identical gate on three Node versions (`lts/-1`, `lts/*`,
-`current`), plus a separate formatting job. Before pushing:
+`current`), plus two separate jobs — formatting, and a doc-link check. Before
+pushing:
 
 ```bash
 pnpm prettify      # writes formatting fixes
 pnpm format:check  # what CI actually runs
+pnpm docs:links    # every `docs/**.md` reference in a tracked file resolves
 ```
+
+`docs:links` is not part of `pnpm check` because it needs no toolchain at all —
+it is `git grep` plus a file test (`scripts/check-doc-links.sh`), so CI runs it
+as its own dependency-free job. It exists because a docs move leaves every
+mention of the old path behind, in skills, agent prompts, package READMEs, and
+`src/` doc comments — and several of those ship to npm, so a dead reference is
+one an adopter follows. If a reference is a deliberate template placeholder
+rather than a link, teach the script about it instead of deleting the check.
 
 One thing the gate does **not** cover: CI installs with
 `pnpm install --frozen-lockfile` _before_ running it, and neither `pnpm check`

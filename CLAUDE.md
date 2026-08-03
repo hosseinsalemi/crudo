@@ -19,6 +19,7 @@ pnpm test         # vitest run (whole monorepo)
 pnpm depcruise    # enforce package-boundary rules (.dependency-cruiser.cjs)
 pnpm lint         # oxlint over packages/*/src and packages/*/tests
 pnpm prettify     # prettier --write . (printWidth 120)
+pnpm docs:links   # every `docs/**.md` reference in a tracked file resolves (own CI job, not in `check`)
 ```
 
 Run a single test file or test by name:

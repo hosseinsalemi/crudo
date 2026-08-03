@@ -133,7 +133,12 @@ packages or expensive non-tsc pipelines (a future e2e suite is the
 natural checkpoint).
 
 Root scripts: `build` (`tsc -b`), `clean`, `depcruise`, and `check`
-(build + boundaries) — `pnpm check` is the verification gate.
+(build + boundaries) — `pnpm check` is the verification gate. Two checks sit
+deliberately outside it, as their own CI jobs, because neither needs the
+built workspace: `format:check` (Prettier) and `docs:links`
+(`scripts/check-doc-links.sh` — every `docs/**.md` path a tracked file
+mentions must resolve, so a docs move cannot leave dead links in the package
+READMEs and `src/` doc comments that ship to npm).
 
 ## 5. Public vs. internal API surface
 
