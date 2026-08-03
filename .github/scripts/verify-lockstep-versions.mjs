@@ -42,6 +42,13 @@ for (const dir of dirs) {
   let manifest;
   try {
     manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    // `JSON.parse` happily returns null, an array or a bare number. Rejecting
+    // those here rather than dereferencing them below keeps the exit-2
+    // contract — and keeps one malformed manifest from aborting the loop and
+    // hiding the versions of every package after it.
+    if (manifest === null || typeof manifest !== "object" || Array.isArray(manifest)) {
+      throw new TypeError(`expected a JSON object, got ${Array.isArray(manifest) ? "an array" : typeof manifest}`);
+    }
   } catch (error) {
     unreadable.push({ dir, reason: error.message });
     continue;

@@ -101,6 +101,70 @@ function readStepBlock(source: string, name: string): string {
 }
 
 /**
+ * A step's `run:` value, normalised across YAML styles: an inline scalar and a
+ * `run: |` block holding the same single command both come back as that one
+ * command. That is what lets the gate's command be asserted by equality — the
+ * only assertion that survives ` || true`, `; exit 0` and `set +e`, none of
+ * which a substring check on the command notices.
+ */
+function readStepRun(source: string, name: string): string {
+  const block = readStepBlock(source, name);
+  const lines = block.split("\n");
+  const start = lines.findIndex((line) => /^\s*run:/.test(line));
+  if (start === -1) throw new Error(`publish.yml step "${name}" has no run: key`);
+
+  const header = lines[start]!;
+  const value = /^\s*run:[ \t]*(.*)$/.exec(header)![1]!.trim();
+  // Anything that is not a block indicator (`|`, `|-`, `>`, `>-`, `|2` …) is
+  // the command itself, written inline.
+  if (value !== "" && !/^[|>][-+]?\d*$/.test(value)) return value;
+
+  const runIndent = header.length - header.trimStart().length;
+  const body: string[] = [];
+  for (const line of lines.slice(start + 1)) {
+    const indent = line.length - line.trimStart().length;
+    if (line.trim() !== "" && indent <= runIndent) break;
+    body.push(line.trim());
+  }
+
+  return body.join("\n").trim();
+}
+
+/**
+ * A job's whole YAML block, so the keys that govern every step in it —
+ * `if:`, `continue-on-error:` — can be asserted, not just the keys on one
+ * step. A job-level `if: false` silences every step underneath it.
+ */
+function readJobBlock(source: string, name: string): string {
+  const lines = source.split("\n");
+  const start = lines.findIndex((line) => line.trimEnd() === `  ${name}:`);
+  if (start === -1) throw new Error(`publish.yml has no job named "${name}"`);
+
+  const jobIndent = lines[start]!.length - lines[start]!.trimStart().length;
+  const block = [lines[start]!];
+  for (const line of lines.slice(start + 1)) {
+    const indent = line.length - line.trimStart().length;
+    if (line.trim() !== "" && indent <= jobIndent) break;
+    block.push(line);
+  }
+
+  return block.join("\n");
+}
+
+/** The keys attached directly to a job, ignoring everything nested under them. */
+function readJobKeys(source: string, name: string): string[] {
+  const lines = readJobBlock(source, name).split("\n").slice(1);
+  const keyIndent = Math.min(
+    ...lines.filter((line) => line.trim() !== "").map((line) => line.length - line.trimStart().length),
+  );
+
+  return lines
+    .filter((line) => line.length - line.trimStart().length === keyIndent)
+    .map((line) => /^\s*([\w-]+):/.exec(line)?.[1])
+    .filter((key): key is string => key !== undefined);
+}
+
+/**
  * The directories `pnpm-workspace.yaml` globs over, reduced to the roots a
  * filesystem walk has to start from. Deriving them from the workspace file
  * rather than hardcoding `packages` is what keeps the coverage assertion
@@ -167,8 +231,19 @@ const KNOWN_DRIFT: Record<string, string> = { "packages/orms/prisma": "0.5.0" };
 
 /** The directories not on `version`, minus the grandfathered v0.6.0 drift. */
 function findBehind(version: string | undefined, actual: Record<string, string | undefined>): string[] {
-  const tolerated = version === DRIFTED_RELEASE ? KNOWN_DRIFT : {};
-  return Object.keys(actual).filter((dir) => actual[dir] !== version && tolerated[dir] !== actual[dir]);
+  const tolerated: Record<string, string> = version === DRIFTED_RELEASE ? KNOWN_DRIFT : {};
+
+  return Object.keys(actual).filter((dir) => {
+    const found = actual[dir];
+    if (found === version) return false;
+    // A manifest with no `version` at all is drift, never a match against the
+    // allowance: `tolerated[dir]` is also undefined for every directory that
+    // is not grandfathered, so comparing the two directly would read a
+    // missing field as "in lockstep" — the one thing the gate script itself
+    // is careful to call a mismatch.
+    if (found === undefined) return true;
+    return tolerated[dir] !== found;
+  });
 }
 
 describe("lockstep versions in this repository", () => {
@@ -194,6 +269,24 @@ describe("lockstep versions in this repository", () => {
     const actual = { "packages/core": "0.7.0", "packages/orms/prisma": "0.7.0" };
 
     expect(findBehind("0.7.0", actual)).toEqual([]);
+  });
+
+  it("fails a package whose version field is missing entirely", () => {
+    const actual = { "packages/core": "0.6.0", "packages/protocols/mcp": undefined };
+
+    expect(findBehind("0.6.0", actual)).toEqual(["packages/protocols/mcp"]);
+  });
+
+  it("fails prisma at a stale version other than the one grandfathered", () => {
+    const actual = { "packages/core": "0.6.0", "packages/orms/prisma": "0.4.0" };
+
+    expect(findBehind("0.6.0", actual)).toEqual(["packages/orms/prisma"]);
+  });
+
+  it("fails prisma ahead of the tree as readily as behind it", () => {
+    const actual = { "packages/core": "0.6.0", "packages/orms/prisma": "0.7.0" };
+
+    expect(findBehind("0.6.0", actual)).toEqual(["packages/orms/prisma"]);
   });
 
   it("fails new drift even at the grandfathered version", () => {
@@ -225,27 +318,39 @@ describe("publish.yml wiring", () => {
   });
 
   it("runs the gate script over the whole PACKAGE_DIRS list, not one package", () => {
-    const step = readStepBlock(workflow, "Verify lockstep versions");
-
-    expect(step).toContain("verify-lockstep-versions.mjs");
-    expect(step).toContain('"${GITHUB_REF_NAME#v}"');
-    // Unquoted on purpose: word splitting is what turns the folded list into
-    // one argument per directory, so quoting it would pass a single blob.
-    expect(step).toContain(" $PACKAGE_DIRS");
-    expect(step).not.toContain('"$PACKAGE_DIRS"');
+    // By equality, not by substring. Every way of neutering the gate leaves
+    // the command itself intact and appends to it — ` || true`, `; exit 0` —
+    // so a `toContain` on the command is exactly the assertion that misses
+    // them. `$PACKAGE_DIRS` is unquoted on purpose: word splitting is what
+    // turns the folded list into one argument per directory.
+    expect(readStepRun(workflow, "Verify lockstep versions")).toBe(
+      'node .github/scripts/verify-lockstep-versions.mjs "${GITHUB_REF_NAME#v}" $PACKAGE_DIRS',
+    );
+    expect(existsSync(SCRIPT_PATH)).toBe(true);
   });
 
-  it("keeps the gate unconditional", () => {
-    const step = readStepBlock(workflow, "Verify lockstep versions");
+  it("keeps the gate, and everything it guards, unconditional", () => {
+    // Three ways to reopen the v0.6.0 hole, all of which used to leave every
+    // assertion in this file green: silence the gate step, silence the whole
+    // job, or let the steps the gate protects run anyway.
+    for (const name of ["Verify lockstep versions", "Pack packages", "Publish packages"]) {
+      const step = readStepBlock(workflow, name);
+      expect(step, `${name} is conditional`).not.toContain("continue-on-error");
+      expect(step, `${name} is conditional`).not.toMatch(/^\s+if:/m);
+    }
 
-    // A `continue-on-error` or an `if:` here would reopen the v0.6.0 hole
-    // while every other assertion in this file stayed green.
-    expect(step).not.toContain("continue-on-error");
-    expect(step).not.toMatch(/^\s+if:/m);
+    expect(readJobKeys(workflow, "publish")).not.toContain("if");
+    expect(readJobKeys(workflow, "publish")).not.toContain("continue-on-error");
   });
 
   it("keeps the skip-if-already-published guard so a re-run after a partial failure completes", () => {
-    expect(workflow).toContain("already published, skipping");
+    // The echo alone is not the guard — assert the condition that produces it,
+    // or deleting the `if` and leaving an unconditional echo would pass.
+    const step = readStepRun(workflow, "Publish packages");
+
+    expect(step).toMatch(/if npm view "\$NAME@\$VERSION" version .*; then/);
+    expect(step).toContain("already published, skipping");
+    expect(step).toContain("npm publish");
   });
 
   it("lists every package after the packages it depends on", () => {
@@ -411,6 +516,31 @@ describe("verify-lockstep-versions", () => {
     expect(result.status).toBe(2);
     expect(result.stderr).toContain("@kavo/prisma (packages/orms/prisma/package.json) is 0.5.0, expected 0.6.0");
     expect(result.stderr).toContain("packages/typo/package.json");
+  });
+
+  // `JSON.parse` succeeds on these, so they never reach the catch — they used
+  // to crash on the dereference instead, aborting the loop with a stack trace
+  // and hiding every package after them.
+  it.each([
+    ["null", "null"],
+    ["an array", "[]"],
+    ["a bare number", "42"],
+  ])("treats %s as an unreadable manifest rather than crashing", (label, contents) => {
+    const cwd = join(fixtureRoot, `not-an-object-${label.replace(/\W/g, "")}`);
+    mkdirSync(join(cwd, "packages/core"), { recursive: true });
+    writeFileSync(join(cwd, "packages/core/package.json"), contents);
+    mkdirSync(join(cwd, "packages/orms/prisma"), { recursive: true });
+    writeFileSync(
+      join(cwd, "packages/orms/prisma/package.json"),
+      JSON.stringify({ name: "@kavo/prisma", version: "0.5.0" }),
+    );
+
+    const result = runCheck(cwd, ["0.6.0", "packages/core", "packages/orms/prisma"]);
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("packages/core/package.json");
+    // The loop kept going: the package after the bad manifest is still named.
+    expect(result.stderr).toContain("@kavo/prisma (packages/orms/prisma/package.json) is 0.5.0, expected 0.6.0");
   });
 
   it("exits 2 without an expected version or any package directories", () => {
