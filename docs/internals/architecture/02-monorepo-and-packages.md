@@ -168,12 +168,20 @@ to cross-package version-matrix support.
 
 Release mechanics live in `.github/workflows/publish.yml`, triggered by a
 pushed `v*.*.*` tag and nothing else. Its `PACKAGE_DIRS` is the single source
-of truth for the released set, and two guards run before anything reaches the
-registry: every package's `version` must equal `@kavo/core`'s (lockstep, this
-section), and every packed tarball's manifest must be free of `workspace:`
-ranges. The second one exists because only `pnpm pack` rewrites `workspace:^`
-into a real semver range — a package published any other way is uninstallable,
-and npm does not allow republishing a version to fix it.
+of truth for the released set, listed in topological order so a package always
+publishes before its dependents — `@kavo/nest` last, since it hard-depends on
+`@kavo/core`, `@kavo/graphql`, and `@kavo/mcp`. npm never checks that a
+dependency exists at publish time, so that order only matters when a run
+fails partway: it keeps whatever already reached the registry pinned to
+versions that also reached it.
+
+Three guards run before anything is published. `PACKAGE_DIRS` must cover every
+non-private workspace package (a package missing from the list is invisible to
+every other guard); every package's `version` must equal `@kavo/core`'s
+(lockstep, this section); and every packed tarball's manifest must be free of
+`workspace:` ranges. The last exists because only `pnpm pack` rewrites
+`workspace:^` into a real semver range — a package published any other way is
+uninstallable, and npm does not allow republishing a version to fix it.
 
 ## 8. Dependency classification (decided now, executed later)
 

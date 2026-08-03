@@ -1,7 +1,7 @@
 ---
 description: Bump @kavo/* to the next lockstep version and publish via a git tag
 argument-hint: "[patch|minor|major to override auto-detection]"
-allowed-tools: Bash(git:*), Bash(pnpm:*), Bash(gh:*), Bash(node:*), Read, Grep, Glob
+allowed-tools: Bash(git:*), Bash(pnpm:*), Bash(gh:*), Bash(node:*), Bash(npm view:*), Bash(tar:*), Read, Grep, Glob
 ---
 
 ## Context
@@ -62,7 +62,8 @@ guard, which is why the rule is the tag and nothing else.
 3. **Apply the version, in lockstep** (ADR-0004 — [`docs/internals/adr/0004-lockstep-versioning.md`](../../docs/internals/adr/0004-lockstep-versioning.md)):
    set the new version in the `package.json` of **every** published package.
    `PACKAGE_DIRS` in `.github/workflows/publish.yml` is the single source of
-   truth for that set — read it and bump exactly those. Today it is all seven:
+   truth for that set — read it and bump exactly those. Today it is all seven,
+   in the topological order the workflow publishes them (dependents last):
 
    | Directory                    | Package          |
    | ---------------------------- | ---------------- |
@@ -70,9 +71,9 @@ guard, which is why the rule is the tag and nothing else.
    | `packages/orms/typeorm`      | `@kavo/typeorm`  |
    | `packages/orms/prisma`       | `@kavo/prisma`   |
    | `packages/orms/mongoose`     | `@kavo/mongoose` |
-   | `packages/frameworks/nest`   | `@kavo/nest`     |
    | `packages/protocols/graphql` | `@kavo/graphql`  |
    | `packages/protocols/mcp`     | `@kavo/mcp`      |
+   | `packages/frameworks/nest`   | `@kavo/nest`     |
 
    If this table and `PACKAGE_DIRS` ever disagree, `PACKAGE_DIRS` wins — it is
    what actually publishes — and the table is a bug to fix in the same pass.
@@ -102,7 +103,8 @@ guard, which is why the rule is the tag and nothing else.
    never been published cannot go out through this workflow, because npm's
    trusted publishers are configured per package on npmjs.com and a package
    with no versions has no settings page to configure. First publishes are
-   manual, out-of-band, and have to happen **before** the tag:
+   manual and out-of-band — but they happen **during** the release, not before
+   it (the sequence below explains why):
 
    ```bash
    for dir in <PACKAGE_DIRS from step 3>; do
@@ -111,30 +113,70 @@ guard, which is why the rule is the tag and nothing else.
    done
    ```
 
-   If anything prints, **stop and tell the user before tagging.** Skipping this
-   is not a cosmetic risk: `publish.yml` publishes `PACKAGE_DIRS` in order and
-   `@kavo/nest` depends on `@kavo/graphql` and `@kavo/mcp` as hard
-   `dependencies`, so a late failure can leave an already-published
-   `@kavo/nest` pointing at a version of a sibling that does not exist —
-   uninstallable, and past npm's unpublish window it cannot be withdrawn.
+   If anything prints, **stop and tell the user before tagging**, then follow
+   the bootstrap sequence below. `publish.yml` publishes `PACKAGE_DIRS` in
+   topological order, so the run will stop at the unpublished package with
+   nothing that depends on it published yet — that ordering is what keeps a
+   failure here recoverable instead of leaving an uninstallable `@kavo/nest`
+   on the registry forever.
 
-   Bootstrapping one is the **only** sanctioned publish outside the tag, and
-   even then it is a publish of a packed tarball, never `npm publish` from
-   inside the package directory — that shortcut is what shipped
+   Bootstrapping is the **only** sanctioned publish outside the tag, and it
+   has two hard rules. First, publish a **packed tarball** — never
+   `npm publish` from inside the package directory, the shortcut that shipped
    `@kavo/prisma@0.5.0` and `@kavo/mongoose@0.6.0` with an unresolvable
-   `workspace:^`. Get the user's explicit go-ahead first (it is public and
-   irreversible), then:
+   `workspace:^`. Second, every `@kavo/*` range in that tarball must **already
+   resolve on the registry**. `pnpm pack` rewrites `workspace:^` into
+   `^X.Y.Z` — the version step 3 just bumped to, which nothing has published
+   yet. Publish that tarball before the release and then abort it (a declined
+   confirmation at step 6, a red gate, a failed tag push) and you have shipped
+   a version pinned to a sibling that does not exist, which npm will not let
+   you replace. **A tarball free of `workspace:` is not the same as a tarball
+   that installs.**
 
-   ```bash
-   (cd <dir> && pnpm pack --pack-destination /tmp/kavo-bootstrap)
-   # must print nothing — any `workspace:` here is an uninstallable release
-   tar -xzOf /tmp/kavo-bootstrap/<tarball> package/package.json | grep '"workspace:' || true
-   npm publish /tmp/kavo-bootstrap/<tarball> --access public
-   ```
+   So bootstrap _during_ the release, once the tag has put the siblings on the
+   registry:
 
-   Then configure its trusted publisher on npmjs.com (`kavo-labs/kavo` +
-   `publish.yml`), confirm `npm view` resolves, and only then release. That
-   first version will lack OIDC provenance; every later release of it through
+   1. Tag and push as normal (steps 6-7). The run publishes `@kavo/core` and
+      everything else ahead of the gap, then fails on the unpublished package.
+   2. Pack it from the release commit and verify the tarball on both counts:
+
+      ```bash
+      (cd <dir> && pnpm pack --pack-destination /tmp/kavo-bootstrap)
+      MANIFEST=$(tar -xzOf /tmp/kavo-bootstrap/<tarball> package/package.json)
+
+      if printf '%s' "$MANIFEST" | grep -q '"workspace:'; then
+        echo "unresolved workspace: range — do not publish" >&2
+        exit 1
+      fi
+
+      for spec in $(printf '%s' "$MANIFEST" | node -e '
+        let raw = "";
+        process.stdin.on("data", (chunk) => (raw += chunk));
+        process.stdin.on("end", () => {
+          const pkg = JSON.parse(raw);
+          for (const [name, range] of Object.entries(pkg.dependencies ?? {})) {
+            if (name.startsWith("@kavo/")) console.log(name + "@" + range);
+          }
+        });
+      '); do
+        npm view "$spec" version >/dev/null 2>&1 || {
+          echo "pins a version that is not on the registry: $spec" >&2
+          exit 1
+        }
+      done
+      ```
+
+   3. Get the user's explicit go-ahead — this is public and irreversible —
+      then `npm publish /tmp/kavo-bootstrap/<tarball> --access public` and
+      configure its trusted publisher on npmjs.com (`kavo-labs/kavo` +
+      `publish.yml`). `npm publish` is deliberately absent from this command's
+      `allowed-tools`: the permission prompt is that go-ahead, so do not
+      pre-authorize it away.
+   4. Re-run the failed workflow (`gh run rerun <run-id> --failed`). The
+      `already published, skipping` branch walks past everything that went out
+      on the first attempt and publishes the rest.
+
+   That first version lacks OIDC provenance; every later release of it through
    the workflow will have it.
 
 6. **Confirm with the user before doing anything irreversible.** State
