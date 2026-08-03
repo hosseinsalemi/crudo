@@ -77,8 +77,11 @@ TypeORM's entity columns and Nest's DI need it:
 }
 ```
 
-`useDefineForClassFields: false` matters here: with it on, TypeORM's
-`@Column()` decorators can't see field initializers correctly.
+`useDefineForClassFields: false` matters here: with it on, every declared
+field is emitted as a real class field, so a fresh entity carries an own key
+for every column — set to `undefined` — whether the adapter hydrated it or
+not. Partially-hydrated rows then serialize with those columns present as
+`undefined` instead of absent.
 
 ## 4. One plain entity — no DTOs
 

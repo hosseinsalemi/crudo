@@ -4,9 +4,27 @@ Kavo's engine (`@kavo/core`) is ORM-agnostic — it talks to your data through a
 
 If you haven't yet, read [Getting started](/getting-started) first — this page assumes you already know what `@Kavo()` does and just needs the app-wiring.
 
-```bash
+::: code-group
+
+```bash [pnpm]
 pnpm add @kavo/core @kavo/nest @kavo/typeorm
 ```
+
+```bash [npm]
+npm install @kavo/core @kavo/nest @kavo/typeorm
+```
+
+```bash [yarn]
+yarn add @kavo/core @kavo/nest @kavo/typeorm
+```
+
+```bash [bun]
+bun add @kavo/core @kavo/nest @kavo/typeorm
+```
+
+:::
+
+`@kavo/typeorm` expects `typeorm` (`^0.3.20 || ^1.0.0`) as a peer — add it to the command above if your app doesn't already have it — and `@kavo/nest` expects the Nest runtime your app already has. See [Peer dependencies](/getting-started#peer-dependencies) for the full list with versions, and [Requirements](/getting-started#requirements) for the Node and TypeScript prerequisites.
 
 ## Zero-config wiring
 
@@ -66,3 +84,5 @@ export class AppModule {}
 ```
 
 `createInfrastructure(dataSource)` derives both Kavo's entity metadata and its repository adapter from the `DataSource`'s own TypeORM metadata — nothing to declare twice.
+
+A complete, runnable app using all of the above lives in [`examples/nest-typeorm`](https://github.com/kavo-labs/kavo/tree/main/examples/nest-typeorm).
