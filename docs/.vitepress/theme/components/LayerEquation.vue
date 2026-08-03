@@ -21,8 +21,7 @@
       </div>
     </div>
     <p class="layer-note">
-      Swap ORMs later and the API surface doesn't move — <code>RepositoryAdapter</code> is the only seam that
-      changes.
+      Swap ORMs later and the API surface doesn't move — <code>RepositoryAdapter</code> is the only seam that changes.
     </p>
   </div>
 </template>

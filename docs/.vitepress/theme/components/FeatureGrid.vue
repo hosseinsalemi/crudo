@@ -1,7 +1,9 @@
 <template>
   <div class="feature-section">
     <p class="feature-title">Everything a CRUD API needs</p>
-    <p class="feature-subtitle">One decorator, the full surface — configurable at global, entity, operation, and per-call scope.</p>
+    <p class="feature-subtitle">
+      One decorator, the full surface — configurable at global, entity, operation, and per-call scope.
+    </p>
     <div class="feature-grid">
       <div v-for="feature in features" :key="feature.index" class="feature-item">
         <span class="feature-index">{{ feature.index }}</span>

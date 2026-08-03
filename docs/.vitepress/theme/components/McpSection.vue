@@ -9,9 +9,8 @@
     <McpChatDemo />
 
     <p class="mcp-note">
-      Every standard operation, for every <code>@Kavo</code> entity, unconditionally — an agent gets the same
-      filtering, pagination, and soft-delete semantics a REST or GraphQL client does, because it calls the same
-      engine.
+      Every standard operation, for every <code>@Kavo</code> entity, unconditionally — an agent gets the same filtering,
+      pagination, and soft-delete semantics a REST or GraphQL client does, because it calls the same engine.
     </p>
   </div>
 </template>
