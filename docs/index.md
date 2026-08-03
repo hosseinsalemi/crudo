@@ -36,7 +36,7 @@ const activeQueryGrammarTab = ref(queryGrammarTabs[0].id);
 <ToolLogoStrip />
 
 <div class="before-after">
-  <p class="before-after-lead">Stop writing repetitive CRUD endpoints.</p>
+  <p class="before-after-lead ai-title">Stop writing repetitive CRUD endpoints.</p>
   <div class="before-after-col before-after-col--before">
     <div class="before-after-header before-after-header--before before-after-header--stacked">
       <div class="before-after-header-row">
