@@ -57,3 +57,32 @@ jobs:
 
       - name: Check formatting
         run: pnpm format:check
+
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # `pnpm check` does not build the docs site, so a dead link or a broken
+      # theme component would otherwise only surface in the Pages deploy on
+      # `main`, after the PR merged. This builds the site — VitePress fails the
+      # build on dead links — so docs breakage gates the PR instead.
+      # Deliberately not path-filtered: docs/.vitepress/config.mts reads
+      # packages/core/package.json at build time, so a packaging change can
+      # break the docs build without touching docs/. pages.yml still owns
+      # deployment; this job only builds.
+      - name: Build docs
+        run: pnpm docs:build
