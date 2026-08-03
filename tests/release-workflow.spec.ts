@@ -108,7 +108,28 @@ function readStepBlock(source: string, name: string): string {
  */
 function readWorkspaceRoots(): string[] {
   const source = readFileSync(resolve(REPO_ROOT, "pnpm-workspace.yaml"), "utf8");
-  const patterns = [...source.matchAll(/^\s*-\s+(\S+)\s*$/gm)].map((match) => match[1]!);
+  const lines = source.split("\n");
+  const start = lines.findIndex((line) => line.trimEnd() === "packages:");
+  if (start === -1) {
+    throw new Error("pnpm-workspace.yaml no longer declares a `packages:` list");
+  }
+
+  const patterns: string[] = [];
+  for (const line of lines.slice(start + 1)) {
+    if (line.trim() === "") continue;
+    // Only the `packages:` list counts. Sweeping the whole file would also
+    // pick up the entries of pnpm's other top-level lists — most likely
+    // `onlyBuiltDependencies:`, which `pnpm approve-builds` writes — and
+    // then try to walk `esbuild/` as if it were a workspace root.
+    const entry = /^\s+-\s+["']?([^"'\s]+)/.exec(line);
+    if (!entry) break;
+    patterns.push(entry[1]!);
+  }
+
+  if (patterns.length === 0) {
+    throw new Error("pnpm-workspace.yaml declares an empty `packages:` list");
+  }
+
   return [...new Set(patterns.map((pattern) => pattern.split("/")[0]!))];
 }
 
@@ -126,25 +147,59 @@ function findWorkspacePackages(dir: string): string[] {
 
 const packageDirs = readPackageDirs(workflow);
 
+/**
+ * The release v0.6.0 shipped `@kavo/prisma` at 0.5.0 and everything else at
+ * 0.6.0; repairing that on the registry is a separate issue, so the tree is
+ * allowed to still show it. The allowance is deliberately narrow on both
+ * axes — an exact directory *and* an exact stale version — and it expires
+ * with the release that caused it: it applies only while `@kavo/core` is
+ * still on `DRIFTED_RELEASE`.
+ *
+ * That expiry is the whole point. A blanket "prisma may lag" exception would
+ * wave through the next release repeating the exact mistake this file exists
+ * to catch (six packages bumped, prisma left behind — still one drifted
+ * directory, still matching), while *failing* a correct release that bumped
+ * all seven. Keying it to the release inverts both: once `/publish` moves the
+ * tree to the next version the allowance is gone, so prisma must come along.
+ */
+const DRIFTED_RELEASE = "0.6.0";
+const KNOWN_DRIFT: Record<string, string> = { "packages/orms/prisma": "0.5.0" };
+
+/** The directories not on `version`, minus the grandfathered v0.6.0 drift. */
+function findBehind(version: string | undefined, actual: Record<string, string | undefined>): string[] {
+  const tolerated = version === DRIFTED_RELEASE ? KNOWN_DRIFT : {};
+  return Object.keys(actual).filter((dir) => actual[dir] !== version && tolerated[dir] !== actual[dir]);
+}
+
 describe("lockstep versions in this repository", () => {
   /**
    * ADR-0004 is a property of the tree, not only of a release: checking it
    * here means drift fails `pnpm check` on the pull request that introduces
    * it, rather than at a tag push that cannot be cleanly undone.
-   *
-   * One violation predates this gate — v0.6.0 shipped with `@kavo/prisma`
-   * left at 0.5.0, and repairing it (npm registry included) is a separate
-   * issue. It is pinned by name rather than tolerated silently: any *new*
-   * drift fails this test, and the test fails once prisma is bumped, which
-   * is the signal to replace the expectation with an empty list.
    */
-  const KNOWN_DRIFT = ["packages/orms/prisma"];
-
   it("keeps every package on one version, bar the drift v0.6.0 left behind", () => {
     const version = readManifest("packages/core").version;
-    const behind = packageDirs.filter((dir) => readManifest(dir).version !== version);
+    const actual = Object.fromEntries(packageDirs.map((dir) => [dir, readManifest(dir).version]));
 
-    expect(behind).toEqual(KNOWN_DRIFT);
+    expect(findBehind(version, actual)).toEqual([]);
+  });
+
+  it("still fails a release that leaves prisma behind, once the tree moves past v0.6.0", () => {
+    const actual = { "packages/core": "0.7.0", "packages/orms/prisma": "0.5.0" };
+
+    expect(findBehind("0.7.0", actual)).toEqual(["packages/orms/prisma"]);
+  });
+
+  it("passes a correct release that bumps prisma along with everything else", () => {
+    const actual = { "packages/core": "0.7.0", "packages/orms/prisma": "0.7.0" };
+
+    expect(findBehind("0.7.0", actual)).toEqual([]);
+  });
+
+  it("fails new drift even at the grandfathered version", () => {
+    const actual = { "packages/core": "0.6.0", "packages/orms/prisma": "0.5.0", "packages/protocols/mcp": "0.5.0" };
+
+    expect(findBehind("0.6.0", actual)).toEqual(["packages/protocols/mcp"]);
   });
 });
 

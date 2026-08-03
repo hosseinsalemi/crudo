@@ -71,9 +71,6 @@ if (unreadable.length > 0) {
   for (const { dir, reason } of unreadable) {
     console.error(`  ${dir}/package.json — ${reason}`);
   }
-}
-
-if (unreadable.length > 0) {
   console.error("");
   console.error("Every listed directory must be a package. Fix PACKAGE_DIRS, then re-tag the release.");
   process.exit(2);
