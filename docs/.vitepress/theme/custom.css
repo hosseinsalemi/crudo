@@ -22,6 +22,22 @@
 .VPHero .container {
   position: relative;
   z-index: 1;
+  /* Match the vp-doc container's width/padding so the hero lines up with
+     the rest of the homepage content below it. */
+  max-width: 1280px;
+  padding: 0 24px;
+}
+
+@media (min-width: 640px) {
+  .VPHero .container {
+    padding: 0 48px;
+  }
+}
+
+@media (min-width: 960px) {
+  .VPHero .container {
+    padding: 0 64px;
+  }
 }
 
 .VPHero .name {
