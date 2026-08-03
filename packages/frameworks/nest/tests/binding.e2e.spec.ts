@@ -9,11 +9,11 @@ import { ConfigurationException, WireQuery } from "@kavo/core";
 import type { KavoModuleOptions } from "@kavo/nest";
 import { Kavo, KavoModule, Override, enumProp, flattenQuery, getKavoServiceToken, oneOfArray } from "@kavo/nest";
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
-import { listen } from "./support/listen.js";
+import { listen, type SupertestTarget } from "./support/listen.js";
 
 let app: INestApplication;
 let adapter: InMemoryTodoAdapter;
-let httpServer: Parameters<typeof request>[0];
+let httpServer: SupertestTarget;
 
 interface BootstrapOptions {
   readonly defaults?: KavoModuleOptions["defaults"];
@@ -52,7 +52,7 @@ afterEach(async () => {
  * which would also answer for an app that was only `init()`ed and send
  * supertest back to binding a wildcard port per request (see `listen`).
  */
-function server(): Parameters<typeof request>[0] {
+function server(): SupertestTarget {
   return httpServer;
 }
 

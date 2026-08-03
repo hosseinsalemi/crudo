@@ -6,7 +6,7 @@ import { Test } from "@nestjs/testing";
 import type { INestApplication } from "@nestjs/common";
 import { Kavo, KavoModule } from "@kavo/nest";
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
-import { listen } from "./support/listen.js";
+import { listen, type SupertestTarget } from "./support/listen.js";
 
 /**
  * Proves the zero-controller path: `KavoModule.forRoot({ mcp: true })`
@@ -27,7 +27,7 @@ afterEach(async () => {
   await app.close();
 });
 
-function mcpRequest(server: Parameters<typeof request>[0], path = "/mcp") {
+function mcpRequest(server: SupertestTarget, path = "/mcp") {
   return request(server)
     .post(path)
     .set("Accept", "application/json, text/event-stream")

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import request from "supertest";
 import type { Server } from "node:http";
 import type { INestApplication } from "@nestjs/common";
+import type { SupertestTarget } from "./support/listen.js";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import type { DataSource } from "typeorm";
 import { DATA_SOURCE } from "../src/database.module.js";
@@ -21,7 +22,7 @@ import { Address } from "../src/address/address.entity.js";
  * drivers, no forked assertions.
  */
 export function registerCrudE2eSuite(getApp: () => INestApplication): void {
-  function server(): Parameters<typeof request>[0] {
+  function server(): SupertestTarget {
     const httpServer = getApp().getHttpServer() as Server;
     // The spec that registered this suite must have bootstrapped with
     // `listen(app)`, not `app.init()`: an unbound server makes supertest
@@ -30,7 +31,7 @@ export function registerCrudE2eSuite(getApp: () => INestApplication): void {
     if (httpServer.address() === null) {
       throw new Error("app is not listening — bootstrap the spec with listen(app) instead of app.init()");
     }
-    return httpServer as Parameters<typeof request>[0];
+    return httpServer as SupertestTarget;
   }
 
   async function seed(): Promise<void> {

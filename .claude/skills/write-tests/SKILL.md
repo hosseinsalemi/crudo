@@ -62,7 +62,7 @@ silently regressed:
 Any suite that drives a Nest app through supertest must bind it first:
 
 ```ts
-import { listen } from "./support/listen.js"; // examples: "./listen.js"
+import { listen } from "./support/listen.js";
 
 app = moduleRef.createNestApplication();
 const server = await listen(app); // == await app.listen(0, "127.0.0.1")
@@ -79,11 +79,12 @@ or a hook timeout, and it made these suites ~10% flaky (issue #91). A foreign
 `405` is the worst of them: it reads as a missing generated route.
 
 The `await` is load-bearing — `listen(0, host)` binds asynchronously, unlike
-the no-host path — so the helper asserts the address is bound. The helper is
-duplicated per package (`packages/frameworks/nest/tests/support/listen.ts`,
-`examples/*/tests/listen.ts`) because a test file may not import another
-package's `tests/`. Never fix a port collision with a retry, a fixed port, or
-a raised timeout; those hide it.
+the no-host path — so the helper asserts the address is bound: unreachable
+while the `await` is there, and it fires the moment someone drops it. The
+helper is duplicated per package (`packages/frameworks/nest/tests/support/`,
+`examples/*/tests/support/`) because a test file may not import another
+package's `tests/`; change all three copies together. Never fix a port
+collision with a retry, a fixed port, or a raised timeout; those hide it.
 
 ## Contracts that need wire-level assertions
 

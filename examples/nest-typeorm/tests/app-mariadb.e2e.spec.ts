@@ -5,7 +5,7 @@ import { Test } from "@nestjs/testing";
 import { MariaDbContainer, type StartedMariaDbContainer } from "@testcontainers/mariadb";
 import { AppModule } from "../src/app.module.js";
 import { registerCrudE2eSuite } from "./crud-e2e.suite.js";
-import { listen } from "./listen.js";
+import { listen } from "./support/listen.js";
 
 /**
  * Same suite as `app.e2e.spec.ts`, run against a real MariaDB instead of

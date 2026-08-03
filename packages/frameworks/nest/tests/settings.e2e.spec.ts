@@ -6,7 +6,7 @@ import { Test } from "@nestjs/testing";
 import type { KavoModuleOptions } from "@kavo/nest";
 import { Kavo, KavoModule } from "@kavo/nest";
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
-import { listen } from "./support/listen.js";
+import { listen, type SupertestTarget } from "./support/listen.js";
 
 /**
  * End-to-end coverage for `@Kavo`/`KavoSettings` knobs that
@@ -21,7 +21,7 @@ import { listen } from "./support/listen.js";
 
 let app: INestApplication;
 let adapter: InMemoryTodoAdapter;
-let httpServer: Parameters<typeof request>[0];
+let httpServer: SupertestTarget;
 
 interface BootstrapOptions {
   readonly defaults?: KavoModuleOptions["defaults"];
@@ -50,7 +50,7 @@ afterEach(async () => {
  * The bound server `bootstrap` listened on — see the same helper in
  * `binding.e2e.spec.ts`.
  */
-function server(): Parameters<typeof request>[0] {
+function server(): SupertestTarget {
   return httpServer;
 }
 

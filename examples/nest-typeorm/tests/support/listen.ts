@@ -2,7 +2,8 @@ import type { Server } from "node:http";
 import type { INestApplication } from "@nestjs/common";
 import type request from "supertest";
 
-type SupertestTarget = Parameters<typeof request>[0];
+/** What `request(...)` accepts — the app under test, already bound. */
+export type SupertestTarget = Parameters<typeof request>[0];
 
 /**
  * Bind `app` to an ephemeral port on the loopback, so supertest talks to a
@@ -13,12 +14,16 @@ type SupertestTarget = Parameters<typeof request>[0];
  * per request — `listen(0)` on the *wildcard*, then a connect to a hardcoded
  * `127.0.0.1` — and that asymmetry lets the request land on an unrelated
  * local process that already holds the port (issue #91). The `await` is
- * load-bearing: `listen(0, host)` binds asynchronously, so the port exists
- * only once the promise settles.
+ * load-bearing: `listen(0, host)` binds asynchronously, so the assertion
+ * below is unreachable while the `await` is there and fires the moment
+ * someone drops it.
  *
- * Deliberately duplicated from `@kavo/nest`'s copy rather than shared: a
- * test file may not reach into another package's `tests/`
- * (`.dependency-cruiser.cjs`, `tests-no-other-package-internals`).
+ * A verbatim copy of `packages/frameworks/nest/tests/support/listen.ts`;
+ * `examples/nest-mongoose` holds the third. Importing one of the others is
+ * what `.dependency-cruiser.cjs`'s `tests-no-other-package-internals`
+ * forbids, and the alternative — a shared home outside every package that
+ * owns it — buys less than it costs for ten lines. Change all three
+ * together.
  */
 export async function listen(app: INestApplication): Promise<SupertestTarget> {
   await app.listen(0, "127.0.0.1");

@@ -7,7 +7,7 @@ import { Controller, type INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { Kavo, KavoModule } from "@kavo/nest";
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
-import { listen } from "./support/listen.js";
+import { listen, type SupertestTarget } from "./support/listen.js";
 
 /**
  * Pins the contract every HTTP suite in this package leans on (issue #91):
@@ -27,7 +27,7 @@ afterEach(async () => {
   await app.close();
 });
 
-async function bootstrap(): Promise<Parameters<typeof request>[0]> {
+async function bootstrap(): Promise<SupertestTarget> {
   const moduleRef = await Test.createTestingModule({
     imports: [
       KavoModule.forRoot({ infrastructure: fakeInfrastructure(new InMemoryTodoAdapter()) }),
@@ -38,7 +38,7 @@ async function bootstrap(): Promise<Parameters<typeof request>[0]> {
   return listen(app);
 }
 
-function boundAddress(server: Parameters<typeof request>[0]): AddressInfo {
+function boundAddress(server: SupertestTarget): AddressInfo {
   const address = (server as Server).address();
   if (address === null || typeof address === "string") throw new Error("server is not bound to a TCP address");
   return address;

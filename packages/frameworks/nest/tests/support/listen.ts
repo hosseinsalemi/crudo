@@ -2,7 +2,8 @@ import type { Server } from "node:http";
 import type { INestApplication } from "@nestjs/common";
 import type request from "supertest";
 
-type SupertestTarget = Parameters<typeof request>[0];
+/** What `request(...)` accepts — the app under test, already bound. */
+export type SupertestTarget = Parameters<typeof request>[0];
 
 /**
  * Bind `app` to an ephemeral port on the loopback, and hand back the
@@ -20,9 +21,15 @@ type SupertestTarget = Parameters<typeof request>[0];
  *
  * The `await` is load-bearing: `listen(0, host)` resolves the host
  * asynchronously, unlike the no-host path, so the port exists only once the
- * promise settles. The assertion pins that down — an unbound server here
- * would silently send supertest back to binding per request, and the fix
- * would do nothing.
+ * promise settles. The assertion below is what pins that down — it is
+ * unreachable while the `await` is there, and fires the moment someone drops
+ * it, instead of letting supertest quietly go back to binding per request.
+ *
+ * `examples/nest-typeorm/tests/support/listen.ts` and
+ * `examples/nest-mongoose/tests/support/listen.ts` are verbatim copies of
+ * this function: a test file may not import another package's `tests/`
+ * (`.dependency-cruiser.cjs`, `tests-no-other-package-internals`). Change
+ * all three together.
  */
 export async function listen(app: INestApplication): Promise<SupertestTarget> {
   await app.listen(0, "127.0.0.1");
