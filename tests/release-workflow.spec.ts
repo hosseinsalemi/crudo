@@ -383,6 +383,65 @@ describe("publish.yml wiring", () => {
     expect([...packageDirs].sort()).toEqual(publishable.sort());
   });
 
+  it("verifies the packed tarballs after packing them and before publishing", () => {
+    const steps = readStepNames(workflow);
+    const pack = steps.indexOf("Pack packages");
+    const verify = steps.indexOf("Verify packed tarballs are installable");
+    const publish = steps.indexOf("Publish packages");
+
+    expect(verify).toBeGreaterThanOrEqual(0);
+    expect(pack).toBeLessThan(verify);
+    expect(verify).toBeLessThan(publish);
+  });
+
+  it("inspects every dependency field a consumer installs for workspace: ranges", () => {
+    // `pnpm pack` rewriting workspace:^ is the only thing standing between
+    // the repo and an uninstallable release, and it is unguarded everywhere
+    // else — @kavo/prisma@0.5.0 and @kavo/mongoose@0.6.0 are what that looks
+    // like on the registry. devDependencies are excluded on purpose: npm does
+    // not install them for consumers.
+    const step = readStepRun(workflow, "Verify packed tarballs are installable");
+
+    expect(step).toContain('["dependencies", "optionalDependencies", "peerDependencies"]');
+    expect(step).toContain('String(range).includes("workspace:")');
+    // The manifest inside the tarball, not the one in the repo — the repo's
+    // copy says workspace:^ and always will.
+    expect(step).toContain("tar -xzOf");
+    expect(step).toContain("package/package.json");
+  });
+
+  it("requires each tarball to contain the entry point its own manifest declares", () => {
+    // No package declares prepack, so `pnpm pack` builds nothing: packing a
+    // tree with no dist/ exits 0 and produces a manifest-only tarball. Only
+    // the Check-before-Pack ordering prevents that today, and ordering is a
+    // convention rather than a check.
+    const step = readStepRun(workflow, "Verify packed tarballs are installable");
+
+    expect(step).toContain('pkg.exports?.["."]?.default ?? pkg.main');
+    expect(step).toMatch(/tar -tzf "\$tarball" \| grep -qx "\$ENTRY"/);
+    expect(step).toContain("packed without a build");
+  });
+
+  it("keeps the tarball verification unconditional and failing", () => {
+    // Same three escapes the lockstep gate is held to: a silenced step, an
+    // `if:`, or a body that reports without exiting non-zero.
+    const block = readStepBlock(workflow, "Verify packed tarballs are installable");
+
+    expect(block).not.toContain("continue-on-error");
+    expect(block).not.toMatch(/^\s+if:/m);
+    expect(readStepRun(workflow, "Verify packed tarballs are installable")).toContain("exit $status");
+  });
+
+  it("publishes an exactly-named tarball rather than a glob", () => {
+    // `<prefix>-*.tgz` also matches a sibling whose name extends this one, and
+    // `npm publish` takes exactly one spec — so the glob turns a future
+    // @kavo/core-utils into an EUSAGE abort partway through a release.
+    const step = readStepRun(workflow, "Publish packages");
+
+    expect(step).toContain('-$VERSION.tgz"');
+    expect(step).not.toContain('"-*.tgz');
+  });
+
   it("keeps /publish's package table in the order PACKAGE_DIRS publishes", () => {
     // publish.md names PACKAGE_DIRS the authority and calls a disagreement
     // "a bug to fix in the same pass" — this is what notices.
