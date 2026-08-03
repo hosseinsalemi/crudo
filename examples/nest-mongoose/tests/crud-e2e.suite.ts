@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import mongoose from "mongoose";
 import type { INestApplication } from "@nestjs/common";
+import { boundServer, type SupertestTarget } from "./support/listen.js";
 
 /**
  * The Blog example served by the real stack — `@Kavo`-generated NestJS
@@ -26,8 +27,12 @@ import type { INestApplication } from "@nestjs/common";
  * `getApp()`.
  */
 export function registerCrudE2eSuite(getApp: () => INestApplication): void {
-  function server(): Parameters<typeof request>[0] {
-    return getApp().getHttpServer() as Parameters<typeof request>[0];
+  function server(): SupertestTarget {
+    // The spec that registered this suite must have bootstrapped with
+    // `listen(app)`, not `app.init()`, and must not have closed the app:
+    // `boundServer` rejects every shape supertest would answer by binding
+    // a wildcard port per request, which is the collision behind #91.
+    return boundServer(getApp().getHttpServer() as SupertestTarget);
   }
 
   async function newAuthor(email = "ada@x.io"): Promise<string> {

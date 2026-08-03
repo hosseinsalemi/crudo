@@ -4,7 +4,9 @@ import swc from "unplugin-swc";
 /**
  * One vitest run for the whole monorepo. Tests live in each package's
  * `tests/` directory (outside `src/`, so they are never compiled into
- * `dist/` or shipped).
+ * `dist/` or shipped). The repo-level `tests/` directory holds the few
+ * tests that belong to no package because their subject is the repo's own
+ * wiring — the release workflow, for instance.
  *
  * The swc plugin is required by the TypeORM / NestJS projects: vitest's
  * default esbuild transform cannot emit decorator metadata, which TypeORM
@@ -34,7 +36,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["packages/**/tests/**/*.spec.ts", "examples/**/tests/**/*.spec.ts"],
+    include: ["packages/**/tests/**/*.spec.ts", "examples/**/tests/**/*.spec.ts", "tests/**/*.spec.ts"],
     exclude: ["**/node_modules/**", "**/dist/**"],
     environment: "node",
     testTimeout: 30_000,

@@ -136,8 +136,7 @@ Two independent enforcement layers:
 pnpm workspaces with **plain root scripts**, no
 task runner. The entire build graph is seven packages and two example apps,
 whose ordering is already fully expressed by TS project references — `tsc -b`
-performs
-incremental, dependency-ordered, cached builds natively. A task runner
+performs incremental, dependency-ordered, cached builds natively. A task runner
 (turborepo/nx) would add a second place where the graph is declared, a
 cache layer duplicating `.tsbuildinfo`, and config to keep honest, while
 buying nothing at this scale. Revisit only if the workspace gains many
@@ -145,9 +144,10 @@ packages or expensive non-tsc pipelines (a future e2e suite is the
 natural checkpoint).
 
 Root scripts: `generate`, `build` (`tsc -b`), `clean`, `typecheck`,
-`depcruise`, `lint`, `test`, `prettify`, `format:check`, and `check` — the
-last runs `generate → build → typecheck → depcruise → lint → test` and is the
-verification gate. `format:check` sits outside it, as its own CI job.
+`depcruise`, `lint`, `test`, `prettify`, `format:check`, `docs:build`, and
+`check` — the last runs `generate → build → typecheck → depcruise → lint →
+test` and is the verification gate. `format:check` and `docs:build` sit
+outside it, each as its own CI job.
 
 ## 5. Public vs. internal API surface
 
@@ -179,8 +179,15 @@ The packages form one tightly coupled contract surface — a core contract
 change almost always touches an edge package, and a single version answers
 "which adapter works with which core" permanently. Cost: occasional no-op
 version bumps for an untouched package — accepted as trivially cheap next
-to cross-package version-matrix support. Release mechanics (changesets,
-publish order) are future work.
+to cross-package version-matrix support.
+
+Release mechanics live in `.github/workflows/publish.yml`, triggered by a
+`vX.Y.Z` tag. `PACKAGE_DIRS` there is the explicit list of what gets
+released, ordered so every package publishes after the packages it depends
+on (`@kavo/nest` last), which keeps the registry internally consistent if a
+run fails partway. Lockstep itself is checked rather than assumed: a gate
+ahead of packing fails the release unless every listed package is already at
+the tag's version.
 
 ## 8. Dependency classification (decided now, executed later)
 
