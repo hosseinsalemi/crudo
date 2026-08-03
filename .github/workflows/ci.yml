@@ -64,10 +64,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Every `docs/**.md` path mentioned by a tracked file must resolve.
-      # Moving a docs directory leaves the mentions behind, and some of the
-      # files carrying them (package READMEs, `src/` doc comments, the
-      # adopter-facing skills in `extensions/`) ship to npm — so a dead
-      # reference is one an adopter follows. Needs no toolchain: pure git+sh.
+      # Every `docs/**.md` path mentioned by a tracked file, and every
+      # VitePress sidebar link, must resolve. Moving a docs directory leaves
+      # the mentions behind, and some of the files carrying them (package
+      # READMEs, `src/` doc comments, the adopter-facing skills in
+      # `extensions/`) ship to npm — so a dead reference is one an adopter
+      # follows. Needs no toolchain: pure git+sh.
       - name: Check doc links
         run: ./scripts/check-doc-links.sh

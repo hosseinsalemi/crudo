@@ -96,7 +96,7 @@ pushing:
 ```bash
 pnpm prettify      # writes formatting fixes
 pnpm format:check  # what CI actually runs
-pnpm docs:links    # every `docs/**.md` reference in a tracked file resolves
+pnpm docs:links    # every `docs/**.md` reference and VitePress sidebar link resolves
 ```
 
 `docs:links` is not part of `pnpm check` because it needs no toolchain at all —
@@ -104,8 +104,12 @@ it is `git grep` plus a file test (`scripts/check-doc-links.sh`), so CI runs it
 as its own dependency-free job. It exists because a docs move leaves every
 mention of the old path behind, in skills, agent prompts, package READMEs, and
 `src/` doc comments — and several of those ship to npm, so a dead reference is
-one an adopter follows. If a reference is a deliberate template placeholder
-rather than a link, teach the script about it instead of deleting the check.
+one an adopter follows. It also resolves the sidebar/nav links in
+`docs/.vitepress/config.mts`, which are extensionless and which VitePress's own
+dead-link check never looks at, so a renamed page would otherwise ship a silent
+404 (the docs build runs only on push to `main`, after the merge). If a
+reference is a deliberate template placeholder rather than a link, teach the
+script about it instead of deleting the check.
 
 One thing the gate does **not** cover: CI installs with
 `pnpm install --frozen-lockfile` _before_ running it, and neither `pnpm check`

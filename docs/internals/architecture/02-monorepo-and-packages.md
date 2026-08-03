@@ -137,8 +137,9 @@ Root scripts: `build` (`tsc -b`), `clean`, `depcruise`, and `check`
 deliberately outside it, as their own CI jobs, because neither needs the
 built workspace: `format:check` (Prettier) and `docs:links`
 (`scripts/check-doc-links.sh` — every `docs/**.md` path a tracked file
-mentions must resolve, so a docs move cannot leave dead links in the package
-READMEs and `src/` doc comments that ship to npm).
+mentions, and every VitePress sidebar link, must resolve, so a docs move
+cannot leave dead links in the package READMEs and `src/` doc comments that
+ship to npm, nor a silent 404 in the published sidebar).
 
 ## 5. Public vs. internal API surface
 

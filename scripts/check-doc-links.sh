@@ -8,9 +8,11 @@
 # an adopter follows. A one-off grep is not a guard, because nothing re-runs
 # it; this does, from CI, on every push and pull request.
 #
-# Scope: repo-root-relative `docs/**.md` references, in any tracked file, plus
-# markdown links between files under `docs/` written relative to the linking
-# file — how the docs index writes them — so the index is covered too.
+# Scope: `docs/**.md` references in any tracked file, resolved from the repo
+# root or from the mentioning file; markdown links between files under `docs/`
+# written relative to the linking file — how the docs index writes them — so
+# the index is covered too; and the extensionless VitePress sidebar/nav links
+# in `docs/.vitepress/config.mts`, which VitePress itself never validates.
 
 set -euo pipefail
 
@@ -33,15 +35,24 @@ report() {
   status=1
 }
 
-# 1. Repo-root-relative `docs/**.md` references, anywhere in the tree.
+# 1. `docs/**.md` references anywhere in the tree. The leading segments are
+#    matched too, so a mention embedded in a longer path (`pkg/docs/<name>.md`)
+#    or in a URL (`https://host/docs/<name>.md` — the repo cites such URLs) is
+#    read whole rather than mistaken for a repo-root-relative path. A reference
+#    counts as live if it resolves from the repo root (how source comments and
+#    skills write it) or from the mentioning file's own directory (how a
+#    package README writes `../../docs/...`).
 while IFS= read -r hit; do
   file=${hit%%:*}
   rest=${hit#*:}
   line=${rest%%:*}
   ref=${rest#*:}
+  case "$ref" in
+    http://* | https://*) continue ;; # external URL, not a repo path
+  esac
   is_placeholder "$ref" && continue
-  [ -f "$ref" ] || report "$file" "$line" "$ref"
-done < <(git grep -n -o -E 'docs/[A-Za-z0-9._/-]+\.md' -- . | sort -u)
+  [ -f "$ref" ] || [ -f "$(dirname "$file")/$ref" ] || report "$file" "$line" "$ref"
+done < <(git grep -n -o -E '(https?://)?[A-Za-z0-9._/-]*docs/[A-Za-z0-9._/-]+\.md' -- . | sort -u)
 
 # 2. Relative markdown links between files under `docs/`, resolved against the
 #    linking file — how the docs index and cross-doc links are actually written.
@@ -61,6 +72,29 @@ while IFS= read -r hit; do
   [ -f "$(dirname "$file")/$ref" ] || report "$file" "$line" "$ref"
 done < <(git grep -n -o -E '\]\([A-Za-z0-9._/-]+\.md(#[A-Za-z0-9._-]+)?\)' -- 'docs/**.md' | sort -u)
 
+# 3. VitePress sidebar/nav links. They are extensionless (`/internals/adr/0001-…`),
+#    so passes 1 and 2 cannot see them, and VitePress's own dead-link check only
+#    covers links written in markdown — a sidebar entry left behind by a renamed
+#    doc builds clean and ships a 404 to the published site. The docs build also
+#    only runs on push to `main`, so nothing else catches it before merge.
+config=docs/.vitepress/config.mts
+if [ -f "$config" ]; then
+  while IFS= read -r hit; do
+    rest=${hit#*:}
+    line=${rest%%:*}
+    ref=${rest#*:}
+    ref=${ref#*\"}
+    ref=${ref%\"}
+    ref=${ref%%#*}
+    case "$ref" in
+      *.md) target="docs$ref" ;;
+      */) target="docs${ref}index.md" ;;
+      *) target="docs$ref.md" ;;
+    esac
+    [ -f "$target" ] || report "$config" "$line" "$target"
+  done < <(git grep -n -o -E 'link: "/[A-Za-z0-9._/#-]*"' -- "$config" | sort -u)
+fi
+
 if [ "$status" -ne 0 ]; then
   echo
   echo "Dead references above. Repoint them at the real file, or add a"
@@ -68,4 +102,4 @@ if [ "$status" -ne 0 ]; then
   exit 1
 fi
 
-echo "doc links OK — every tracked docs/**.md reference resolves"
+echo "doc links OK — every tracked docs/**.md reference and sidebar link resolves"
