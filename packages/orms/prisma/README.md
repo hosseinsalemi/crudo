@@ -18,7 +18,7 @@ includes all run through this adapter.
 Prisma generates no runtime class for a model, so each entity needs a
 caller-declared **marker class** as its `ClassRef` identity, matched by
 name to the schema (`class Author {}` ↔ `model Author { … }`). See
-`docs/adr/0017-prisma-marker-classes-and-entity-registry.md` for why.
+`docs/internals/adr/0017-prisma-marker-classes-and-entity-registry.md` for why.
 
 ```ts
 import { PrismaClient, Prisma } from "@prisma/client";

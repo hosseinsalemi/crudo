@@ -20,7 +20,7 @@ at `onModuleInit` (`KavoBinder`) — not through the constructor. Reach it
 with `boundKavoService(this)`, never constructor injection, inside a
 `@Kavo`-decorated class.
 
-Full detail: `docs/architecture/10-nestjs-integration.md`.
+Full detail: `docs/internals/architecture/10-nestjs-integration.md`.
 
 ## Generated routes
 
@@ -142,7 +142,7 @@ below if omitted:
   against the target entity's `selectable` allowlist.
 
 Full detail (cycle guard, pagination-correctness guarantee, soft-delete
-interplay, write semantics for relations): `docs/architecture/12-relations-and-includes.md`.
+interplay, write semantics for relations): `docs/internals/architecture/12-relations-and-includes.md`.
 The wire-side `include=`/`fields[<relation>]=` grammar is in the
 `query-grammar` skill.
 
