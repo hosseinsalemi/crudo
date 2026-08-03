@@ -15,19 +15,26 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TARBALL_DIR: /tmp/kavo-tarballs
-      # Published in dependency order (core before its dependents) even
-      # though publish-time order has no functional effect on npm — it
-      # mirrors the package graph per ADR-0004 lockstep versioning. Single
-      # source of truth for "which packages get released" — add a new
-      # package here only.
+      # Topological order: every package publishes before anything that
+      # depends on it (@kavo/nest last — it has @kavo/core, @kavo/graphql and
+      # @kavo/mcp as hard dependencies). npm does not check that a dependency
+      # exists at publish time, so the order costs nothing on a clean run; it
+      # bounds the blast radius of a failed one. The loop stops at the first
+      # failure, and this order guarantees whatever already reached the
+      # registry pins only versions that also reached it — the alternative
+      # leaves a published @kavo/nest pointing at a sibling that does not
+      # exist, uninstallable and, past npm's unpublish window, unfixable.
+      # Single source of truth for "which packages get released" — add a new
+      # package here only; the coverage guard below fails the release if this
+      # list and the workspace disagree.
       PACKAGE_DIRS: >-
         packages/core
         packages/orms/typeorm
         packages/orms/prisma
         packages/orms/mongoose
-        packages/frameworks/nest
         packages/protocols/graphql
         packages/protocols/mcp
+        packages/frameworks/nest
     steps:
       - uses: actions/checkout@v7
 
@@ -59,6 +66,34 @@ jobs:
           PKG_VERSION=$(node -p "require('./packages/core/package.json').version")
           if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
             echo "Tag $GITHUB_REF_NAME does not match @kavo/core version $PKG_VERSION" >&2
+            exit 1
+          fi
+
+      # PACKAGE_DIRS is hand-maintained, and every other guard here only sees
+      # what it lists — a publishable package missing from it is invisible to
+      # all of them, and the release ships dependents pinning a version that
+      # was never published. Derive the publishable set from the workspace
+      # itself (everything not marked private) and require the two to agree.
+      # This adds no second list to keep in sync: PACKAGE_DIRS stays the
+      # source of truth for order and membership, and this only refuses to
+      # release while it is incomplete.
+      - name: Verify PACKAGE_DIRS covers every publishable package
+        run: |
+          EXPECTED=$(pnpm -r list --depth -1 --json | node -e '
+            let raw = "";
+            process.stdin.on("data", (chunk) => (raw += chunk));
+            process.stdin.on("end", () => {
+              const root = process.cwd() + "/";
+              for (const pkg of JSON.parse(raw)) {
+                if (pkg.private !== true) console.log(pkg.path.replace(root, ""));
+              }
+            });
+          ' | sort)
+          ACTUAL=$(printf "%s\n" $PACKAGE_DIRS | sort)
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "PACKAGE_DIRS and the publishable workspace packages disagree:" >&2
+            echo "  PACKAGE_DIRS: $(echo $ACTUAL)" >&2
+            echo "  workspace:    $(echo $EXPECTED)" >&2
             exit 1
           fi
 
@@ -120,7 +155,7 @@ jobs:
               process.stdin.on("data", (chunk) => (raw += chunk));
               process.stdin.on("end", () => {
                 const pkg = JSON.parse(raw);
-                for (const field of ["dependencies", "peerDependencies"]) {
+                for (const field of ["dependencies", "optionalDependencies", "peerDependencies"]) {
                   for (const [name, range] of Object.entries(pkg[field] ?? {})) {
                     if (String(range).includes("workspace:")) console.log(`  ${field}.${name}: ${range}`);
                   }
