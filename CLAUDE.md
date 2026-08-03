@@ -12,13 +12,14 @@ The authoritative sources are `docs/` (architecture notes and ADRs) and the **Co
 
 ```bash
 pnpm install
-pnpm check        # the full gate: build + typecheck + depcruise + lint + test (run before considering work done)
+pnpm check        # the full gate: generate (Prisma client + fixture schema) + build + typecheck + depcruise + lint + test (run before considering work done)
 pnpm build        # tsc -b (project references across the workspace — src only)
 pnpm typecheck    # tsc --noEmit over each package's tests/ (tsconfig.tests.json)
 pnpm test         # vitest run (whole monorepo)
 pnpm depcruise    # enforce package-boundary rules (.dependency-cruiser.cjs)
-pnpm lint         # oxlint over packages/*/src and packages/*/tests
+pnpm lint         # oxlint over packages/ and examples/
 pnpm prettify     # prettier --write . (printWidth 120)
+pnpm format:check # prettier --check . — the separate formatting job CI runs alongside the gate
 ```
 
 Run a single test file or test by name:
@@ -137,4 +138,4 @@ Two rules make this work:
 
 ## Where to read more
 
-`docs/getting-started.md`, `docs/using-the-api.md`, and `docs/integrations/nest/` (per-ORM wiring plus the full `@Kavo`/`KavoModule` configuration reference) are the adopter-facing front door; `docs/internals/` holds the design docs and ADRs (`adr/0001`…`0018`) — one ADR per load-bearing decision. `docs/internals/architecture/` mirrors the packages (query grammar, error handling, engine, TypeORM adapter, Nest integration, soft delete, relations). ADRs are referenced by name in code comments; read the referenced ADR before changing the behavior it governs.
+`docs/getting-started.md`, `docs/using-the-api.md`, and `docs/integrations/nest/` (per-ORM wiring plus the full `@Kavo`/`KavoModule` configuration reference) are the adopter-facing front door; `docs/internals/` holds the design docs and ADRs (`adr/0001`…`0018`) — one ADR per load-bearing decision. `docs/internals/architecture/` mirrors the packages (query grammar, error handling, engine, the TypeORM/Prisma/Mongoose adapters, Nest integration, the GraphQL and MCP bindings, soft delete, relations). ADRs are referenced by name in code comments; read the referenced ADR before changing the behavior it governs.
