@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * The mechanical gate for ADR-0004 lockstep versioning
  * (docs/internals/adr/0004-lockstep-versioning.md): every published package
@@ -11,13 +10,15 @@
  * "already published, skipping" — so the release goes green having shipped one
  * package short. That is how v0.6.0 left `@kavo/prisma` at 0.5.0.
  *
- * Usage: verify-lockstep-versions.mjs <expected-version> <package-dir>...
+ * Usage: node .github/scripts/verify-lockstep-versions.mjs <version> <dir>...
  *
  * Package directories are resolved against the current working directory, so
  * the workflow can hand it `$PACKAGE_DIRS` verbatim from the repo root.
  *
  * Exit codes: 0 every package matches, 1 at least one mismatch, 2 bad usage or
  * an unreadable manifest (a broken invocation must never read as "all clear").
+ * Every directory is inspected before exiting: an operator fixing a release
+ * gets the whole list in one run rather than one problem per re-tag.
  */
 
 import { readFileSync } from "node:fs";
@@ -32,17 +33,18 @@ if (!expected || dirs.length === 0) {
   process.exit(2);
 }
 
+const unreadable = [];
 const mismatches = [];
 
 for (const dir of dirs) {
-  const manifestPath = resolve(process.cwd(), dir, "package.json");
+  const manifestPath = resolve(dir, "package.json");
 
   let manifest;
   try {
     manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   } catch (error) {
-    console.error(`Cannot read ${manifestPath}: ${error.message}`);
-    process.exit(2);
+    unreadable.push({ dir, reason: error.message });
+    continue;
   }
 
   if (manifest.version !== expected) {
@@ -62,6 +64,22 @@ if (mismatches.length > 0) {
   for (const { name, dir, actual } of mismatches) {
     console.error(`  ${name} (${dir}/package.json) is ${actual}, expected ${expected}`);
   }
+}
+
+if (unreadable.length > 0) {
+  console.error(`Cannot read ${unreadable.length} of ${dirs.length} package manifests:`);
+  for (const { dir, reason } of unreadable) {
+    console.error(`  ${dir}/package.json — ${reason}`);
+  }
+}
+
+if (unreadable.length > 0) {
+  console.error("");
+  console.error("Every listed directory must be a package. Fix PACKAGE_DIRS, then re-tag the release.");
+  process.exit(2);
+}
+
+if (mismatches.length > 0) {
   console.error("");
   console.error("ADR-0004 requires every @kavo/* package to ship on one version.");
   console.error("Bump the packages listed above, then re-tag the release.");

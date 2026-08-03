@@ -14,10 +14,10 @@ The authoritative sources are `docs/` (architecture notes and ADRs) and the **Co
 pnpm install
 pnpm check        # the full gate: build + typecheck + depcruise + lint + test (run before considering work done)
 pnpm build        # tsc -b (project references across the workspace — src only)
-pnpm typecheck    # tsc --noEmit over each package's tests/ (tsconfig.tests.json)
+pnpm typecheck    # tsc --noEmit over the root tests/ and each package's tests/ (tsconfig.tests.json)
 pnpm test         # vitest run (whole monorepo)
 pnpm depcruise    # enforce package-boundary rules (.dependency-cruiser.cjs)
-pnpm lint         # oxlint over packages/*/src and packages/*/tests
+pnpm lint         # oxlint over packages/*, examples/*, tests/ and .github/scripts/
 pnpm prettify     # prettier --write . (printWidth 120)
 ```
 

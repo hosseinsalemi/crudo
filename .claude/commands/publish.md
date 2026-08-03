@@ -119,10 +119,13 @@ workflow.
    rather than by enumerating packages — step 1 already refused to run on a
    dirty tree, so the only modified files are the version bumps from step 3 and
    the lockfile. A hardcoded list here is the same drift hazard as a hardcoded
-   list at the gate. A missed package no longer fails _green_ — `publish.yml`'s
-   `Verify lockstep versions` step names it and stops the run before anything
-   is packed — but the tag has already been pushed by then, so the fix costs a
-   commit on `main` and a re-tag.
+   list at the gate. A missed package no longer fails _green_: step 4's
+   `pnpm check` fails on it first (`tests/release-workflow.spec.ts` asserts
+   every `PACKAGE_DIRS` package carries one version), which is the point at
+   which nothing irreversible has happened yet. `publish.yml`'s
+   `Verify lockstep versions` step is the backstop behind it, and by the time
+   that one speaks the tag is already pushed — the fix then costs a commit on
+   `main` and a re-tag.
 
    ```bash
    git add packages pnpm-lock.yaml

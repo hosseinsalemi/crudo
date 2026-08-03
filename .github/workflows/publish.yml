@@ -44,6 +44,23 @@ jobs:
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
+      # ADR-0004 lockstep versioning, enforced mechanically rather than left
+      # to review: *every* package must be at the tag's version, not just
+      # `@kavo/core`. A package left behind would otherwise pack stale and
+      # then be waved through by the already-published guard below, shipping
+      # a release one package short — silently, and after the fact.
+      #
+      # First real step in the job: it needs nothing but a checkout and node,
+      # and a doomed release should not spend the install and `pnpm check`
+      # legs first. Everything it guards comes later, so nothing is public
+      # when it fails.
+      #
+      # `$PACKAGE_DIRS` is intentionally unquoted: word splitting is what
+      # turns the folded list into one argument per package directory.
+      - name: Verify lockstep versions
+        # shellcheck disable=SC2086
+        run: node .github/scripts/verify-lockstep-versions.mjs "${GITHUB_REF_NAME#v}" $PACKAGE_DIRS
+
       # npm's OIDC trusted-publishing exchange needs npm >=11.5.1; the
       # bundled version on some Node builds can lag behind that.
       - name: Update npm
@@ -55,19 +72,6 @@ jobs:
       # Same gate as CI — a release never ships on a red build.
       - name: Check
         run: pnpm check
-
-      # ADR-0004 lockstep versioning, enforced mechanically rather than left
-      # to review: *every* package must be at the tag's version, not just
-      # `@kavo/core`. A package left behind would otherwise pack stale and
-      # then be waved through by the already-published guard below, shipping
-      # a release one package short — silently, and after the fact. This runs
-      # before `Pack packages`, so it fails while nothing is public yet.
-      #
-      # `$PACKAGE_DIRS` is intentionally unquoted: word splitting is what
-      # turns the folded list into one argument per package directory.
-      - name: Verify lockstep versions
-        # shellcheck disable=SC2086
-        run: node .github/scripts/verify-lockstep-versions.mjs "${GITHUB_REF_NAME#v}" $PACKAGE_DIRS
 
       # `pnpm pack` (not `pnpm publish`) does the packaging: it rewrites
       # workspace:^ deps to a real semver range in the tarball. Publishing
