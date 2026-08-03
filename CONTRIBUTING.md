@@ -133,6 +133,15 @@ A few things about the test setup that are easy to trip over:
 - **The SWC transform is required.** TypeORM entities and Nest DI rely on
   decorator metadata, which vitest's default esbuild transform cannot emit. That
   is why `unplugin-swc` is in the vitest config — don't remove it.
+- **An e2e spec binds its app with `listen(app)`, never `app.init()`.** The
+  helper lives in each package's `tests/support/listen.ts`. `init()` leaves
+  `getHttpServer()` unbound, so supertest binds it per request — `listen(0)` on
+  the _wildcard_, then a connect to a hardcoded `127.0.0.1` — and that
+  asymmetry lets your request reach an unrelated local process that already
+  holds the port. It shows up as a parse error, a foreign 400/404/405, a socket
+  hang up, or a timeout, in roughly one run in ten. Read the request through the
+  suite's `server()` accessor rather than `app.getHttpServer()`, and never
+  "fix" a port collision with a retry, a fixed port, or a longer timeout.
 - **`*.test-d.ts` files are type-level tests and never execute.** Vitest does not
   collect them; `pnpm typecheck` is what verifies them, via each package's
   `tsconfig.tests.json`. They assert with `expectTypeOf` and `@ts-expect-error`,

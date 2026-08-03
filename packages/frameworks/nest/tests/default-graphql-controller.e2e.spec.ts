@@ -15,6 +15,7 @@ import {
   GraphQLString,
 } from "graphql";
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
+import { listen } from "./support/listen.js";
 
 /**
  * Proves the zero-controller path: `KavoModule.forRoot({ graphql: true })`
@@ -60,16 +61,16 @@ describe("KavoModule.forRoot({ graphql: true })", () => {
       controllers: [TodoController],
     }).compile();
     app = moduleRef.createNestApplication();
-    await app.init();
+    const server = await listen(app);
 
-    const created = await request(app.getHttpServer() as Parameters<typeof request>[0])
+    const created = await request(server)
       .post("/graphql")
       .send({ query: `mutation { createTodo(input: { title: "zero controller", done: false }) { id title } }` })
       .expect(200);
     expect(created.body.errors).toBeUndefined();
     expect(created.body.data.createTodo).toEqual({ id: 1, title: "zero controller" });
 
-    const fetched = await request(app.getHttpServer() as Parameters<typeof request>[0])
+    const fetched = await request(server)
       .post("/graphql")
       .send({ query: `query { todo(id: 1) { title } }` })
       .expect(200);
@@ -84,13 +85,11 @@ describe("KavoModule.forRoot({ graphql: true })", () => {
       controllers: [TodoController],
     }).compile();
     app = moduleRef.createNestApplication();
-    await app.init();
+    const server = await listen(app);
 
-    await request(app.getHttpServer() as Parameters<typeof request>[0])
-      .post("/graphql")
-      .expect(404);
+    await request(server).post("/graphql").expect(404);
 
-    const created = await request(app.getHttpServer() as Parameters<typeof request>[0])
+    const created = await request(server)
       .post("/api/graphql")
       .send({ query: `mutation { createTodo(input: { title: "custom path", done: false }) { id title } }` })
       .expect(200);
@@ -105,10 +104,8 @@ describe("KavoModule.forRoot({ graphql: true })", () => {
       controllers: [TodoController],
     }).compile();
     app = moduleRef.createNestApplication();
-    await app.init();
+    const server = await listen(app);
 
-    await request(app.getHttpServer() as Parameters<typeof request>[0])
-      .post("/graphql")
-      .expect(404);
+    await request(server).post("/graphql").expect(404);
   });
 });

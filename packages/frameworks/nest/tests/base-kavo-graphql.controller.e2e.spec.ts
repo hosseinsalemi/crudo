@@ -16,6 +16,7 @@ import {
   GraphQLString,
 } from "graphql";
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
+import { listen } from "./support/listen.js";
 
 /**
  * Proves `BaseKavoGraphQLController` end to end: a concrete controller
@@ -74,16 +75,16 @@ describe("BaseKavoGraphQLController", () => {
       controllers: [TodoController, GraphQLController],
     }).compile();
     app = moduleRef.createNestApplication();
-    await app.init();
+    const server = await listen(app);
 
-    const created = await request(app.getHttpServer() as Parameters<typeof request>[0])
+    const created = await request(server)
       .post("/graphql")
       .send({ query: `mutation { createTodo(input: { title: "from graphql", done: false }) { id title } }` })
       .expect(200);
     expect(created.body.errors).toBeUndefined();
     expect(created.body.data.createTodo).toEqual({ id: 1, title: "from graphql" });
 
-    const fetched = await request(app.getHttpServer() as Parameters<typeof request>[0])
+    const fetched = await request(server)
       .post("/graphql")
       .send({ query: `query { todo(id: 1) { title done } }` })
       .expect(200);
@@ -98,16 +99,16 @@ describe("BaseKavoGraphQLController", () => {
       controllers: [TodoController, GraphQLController],
     }).compile();
     app = moduleRef.createNestApplication();
-    await app.init();
+    const server = await listen(app);
 
     for (const title of ["a", "b", "c"]) {
-      await request(app.getHttpServer() as Parameters<typeof request>[0])
+      await request(server)
         .post("/graphql")
         .send({ query: `mutation { createTodo(input: { title: "${title}", done: false }) { id } }` })
         .expect(200);
     }
 
-    const listed = await request(app.getHttpServer() as Parameters<typeof request>[0])
+    const listed = await request(server)
       .post("/graphql")
       .send({ query: `query { todos(limit: 1, offset: 1) { items { title } total limit offset } }` })
       .expect(200);
@@ -127,14 +128,14 @@ describe("BaseKavoGraphQLController", () => {
       controllers: [TodoController, GraphQLController],
     }).compile();
     app = moduleRef.createNestApplication();
-    await app.init();
+    const server = await listen(app);
 
     adapter.rows.push(
       { ...new Todo(), id: 1, title: "a", done: false },
       { ...new Todo(), id: 2, title: "b", done: true },
     );
 
-    const listed = await request(app.getHttpServer() as Parameters<typeof request>[0])
+    const listed = await request(server)
       .post("/graphql")
       .send({
         query: `query {
