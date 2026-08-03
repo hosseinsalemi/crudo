@@ -8,8 +8,11 @@ import { SCRATCH_ROOT_ENV } from "./global-setup.js";
  * The SQLite file `pnpm generate` (`prisma db push`) builds from
  * `prisma/schema.prisma`. No test ever opens it: it is a *template*, copied
  * per client, which is what keeps the spec files from sharing one database.
+ *
+ * Must name the same file as `DATABASE_URL` in `prisma/.env`, which is what
+ * `prisma db push` writes; `database-isolation.spec.ts` pins the pair.
  */
-const TEMPLATE_DATABASE = fileURLToPath(new URL("../../prisma/template.db", import.meta.url));
+export const TEMPLATE_DATABASE = fileURLToPath(new URL("../../prisma/template.db", import.meta.url));
 
 /**
  * A finished `db push` leaves a checkpointed, sidecar-free database behind,
@@ -17,6 +20,11 @@ const TEMPLATE_DATABASE = fileURLToPath(new URL("../../prisma/template.db", impo
  * committed transaction the template does. `-shm` is deliberately *not*
  * copied: it is a derived wal-index that SQLite rebuilds on open, and a
  * copied one can be stale enough to make SQLite skip recovering the `-wal`.
+ *
+ * `-wal` and the `-shm` exclusion are pinned by
+ * `database-isolation.spec.ts`. `-journal` is not: a rollback journal only
+ * outlives its transaction after a crash mid-`db push`, and the only test
+ * that could cover it would restate this array rather than exercise SQLite.
  */
 const DATABASE_FILE_SUFFIXES = ["", "-journal", "-wal"];
 
@@ -61,7 +69,11 @@ export function provisionTestDatabase(templatePath: string = TEMPLATE_DATABASE):
  * because a plain `vitest run` has no reason to have that variable set; the
  * CLI commands that build the template (`generate`, `db push`) load it from
  * `prisma/.env` on their own.
+ *
+ * `databasePath` exists for the one case a fresh copy cannot serve: two
+ * clients that must meet on the same file, which is how
+ * `database-isolation.spec.ts` builds a database with an unfinished WAL.
  */
-export function newTestPrismaClient(): PrismaClient {
-  return new PrismaClient({ datasourceUrl: `file:${provisionTestDatabase()}` });
+export function newTestPrismaClient(databasePath: string = provisionTestDatabase()): PrismaClient {
+  return new PrismaClient({ datasourceUrl: `file:${databasePath}` });
 }

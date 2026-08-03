@@ -80,3 +80,10 @@ model Invoice {
   number     String
   archivedAt DateTime?
 }
+
+// ── database-isolation.spec.ts ──────────────────────────────────────────
+
+model Scratch {
+  id    Int    @id @default(autoincrement())
+  label String
+}
