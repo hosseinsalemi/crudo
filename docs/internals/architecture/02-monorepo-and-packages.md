@@ -84,7 +84,7 @@ boundary rather than widening core's `EntityId`).
   only, plus the `@modelcontextprotocol/sdk` peer for types (never
   imported at runtime by `@kavo/mcp` itself — `@kavo/nest`'s zero-config
   default controller is the one place the SDK actually runs, lazily — see
-  doc 14, §6). See `docs/internals/architecture/14-mcp-binding.md`.
+  doc 16, §5). See `docs/internals/architecture/16-mcp-binding.md`.
 
 Every package earns its place: core is the hub, and every other package
 adapts exactly one external technology or protocol — an ORM, a host
