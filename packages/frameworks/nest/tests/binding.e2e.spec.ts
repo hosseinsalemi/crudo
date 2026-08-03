@@ -9,7 +9,7 @@ import { ConfigurationException, WireQuery } from "@kavo/core";
 import type { KavoModuleOptions } from "@kavo/nest";
 import { Kavo, KavoModule, Override, enumProp, flattenQuery, getKavoServiceToken, oneOfArray } from "@kavo/nest";
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
-import { listen, type SupertestTarget } from "./support/listen.js";
+import { boundServer, listen, type SupertestTarget } from "./support/listen.js";
 
 let app: INestApplication;
 let adapter: InMemoryTodoAdapter;
@@ -50,17 +50,14 @@ afterEach(async () => {
 
 /**
  * The bound server `bootstrap` listened on — not `app.getHttpServer()`,
- * which would also answer for an app that was only `init()`ed and send
- * supertest back to binding a wildcard port per request (see `listen`).
- *
- * Cleared in `afterEach`, so a test that never reached `bootstrap` fails
- * here instead of quietly driving the previous test's closed server —
- * which supertest would re-`listen(0)` on, restoring exactly the
- * per-request wildcard bind `listen` exists to remove (issue #91).
+ * which answers just as happily for an app that was only `init()`ed.
+ * Cleared in `afterEach`, and re-checked on every call, so a test that
+ * never reached `bootstrap` or closed the app mid-test fails here rather
+ * than sending supertest back to binding a wildcard port per request
+ * (issue #91) — see `boundServer` for the three shapes that covers.
  */
 function server(): SupertestTarget {
-  if (httpServer === undefined) throw new Error("no bound server — this test did not await bootstrap()");
-  return httpServer;
+  return boundServer(httpServer);
 }
 
 describe("@Kavo route generation", () => {

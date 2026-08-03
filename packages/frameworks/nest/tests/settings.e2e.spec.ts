@@ -6,7 +6,7 @@ import { Test } from "@nestjs/testing";
 import type { KavoModuleOptions } from "@kavo/nest";
 import { Kavo, KavoModule } from "@kavo/nest";
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
-import { listen, type SupertestTarget } from "./support/listen.js";
+import { boundServer, listen, type SupertestTarget } from "./support/listen.js";
 
 /**
  * End-to-end coverage for `@Kavo`/`KavoSettings` knobs that
@@ -48,13 +48,11 @@ afterEach(async () => {
 });
 
 /**
- * The bound server `bootstrap` listened on, cleared between tests so a
- * missing `bootstrap` fails here rather than driving the previous test's
- * closed server — see the same helper in `binding.e2e.spec.ts`.
+ * The bound server `bootstrap` listened on, cleared between tests and
+ * re-checked on every call — see the same helper in `binding.e2e.spec.ts`.
  */
 function server(): SupertestTarget {
-  if (httpServer === undefined) throw new Error("no bound server — this test did not await bootstrap()");
-  return httpServer;
+  return boundServer(httpServer);
 }
 
 describe("@Kavo allowlists — filterable/sortable/selectable enforced over HTTP", () => {

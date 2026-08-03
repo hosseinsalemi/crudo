@@ -79,12 +79,19 @@ or a hook timeout, and it made these suites ~10% flaky (issue #91). A foreign
 `405` is the worst of them: it reads as a missing generated route.
 
 The `await` is load-bearing — `listen(0, host)` binds asynchronously, unlike
-the no-host path — so the helper asserts the address is bound: unreachable
-while the `await` is there, and it fires the moment someone drops it. The
-helper is duplicated per package (`packages/frameworks/nest/tests/support/`,
+the no-host path — so `listen` returns through `boundServer`, which rejects
+all three ways the binding can be wrong: absent, unbound, or bound to the
+wildcard. That last one is why a plain null-check is not enough — a wildcard
+bind reports a healthy-looking `::` address while supertest still connects to
+`127.0.0.1`. A suite that keeps its server in a variable routes its `server()`
+accessor through `boundServer` too, so a mid-test `close()` cannot slip past.
+
+The helper is duplicated per package (`packages/frameworks/nest/tests/support/`,
 `examples/*/tests/support/`) because a test file may not import another
-package's `tests/`; change all three copies together. Never fix a port
-collision with a retry, a fixed port, or a raised timeout; those hide it.
+package's `tests/` — the alternative, a shared home outside every package that
+owns it, is legal but buys less than it costs. Change all three copies
+together. Never fix a port collision with a retry, a fixed port, or a raised
+timeout; those hide it, and `listen.e2e.spec.ts` fails on the fixed port.
 
 ## Contracts that need wire-level assertions
 

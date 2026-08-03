@@ -1,9 +1,8 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import mongoose from "mongoose";
-import type { Server } from "node:http";
 import type { INestApplication } from "@nestjs/common";
-import type { SupertestTarget } from "./support/listen.js";
+import { boundServer, type SupertestTarget } from "./support/listen.js";
 
 /**
  * The Blog example served by the real stack — `@Kavo`-generated NestJS
@@ -29,15 +28,11 @@ import type { SupertestTarget } from "./support/listen.js";
  */
 export function registerCrudE2eSuite(getApp: () => INestApplication): void {
   function server(): SupertestTarget {
-    const httpServer = getApp().getHttpServer() as Server;
     // The spec that registered this suite must have bootstrapped with
-    // `listen(app)`, not `app.init()`: an unbound server makes supertest
-    // bind a wildcard port per request and then connect to `127.0.0.1`,
-    // which is the collision behind issue #91.
-    if (httpServer.address() === null) {
-      throw new Error("app is not listening — bootstrap the spec with listen(app) instead of app.init()");
-    }
-    return httpServer as SupertestTarget;
+    // `listen(app)`, not `app.init()`, and must not have closed the app:
+    // `boundServer` rejects every shape supertest would answer by binding
+    // a wildcard port per request, which is the collision behind #91.
+    return boundServer(getApp().getHttpServer() as SupertestTarget);
   }
 
   async function newAuthor(email = "ada@x.io"): Promise<string> {
