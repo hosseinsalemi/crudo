@@ -293,6 +293,7 @@ onUnmounted(() => {
   gap: 7px;
   padding: 11px 14px;
   border-bottom: 1px solid var(--vp-c-divider);
+  background: var(--vp-c-bg-soft);
 }
 
 .mcp-window-dot {
@@ -325,6 +326,24 @@ onUnmounted(() => {
   position: relative;
   height: 345px;
   overflow: hidden;
+}
+
+@media (max-width: 600px) {
+  .mcp-window-body {
+    height: 455px;
+  }
+}
+
+@media (max-width: 440px) {
+  .mcp-window-body {
+    height: 500px;
+  }
+}
+
+@media (max-width: 410px) {
+  .mcp-window-body {
+    height: 550px;
+  }
 }
 
 .mcp-feed {
