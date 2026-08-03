@@ -85,15 +85,21 @@ describe("buildEntityMetadata — bootstrap error paths", () => {
 });
 
 describe("createInfrastructure — adapter bootstrap error path", () => {
-  it("throws ConfigurationException when Prisma Client has no delegate for the resolved model name", () => {
+  it("throws ConfigurationException when Prisma Client has no delegate for the resolved model name", async () => {
     const client = newTestPrismaClient();
-    const infrastructure = createInfrastructure(client as never, {
-      datamodel: ghostDatamodel,
-      entities: [Ghost],
-    });
-    // Metadata resolution succeeds (Ghost matches ghostDatamodel); the real
-    // Prisma Client just has no `ghost` delegate, since no such model exists
-    // in the actual schema — this is the adapter constructor's own guard.
-    expect(() => infrastructure.adapterFor(Ghost)).toThrow(ConfigurationException);
+    try {
+      const infrastructure = createInfrastructure(client as never, {
+        datamodel: ghostDatamodel,
+        entities: [Ghost],
+      });
+      // Metadata resolution succeeds (Ghost matches ghostDatamodel); the real
+      // Prisma Client just has no `ghost` delegate, since no such model exists
+      // in the actual schema — this is the adapter constructor's own guard.
+      expect(() => infrastructure.adapterFor(Ghost)).toThrow(ConfigurationException);
+    } finally {
+      // Each client owns a database file now, and the run's scratch root is
+      // removed at teardown — an undisconnected client leaves that file open.
+      await client.$disconnect();
+    }
   });
 });

@@ -51,6 +51,13 @@ pnpm build
 fixture schema is SQLite, and `packages/orms/prisma/prisma/.env` is committed
 with a working `DATABASE_URL`.
 
+What it pushes is a **template**, `prisma/template.db`, which no test opens.
+`tests/support/client.ts` copies it per client, so each spec file writes to a
+database of its own — SQLite admits one writer at a time, and one shared file
+made the suite flaky under CI load. The copies live in a scratch directory
+that `tests/support/global-setup.ts` creates per vitest run and deletes when
+the run ends.
+
 Note what it is _not_ for. `@kavo/prisma`'s own `src` never imports
 `@prisma/client` — it models the client structurally in
 `prisma-client-like.ts`, precisely so a library package does not assume the
@@ -160,6 +167,13 @@ A few things about the test setup that are easy to trip over:
 - **The SWC transform is required.** TypeORM entities and Nest DI rely on
   decorator metadata, which vitest's default esbuild transform cannot emit. That
   is why `unplugin-swc` is in the vitest config — don't remove it.
+- **`@kavo/prisma`'s specs need the `globalSetup` in the vitest config.** It
+  creates the scratch directory their database copies are written into and
+  deletes it when the run ends. Remove it, or run those specs under a config
+  that omits it, and every `newTestPrismaClient()` throws
+  `KAVO_PRISMA_SCRATCH_ROOT is unset` — the fixture provisioner refuses to fall
+  back to the OS temp directory, because a copy made outside that root is one
+  nothing ever deletes.
 - **An e2e spec binds its app with `listen(app)`, never `app.init()`.** The
   helper lives in each package's `tests/support/listen.ts`. `init()` leaves
   `getHttpServer()` unbound, so supertest binds it per request — `listen(0)` on

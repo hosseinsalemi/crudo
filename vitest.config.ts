@@ -40,5 +40,9 @@ export default defineConfig({
     exclude: ["**/node_modules/**", "**/dist/**"],
     environment: "node",
     testTimeout: 30_000,
+    // @kavo/prisma's specs each get their own copy of the pushed SQLite
+    // fixture, so parallel workers never contend for one file (issue #101).
+    // Only the main process can clean those copies up — vitest kills workers.
+    globalSetup: ["./packages/orms/prisma/tests/support/global-setup.ts"],
   },
 });

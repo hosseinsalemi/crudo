@@ -114,3 +114,12 @@ SQLite (`tests/adapter.spec.ts`, `tests/soft-delete.spec.ts`,
 `tests/includes.spec.ts`), per-package testing as specified — the shared
 test schema and generated client are built by `pnpm generate`
 (`prisma generate` + `prisma db push`), which `pnpm check` runs first.
+
+The schema is shared; the database is not. `db push` writes a template
+(`prisma/template.db`) that no test opens, and `tests/support/client.ts`
+copies it per client into a scratch directory `tests/support/global-setup.ts`
+provisions for the run and removes afterwards. Vitest runs spec files in
+parallel workers and SQLite admits one writer at a time, so a single file
+turned each `beforeEach` write chain into a lock other files could stall
+behind — a `P1008` socket timeout under CI load. One database per client
+removes the contention instead of widening the timeout around it.
