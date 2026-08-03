@@ -23,6 +23,20 @@ developer changes, or open a PR — it bumps the version, commits that bump
 straight to `main`, tags it, and pushes the tag to trigger the publish
 workflow.
 
+**Packages reach npm one way only: a pushed `v*.*.*` tag.** That tag triggers
+`.github/workflows/publish.yml`, and that workflow is the only thing that
+publishes. Never run `npm publish` or `pnpm publish` from a package directory,
+not even for a one-off fix. Every `packages/*/package.json` depends on its
+siblings through `workspace:^`, and only `pnpm pack` rewrites that into a real
+semver range; a direct publish ships the literal `workspace:^` to the registry,
+where no package manager can resolve it (`npm error code
+EUNSUPPORTEDPROTOCOL`, `ERR_PNPM_WORKSPACE_PKG_NOT_FOUND`). That is exactly how
+`@kavo/prisma@0.5.0` and `@kavo/mongoose@0.6.0` shipped uninstallable, and npm
+forbids republishing a version, so the only repair was a new release plus an
+`npm deprecate` on the burned ones. The workflow now fails on a packed tarball
+that still contains `workspace:` — but a hand-run publish never reaches that
+guard, which is why the rule is the tag and nothing else.
+
 1. **Refuse and stop if**: the current branch isn't `main`; `main` is not up
    to date with `origin/main`; the working tree is dirty (this command never
    touches or commits pre-existing changes — ask the user to commit or stash
@@ -64,6 +78,16 @@ workflow.
    what actually publishes — and the table is a bug to fix in the same pass.
    Leave `examples/*` (private, unpublished) alone.
 
+   Then read the versions back and confirm they are identical — the workflow
+   fails the release on a mismatch (`Verify lockstep versions`), and catching
+   it here costs nothing while catching it there burns a tag:
+
+   ```bash
+   for dir in <PACKAGE_DIRS from above>; do
+     node -p "const p = require('./$dir/package.json'); p.name + ' ' + p.version"
+   done
+   ```
+
 4. **Regenerate the lockfile and gate:**
 
    ```bash
@@ -94,10 +118,24 @@ workflow.
    `@kavo/nest` pointing at a version of a sibling that does not exist —
    uninstallable, and past npm's unpublish window it cannot be withdrawn.
 
-   To bootstrap one: publish it by hand, then configure its trusted publisher
-   on npmjs.com (`kavo-labs/kavo` + `publish.yml`), confirm `npm view` resolves,
-   and only then release. That first version will lack OIDC provenance; every
-   later release of it through the workflow will have it.
+   Bootstrapping one is the **only** sanctioned publish outside the tag, and
+   even then it is a publish of a packed tarball, never `npm publish` from
+   inside the package directory — that shortcut is what shipped
+   `@kavo/prisma@0.5.0` and `@kavo/mongoose@0.6.0` with an unresolvable
+   `workspace:^`. Get the user's explicit go-ahead first (it is public and
+   irreversible), then:
+
+   ```bash
+   (cd <dir> && pnpm pack --pack-destination /tmp/kavo-bootstrap)
+   # must print nothing — any `workspace:` here is an uninstallable release
+   tar -xzOf /tmp/kavo-bootstrap/<tarball> package/package.json | grep '"workspace:' || true
+   npm publish /tmp/kavo-bootstrap/<tarball> --access public
+   ```
+
+   Then configure its trusted publisher on npmjs.com (`kavo-labs/kavo` +
+   `publish.yml`), confirm `npm view` resolves, and only then release. That
+   first version will lack OIDC provenance; every later release of it through
+   the workflow will have it.
 
 6. **Confirm with the user before doing anything irreversible.** State
    plainly: committing and pushing straight to `main`, then pushing tag
