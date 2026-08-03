@@ -62,6 +62,31 @@ jobs:
             exit 1
           fi
 
+      # ADR-0004: one version identifies a consumer's whole setup, so every
+      # package in PACKAGE_DIRS ships at @kavo/core's version. A package left
+      # behind at an older version is otherwise invisible at release time —
+      # the tag check above only looks at core, and the publish loop below
+      # then finds the stale version already on the registry and prints
+      # "already published, skipping". The release goes green having never
+      # released that package, which is how @kavo/prisma sat at 0.5.0 while
+      # everything else moved to 0.6.0. Fail here, before anything is packed
+      # or published.
+      - name: Verify lockstep versions
+        run: |
+          CORE_VERSION=$(node -p "require('./packages/core/package.json').version")
+          status=0
+          for dir in $PACKAGE_DIRS; do
+            NAME=$(node -p "require('./$dir/package.json').name")
+            VERSION=$(node -p "require('./$dir/package.json').version")
+            if [ "$VERSION" = "$CORE_VERSION" ]; then
+              echo "$NAME $VERSION"
+            else
+              echo "$NAME is at $VERSION, expected $CORE_VERSION (ADR-0004 lockstep versioning)" >&2
+              status=1
+            fi
+          done
+          exit $status
+
       # `pnpm pack` (not `pnpm publish`) does the packaging: it rewrites
       # workspace:^ deps to a real semver range in the tarball. Publishing
       # itself goes through plain `npm publish`, which has stable, GA OIDC
@@ -75,6 +100,42 @@ jobs:
           for dir in $PACKAGE_DIRS; do
             (cd "$dir" && pnpm pack --pack-destination "$TARBALL_DIR")
           done
+
+      # The pack step above is the only thing that turns `workspace:^` into a
+      # real semver range, so a tarball that still carries the literal
+      # protocol is uninstallable by every package manager (npm fails with
+      # EUNSUPPORTEDPROTOCOL, pnpm with ERR_PNPM_WORKSPACE_PKG_NOT_FOUND) —
+      # and npm forbids republishing a version, so the mistake can only be
+      # fixed by burning a version number. @kavo/prisma@0.5.0 and
+      # @kavo/mongoose@0.6.0 both shipped that way. Inspect the packed
+      # manifests, not the source ones: the source manifests always say
+      # `workspace:^`, which is exactly right in the repo and only wrong on
+      # the registry.
+      - name: Verify packed manifests resolve workspace deps
+        run: |
+          status=0
+          for tarball in "$TARBALL_DIR"/*.tgz; do
+            OFFENDERS=$(tar -xzOf "$tarball" package/package.json | node -e '
+              let raw = "";
+              process.stdin.on("data", (chunk) => (raw += chunk));
+              process.stdin.on("end", () => {
+                const pkg = JSON.parse(raw);
+                for (const field of ["dependencies", "peerDependencies"]) {
+                  for (const [name, range] of Object.entries(pkg[field] ?? {})) {
+                    if (String(range).includes("workspace:")) console.log(`  ${field}.${name}: ${range}`);
+                  }
+                }
+              });
+            ')
+            if [ -n "$OFFENDERS" ]; then
+              echo "$(basename "$tarball") ships unresolved workspace: ranges and would be uninstallable:" >&2
+              echo "$OFFENDERS" >&2
+              status=1
+            else
+              echo "$(basename "$tarball") ok"
+            fi
+          done
+          exit $status
 
       # Each publish is skipped if that exact name@version is already on
       # the registry, so re-running the job after a partial failure (one
