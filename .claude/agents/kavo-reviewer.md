@@ -69,8 +69,8 @@ and doc sync.
    │            │ │ └─────── @kavo/mongoose
    │            │ └───────── @kavo/mcp     ◀─┐
    │            └─────────── @kavo/graphql ◀─┤
-   └──────────── the one sanctioned sideways edge ──┘
-                 (frameworks/* → protocols/*, ADR-0016)
+   └───── the one sanctioned sideways edge ──┘
+          (frameworks/* → protocols/*, ADR-0016; never the reverse)
 ```
 
 - **`@kavo/core` imports nothing** — zero runtime dependencies (ADR-0005).
