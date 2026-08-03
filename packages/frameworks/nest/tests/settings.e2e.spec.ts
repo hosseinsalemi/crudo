@@ -21,7 +21,7 @@ import { listen, type SupertestTarget } from "./support/listen.js";
 
 let app: INestApplication;
 let adapter: InMemoryTodoAdapter;
-let httpServer: SupertestTarget;
+let httpServer: SupertestTarget | undefined;
 
 interface BootstrapOptions {
   readonly defaults?: KavoModuleOptions["defaults"];
@@ -43,14 +43,17 @@ async function bootstrap(controller: unknown, options: BootstrapOptions = {}): P
 }
 
 afterEach(async () => {
+  httpServer = undefined;
   await app.close();
 });
 
 /**
- * The bound server `bootstrap` listened on — see the same helper in
- * `binding.e2e.spec.ts`.
+ * The bound server `bootstrap` listened on, cleared between tests so a
+ * missing `bootstrap` fails here rather than driving the previous test's
+ * closed server — see the same helper in `binding.e2e.spec.ts`.
  */
 function server(): SupertestTarget {
+  if (httpServer === undefined) throw new Error("no bound server — this test did not await bootstrap()");
   return httpServer;
 }
 
