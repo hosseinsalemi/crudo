@@ -18,8 +18,11 @@ ranges between them pin the same version line.
 - "Kavo 0.4" fully identifies a consumer's setup; cross-package bugs are
   reproducible from one number.
 - Occasional no-op bumps of untouched packages — trivially cheap in an
-  automated pipeline (`.github/workflows/publish.yml`, which enforces this
-  decision: it refuses to publish unless every package in `PACKAGE_DIRS` is
-  at `@kavo/core`'s version).
+  automated pipeline (changesets).
+- Enforced mechanically rather than by review: before it packs anything,
+  `.github/workflows/publish.yml` runs
+  `.github/scripts/verify-lockstep-versions.mjs` over every package in
+  `PACKAGE_DIRS`, so a tag that some package was not bumped to fails the
+  release instead of shipping it one package short.
 - A core-breaking change cannot ship before dependents catch up, because
   they ship in the same release.

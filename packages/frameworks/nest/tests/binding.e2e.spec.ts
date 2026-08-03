@@ -9,9 +9,11 @@ import { ConfigurationException, WireQuery } from "@kavo/core";
 import type { KavoModuleOptions } from "@kavo/nest";
 import { Kavo, KavoModule, Override, enumProp, flattenQuery, getKavoServiceToken, oneOfArray } from "@kavo/nest";
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
+import { boundServer, listen, type SupertestTarget } from "./support/listen.js";
 
 let app: INestApplication;
 let adapter: InMemoryTodoAdapter;
+let httpServer: SupertestTarget | undefined;
 
 interface BootstrapOptions {
   readonly defaults?: KavoModuleOptions["defaults"];
@@ -38,15 +40,24 @@ async function bootstrap(controller: unknown, options: BootstrapOptions = {}): P
       "extended",
     );
   }
-  await app.init();
+  httpServer = await listen(app);
 }
 
 afterEach(async () => {
+  httpServer = undefined;
   await app.close();
 });
 
-function server(): Parameters<typeof request>[0] {
-  return app.getHttpServer() as Parameters<typeof request>[0];
+/**
+ * The bound server `bootstrap` listened on — not `app.getHttpServer()`,
+ * which answers just as happily for an app that was only `init()`ed.
+ * Cleared in `afterEach`, and re-checked on every call, so a test that
+ * never reached `bootstrap` or closed the app mid-test fails here rather
+ * than sending supertest back to binding a wildcard port per request
+ * (issue #91) — see `boundServer` for the three shapes that covers.
+ */
+function server(): SupertestTarget {
+  return boundServer(httpServer);
 }
 
 describe("@Kavo route generation", () => {

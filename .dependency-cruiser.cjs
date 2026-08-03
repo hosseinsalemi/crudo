@@ -10,7 +10,7 @@
  *      │                ├── @kavo/mongoose
  *      │                ├── @kavo/graphql ◀─┐
  *      │                └── @kavo/mcp     ◀─┤
- *      └── the one sanctioned sideways edge ─┘
+ *      └── the one sanctioned sideways edge ┘
  *          (frameworks/* → protocols/*, ADR-0016; never the reverse)
  *
  * `@kavo/core` imports nothing. When an edge package imports core it goes

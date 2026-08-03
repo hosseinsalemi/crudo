@@ -9,8 +9,8 @@ Every generated `findMany`/`findOne` route (and the programmatic
 `findMany({ filter, sort, ... })` equivalent) is driven by one query model,
 normalized in `core/src/query/` (`DefaultFilterParser`, `QueryNormalizer`,
 `PaginationStrategy`). This doc is end-user-safe — hand it to an API
-consumer as-is. Full source: `docs/architecture/05-query-grammar.md`
-(operators/grammar) and `docs/architecture/12-relations-and-includes.md`
+consumer as-is. Full source: `docs/internals/architecture/05-query-grammar.md`
+(operators/grammar) and `docs/internals/architecture/12-relations-and-includes.md`
 (includes). What an entity _allows_ through these params is configured via
 `allowlists`/`relations` on `@Kavo` — see the `kavo-decorator` skill.
 
@@ -126,7 +126,7 @@ the entity's inclusion allowlist (`relations.edges.<name>.includable`) is a
 (`join`/`batch`/`auto`), depth/node budgets, the pagination-correctness
 guarantee for joined to-many relations, cycle guard, soft-delete interplay,
 and relation writes — is in the `kavo-decorator` skill's "relations" section
-and `docs/architecture/12-relations-and-includes.md`.
+and `docs/internals/architecture/12-relations-and-includes.md`.
 
 ## Soft delete — `withDeleted=true`
 

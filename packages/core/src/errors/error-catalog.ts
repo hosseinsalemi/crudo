@@ -4,7 +4,7 @@ import type { KavoErrorCode } from "./kavo-exception-shape.js";
  * One catalog entry: everything stable about an error code. Codes are API
  * surface — renaming one is a breaking change (semver policy).
  * The full human-facing table lives in
- * docs/architecture/06-error-handling.md and is generated from
+ * docs/internals/architecture/06-error-handling.md and is generated from
  * this object, so code and docs cannot drift.
  */
 export interface ErrorCatalogEntry {

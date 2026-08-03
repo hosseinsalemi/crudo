@@ -1,0 +1,22 @@
+{
+  // Typecheck-only project for the repo-level `tests/` directory — the tests
+  // whose subject is the repo's own wiring rather than any one package. Same
+  // role as each package's tsconfig.tests.json: the build compiles `src` only,
+  // so without this these sources would never be type-checked at all. Not
+  // composite and not referenced from the root solution: it emits nothing.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "types": ["node"],
+    // Every published package declares `"type": "module"`; the private
+    // workspace root does not, so the inherited Node16 module mode would
+    // classify these sources as CommonJS and reject both `import` and
+    // `import.meta`. Vitest loads them through vite, so bundler resolution
+    // over ES modules is what actually happens at run time.
+    "module": "ESNext",
+    "moduleResolution": "Bundler"
+  },
+  "include": ["tests"]
+}

@@ -26,10 +26,14 @@ Push this branch and create or update its PR. Notes: **$ARGUMENTS**
 
    ```bash
    pnpm check
+   pnpm docs:links
    ```
 
    If build, typecheck, `depcruise`, or the tests fail, **stop** and report the
-   failure output. A red gate is never pushed, and never worked around.
+   failure output. A red gate is never pushed, and never worked around. The
+   same goes for `docs:links` — it is a separate CI job, so `pnpm check`
+   passing says nothing about it, and pushing without it means finding out from
+   a red job instead of from a one-second local run.
 
 3. **Push:**
 

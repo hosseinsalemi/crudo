@@ -10,7 +10,7 @@ import type { KavoCallOptions } from "./kavo-call-options.js";
  *
  * Every generic parameter defaults from `Entity`, so the zero-config path
  * needs no manual arguments (see the generic-parameter table in
- * `docs/architecture/03-core-contracts-and-type-system.md`).
+ * `docs/internals/architecture/03-core-contracts-and-type-system.md`).
  * Registered DTO classes narrow the corresponding slot.
  *
  * Single-item only. The spec makes batch operations optional and says to

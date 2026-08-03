@@ -6,6 +6,7 @@ import { Test } from "@nestjs/testing";
 import type { KavoModuleOptions } from "@kavo/nest";
 import { Kavo, KavoModule } from "@kavo/nest";
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
+import { boundServer, listen, type SupertestTarget } from "./support/listen.js";
 
 /**
  * End-to-end coverage for `@Kavo`/`KavoSettings` knobs that
@@ -20,6 +21,7 @@ import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-in
 
 let app: INestApplication;
 let adapter: InMemoryTodoAdapter;
+let httpServer: SupertestTarget | undefined;
 
 interface BootstrapOptions {
   readonly defaults?: KavoModuleOptions["defaults"];
@@ -37,15 +39,20 @@ async function bootstrap(controller: unknown, options: BootstrapOptions = {}): P
     imports: [rootModule, KavoModule.forFeature([controller as never])],
   }).compile();
   app = moduleRef.createNestApplication();
-  await app.init();
+  httpServer = await listen(app);
 }
 
 afterEach(async () => {
+  httpServer = undefined;
   await app.close();
 });
 
-function server(): Parameters<typeof request>[0] {
-  return app.getHttpServer() as Parameters<typeof request>[0];
+/**
+ * The bound server `bootstrap` listened on, cleared between tests and
+ * re-checked on every call — see the same helper in `binding.e2e.spec.ts`.
+ */
+function server(): SupertestTarget {
+  return boundServer(httpServer);
 }
 
 describe("@Kavo allowlists — filterable/sortable/selectable enforced over HTTP", () => {

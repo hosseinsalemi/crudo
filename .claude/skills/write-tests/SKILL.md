@@ -57,6 +57,42 @@ silently regressed:
 - **Regression** — a bugfix without a test that fails against the old code is
   unfinished. Write that test first and watch it fail.
 
+## HTTP e2e suites: bootstrap with `listen(app)`, never `app.init()`
+
+Any suite that drives a Nest app through supertest must bind it first:
+
+```ts
+import { listen } from "./support/listen.js";
+
+app = moduleRef.createNestApplication();
+const server = await listen(app); // == await app.listen(0, "127.0.0.1")
+await request(server).get("/todos").expect(200);
+```
+
+`app.init()` leaves `getHttpServer()` unbound, so supertest binds it itself,
+once per request: `listen(0)` on the **wildcard**, then a connect to a
+hardcoded `127.0.0.1`. That asymmetry is a lottery over the ephemeral range —
+a wildcard bind can be handed a port an unrelated local process already holds
+on the loopback, and the request goes to that process instead. It surfaces as
+`Parse Error: Expected HTTP/`, a foreign `400`/`404`/`405`, `socket hang up`,
+or a hook timeout, and it made these suites ~10% flaky (issue #91). A foreign
+`405` is the worst of them: it reads as a missing generated route.
+
+The `await` is load-bearing — `listen(0, host)` binds asynchronously, unlike
+the no-host path — so `listen` returns through `boundServer`, which rejects
+all three ways the binding can be wrong: absent, unbound, or bound to the
+wildcard. That last one is why a plain null-check is not enough — a wildcard
+bind reports a healthy-looking `::` address while supertest still connects to
+`127.0.0.1`. A suite that keeps its server in a variable routes its `server()`
+accessor through `boundServer` too, so a mid-test `close()` cannot slip past.
+
+The helper is duplicated per package (`packages/frameworks/nest/tests/support/`,
+`examples/*/tests/support/`) because a test file may not import another
+package's `tests/` — the alternative, a shared home outside every package that
+owns it, is legal but buys less than it costs. Change all three copies
+together. Never fix a port collision with a retry, a fixed port, or a raised
+timeout; those hide it, and `listen.e2e.spec.ts` fails on the fixed port.
+
 ## Contracts that need wire-level assertions
 
 These cross a boundary to a consumer, so assert the actual shape:

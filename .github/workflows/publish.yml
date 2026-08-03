@@ -15,18 +15,14 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TARBALL_DIR: /tmp/kavo-tarballs
-      # Topological order: every package publishes before anything that
-      # depends on it (@kavo/nest last — it has @kavo/core, @kavo/graphql and
-      # @kavo/mcp as hard dependencies). npm does not check that a dependency
-      # exists at publish time, so the order costs nothing on a clean run; it
-      # bounds the blast radius of a failed one. The loop stops at the first
-      # failure, and this order guarantees whatever already reached the
-      # registry pins only versions that also reached it — the alternative
-      # leaves a published @kavo/nest pointing at a sibling that does not
-      # exist, uninstallable and, past npm's unpublish window, unfixable.
-      # Single source of truth for "which packages get released" — add a new
-      # package here only; the coverage guard below fails the release if this
-      # list and the workspace disagree.
+      # Published in dependency order: every package appears after the
+      # packages it depends on, which puts `@kavo/nest` last because it
+      # depends on `@kavo/graphql` and `@kavo/mcp`. npm has no cross-package
+      # ordering requirement, but a publish that fails partway then leaves
+      # the registry internally consistent — no published package referring
+      # to a sibling version that isn't there — and a re-run finishes the
+      # job. Single source of truth for "which packages get released" — add
+      # a new package here only.
       PACKAGE_DIRS: >-
         packages/core
         packages/orms/typeorm
@@ -48,6 +44,23 @@ jobs:
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
+      # ADR-0004 lockstep versioning, enforced mechanically rather than left
+      # to review: *every* package must be at the tag's version, not just
+      # `@kavo/core`. A package left behind would otherwise pack stale and
+      # then be waved through by the already-published guard below, shipping
+      # a release one package short — silently, and after the fact.
+      #
+      # First real step in the job: it needs nothing but a checkout and node,
+      # and a doomed release should not spend the install and `pnpm check`
+      # legs first. Everything it guards comes later, so nothing is public
+      # when it fails.
+      #
+      # `$PACKAGE_DIRS` is intentionally unquoted: word splitting is what
+      # turns the folded list into one argument per package directory.
+      - name: Verify lockstep versions
+        # shellcheck disable=SC2086
+        run: node .github/scripts/verify-lockstep-versions.mjs "${GITHUB_REF_NAME#v}" $PACKAGE_DIRS
+
       # npm's OIDC trusted-publishing exchange needs npm >=11.5.1; the
       # bundled version on some Node builds can lag behind that.
       - name: Update npm
@@ -56,91 +69,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # The version guards run before `pnpm check`: they are the cheapest
-      # steps here and the most likely to fail, and there is nothing to gain
-      # from spending a full build on a tag that already cannot ship.
-      - name: Verify tag matches package version
-        run: |
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-          PKG_VERSION=$(node -p "require('./packages/core/package.json').version")
-          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match @kavo/core version $PKG_VERSION" >&2
-            exit 1
-          fi
-
-      # PACKAGE_DIRS is hand-maintained, and every other guard here only sees
-      # what it lists — a publishable package missing from it is invisible to
-      # all of them, and the release ships dependents pinning a version that
-      # was never published. Derive the publishable set from the workspace
-      # itself (everything not marked private) and require the two to agree.
-      # This adds no second list to keep in sync: PACKAGE_DIRS stays the
-      # source of truth for order and membership, and this only refuses to
-      # release while it is incomplete.
-      - name: Verify PACKAGE_DIRS covers every publishable package
-        run: |
-          set -o pipefail
-          EXPECTED=$(pnpm -r list --depth -1 --json | node -e '
-            const { relative } = require("node:path");
-            let raw = "";
-            process.stdin.on("data", (chunk) => (raw += chunk));
-            process.stdin.on("end", () => {
-              for (const pkg of JSON.parse(raw)) {
-                if (pkg.private !== true) console.log(relative(process.cwd(), pkg.path));
-              }
-            });
-          ' | sort)
-          ACTUAL=$(printf "%s\n" $PACKAGE_DIRS | sort)
-          if [ "$EXPECTED" != "$ACTUAL" ]; then
-            echo "PACKAGE_DIRS and the publishable workspace packages disagree:" >&2
-            echo "  PACKAGE_DIRS: $(echo $ACTUAL)" >&2
-            echo "  workspace:    $(echo $EXPECTED)" >&2
-            exit 1
-          fi
-
-      # ADR-0004: one version identifies a consumer's whole setup, so every
-      # package in PACKAGE_DIRS ships at @kavo/core's version. A package left
-      # behind at an older version is otherwise invisible at release time —
-      # the tag check above only looks at core, and the publish loop below
-      # then finds the stale version already on the registry and prints
-      # "already published, skipping". The release goes green having never
-      # released that package, which is how @kavo/prisma sat at 0.5.0 while
-      # everything else moved to 0.6.0. Fail here, before anything is packed
-      # or published.
-      #
-      # The same loop asserts PACKAGE_DIRS is topological, because the ordering
-      # the env comment promises is otherwise enforced by nothing: the coverage
-      # guard above sorts both sides, so it sees membership and not order, and
-      # re-alphabetizing this list would silently put @kavo/nest back ahead of
-      # its own dependencies while every check stayed green.
-      - name: Verify lockstep versions and publish order
-        run: |
-          CORE_VERSION=$(node -p "require('./packages/core/package.json').version")
-          status=0
-          PUBLISHED=""
-          for dir in $PACKAGE_DIRS; do
-            NAME=$(node -p "require('./$dir/package.json').name")
-            VERSION=$(node -p "require('./$dir/package.json').version")
-            if [ "$VERSION" = "$CORE_VERSION" ]; then
-              echo "$NAME $VERSION"
-            else
-              echo "$NAME is at $VERSION, expected $CORE_VERSION (ADR-0004 lockstep versioning)" >&2
-              status=1
-            fi
-            for dep in $(node -p "Object.keys(require('./$dir/package.json').dependencies ?? {}).filter((name) => name.startsWith('@kavo/')).join(' ')"); do
-              case " $PUBLISHED " in
-                *" $dep "*) ;;
-                *)
-                  echo "$NAME publishes before its dependency $dep — PACKAGE_DIRS must list a package after everything it depends on" >&2
-                  status=1
-                  ;;
-              esac
-            done
-            PUBLISHED="$PUBLISHED $NAME"
-          done
-          exit $status
-
-      # Same gate as CI — a release never ships on a red build. It also
-      # builds the `dist/` that the pack step below ships.
+      # Same gate as CI — a release never ships on a red build.
       - name: Check
         run: pnpm check
 
@@ -158,85 +87,20 @@ jobs:
             (cd "$dir" && pnpm pack --pack-destination "$TARBALL_DIR")
           done
 
-      # The pack step above is the only thing that turns `workspace:^` into a
-      # real semver range, so a tarball that still carries the literal
-      # protocol is uninstallable by every package manager (npm fails with
-      # EUNSUPPORTEDPROTOCOL, pnpm with ERR_PNPM_WORKSPACE_PKG_NOT_FOUND) —
-      # and npm forbids republishing a version, so the mistake can only be
-      # fixed by burning a version number. @kavo/prisma@0.5.0 and
-      # @kavo/mongoose@0.6.0 both shipped that way. Inspect the packed
-      # manifests, not the source ones: the source manifests always say
-      # `workspace:^`, which is exactly right in the repo and only wrong on
-      # the registry.
-      # The entry-point check is the other half of "installable". `pnpm pack`
-      # runs no build (no package here has a prepack script), so packing a
-      # tree with no dist/ produces a manifest-only tarball and exits 0. That
-      # cannot happen while `Check` runs before `Pack` — but that is a step
-      # ordering, not a check, so assert the artifact directly rather than
-      # trusting the order to survive the next edit of this file.
-      - name: Verify packed tarballs are installable
-        run: |
-          status=0
-          for tarball in "$TARBALL_DIR"/*.tgz; do
-            NAME=$(basename "$tarball")
-            MANIFEST=$(tar -xzOf "$tarball" package/package.json)
-            OFFENDERS=$(printf '%s' "$MANIFEST" | node -e '
-              let raw = "";
-              process.stdin.on("data", (chunk) => (raw += chunk));
-              process.stdin.on("end", () => {
-                const pkg = JSON.parse(raw);
-                for (const field of ["dependencies", "optionalDependencies", "peerDependencies"]) {
-                  for (const [name, range] of Object.entries(pkg[field] ?? {})) {
-                    if (String(range).includes("workspace:")) console.log(`  ${field}.${name}: ${range}`);
-                  }
-                }
-              });
-            ')
-            ENTRY="package/$(printf '%s' "$MANIFEST" | node -e '
-              let raw = "";
-              process.stdin.on("data", (chunk) => (raw += chunk));
-              process.stdin.on("end", () => {
-                const pkg = JSON.parse(raw);
-                const entry = pkg.exports?.["."]?.default ?? pkg.main ?? "index.js";
-                console.log(entry.replace(/^\.\//, ""));
-              });
-            ')"
-            if [ -n "$OFFENDERS" ]; then
-              echo "$NAME ships unresolved workspace: ranges and would be uninstallable:" >&2
-              echo "$OFFENDERS" >&2
-              status=1
-            fi
-            if tar -tzf "$tarball" | grep -qx "$ENTRY"; then
-              [ -n "$OFFENDERS" ] || echo "$NAME ok"
-            else
-              echo "$NAME has no build output at $ENTRY — it was packed without a build" >&2
-              status=1
-            fi
-          done
-          exit $status
-
       # Each publish is skipped if that exact name@version is already on
       # the registry, so re-running the job after a partial failure (one
       # package published, a later one failing) doesn't die re-publishing
       # what already succeeded — npm publish itself is not idempotent.
-      #
-      # The tarball is named exactly, not globbed: `pnpm pack` writes
-      # <name-with-@-and-/-flattened>-<version>.tgz, and a `<prefix>-*.tgz`
-      # glob would also match a sibling whose name extends this one
-      # (`kavo-core-*` matching a future `kavo-core-utils-…`). `npm publish`
-      # takes exactly one spec, so the extra path aborts the release with
-      # EUSAGE rather than mispublishing — noisy, but only after the packages
-      # ahead of it went out. Naming the file removes the ambiguity.
       - name: Publish packages
         run: |
           for dir in $PACKAGE_DIRS; do
             NAME=$(node -p "require('./$dir/package.json').name")
             VERSION=$(node -p "require('./$dir/package.json').version")
-            TARBALL="$TARBALL_DIR/$(echo "$NAME" | sed 's/^@//; s/\//-/')-$VERSION.tgz"
+            TARBALL_PREFIX=$(echo "$NAME" | sed 's/^@//; s/\//-/')
             if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
               echo "$NAME@$VERSION already published, skipping"
             else
-              npm publish "$TARBALL" --access public
+              npm publish "$TARBALL_DIR/$TARBALL_PREFIX"-*.tgz --access public
             fi
           done
 

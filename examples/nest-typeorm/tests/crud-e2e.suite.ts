@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import request from "supertest";
 import type { INestApplication } from "@nestjs/common";
+import { boundServer, type SupertestTarget } from "./support/listen.js";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import type { DataSource } from "typeorm";
 import { DATA_SOURCE } from "../src/database.module.js";
@@ -20,8 +21,12 @@ import { Address } from "../src/address/address.entity.js";
  * drivers, no forked assertions.
  */
 export function registerCrudE2eSuite(getApp: () => INestApplication): void {
-  function server(): Parameters<typeof request>[0] {
-    return getApp().getHttpServer() as Parameters<typeof request>[0];
+  function server(): SupertestTarget {
+    // The spec that registered this suite must have bootstrapped with
+    // `listen(app)`, not `app.init()`, and must not have closed the app:
+    // `boundServer` rejects every shape supertest would answer by binding
+    // a wildcard port per request, which is the collision behind #91.
+    return boundServer(getApp().getHttpServer() as SupertestTarget);
   }
 
   async function seed(): Promise<void> {

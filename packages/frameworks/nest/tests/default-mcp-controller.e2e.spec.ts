@@ -6,6 +6,7 @@ import { Test } from "@nestjs/testing";
 import type { INestApplication } from "@nestjs/common";
 import { Kavo, KavoModule } from "@kavo/nest";
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
+import { listen, type SupertestTarget } from "./support/listen.js";
 
 /**
  * Proves the zero-controller path: `KavoModule.forRoot({ mcp: true })`
@@ -26,8 +27,8 @@ afterEach(async () => {
   await app.close();
 });
 
-function mcpRequest(app: INestApplication, path = "/mcp") {
-  return request(app.getHttpServer() as Parameters<typeof request>[0])
+function mcpRequest(server: SupertestTarget, path = "/mcp") {
+  return request(server)
     .post(path)
     .set("Accept", "application/json, text/event-stream")
     .set("Content-Type", "application/json");
@@ -41,9 +42,9 @@ describe("KavoModule.forRoot({ mcp: true })", () => {
       controllers: [TodoController],
     }).compile();
     app = moduleRef.createNestApplication();
-    await app.init();
+    const server = await listen(app);
 
-    const listed = await mcpRequest(app).send({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} });
+    const listed = await mcpRequest(server).send({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} });
     expect(listed.status).toBe(200);
     const toolNames = (listed.body.result.tools as { name: string }[]).map((tool) => tool.name).sort();
     expect(toolNames).toEqual(
@@ -59,7 +60,7 @@ describe("KavoModule.forRoot({ mcp: true })", () => {
       ].sort(),
     );
 
-    const called = await mcpRequest(app).send({
+    const called = await mcpRequest(server).send({
       jsonrpc: "2.0",
       id: 2,
       method: "tools/call",
@@ -78,11 +79,16 @@ describe("KavoModule.forRoot({ mcp: true })", () => {
       controllers: [TodoController],
     }).compile();
     app = moduleRef.createNestApplication();
-    await app.init();
+    const server = await listen(app);
 
-    await mcpRequest(app, "/mcp").send({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }).expect(404);
+    await mcpRequest(server, "/mcp").send({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }).expect(404);
 
-    const listed = await mcpRequest(app, "/api/mcp").send({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} });
+    const listed = await mcpRequest(server, "/api/mcp").send({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/list",
+      params: {},
+    });
     expect(listed.status).toBe(200);
     expect((listed.body.result.tools as { name: string }[]).map((tool) => tool.name).sort()).toEqual(
       [
@@ -105,9 +111,9 @@ describe("KavoModule.forRoot({ mcp: true })", () => {
       controllers: [TodoController],
     }).compile();
     app = moduleRef.createNestApplication();
-    await app.init();
+    const server = await listen(app);
 
-    await mcpRequest(app).send({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }).expect(404);
+    await mcpRequest(server).send({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }).expect(404);
   });
 
   it("maps a not-found id to an isError tool result over HTTP", async () => {
@@ -117,9 +123,9 @@ describe("KavoModule.forRoot({ mcp: true })", () => {
       controllers: [TodoController],
     }).compile();
     app = moduleRef.createNestApplication();
-    await app.init();
+    const server = await listen(app);
 
-    const called = await mcpRequest(app).send({
+    const called = await mcpRequest(server).send({
       jsonrpc: "2.0",
       id: 1,
       method: "tools/call",

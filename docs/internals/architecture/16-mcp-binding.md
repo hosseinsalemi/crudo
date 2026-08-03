@@ -1,4 +1,4 @@
-# 14 — MCP Binding
+# 16 — MCP Binding
 
 `@kavo/mcp` (`packages/protocols/mcp`) exposes a `createCrud` service's
 standard operations as [MCP](https://modelcontextprotocol.io) tools. Every

@@ -84,7 +84,7 @@ boundary rather than widening core's `EntityId`).
   only, plus the `@modelcontextprotocol/sdk` peer for types (never
   imported at runtime by `@kavo/mcp` itself — `@kavo/nest`'s zero-config
   default controller is the one place the SDK actually runs, lazily — see
-  doc 14, §6). See `docs/internals/architecture/14-mcp-binding.md`.
+  doc 16, §5). See `docs/internals/architecture/16-mcp-binding.md`.
 
 Every package earns its place: core is the hub, and every other package
 adapts exactly one external technology or protocol — an ORM, a host
@@ -106,7 +106,18 @@ Two independent enforcement layers:
    `protocols/*` package (`@kavo/nest` → `@kavo/graphql`/`@kavo/mcp`), never
    the reverse — ADR-0016.
 
-   Two properties of that rule set are load-bearing and easy to lose:
+   Three properties of that rule set are load-bearing and easy to lose:
+   - **Coverage is narrower than the invariants it supports.** The adapter
+     rules' `to` covers `packages/frameworks` only and the protocol rules omit
+     each other, so an ORM adapter importing a protocol package, one ORM
+     adapter importing another, and one protocol importing another all pass
+     today. So does a type-only import out of core spelled as a bare specifier
+     or a barrel (`core-imports-nothing` carries
+     `dependencyTypesNot: ["type-only"]`), and one edge's `src` deep-importing
+     another edge's `src` (both deep-import rules are anchored on core). Each
+     is still a violation — review is what catches it. A green `depcruise` is
+     not proof a change respects the boundaries; see the footnotes under
+     `CONTRIBUTING.md`'s boundary table.
    - **Both spellings are matched.** A workspace package specifier does not
      resolve to a path for dependency-cruiser, so a path-only rule silently
      misses `from "@kavo/nest"` — the spelling anyone would actually write.
@@ -116,24 +127,37 @@ Two independent enforcement layers:
      entirely, which left the boundary convention-only exactly where fixture
      sharing tempts a shortcut. A test file may import its own package's
      source and the `@kavo/*` barrels, never another package's `src` or
-     `tests`; core's tests additionally may not reach an adapter or framework
-     package, because core's ignorance of both is what its suite exists to
-     prove.
+     `tests`; core's tests additionally may not reach an adapter, a protocol
+     binding, or a framework package, because core's ignorance of all three is
+     what its suite exists to prove.
 
 ## 4. Workspace tooling: pnpm + plain scripts (ADR-0003)
 
 pnpm workspaces with **plain root scripts**, no
-task runner. The entire build graph is three packages whose ordering is
-already fully expressed by TS project references — `tsc -b` performs
-incremental, dependency-ordered, cached builds natively. A task runner
+task runner. The entire build graph is seven packages and two example apps,
+whose ordering is already fully expressed by TS project references — `tsc -b`
+performs incremental, dependency-ordered, cached builds natively. A task runner
 (turborepo/nx) would add a second place where the graph is declared, a
 cache layer duplicating `.tsbuildinfo`, and config to keep honest, while
 buying nothing at this scale. Revisit only if the workspace gains many
 packages or expensive non-tsc pipelines (a future e2e suite is the
 natural checkpoint).
 
-Root scripts: `build` (`tsc -b`), `clean`, `depcruise`, and `check`
-(build + boundaries) — `pnpm check` is the verification gate.
+Root scripts: `generate`, `build` (`tsc -b`), `clean`, `typecheck`,
+`depcruise`, `lint`, `test`, `prettify`, `format:check`, `docs:build`,
+`docs:links`, and `check` — the last runs `generate → build → typecheck →
+depcruise → lint → test` and is the verification gate. Three checks sit
+outside it, each as its own CI job: `format:check`, `docs:build` (VitePress,
+which resolves the links inside the pages it renders), and `docs:links`
+(`scripts/check-doc-links.sh`). The last two are complements, not overlaps —
+the docs build never sees a `docs/**.md` reference written from `packages/`
+or `extensions/`, because those are not pages, and it never reads
+`docs/.vitepress/config.mts`, because that is config rather than content. So
+a renamed doc can still leave a dead link in a package README that ships to
+npm, or a silent 404 in the published sidebar, and `docs:links` is what
+catches both. The `/implement`, `/review`, `/pr` and `/merge` commands run
+these alongside `pnpm check` locally, so none of them is a gate you only hear
+about from CI.
 
 ## 5. Public vs. internal API surface
 
@@ -152,7 +176,8 @@ dual ESM+CJS output is a future deliverable.
 ## 6. Build strategy
 
 `tsc -b` against the solution file: incremental (`.tsbuildinfo`),
-project-reference-ordered (core → typeorm/prisma/mongoose/nest), each package emitting
+project-reference-ordered (core → typeorm/prisma/mongoose/graphql/mcp → nest),
+each package emitting
 `dist/` with declarations + declaration maps. Consumers inside the
 workspace resolve `@kavo/*` via pnpm workspace links to the built
 `dist`, exactly as external consumers will.
@@ -167,28 +192,12 @@ version bumps for an untouched package — accepted as trivially cheap next
 to cross-package version-matrix support.
 
 Release mechanics live in `.github/workflows/publish.yml`, triggered by a
-pushed `v*.*.*` tag and nothing else. Its `PACKAGE_DIRS` is the single source
-of truth for the released set, listed in topological order so a package always
-publishes before its dependents — `@kavo/nest` last, since it hard-depends on
-`@kavo/core`, `@kavo/graphql`, and `@kavo/mcp`. npm never checks that a
-dependency exists at publish time, so that order only matters when a run
-fails partway: it keeps whatever already reached the registry pinned to
-versions that also reached it.
-
-Four guards run before anything is published. The tag must match
-`@kavo/core`'s version; `PACKAGE_DIRS` must cover every non-private workspace
-package (a package missing from the list is invisible to every other guard);
-every package's `version` must equal `@kavo/core`'s and no package may be
-listed before something it depends on (lockstep and order, this section); and
-every packed tarball must be free of `workspace:` ranges and actually contain
-its build output. The last exists because only `pnpm pack` rewrites
-`workspace:^` into a real semver range — a package published any other way is
-uninstallable, and npm does not allow republishing a version to fix it.
-
-The version, order, and workspace-protocol rules are also asserted at
-`pnpm check` time by `packages/core/tests/release-invariants.spec.ts`, parsed
-from `PACKAGE_DIRS` rather than restated, so drift fails a pull request
-instead of a tag.
+`vX.Y.Z` tag. `PACKAGE_DIRS` there is the explicit list of what gets
+released, ordered so every package publishes after the packages it depends
+on (`@kavo/nest` last), which keeps the registry internally consistent if a
+run fails partway. Lockstep itself is checked rather than assumed: a gate
+ahead of packing fails the release unless every listed package is already at
+the tag's version.
 
 ## 8. Dependency classification (decided now, executed later)
 

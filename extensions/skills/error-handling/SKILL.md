@@ -7,7 +7,7 @@ description: Reference for Kavo's exception hierarchy, KAVO_* error-code catalog
 
 One exception hierarchy (`core/src/errors/`), one stable code catalog, one
 wire shape (RFC 9457 problem details, ADR-0009). Full detail:
-`docs/architecture/06-error-handling.md`.
+`docs/internals/architecture/06-error-handling.md`.
 
 ## Hierarchy
 

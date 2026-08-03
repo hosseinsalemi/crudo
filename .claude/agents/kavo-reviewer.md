@@ -69,8 +69,8 @@ and doc sync.
    │            │ │ └─────── @kavo/mongoose
    │            │ └───────── @kavo/mcp     ◀─┐
    │            └─────────── @kavo/graphql ◀─┤
-   └──────────── the one sanctioned sideways edge ──┘
-                 (frameworks/* → protocols/*, ADR-0016)
+   └───── the one sanctioned sideways edge ──┘
+          (frameworks/* → protocols/*, ADR-0016; never the reverse)
 ```
 
 - **`@kavo/core` imports nothing** — zero runtime dependencies (ADR-0005).
@@ -145,14 +145,13 @@ from source.
   "engine gets faster" but "the pipeline now has a new stage", "the wire token
   mapping changed", "a new config key exists at this precedence level"), the
   matching doc should have moved too.
-- **`docs/glossary.md`** — one canonical name per concept. A new
-  operation, config key, or exception introduces a term; check it either
-  reuses an existing glossary term or the glossary gained an entry. A rename
-  that leaves the old term in the glossary is a finding (stale synonym).
-- **`CLAUDE.md`'s Conventions section** — normative naming rules. If the
-  change establishes a new convention (a new DTO slot shape, a new suffix
-  rule), `CLAUDE.md` not being updated is a finding at the same severity as a
-  missing ADR.
+- **`CLAUDE.md`'s Conventions section** — normative naming rules, and the
+  canonical name for each concept. If the change establishes a new convention
+  (a new DTO slot shape, a new suffix rule), `CLAUDE.md` not being updated is a
+  finding at the same severity as a missing ADR. A new operation, config key,
+  or exception introduces a term: check it either reuses the name the
+  Conventions section already fixes or extends that section. A rename that
+  leaves the old term behind is a finding (stale synonym).
 - **Code comments citing an ADR by number** — if a comment says "see ADR-000N"
   and the change alters that behavior, check the ADR still matches; a stale
   citation pointing at outdated rationale is worth flagging even though it is
@@ -174,15 +173,15 @@ people to ignore this section.
 - Exceptions are `*Exception` with stable `KAVO_SNAKE_CASE` codes.
 - Config keys are camelCase with positively-phrased booleans (`exposeInternals`,
   never `hideInternals`). No `I` prefix on interfaces.
-- One canonical name per concept — check `docs/glossary.md`. A synonym
-  is a finding.
+- One canonical name per concept — check `CLAUDE.md`'s Conventions section.
+  A synonym is a finding.
 
 ## Output
 
 Rank findings most-severe first: boundary violations and breaking barrel
 changes, then correctness and design-invariant breaks, then missing/
-contradicted ADRs and stale architecture docs, then naming and glossary/
-roadmap drift. For each: file and line, one sentence on the defect, a concrete
+contradicted ADRs and stale architecture docs, then naming and convention
+drift. For each: file and line, one sentence on the defect, a concrete
 failure scenario (inputs → wrong behavior), and the fix. Separate blocking
 findings from suggestions. If the branch is clean, say so and state what you
 verified — including the `pnpm check` and `pnpm depcruise` results. Do not

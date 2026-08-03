@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
 
+# Every job here only reads the checkout — nothing comments, pushes, or
+# deploys. pages.yml and publish.yml already declare their permissions; this
+# was the one workflow still inheriting the repo default.
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -57,3 +63,50 @@ jobs:
 
       - name: Check formatting
         run: pnpm format:check
+
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    # The build itself takes seconds; a bound turns a hung SSR render into a
+    # fast red instead of letting it sit on a runner for GitHub's 6-hour
+    # default.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Not path-filtered on purpose: docs/.vitepress/config.mts reads
+      # packages/core/package.json at build time, so a packaging change can
+      # break the docs build without touching docs/. Builds only — pages.yml
+      # still owns deployment.
+      - name: Build docs
+        run: pnpm docs:build
+
+  doc-links:
+    name: doc links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Every `docs/**.md` path mentioned by a tracked file, and every
+      # VitePress sidebar link, must resolve. Moving a docs directory leaves
+      # the mentions behind, and some of the files carrying them (package
+      # READMEs, `src/` doc comments, the adopter-facing skills in
+      # `extensions/`) ship to npm — so a dead reference is one an adopter
+      # follows. The `docs` job above cannot cover either class: VitePress
+      # only resolves links inside the pages it renders, so it never sees a
+      # reference from `packages/` and never reads the sidebar config.
+      # Needs no toolchain: pure git+sh.
+      - name: Check doc links
+        run: ./scripts/check-doc-links.sh

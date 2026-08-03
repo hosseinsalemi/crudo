@@ -10,7 +10,7 @@ means entity-derived defaults; registering a class narrows exactly one slot.
 DTOs are shapes for **typing, serialization, and Swagger docs only** — there
 is no validation subsystem attached to them (that's the caller's own
 pipe/guard, e.g. Nest's `ValidationPipe`). Full detail:
-`docs/architecture/04-dto-system.md`. Config-side wiring
+`docs/internals/architecture/04-dto-system.md`. Config-side wiring
 (`@Kavo(Entity, { dto: {...} })`) is in the `kavo-decorator` skill.
 
 ## The six slots
