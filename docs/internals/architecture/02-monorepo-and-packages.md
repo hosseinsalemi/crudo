@@ -175,13 +175,20 @@ dependency exists at publish time, so that order only matters when a run
 fails partway: it keeps whatever already reached the registry pinned to
 versions that also reached it.
 
-Three guards run before anything is published. `PACKAGE_DIRS` must cover every
-non-private workspace package (a package missing from the list is invisible to
-every other guard); every package's `version` must equal `@kavo/core`'s
-(lockstep, this section); and every packed tarball's manifest must be free of
-`workspace:` ranges. The last exists because only `pnpm pack` rewrites
+Four guards run before anything is published. The tag must match
+`@kavo/core`'s version; `PACKAGE_DIRS` must cover every non-private workspace
+package (a package missing from the list is invisible to every other guard);
+every package's `version` must equal `@kavo/core`'s and no package may be
+listed before something it depends on (lockstep and order, this section); and
+every packed tarball must be free of `workspace:` ranges and actually contain
+its build output. The last exists because only `pnpm pack` rewrites
 `workspace:^` into a real semver range — a package published any other way is
 uninstallable, and npm does not allow republishing a version to fix it.
+
+The version, order, and workspace-protocol rules are also asserted at
+`pnpm check` time by `packages/core/tests/release-invariants.spec.ts`, parsed
+from `PACKAGE_DIRS` rather than restated, so drift fails a pull request
+instead of a tag.
 
 ## 8. Dependency classification (decided now, executed later)
 

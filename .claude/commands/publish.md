@@ -1,7 +1,7 @@
 ---
 description: Bump @kavo/* to the next lockstep version and publish via a git tag
 argument-hint: "[patch|minor|major to override auto-detection]"
-allowed-tools: Bash(git:*), Bash(pnpm:*), Bash(gh:*), Bash(node:*), Bash(npm view:*), Bash(tar:*), Read, Grep, Glob
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(node:*), Bash(pnpm install:*), Bash(pnpm check:*), Bash(pnpm build:*), Bash(pnpm pack:*), Bash(npm view:*), Bash(tar:*), Read, Grep, Glob
 ---
 
 ## Context
@@ -79,8 +79,8 @@ guard, which is why the rule is the tag and nothing else.
    what actually publishes — and the table is a bug to fix in the same pass.
    Leave `examples/*` (private, unpublished) alone.
 
-   Then read the versions back and confirm they are identical — the workflow
-   fails the release on a mismatch (`Verify lockstep versions`), and catching
+   Then read the versions back and confirm they are identical. A mismatch
+   fails the release in the workflow's version-and-order guard, and catching
    it here costs nothing while catching it there burns a tag:
 
    ```bash
@@ -88,6 +88,11 @@ guard, which is why the rule is the tag and nothing else.
      node -p "const p = require('./$dir/package.json'); p.name + ' ' + p.version"
    done
    ```
+
+   `pnpm check` in step 4 asserts the same thing via
+   `packages/core/tests/release-invariants.spec.ts`, so a mismatch here fails
+   the gate too — but read the versions anyway, because step 4 is where you
+   would otherwise discover it after a full build.
 
 4. **Regenerate the lockfile and gate:**
 
@@ -264,8 +269,11 @@ Three things must be true of the tarball, and **a tarball free of
    npm publish "$TARBALL" --access public
    ```
 
-   `npm publish` is deliberately absent from this command's `allowed-tools`:
-   the permission prompt is that go-ahead, so do not pre-authorize it away.
+   Neither `npm publish` nor `pnpm publish` is in this command's
+   `allowed-tools`, and `pnpm` is granted per-subcommand for the same reason:
+   the permission prompt is that go-ahead. Do not pre-authorize it away, and
+   do not widen the entry to `Bash(pnpm:*)` — that hands back `pnpm publish`,
+   half of what the rule at the top of this file forbids.
 
 4. Re-run the failed workflow. The `already published, skipping` branch walks
    past everything that went out on the first attempt and publishes the rest:
