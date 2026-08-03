@@ -27,7 +27,7 @@ A `tsconfig.json` that satisfies all three:
 }
 ```
 
-`useDefineForClassFields: false` is load-bearing at `ES2022` and above. With it on, every declared field is emitted as a class field, so a typical entity's `id!: number` becomes an own property set to `undefined` on construction — overwriting the value TypeORM just assigned while hydrating the row. With it off, only fields that have an initializer are assigned, and the rest are left alone.
+`useDefineForClassFields: false` is load-bearing at `ES2022` and above. With it on, every declared field is emitted as a real class field, so a fresh entity carries an own key for _every_ column — set to `undefined` — whether the adapter hydrated it or not. A partially-hydrated entity then looks fully populated: Kavo projects a response with `Object.keys(entity)` when no field selection narrows it, so those columns surface in the body as `undefined` rather than being absent, and TypeORM's persistence diffing reads them as explicit values. With it off, only fields with an initializer are assigned and the rest are left to the prototype — which is what Kavo's own packages and both example apps compile with.
 
 ## Install
 
@@ -67,34 +67,34 @@ Kavo never bundles your framework or your ORM. Each package declares what it exp
 - **`@kavo/graphql`** — `graphql` (`^17.0.0`).
 - **`@kavo/mcp`** — `@modelcontextprotocol/sdk` (`^1.0.0`).
 
-Three of `@kavo/nest`'s own peers are declared **optional** — `@nestjs/swagger` (`^8.0.0 || ^11.0.0`) for generated OpenAPI docs, `graphql` (`^17.0.0`) for the GraphQL controller, and `@modelcontextprotocol/sdk` (`^1.0.0`) for the MCP controller — so nothing makes you configure a protocol you don't serve. They may still land in your dependency tree either way: `@kavo/nest` depends on `@kavo/graphql` and `@kavo/mcp`, and those two declare `graphql` and `@modelcontextprotocol/sdk` as _required_ peers, which npm auto-installs. Optional here means you never have to import or wire them, not that they are absent from `node_modules`.
+Three of `@kavo/nest`'s own peers are declared **optional** — `@nestjs/swagger` (`^8.0.0 || ^11.0.0`) for generated OpenAPI docs, `graphql` (`^17.0.0`) for the GraphQL controller, and `@modelcontextprotocol/sdk` (`^1.0.0`) for the MCP controller — so nothing makes you configure a protocol you don't serve. They may still land in your dependency tree either way: `@kavo/nest` depends on `@kavo/graphql` and `@kavo/mcp`, and those two declare `graphql` and `@modelcontextprotocol/sdk` as _required_ peers. npm, pnpm, and bun install required peers automatically, so both arrive even in a REST-only app; yarn does not, and reports them as unmet peers instead. Optional here means you never have to import or wire them.
 
 ### GraphQL and MCP
 
 The same entities can be served over GraphQL and the Model Context Protocol, through the same engine.
 
-Inside a Nest app you never install the Kavo bindings directly — `@kavo/nest` already depends on `@kavo/graphql` and `@kavo/mcp`. Add only the protocol library you intend to use:
+Inside a Nest app you never install the Kavo bindings directly — `@kavo/nest` depends on `@kavo/graphql`, and on `@kavo/mcp` as of the next release. Add only the protocol library you intend to use:
 
 ::: code-group
 
 ```bash [pnpm]
-pnpm add graphql                  # GraphQL
-pnpm add @modelcontextprotocol/sdk # MCP
+pnpm add graphql                    # GraphQL
+pnpm add @modelcontextprotocol/sdk  # MCP
 ```
 
 ```bash [npm]
-npm install graphql                  # GraphQL
-npm install @modelcontextprotocol/sdk # MCP
+npm install graphql                    # GraphQL
+npm install @modelcontextprotocol/sdk  # MCP
 ```
 
 ```bash [yarn]
-yarn add graphql                  # GraphQL
-yarn add @modelcontextprotocol/sdk # MCP
+yarn add graphql                    # GraphQL
+yarn add @modelcontextprotocol/sdk  # MCP
 ```
 
 ```bash [bun]
-bun add graphql                  # GraphQL
-bun add @modelcontextprotocol/sdk # MCP
+bun add graphql                    # GraphQL
+bun add @modelcontextprotocol/sdk  # MCP
 ```
 
 :::
