@@ -38,10 +38,10 @@ const routes = [
 
 <style scoped>
 .hero-terminal {
-  width: 100%;
+  width: 95%;
   max-width: 440px;
   margin: 0 auto;
-  border-radius: 14px;
+  border-radius: 12px;
   overflow: hidden;
   border: 1px solid var(--vp-c-divider);
   background: var(--vp-code-block-bg);
@@ -52,7 +52,7 @@ const routes = [
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 12px 14px;
+  padding: 11px 14px;
   border-bottom: 1px solid var(--vp-c-divider);
   background: var(--vp-c-bg-soft);
 }
