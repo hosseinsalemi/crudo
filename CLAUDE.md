@@ -12,13 +12,14 @@ The authoritative sources are `docs/` (architecture notes and ADRs) and the **Co
 
 ```bash
 pnpm install
-pnpm check        # the full gate: build + typecheck + depcruise + lint + test (run before considering work done)
+pnpm check        # the full gate: generate (Prisma client + fixture schema) + build + typecheck + depcruise + lint + test (run before considering work done)
 pnpm build        # tsc -b (project references across the workspace — src only)
-pnpm typecheck    # tsc --noEmit over the root tests/ and each package's tests/ (tsconfig.tests.json)
+pnpm typecheck    # tsc --noEmit over the root tests/ plus every package's and example's tests/ (tsconfig.tests.json)
 pnpm test         # vitest run (whole monorepo)
 pnpm depcruise    # enforce package-boundary rules (.dependency-cruiser.cjs)
 pnpm lint         # oxlint over packages/*, examples/*, tests/ and .github/scripts/
 pnpm prettify     # prettier --write . (printWidth 120)
+pnpm format:check # prettier --check . — the separate formatting job CI runs alongside the gate
 pnpm docs:build   # vitepress build docs — a second CI gate that `check` does NOT run
 pnpm docs:links   # every `docs/**.md` reference and sidebar link resolves (a third; also not in `check`)
 ```
@@ -32,17 +33,21 @@ pnpm vitest run -t "coerces JavaScript number syntax"
 
 Tests live in each package's `tests/` directory (never in `src/`, so they are not shipped in `dist/`). The one exception is the repo-level `tests/` directory, for tests whose subject is the repo's own wiring rather than any package — `tests/release-workflow.spec.ts` gates `.github/workflows/publish.yml`, and `tests/check-doc-links.spec.ts` gates `scripts/check-doc-links.sh`. Put a test there only when it belongs to no package; it is type-checked by the root `tsconfig.tests.json`. Vitest aliases `@kavo/*` to package `src/` directly (see `vitest.config.ts`), so tests exercise sources with no stale-`dist` hazard. The SWC vitest plugin is required — TypeORM entities and Nest DI need decorator metadata that esbuild cannot emit.
 
-Because the build compiles `src` only, each package also has a `tsconfig.tests.json` (`noEmit`, `include: ["tests"]`, `paths` mirroring the vitest aliases) that `pnpm typecheck` runs. That is what makes the type-level acceptance tests in `packages/*/tests/types/*.test-d.ts` real: they end in `.test-d.ts`, so vitest never collects them and nothing executes — `expectTypeOf` assertions and `@ts-expect-error` directives are checked by `tsc` alone. An unused `@ts-expect-error` is itself an error, so those tests fail in both directions.
+Because the build compiles `src` only, each package also has a `tsconfig.tests.json` (`noEmit`, `include: ["tests"]`, `paths` mirroring the vitest aliases) that `pnpm typecheck` runs. That is what makes the type-level acceptance tests in `packages/**/tests/types/*.test-d.ts` real: `vitest.config.ts` collects only `*.spec.ts`, so nothing in them ever executes — `expectTypeOf` assertions and `@ts-expect-error` directives are checked by `tsc` alone. An unused `@ts-expect-error` is itself an error, so those tests fail in both directions.
 
 ## Architecture
 
-Five packages in a strict hub-and-spoke topology (`pnpm-workspace.yaml`):
+Seven published packages in a hub-and-spoke topology (`pnpm-workspace.yaml`, which globs in the two `examples/*` apps as well), plus one sanctioned sideways edge:
 
 ```
 @kavo/nest ──▶ @kavo/core ◀── @kavo/typeorm
-                 ▲  ▲  ▲
-                 │  │  └───── @kavo/prisma
-       @kavo/graphql  └────── @kavo/mongoose
+   │            ▲ ▲ ▲ ▲
+   │            │ │ │ └───── @kavo/prisma
+   │            │ │ └─────── @kavo/mongoose
+   │            │ └───────── @kavo/mcp     ◀─┐
+   │            └─────────── @kavo/graphql ◀─┤
+   └───── the one sanctioned sideways edge ──┘
+          (frameworks/* → protocols/*, ADR-0016; never the reverse)
 ```
 
 - **`@kavo/core`** (`packages/core`) — all contracts, the type system, and the request engine. **Zero runtime dependencies** and imports nothing (ADR-0005). It has no knowledge of TypeORM or Nest.
@@ -51,8 +56,13 @@ Five packages in a strict hub-and-spoke topology (`pnpm-workspace.yaml`):
 - **`@kavo/mongoose`** (`packages/orms/mongoose`) — the same seams over a Mongoose model, fed from `schema.paths`. A Mongoose model _is_ the entity identity, so nothing is declared twice, and `ObjectId` converts to a hex string at the adapter boundary (ADR-0018). `mongoose` is a peer dependency.
 - **`@kavo/nest`** (`packages/frameworks/nest`) — the `@Kavo` decorator and NestJS route generation.
 - **`@kavo/graphql`** (`packages/protocols/graphql`) — host-framework-agnostic GraphQL schema binding: builds a schema over a `createCrud` service, delegating every resolver to the same engine REST uses. Depends only on `@kavo/core` and the `graphql` peer, never on `@kavo/nest` — the `frameworks/* → protocols/*` edge is one-directional (ADR-0016). `@kavo/nest` is the side that imports it, to provide `BaseKavoGraphQLController`; it does so through a lazy `import("@kavo/graphql")` so the peer stays genuinely optional.
+- **`@kavo/mcp`** (`packages/protocols/mcp`) — host-framework-agnostic MCP binding: exposes a `createCrud` service's standard operations as MCP tools, every tool handler a direct call into the same engine REST uses. Same `protocols/*` constraint as `@kavo/graphql` — `@kavo/core` plus the `@modelcontextprotocol/sdk` peer, which it consumes for **types only**, never at runtime. That is why `@kavo/nest` imports it directly rather than lazily, to provide `BaseKavoMcpController`; the one place `@kavo/nest` actually runs the SDK is its zero-config default MCP controller, which lazy-loads it (`load-mcp-sdk.ts`).
 
-These boundaries are **mechanically enforced** by `.dependency-cruiser.cjs`, not just convention: core may import nothing, adapters/protocol bindings/framework bindings import the `@kavo/core` barrel only (no deep imports), and spokes never import each other directly — they meet only through Nest's DI container. An illegal import fails `pnpm depcruise` (part of `pnpm check`), not code review.
+Spokes mostly never meet: an ORM adapter never imports another ORM adapter, a framework binding, or a protocol binding; a protocol binding never imports an ORM adapter or a framework binding; and adapters reach Nest's container through DI rather than through an import. The exception is the sideways edge in the diagram — `frameworks/* → protocols/*` (ADR-0016) — so `@kavo/nest` really does import `@kavo/graphql` and `@kavo/mcp`, and that edge is one-directional: a protocol binding never imports `@kavo/nest` back, which is what keeps it host-framework-agnostic.
+
+Most of that is **mechanically enforced** by `.dependency-cruiser.cjs`, not just convention: core's `src` may import nothing at runtime, deep imports across the core boundary are blocked in both directions (an edge reaches core through the `@kavo/core` barrel, and core never reaches into an edge's `src`), an ORM adapter may not import a framework binding, a protocol binding may not import an ORM adapter or a framework binding, and a framework binding may not import an ORM adapter. Those fail `pnpm depcruise` (part of `pnpm check`), not code review. Three more rules are easy to forget because they constrain tests and cycles rather than package edges: `tests/` is cruised too — a test file may import its own package's source and the `@kavo/*` barrels, never another package's `src` or `tests`, and core's tests additionally may not reach an adapter, a protocol binding, or a framework package — and runtime import cycles are forbidden (type-only cycles are exempt, because core's contracts are mutually referential by design). `docs/internals/architecture/02-monorepo-and-packages.md` §3 covers the same rule set at more length.
+
+The coverage is deliberately narrower than the invariants it supports, though. Five things are still convention, caught in review rather than by the gate: an ORM adapter importing a **protocol** package, one ORM adapter importing **another ORM adapter**, one protocol importing another, a **type-only** import out of core spelled as a bare specifier or a barrel (`core-imports-nothing` exempts type-only edges, but core owning its contracts does not — the relative deep-import spelling is still blocked), and one edge's `src` deep-importing another edge's `src` (both deep-import rules are anchored on core; the `tests/` rule does cover a _test_ reaching into a sibling's `src`). Read `.dependency-cruiser.cjs` and the two footnotes under `CONTRIBUTING.md`'s boundary table before assuming a boundary is machine-checked — a green `depcruise` is not proof a change respects them.
 
 ### The request pipeline (the spine)
 
@@ -81,7 +91,7 @@ Standard operations delegate to the typed `DefaultKavoService` surface; custom o
 
 ### Wiring an app
 
-See `examples/nest-typeorm/src/app.module.ts`: `KavoModule.forRootAsync({ provideServices: true, useFactory: () => ({ infrastructure: createInfrastructure(dataSource), defaults: {...} }) })` is the app's only Kavo import — the `@Kavo` controllers just go in `AppModule`'s own `controllers: [...]` array. `KavoModule`'s discovery binder (`DiscoveryService`, `onModuleInit`) finds them there and binds each entity's service, no registration needed; `provideServices: true` additionally provides `getKavoServiceToken(Entity)` as a real DI provider for every `@Kavo`-decorated class the process has seen, which `AddressController` needs for its constructor-injected `base` (a fully custom route wants it typed as an ordinary constructor param). That's the same thing the standalone no-arg `KavoModule.forFeature()` does, folded into one call; `forFeature([...])` with an explicit array also still exists. Both no-arg forms are process-wide, so `@kavo/nest`'s own tests (many differently-configured `@Kavo` classes over one entity in one file) always pass `forFeature` an explicit array instead. The app is what hands Nest its infrastructure — the packages never import each other.
+See `examples/nest-typeorm/src/app.module.ts`: `KavoModule.forRootAsync({ provideServices: true, useFactory: () => ({ infrastructure: createInfrastructure(dataSource), defaults: {...} }) })` is the app's only Kavo import — the `@Kavo` controllers just go in `AppModule`'s own `controllers: [...]` array. `KavoModule`'s discovery binder (`DiscoveryService`, `onModuleInit`) finds them there and binds each entity's service, no registration needed; `provideServices: true` additionally provides `getKavoServiceToken(Entity)` as a real DI provider for every `@Kavo`-decorated class the process has seen, which `AddressController` needs for its constructor-injected `base` (a fully custom route wants it typed as an ordinary constructor param). That's the same thing the standalone no-arg `KavoModule.forFeature()` does, folded into one call; `forFeature([...])` with an explicit array also still exists. Both no-arg forms are process-wide, so `@kavo/nest`'s own tests (many differently-configured `@Kavo` classes over one entity in one file) always pass `forFeature` an explicit array instead. The app is what hands Nest its infrastructure — `@kavo/nest` and the ORM adapter never import each other.
 
 ## Conventions (normative)
 
@@ -130,4 +140,4 @@ Two rules make this work:
 
 ## Where to read more
 
-`docs/getting-started.md`, `docs/using-the-api.md`, and `docs/integrations/nest/` (per-ORM wiring plus the full `@Kavo`/`KavoModule` configuration reference) are the adopter-facing front door; `docs/internals/` holds the design docs and ADRs (`adr/0001`…`0018`) — one ADR per load-bearing decision. `docs/internals/architecture/` mirrors the packages (query grammar, error handling, engine, TypeORM adapter, Nest integration, soft delete, relations). ADRs are referenced by name in code comments; read the referenced ADR before changing the behavior it governs.
+`docs/getting-started.md`, `docs/using-the-api.md`, and `docs/integrations/nest/` (per-ORM wiring plus the full `@Kavo`/`KavoModule` configuration reference) are the adopter-facing front door; `docs/internals/` holds the design docs and ADRs (`adr/0001`…`0018`) — one ADR per load-bearing decision. `docs/internals/architecture/` mirrors the packages (query grammar, error handling, engine, the TypeORM/Prisma/Mongoose adapters, Nest integration, the GraphQL and MCP bindings, soft delete, relations). ADRs are referenced by name in code comments; read the referenced ADR before changing the behavior it governs.

@@ -106,7 +106,18 @@ Two independent enforcement layers:
    `protocols/*` package (`@kavo/nest` → `@kavo/graphql`/`@kavo/mcp`), never
    the reverse — ADR-0016.
 
-   Two properties of that rule set are load-bearing and easy to lose:
+   Three properties of that rule set are load-bearing and easy to lose:
+   - **Coverage is narrower than the invariants it supports.** The adapter
+     rules' `to` covers `packages/frameworks` only and the protocol rules omit
+     each other, so an ORM adapter importing a protocol package, one ORM
+     adapter importing another, and one protocol importing another all pass
+     today. So does a type-only import out of core spelled as a bare specifier
+     or a barrel (`core-imports-nothing` carries
+     `dependencyTypesNot: ["type-only"]`), and one edge's `src` deep-importing
+     another edge's `src` (both deep-import rules are anchored on core). Each
+     is still a violation — review is what catches it. A green `depcruise` is
+     not proof a change respects the boundaries; see the footnotes under
+     `CONTRIBUTING.md`'s boundary table.
    - **Both spellings are matched.** A workspace package specifier does not
      resolve to a path for dependency-cruiser, so a path-only rule silently
      misses `from "@kavo/nest"` — the spelling anyone would actually write.
@@ -116,35 +127,37 @@ Two independent enforcement layers:
      entirely, which left the boundary convention-only exactly where fixture
      sharing tempts a shortcut. A test file may import its own package's
      source and the `@kavo/*` barrels, never another package's `src` or
-     `tests`; core's tests additionally may not reach an adapter or framework
-     package, because core's ignorance of both is what its suite exists to
-     prove.
+     `tests`; core's tests additionally may not reach an adapter, a protocol
+     binding, or a framework package, because core's ignorance of all three is
+     what its suite exists to prove.
 
 ## 4. Workspace tooling: pnpm + plain scripts (ADR-0003)
 
 pnpm workspaces with **plain root scripts**, no
-task runner. The entire build graph is three packages whose ordering is
-already fully expressed by TS project references — `tsc -b` performs
-incremental, dependency-ordered, cached builds natively. A task runner
+task runner. The entire build graph is seven packages and two example apps,
+whose ordering is already fully expressed by TS project references — `tsc -b`
+performs incremental, dependency-ordered, cached builds natively. A task runner
 (turborepo/nx) would add a second place where the graph is declared, a
 cache layer duplicating `.tsbuildinfo`, and config to keep honest, while
 buying nothing at this scale. Revisit only if the workspace gains many
 packages or expensive non-tsc pipelines (a future e2e suite is the
 natural checkpoint).
 
-Root scripts: `build` (`tsc -b`), `clean`, `depcruise`, and `check`
-(build + boundaries) — `pnpm check` is the verification gate. Three checks sit
-deliberately outside it, as their own CI jobs: `format:check` (Prettier),
-`docs:build` (VitePress, which resolves the links inside the pages it
-renders), and `docs:links` (`scripts/check-doc-links.sh`). The last two are
-complements, not overlaps — the docs build never sees a `docs/**.md`
-reference written from `packages/` or `extensions/`, because those are not
-pages, and it never reads `docs/.vitepress/config.mts`, because that is
-config rather than content. So a renamed doc can still leave a dead link in a
-package README that ships to npm, or a silent 404 in the published sidebar,
-and `docs:links` is what catches both. The `/implement`, `/review`, `/pr` and
-`/merge` commands run these alongside `pnpm check` locally, so none of them
-is a gate you only hear about from CI.
+Root scripts: `generate`, `build` (`tsc -b`), `clean`, `typecheck`,
+`depcruise`, `lint`, `test`, `prettify`, `format:check`, `docs:build`,
+`docs:links`, and `check` — the last runs `generate → build → typecheck →
+depcruise → lint → test` and is the verification gate. Three checks sit
+outside it, each as its own CI job: `format:check`, `docs:build` (VitePress,
+which resolves the links inside the pages it renders), and `docs:links`
+(`scripts/check-doc-links.sh`). The last two are complements, not overlaps —
+the docs build never sees a `docs/**.md` reference written from `packages/`
+or `extensions/`, because those are not pages, and it never reads
+`docs/.vitepress/config.mts`, because that is config rather than content. So
+a renamed doc can still leave a dead link in a package README that ships to
+npm, or a silent 404 in the published sidebar, and `docs:links` is what
+catches both. The `/implement`, `/review`, `/pr` and `/merge` commands run
+these alongside `pnpm check` locally, so none of them is a gate you only hear
+about from CI.
 
 ## 5. Public vs. internal API surface
 
@@ -163,7 +176,8 @@ dual ESM+CJS output is a future deliverable.
 ## 6. Build strategy
 
 `tsc -b` against the solution file: incremental (`.tsbuildinfo`),
-project-reference-ordered (core → typeorm/prisma/mongoose/nest), each package emitting
+project-reference-ordered (core → typeorm/prisma/mongoose/graphql/mcp → nest),
+each package emitting
 `dist/` with declarations + declaration maps. Consumers inside the
 workspace resolve `@kavo/*` via pnpm workspace links to the built
 `dist`, exactly as external consumers will.
