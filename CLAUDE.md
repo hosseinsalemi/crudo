@@ -37,7 +37,7 @@ Because the build compiles `src` only, each package also has a `tsconfig.tests.j
 
 ## Architecture
 
-Eight published packages in a hub-and-spoke topology (`pnpm-workspace.yaml`, which globs in the two `examples/*` apps as well), plus one sanctioned sideways edge:
+Eight published packages in a hub-and-spoke topology (`pnpm-workspace.yaml`, which globs in the three `examples/*` apps as well), plus one sanctioned sideways edge:
 
 ```
 @kavo/nest ──▶ @kavo/core ◀── @kavo/typeorm

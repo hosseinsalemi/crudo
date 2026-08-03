@@ -19,10 +19,13 @@ import { wrap } from "@mikro-orm/core";
  *    to-many as `[]`. That is harmless — core's serializer emits a relation
  *    key only for nodes on the request's include tree — and it is why a
  *    relation must be `include=`d to appear as an object.
- * 2. **MikroORM's own property options apply.** A `@Property({ hidden: true })`
- *    is dropped and a custom `serializer` runs before core ever sees the row.
- *    The ORM's declaration wins here, so a hidden property stays hidden even
- *    if a Kavo DTO names it. See doc 17, "Adapter-specific caveats".
+ * 2. **MikroORM's own property options apply.** A custom `serializer` runs
+ *    before core ever sees the row, and a `@Property({ hidden: true })` is
+ *    dropped. The hidden case is belt-and-braces rather than the guard:
+ *    `buildEntityMetadata` excludes such a property from the seam entirely,
+ *    which is what keeps it off the default filter/sort allowlists too — a
+ *    column invisible in the body but filterable in the database would be a
+ *    blind extraction oracle. See doc 17, "Adapter-specific caveats".
  */
 export function toPlain<Entity extends object>(entity: Entity): Entity {
   return wrap(entity).toObject() as Entity;

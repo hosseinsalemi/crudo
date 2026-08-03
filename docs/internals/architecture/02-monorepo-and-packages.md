@@ -34,7 +34,9 @@ kavo/
 ├─ examples/                  # reference applications, one per framework+ORM pairing
 │  ├─ nest-typeorm/           # @kavo/example-nest-typeorm
 │  │  └─ src/index.ts
-│  └─ nest-mongoose/          # @kavo/example-nest-mongoose
+│  ├─ nest-mongoose/          # @kavo/example-nest-mongoose
+│  │  └─ src/index.ts
+│  └─ nest-mikroorm/          # @kavo/example-nest-mikroorm
 │     └─ src/index.ts
 └─ docs/                      # this documentation
 ```
@@ -144,7 +146,7 @@ Two independent enforcement layers:
 ## 4. Workspace tooling: pnpm + plain scripts (ADR-0003)
 
 pnpm workspaces with **plain root scripts**, no
-task runner. The entire build graph is seven packages and two example apps,
+task runner. The entire build graph is eight packages and three example apps,
 whose ordering is already fully expressed by TS project references — `tsc -b`
 performs incremental, dependency-ordered, cached builds natively. A task runner
 (turborepo/nx) would add a second place where the graph is declared, a

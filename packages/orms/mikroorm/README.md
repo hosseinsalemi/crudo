@@ -9,9 +9,11 @@ MikroORM adapter for Kavo: implements `RepositoryAdapter`
 `@kavo/nest` or any framework.
 
 Fully implemented: CRUD, filtering/sorting/pagination (including across
-relation paths), soft delete/restore/purge (explicit `softDelete.field`
-only — MikroORM declares no delete-marker column the way TypeORM's
-`@DeleteDateColumn` does), and nested relation includes (via `populate`).
+relation paths), soft delete/restore/purge, and nested relation includes
+(via `populate`). MikroORM declares no delete-marker column the way
+TypeORM's `@DeleteDateColumn` does, so the seam reports none — but read the
+soft-delete note under "Known limitations" before assuming that means soft
+delete is off until you configure it.
 
 ## Usage
 
@@ -67,25 +69,46 @@ even a loss — SQLite's own `LIKE` is already ASCII case-insensitive.
   (PostgreSQL, MySQL). On SQLite, which has no default escape character,
   `filter[name][like]=100\%` matches the literal text `100\` followed by
   anything, rather than the string `100%`.
+- **Soft-deleted related rows are pruned in memory.** MikroORM's
+  `populateWhere` cannot express per-level scoping: nesting a child condition
+  makes it a predicate on the _parent_, so a parent with no surviving
+  children disappears instead of coming back empty. The adapter populates
+  everything and prunes the loaded tree, which is correct at any depth but
+  does fetch soft-deleted related rows before discarding them. Soft-deleted
+  _roots_ are still excluded in SQL.
 - **`IncludeNode.strategy` is ignored.** MikroORM resolves `populate` with
   its own queries and applies `limit`/`offset` to the root either way, so
   the join/batch distinction has nothing to control here — and MikroORM's
   `strategy` option is per-query rather than per-relation, so it could not
   express a mixed include tree anyway. Same posture as `@kavo/prisma`.
 - **MikroORM's own property options win at the boundary.** Rows are
-  converted with `wrap(entity).toObject()`, so a
-  `@Property({ hidden: true })` is dropped and a custom `serializer` runs
-  before core ever sees the row — a hidden property stays hidden even if a
-  Kavo DTO names it.
-- **The soft-delete marker is writable.** Nothing in a MikroORM entity
-  declares a delete column, so `deletedAt` is an ordinary property and a
-  plain `PATCH` of it will soft-delete a row, bypassing `deleteOne`'s
-  already-deleted check. It cannot _revive_ one: writes are scoped to the
-  live set, so a soft-deleted row 404s on `PUT`/`PATCH`. This is the same
-  hole `@kavo/prisma` and `@kavo/mongoose` have — only `@kavo/typeorm`
-  escapes it, because `@DeleteDateColumn` is detectable — and the fix
-  belongs in core. Until then, register an explicit `update`/`patch` DTO
-  that omits the marker whenever you enable `purgeOne`.
+  converted with `wrap(entity).toObject()`, so a custom `serializer` runs
+  before core ever sees the row.
+- **The soft-delete marker is writable, and it is on by default.** Nothing
+  in a MikroORM entity declares a delete column, so the adapter cannot mark
+  it generated — but `softDelete` defaults to
+  `{ field: "deletedAt", strategy: "auto" }` and core matches that _name_
+  against your columns, so any entity with a `deletedAt` property is
+  soft-deletable with no config at all. The marker then sits in the derived
+  writable projection: a plain `PATCH` of it soft-deletes a row, bypassing
+  `deleteOne`'s already-deleted check and even
+  `operations: { deleteOne: false }`. It cannot _revive_ one — writes are
+  scoped to the live set, so a soft-deleted row 404s on `PUT`/`PATCH`. This
+  is the same hole `@kavo/prisma` and `@kavo/mongoose` have (only
+  `@kavo/typeorm` escapes it, because `@DeleteDateColumn` is detectable and
+  therefore markable), and the fix belongs in core. Until then, register an
+  explicit `update`/`patch` DTO that omits the marker.
+- **A non-auto-increment primary key is client-writable.**
+  `@PrimaryKey() id: string = v4()` carries none of MikroORM's generated
+  flags, so a `PATCH` can rewrite a row's identity. A numeric `@PrimaryKey()`
+  is auto-increment and safe. Name the write DTOs explicitly for any entity
+  with a caller-assigned key.
+- **`hidden` and `lazy` properties are dropped from Kavo entirely.** Not
+  merely hidden from responses — excluding them from the metadata seam is
+  what keeps them off the default filter/sort allowlists, where an invisible
+  but filterable column is a blind extraction oracle. The trade is the one
+  `@kavo/mongoose` makes for `select: false`: Kavo does not manage such a
+  property at all, so write it through a custom operation or the ORM.
 - **A MikroORM `@Filter` is applied on top of Kavo's scoping.** Kavo owns
   soft-delete scoping through `softDelete.field`; a default-on MikroORM
   soft-delete filter would AND a second predicate onto every query and
@@ -93,7 +116,7 @@ even a loss — SQLite's own `LIKE` is already ASCII case-insensitive.
 - **No transactions.** The `TransactionManager` seam is unbuilt across every
   Kavo adapter today.
 - **Composite primary keys are refused.** `buildEntityMetadata` raises
-  `KAVO_CONFIGURATION_ERROR` for an entity with more than one `@PrimaryKey`.
+  `KAVO_CONFIG_INVALID` for an entity with more than one `@PrimaryKey`.
 
 ## Soft delete and unique indexes
 

@@ -1,7 +1,8 @@
 import "reflect-metadata";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { Collection, Entity, ManyToOne, MikroORM, OneToMany, PrimaryKey, Property } from "@mikro-orm/core";
+import { Collection, Entity, ManyToMany, ManyToOne, MikroORM, OneToMany, PrimaryKey, Property } from "@mikro-orm/core";
 import {
+  ConfigurationException,
   ConflictException,
   NotFoundException,
   PersistenceException,
@@ -9,7 +10,7 @@ import {
   type DefaultKavoService,
   type KavoInstance,
 } from "@kavo/core";
-import { buildEntityMetadata, createMikroOrmKavo } from "@kavo/mikroorm";
+import { buildEntityMetadata, createInfrastructure, createMikroOrmKavo } from "@kavo/mikroorm";
 import { clearDatabase, newTestOrm } from "./support/database.js";
 
 // Explicit property types throughout: the swc test transform emits decorator
@@ -40,6 +41,20 @@ class Author {
 
   @OneToMany(() => Book, (book) => book.author)
   books = new Collection<Book>(this);
+
+  // The owning side of a many-to-many, so array-valued relation writes have
+  // somewhere to land.
+  @ManyToMany(() => Shelf, undefined, { owner: true })
+  shelves = new Collection<Shelf>(this);
+}
+
+@Entity()
+class Shelf {
+  @PrimaryKey({ type: "number" })
+  id!: number;
+
+  @Property({ type: "string" })
+  label!: string;
 }
 
 @Entity()
@@ -50,8 +65,9 @@ class Book {
   @Property({ type: "string" })
   title!: string;
 
-  @ManyToOne(() => Author)
-  author!: Author;
+  // Nullable, so an association can be *cleared* as well as set.
+  @ManyToOne(() => Author, { nullable: true })
+  author: Author | null = null;
 }
 
 let orm: MikroORM;
@@ -59,7 +75,7 @@ let kavo: KavoInstance;
 let authors: DefaultKavoService<Author>;
 
 beforeAll(async () => {
-  orm = await newTestOrm([Author, Book]);
+  orm = await newTestOrm([Author, Book, Shelf]);
   kavo = createMikroOrmKavo(orm);
   authors = kavo.createCrud(Author) as DefaultKavoService<Author>;
 });
@@ -75,7 +91,7 @@ beforeEach(async () => {
 /** The persisted foreign key of one book, read straight from the database. */
 async function readAuthorId(bookId: number): Promise<number | undefined> {
   const row = await orm.em.fork().findOne(Book, { id: bookId }, { populate: ["author"] });
-  return row?.author.id;
+  return row?.author?.id;
 }
 
 async function seed(): Promise<void> {
@@ -86,6 +102,24 @@ async function seed(): Promise<void> {
     { email: "joan@x.io", name: "Joan", age: 28, status: "pending" },
   ];
   for (const row of rows) await authors.createOne(row as never);
+}
+
+/** A normalized query with no filter — what a custom handler hands the reader. */
+function unfilteredQuery() {
+  return {
+    filter: { root: null },
+    sort: [],
+    include: {},
+    fields: { root: null, relations: {} },
+    pagination: { limit: 10, offset: 0 },
+    count: false,
+    withDeleted: false,
+    onlyDeleted: false,
+  };
+}
+
+function hardDeleteContext() {
+  return { entityName: "Author", operation: "findOne", config: { softDelete: { strategy: "hard" } } };
 }
 
 describe("metadata derivation seam", () => {
@@ -100,7 +134,7 @@ describe("metadata derivation seam", () => {
     expect(byName["createdAt"]).toMatchObject({ kind: "date", generated: true });
     expect(byName["bio"]).toMatchObject({ nullable: true });
     expect(byName["books"]).toBeUndefined(); // relations are not fields
-    expect(metadata.relations.map((relation) => relation.name)).toEqual(["books"]);
+    expect(metadata.relations.map((relation) => relation.name).sort()).toEqual(["books", "shelves"]);
     expect(metadata.relations[0]).toMatchObject({ cardinality: "many", includable: false });
     // The lazy target thunk resolves to the class itself — the identity core
     // matches registered entities by, with no marker class in sight.
@@ -117,7 +151,15 @@ describe("metadata derivation seam", () => {
     class Ghost {
       id!: number;
     }
-    expect(() => buildEntityMetadata(orm, Ghost)).toThrowError(/no registered entity named 'Ghost'/);
+    let thrown: unknown;
+    try {
+      buildEntityMetadata(orm, Ghost);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(ConfigurationException);
+    expect((thrown as ConfigurationException).code).toBe("KAVO_CONFIG_INVALID");
+    expect((thrown as Error).message).toMatch(/no registered entity named 'Ghost'/);
   });
 });
 
@@ -204,11 +246,99 @@ describe("MikroOrmRepositoryAdapter — relation writes are association-only", (
     const books = isolated.createCrud(Book) as DefaultKavoService<Book>;
     const before = await orm.em.fork().count(Author, {});
 
-    await expect(
-      books.createOne({ title: "smuggled", author: { email: "evil@x.io", name: "Injected", age: 1 } } as never),
-    ).rejects.toBeInstanceOf(PersistenceException);
+    const created = (await books.createOne({
+      title: "smuggled",
+      author: { email: "evil@x.io", name: "Injected", age: 1 },
+    } as never)) as Book;
 
+    // The row is created, the smuggled object is not: an id-less relation
+    // value becomes `null`, so no Author is written and none is associated.
     expect(await orm.em.fork().count(Author, {})).toBe(before);
+    expect(await readAuthorId(created.id)).toBeUndefined();
+  });
+});
+
+describe("MikroOrmRepositoryAdapter — relation writes", () => {
+  async function newShelf(label: string): Promise<number> {
+    const em = orm.em.fork();
+    const shelf = em.create(Shelf, { label } as never);
+    await em.flush();
+    return (shelf as Shelf).id;
+  }
+
+  /** The shelf ids actually persisted against one author. */
+  async function shelvesOf(authorId: number): Promise<string[]> {
+    const row = await orm.em.fork().findOne(Author, { id: authorId }, { populate: ["shelves"] });
+    return row!.shelves
+      .getItems()
+      .map((shelf) => shelf.label)
+      .sort();
+  }
+
+  it("associates a to-many by an array of ids and of { id } references", async () => {
+    const a = await newShelf("A");
+    const b = await newShelf("B");
+    const created = (await authors.createOne({
+      email: "ada@x.io",
+      name: "Ada",
+      age: 36,
+      shelves: [a, { id: b }],
+    } as never)) as Author;
+
+    expect(await shelvesOf(created.id)).toEqual(["A", "B"]);
+  });
+
+  it("drops id-less elements from a to-many write instead of failing the whole request", async () => {
+    // Core's own `associate` filters nulls out of an array; the adapter's
+    // unwrap must too. A relation whose target is not in core's catalog
+    // arrives here as the raw client value, so `[{}]` and `[null]` are
+    // shapes that really can reach this code — and passing `[null]` to
+    // `em.create` fails at the driver as a 500 rather than being ignored.
+    const a = await newShelf("A");
+    const created = (await authors.createOne({
+      email: "ada@x.io",
+      name: "Ada",
+      age: 36,
+      shelves: [{ id: a }, {}, null],
+    } as never)) as Author;
+
+    expect(await shelvesOf(created.id)).toEqual(["A"]);
+  });
+
+  it("clears a to-one association when the payload sends null", async () => {
+    const books = kavo.createCrud(Book) as DefaultKavoService<Book>;
+    const ada = (await authors.createOne({ email: "ada@x.io", name: "Ada", age: 36 } as never)) as Author;
+    const book = (await books.createOne({ title: "Notes", author: ada.id } as never)) as Book;
+    expect(await readAuthorId(book.id)).toBe(ada.id);
+
+    await books.patchOne(book.id, { author: null } as never);
+    expect(await readAuthorId(book.id)).toBeUndefined();
+  });
+});
+
+describe("MikroOrmRepositoryAdapter — findOne by query", () => {
+  it("returns the first row when the query carries no filter at all", async () => {
+    // Regression: MikroORM's validator rejects `em.findOne` with an empty
+    // `where` outright, while `em.find` accepts it. An unfiltered query is a
+    // legitimate shape — `findOne`'s contract is "first match of the query,
+    // or null", and no filter matches everything — so routing it through
+    // `em.findOne` turned a valid read into a 500. Not reachable from a
+    // generated route (the standard `findOne` is by id), but it is exactly
+    // what a custom handler or a direct adapter call produces.
+    await seed();
+    const reader = createInfrastructure(orm).adapterFor(Author);
+    const row = await reader.findOne(unfilteredQuery() as never, hardDeleteContext() as never);
+    expect(row).not.toBeNull();
+  });
+
+  it("still applies sort and soft-delete scope on the unfiltered path", async () => {
+    await seed();
+    const reader = createInfrastructure(orm).adapterFor(Author);
+    const row = (await reader.findOne(
+      { ...unfilteredQuery(), sort: [{ field: "age", direction: "asc" }] } as never,
+      hardDeleteContext() as never,
+    )) as Author | null;
+    expect(row).toMatchObject({ name: "Joan" }); // the youngest, not just any row
   });
 });
 

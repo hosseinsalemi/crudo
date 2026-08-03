@@ -3,12 +3,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Entity, MikroORM, PrimaryKey, Property } from "@mikro-orm/core";
 import {
   AlreadyDeletedException,
+  ConfigurationException,
   ConflictException,
   NotDeletedException,
   NotFoundException,
   type DefaultKavoService,
 } from "@kavo/core";
-import { buildEntityMetadata, createMikroOrmKavo } from "@kavo/mikroorm";
+import { buildEntityMetadata, createInfrastructure, createMikroOrmKavo } from "@kavo/mikroorm";
 import { clearDatabase, newTestOrm } from "./support/database.js";
 
 /**
@@ -80,6 +81,41 @@ describe("delete-marker detection", () => {
     // metadata seam to detect and `softDelete.field` must be configured.
     expect(buildEntityMetadata(orm, Ticket).softDeleteField).toBeNull();
     expect(buildEntityMetadata(orm, Invoice).softDeleteField).toBeNull();
+  });
+});
+
+describe("zero-config soft delete", () => {
+  it("is auto-enabled by a `deletedAt` property alone, with no config at all", async () => {
+    // `softDelete` defaults to `{ field: "deletedAt", strategy: "auto" }`, and
+    // `resolveSoftDelete` matches that name against the entity's own columns.
+    // So an adapter reporting `softDeleteField: null` does NOT mean "soft
+    // delete is off until configured" — the conventional column name turns it
+    // on by itself. That matters because the marker stays *writable* (nothing
+    // declares it, so it cannot be marked generated), which is what makes the
+    // DTO hardening in the note below load-bearing rather than optional.
+    const zeroConfig = createMikroOrmKavo(orm).createCrud(Ticket) as DefaultKavoService<Ticket>;
+    const created = (await zeroConfig.createOne({ reference: "T-zero", title: "x" } as never)) as Ticket;
+
+    await zeroConfig.deleteOne(created.id);
+
+    const raw = await orm.em.fork().findOne(Ticket, { id: created.id });
+    expect(raw).not.toBeNull(); // still there — soft, not hard
+    expect(raw?.deletedAt).toBeInstanceOf(Date);
+    expect((await zeroConfig.findMany()).total).toBe(0);
+  });
+
+  it("leaves the marker client-writable under derived DTOs", async () => {
+    // The consequence of the above, stated as a test so it cannot regress
+    // silently: with no `dto` block, `deletedAt` is an ordinary non-generated
+    // column and therefore in the writable projection. A plain patch stamps
+    // it, bypassing `deleteOne`'s already-deleted check. The mitigation is an
+    // explicit write DTO (see `examples/nest-mikroorm`'s OwnerController);
+    // the real fix belongs in core — see doc 17 §7.
+    const zeroConfig = createMikroOrmKavo(orm).createCrud(Ticket) as DefaultKavoService<Ticket>;
+    const created = (await zeroConfig.createOne({ reference: "T-writable", title: "x" } as never)) as Ticket;
+
+    await zeroConfig.patchOne(created.id, { deletedAt: new Date() } as never);
+    expect((await zeroConfig.findMany()).total).toBe(0);
   });
 });
 
@@ -228,11 +264,58 @@ describe("MikroOrmRepositoryAdapter — hard delete", () => {
     // Core catches this at `createCrud` rather than leaving the adapter to
     // fail per request — the adapter's own `requireSoftDelete` guard is the
     // second line, for a hand-built context.
-    expect(() =>
+    let thrown: unknown;
+    try {
       createMikroOrmKavo(orm).createCrud(Invoice, {
         softDelete: { strategy: "hard" },
         operations: { restoreOne: true },
-      }),
-    ).toThrowError(/hard delete strategy/);
+      });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(ConfigurationException);
+    expect((thrown as ConfigurationException).code).toBe("KAVO_CONFIG_INVALID");
+    expect((thrown as Error).message).toMatch(/hard delete strategy/);
+  });
+
+  it("refuses restore at the adapter too, for a hand-built hard-delete context", async () => {
+    // The second line of defence the bootstrap check above makes unreachable
+    // through `createCrud` — a programmatic caller assembling its own context
+    // reaches the adapter directly, and must not silently no-op.
+    const created = (await invoices.createOne({ number: "INV-guard" } as never)) as Invoice;
+    const adapter = createInfrastructure(orm).adapterFor(Invoice);
+    const hardContext = {
+      entityName: "Invoice",
+      operation: "restoreOne",
+      config: { softDelete: { strategy: "hard" } },
+    };
+
+    let thrown: unknown;
+    try {
+      await adapter.restore(created.id, hardContext as never);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(ConfigurationException);
+    expect((thrown as ConfigurationException).code).toBe("KAVO_CONFIG_INVALID");
+  });
+
+  it("purges a hard-delete row outright, and 404s when it is already gone", async () => {
+    // Under a hard strategy `purge` skips the already-deleted check entirely
+    // and is just a delete. Core refuses to *enable* `purgeOne` on a
+    // hard-delete entity at bootstrap (same guard as `restoreOne`), so this
+    // branch is only reachable the way `requireSoftDelete`'s is: a
+    // programmatic caller assembling its own context.
+    const created = (await invoices.createOne({ number: "INV-purge" } as never)) as Invoice;
+    const adapter = createInfrastructure(orm).adapterFor(Invoice);
+    const hardContext = {
+      entityName: "Invoice",
+      operation: "purgeOne",
+      config: { softDelete: { strategy: "hard" } },
+    };
+
+    await adapter.purge(created.id, hardContext as never);
+    expect(await orm.em.fork().count(Invoice, {})).toBe(0);
+    await expect(adapter.purge(created.id, hardContext as never)).rejects.toBeInstanceOf(NotFoundException);
   });
 });

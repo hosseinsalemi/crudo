@@ -1,0 +1,32 @@
+{
+  "name": "@kavo/example-nest-mikroorm",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Kavo reference application over NestJS + MikroORM (Pet example: single-table inheritance, relations both ways, relation-path filtering, and config-declared soft delete).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@kavo/core": "workspace:*",
+    "@kavo/mikroorm": "workspace:*",
+    "@kavo/nest": "workspace:*",
+    "@mikro-orm/better-sqlite": "^6.6.14",
+    "@mikro-orm/core": "^6.6.14",
+    "@mikro-orm/postgresql": "^6.6.14",
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/platform-express": "^11.0.0",
+    "@nestjs/swagger": "^11.0.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "^11.0.0",
+    "@testcontainers/postgresql": "^12.0.4",
+    "@types/supertest": "^7.2.1",
+    "supertest": "^7.0.0"
+  }
+}

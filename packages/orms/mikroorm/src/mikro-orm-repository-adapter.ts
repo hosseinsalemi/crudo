@@ -15,6 +15,23 @@ import { translateFilter, type FilterTranslatorOptions, type MikroWhere } from "
 import { toPlain, toPlainAll } from "./plain-entity.js";
 
 /**
+ * The subset of MikroORM's `FindOptions` this adapter constructs.
+ *
+ * Declared rather than borrowed: MikroORM's own `FindOptions<T, …>` is
+ * generic over the entity and its populate hints, which the adapter cannot
+ * supply from core's untyped `IncludeTree`. But the *keys* are Kavo's own
+ * construction, and typing them is what makes a typo a compile error — a
+ * silent `populatewhere` would drop the soft-delete scoping from every
+ * include and leave only one test to notice.
+ */
+interface MikroFindOptions {
+  readonly orderBy?: readonly Record<string, unknown>[];
+  readonly populate?: readonly string[];
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+/**
  * `RepositoryAdapter` over a MikroORM `EntityManager`: CRUD with hard *or*
  * soft delete, restore, purge, filtering, sorting, pagination, optional
  * counting, and nested relation includes.
@@ -92,7 +109,7 @@ export class MikroOrmRepositoryAdapter<Entity extends object> implements Reposit
         query?.onlyDeleted ?? false,
       );
       const row = await this.fork().findOne(this.entity, where as never, this.populateOptions(include) as never);
-      return row === null ? null : toPlain(row);
+      return row === null ? null : pruneIncluded(toPlain(row), include);
     } catch (error) {
       throw mapDriverError(error, errorContext(context));
     }
@@ -100,12 +117,23 @@ export class MikroOrmRepositoryAdapter<Entity extends object> implements Reposit
 
   async findOne(query: NormalizedQueryContext<Entity>, context: KavoContext<Entity>): Promise<Entity | null> {
     try {
-      const row = await this.fork().findOne(
+      // `em.find(…, { limit: 1 })` rather than `em.findOne`: MikroORM's
+      // validator rejects `em.findOne` with an empty `where` outright, and an
+      // unfiltered query is a legitimate shape here — `findOne`'s contract is
+      // "first match of the query, or null", and a query with no filter
+      // matches everything. `em.find` accepts it, so routing through it keeps
+      // the contract without an empty-where special case. The two are
+      // otherwise identical: `findOne` is itself a limit-1 `find`.
+      const rows = await this.fork().find(
         this.entity,
         this.buildWhere(query, context) as never,
-        this.buildFindOptions(query) as never,
+        {
+          ...this.buildFindOptions(query),
+          limit: 1,
+        } as never,
       );
-      return row === null ? null : toPlain(row);
+      const row = rows[0];
+      return row === undefined ? null : pruneIncluded(toPlain(row), query.include);
     } catch (error) {
       throw mapDriverError(error, errorContext(context));
     }
@@ -122,7 +150,7 @@ export class MikroOrmRepositoryAdapter<Entity extends object> implements Reposit
           limit: query.pagination.limit,
         } as never,
       );
-      return toPlainAll(rows);
+      return toPlainAll(rows).map((row) => pruneIncluded(row, query.include));
     } catch (error) {
       throw mapDriverError(error, errorContext(context));
     }
@@ -150,7 +178,7 @@ export class MikroOrmRepositoryAdapter<Entity extends object> implements Reposit
     );
   }
 
-  private buildFindOptions(query: NormalizedQueryContext<Entity>): Record<string, unknown> {
+  private buildFindOptions(query: NormalizedQueryContext<Entity>): MikroFindOptions {
     const orderBy = query.sort.map((sort) => nestOrderBy(sort.field as string, sort.direction));
     return {
       ...(orderBy.length > 0 && { orderBy }),
@@ -161,23 +189,20 @@ export class MikroOrmRepositoryAdapter<Entity extends object> implements Reposit
   // ── Relation includes ───────────────────────────────────────────────
 
   /**
-   * Translate a validated `IncludeTree` into MikroORM's `populate` paths
-   * plus, when any included relation is soft-deletable, the `populateWhere`
-   * that keeps deleted related rows out.
+   * Translate a validated `IncludeTree` into MikroORM's `populate` paths.
    *
-   * Soft-deleted related rows are excluded from every include, to-one and
-   * to-many alike — the same rule `@kavo/typeorm` and `@kavo/prisma` apply.
-   * A root `withDeleted` is the root's own opt-in only; it never widens an
-   * included relation.
+   * Soft-delete scoping of included rows is deliberately **not** done here —
+   * see {@link pruneIncluded}. MikroORM's `populateWhere` cannot express it:
+   * a nested condition (`{ articles: { deletedAt: null, notes: { deletedAt:
+   * null } } }`) is read as a relation-path predicate on the *parent*, so an
+   * article with no live notes is dropped from the parent's collection
+   * altogether rather than coming back with an empty one. The dotted spelling
+   * MikroORM rejects outright, and the parent-only spelling silently leaves
+   * every deeper level unscoped.
    */
-  private populateOptions(tree: IncludeTree): Record<string, unknown> {
+  private populateOptions(tree: IncludeTree): MikroFindOptions {
     const paths = populatePaths(tree);
-    if (paths.length === 0) return {};
-    const populateWhere = includeSoftDeleteWhere(tree);
-    return {
-      populate: paths,
-      ...(populateWhere !== undefined && { populateWhere }),
-    };
+    return paths.length === 0 ? {} : { populate: paths };
   }
 
   // ── Soft delete ──────────────────────────────────────────────────────
@@ -386,9 +411,59 @@ export class MikroOrmRepositoryAdapter<Entity extends object> implements Reposit
  * write one cascade setting away from working, which is precisely what
  * ADR-0014 rules out: relations are associated by id, never deep-written.
  */
+/**
+ * Apply the two include-tree rules core expects of a loaded row: every
+ * included relation is **present**, and no soft-deleted related row is in it.
+ *
+ * Both are done here, in memory, rather than in the query — see
+ * `populateOptions` for why `populateWhere` cannot do the second one without
+ * silently dropping parents. The cost is that soft-deleted related rows are
+ * fetched and then discarded; the alternative spellings are wrong rather than
+ * merely slower, so this is the honest trade. Soft-deleted *roots* are still
+ * excluded in SQL (`scopeToLive`), which is where the volume is.
+ *
+ * "Present" matters because core's serializer treats an absent key as "the
+ * adapter never hydrated this" and skips it — so an included to-many that
+ * matches nothing must be `[]`, not missing. A root `withDeleted` never
+ * widens an included relation: this prunes regardless of the root's scope.
+ */
+function pruneIncluded<Row>(row: Row, tree: IncludeTree): Row {
+  const source = row as Record<string, unknown>;
+  for (const node of Object.values(tree)) {
+    const name = node.relation.name;
+    const value = source[name];
+    const deleted = (candidate: unknown): boolean => {
+      if (node.softDelete.strategy !== "soft") return false;
+      const marker = (candidate as Record<string, unknown>)[node.softDelete.field];
+      return marker !== null && marker !== undefined;
+    };
+
+    if (Array.isArray(value)) {
+      const live = value.filter((child) => !deleted(child));
+      for (const child of live) pruneIncluded(child, node.children);
+      source[name] = live;
+      continue;
+    }
+    // A to-one that was populated is an object; anything else (a bare foreign
+    // key from an uninitialized reference, `undefined`, `null`) becomes null.
+    if (value !== null && typeof value === "object" && !deleted(value)) {
+      pruneIncluded(value, node.children);
+      continue;
+    }
+    source[name] = node.relation.cardinality === "many" ? [] : null;
+  }
+  return row;
+}
+
 function unwrapAssociation(value: unknown, idField: string): unknown {
   if (value === null || value === undefined) return null;
-  if (Array.isArray(value)) return value.map((element) => unwrapAssociation(element, idField));
+  if (Array.isArray(value)) {
+    // Nulls are filtered, not mapped through, exactly as core's `associate`
+    // does: a to-many element carrying no id contributes nothing, and passing
+    // `[null]` to `em.create`/`assign` would fail at the driver as a 500
+    // instead of being ignored.
+    return value.map((element) => unwrapAssociation(element, idField)).filter((element) => element !== null);
+  }
   if (typeof value === "object") {
     return (value as Record<string, unknown>)[idField] ?? null;
   }
@@ -409,23 +484,6 @@ function populatePaths(tree: IncludeTree, prefix = ""): string[] {
     paths.push(...populatePaths(node.children, path));
   }
   return paths;
-}
-
-/**
- * The nested `populateWhere` excluding soft-deleted rows from included
- * relations, or `undefined` when no included relation is soft-deletable —
- * MikroORM's default (`PopulateHint.ALL`) is the right behavior then, and
- * passing an empty object would needlessly override it.
- */
-function includeSoftDeleteWhere(tree: IncludeTree): Record<string, unknown> | undefined {
-  const where: Record<string, unknown> = {};
-  for (const node of Object.values(tree)) {
-    const children = includeSoftDeleteWhere(node.children);
-    const live = node.softDelete.strategy === "soft" ? { [node.softDelete.field]: null } : undefined;
-    if (live === undefined && children === undefined) continue;
-    where[node.relation.name] = { ...live, ...children };
-  }
-  return Object.keys(where).length === 0 ? undefined : where;
 }
 
 /** `"author.name"` + `"asc"` → `{ author: { name: "asc" } }`. */

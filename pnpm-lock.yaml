@@ -42,6 +42,58 @@ importers:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@22.20.1)(vite@7.3.6(@types/node@22.20.1)(jiti@2.7.0)(yaml@2.9.0))
 
+  examples/nest-mikroorm:
+    dependencies:
+      '@kavo/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@kavo/mikroorm':
+        specifier: workspace:*
+        version: link:../../packages/orms/mikroorm
+      '@kavo/nest':
+        specifier: workspace:*
+        version: link:../../packages/frameworks/nest
+      '@mikro-orm/better-sqlite':
+        specifier: ^6.6.14
+        version: 6.6.14(@mikro-orm/core@6.6.16)(pg@8.20.0)
+      '@mikro-orm/core':
+        specifier: ^6.6.14
+        version: 6.6.16
+      '@mikro-orm/postgresql':
+        specifier: ^6.6.14
+        version: 6.6.16(@mikro-orm/core@6.6.16)(better-sqlite3@13.0.2)
+      '@nestjs/common':
+        specifier: ^11.0.0
+        version: 11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: ^11.0.0
+        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/platform-express':
+        specifier: ^11.0.0
+        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)
+      '@nestjs/swagger':
+        specifier: ^11.0.0
+        version: 11.4.6(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(reflect-metadata@0.2.2)
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
+      rxjs:
+        specifier: ^7.8.1
+        version: 7.8.2
+    devDependencies:
+      '@nestjs/testing':
+        specifier: ^11.0.0
+        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(@nestjs/platform-express@11.1.28)
+      '@testcontainers/postgresql':
+        specifier: ^12.0.4
+        version: 12.0.4
+      '@types/supertest':
+        specifier: ^7.2.1
+        version: 7.2.1
+      supertest:
+        specifier: ^7.0.0
+        version: 7.2.2
+
   examples/nest-mongoose:
     dependencies:
       '@kavo/core':
@@ -205,7 +257,7 @@ importers:
     devDependencies:
       '@mikro-orm/better-sqlite':
         specifier: ^6.6.14
-        version: 6.6.14(@mikro-orm/core@6.6.16)
+        version: 6.6.14(@mikro-orm/core@6.6.16)(pg@8.20.0)
       '@mikro-orm/core':
         specifier: ^6.6.14
         version: 6.6.16
@@ -777,6 +829,28 @@ packages:
         optional: true
       mariadb:
         optional: true
+
+  '@mikro-orm/knex@6.6.16':
+    resolution: {integrity: sha512-H0fYK4vSe2mtmfBDDNsOw5Z56JDYEzbaoIo24JhkzmoGna85ddwyYzYB289DMS8Ukn7qZKhfR2pn2kQDRSJiyw==}
+    engines: {node: '>= 18.12.0'}
+    peerDependencies:
+      '@mikro-orm/core': ^6.0.0
+      better-sqlite3: '*'
+      libsql: '*'
+      mariadb: '*'
+    peerDependenciesMeta:
+      better-sqlite3:
+        optional: true
+      libsql:
+        optional: true
+      mariadb:
+        optional: true
+
+  '@mikro-orm/postgresql@6.6.16':
+    resolution: {integrity: sha512-9MwmbnF+nuX5i/I4YClOLkYGoN2omY6Z5LA1rJHNs+5P3BDYSxR9dZk9kuPJ+g9GJXAx/gKKJzKgp7Wv4G65fA==}
+    engines: {node: '>= 18.12.0'}
+    peerDependencies:
+      '@mikro-orm/core': ^6.0.0
 
   '@modelcontextprotocol/sdk@1.30.0':
     resolution: {integrity: sha512-xKd8OIzlqNzcqcNumGAa6g+PW2kjD5vrpcKOnfldAUPP3j7lnqMPwlTXQm8gF+UwH72z0lqaRbjr9hqGz0eITA==}
@@ -2891,6 +2965,15 @@ packages:
     resolution: {integrity: sha512-qTAAlrEsl8s4OiEQY69wDvcMIdQN6wdz5ojQiOy6YRMuynxenON0O5oCpJI6lshc6scgAY8qvJ2On/p+CXY0GA==}
     engines: {node: '>=4'}
 
+  pg@8.20.0:
+    resolution: {integrity: sha512-ldhMxz2r8fl/6QkXnBD3CR9/xg694oT6DZQ2s6c/RI28OjtSOpxnPrUCGOBJ46RCUxcWdx3p6kw/xnDHjKvaRA==}
+    engines: {node: '>= 16.0.0'}
+    peerDependencies:
+      pg-native: '>=3.0.1'
+    peerDependenciesMeta:
+      pg-native:
+        optional: true
+
   pg@8.22.0:
     resolution: {integrity: sha512-8wih1vVIBMxoUM2oB4soJsD9tDnDpLv4OXBJ+EJzFsvycD+lfyIreC2gGHq78f8jbLLt+bvlPTFdFZfJkOuzAA==}
     engines: {node: '>= 16.0.0'}
@@ -2933,6 +3016,10 @@ packages:
     resolution: {integrity: sha512-VpZrUqU5A69eQyW2c5CA1jtLecCsN2U/bD6VilrFDWq5+5UIEVO7nazS3TEcHf1zuPYO/sqGvUvW62g86RXZuA==}
     engines: {node: '>=4'}
 
+  postgres-array@3.0.4:
+    resolution: {integrity: sha512-nAUSGfSDGOaOAEGwqsRY27GPOea7CNipJPOA7lPbdEpx5Kg3qzdP0AaWC5MlhTWV9s4hFX39nomVZ+C4tnGOJQ==}
+    engines: {node: '>=12'}
+
   postgres-bytea@1.0.1:
     resolution: {integrity: sha512-5+5HqXnsZPE65IJZSMkZtURARZelel2oXUEO8rH83VS/hxH5vv1uHquPg5wZs8yMAfdv971IU+kcPUczi7NVBQ==}
     engines: {node: '>=0.10.0'}
@@ -2941,9 +3028,17 @@ packages:
     resolution: {integrity: sha512-suDmjLVQg78nMK2UZ454hAG+OAW+HQPZ6n++TNDUX+L0+uUlLywnoxJKDou51Zm+zTCjrCl0Nq6J9C5hP9vK/Q==}
     engines: {node: '>=0.10.0'}
 
+  postgres-date@2.1.0:
+    resolution: {integrity: sha512-K7Juri8gtgXVcDfZttFKVmhglp7epKb1K4pgrkLxehjqkrgPhfG6OO8LHLkfaqkbpjNRnra018XwAr1yQFWGcA==}
+    engines: {node: '>=12'}
+
   postgres-interval@1.2.0:
     resolution: {integrity: sha512-9ZhXKM/rw350N1ovuWHbGxnGh/SNJ4cnxHiM0rxE4VN41wsg8P8zWn9hv/buK00RP4WvlOyr/RBDiptyxVbkZQ==}
     engines: {node: '>=0.10.0'}
+
+  postgres-interval@4.0.2:
+    resolution: {integrity: sha512-EMsphSQ1YkQqKZL2cuG0zHkmjCCzQqQ71l2GXITqRwjhRleCdv00bDk/ktaSi0LnlaPzAc3535KTrjXsTdtx7A==}
+    engines: {node: '>=12'}
 
   preact@10.29.7:
     resolution: {integrity: sha512-DCHYrK/B10yUD3ZjLfhZ3WIE/9Vf9VFUODcRE2dRomTYDpJk6z6L9wecSfhfE6M9ZTHUdyQkoC46arIDhEV84Q==}
@@ -4126,10 +4221,10 @@ snapshots:
 
   '@microsoft/tsdoc@0.16.0': {}
 
-  '@mikro-orm/better-sqlite@6.6.14(@mikro-orm/core@6.6.16)':
+  '@mikro-orm/better-sqlite@6.6.14(@mikro-orm/core@6.6.16)(pg@8.20.0)':
     dependencies:
       '@mikro-orm/core': 6.6.16
-      '@mikro-orm/knex': 6.6.14(@mikro-orm/core@6.6.16)(better-sqlite3@13.0.2)
+      '@mikro-orm/knex': 6.6.14(@mikro-orm/core@6.6.16)(better-sqlite3@13.0.2)(pg@8.20.0)
       better-sqlite3: 13.0.2
       fs-extra: 11.3.3
       sqlstring-sqlite: 0.1.1
@@ -4155,11 +4250,11 @@ snapshots:
       mikro-orm: 6.6.16
       reflect-metadata: 0.2.2
 
-  '@mikro-orm/knex@6.6.14(@mikro-orm/core@6.6.16)(better-sqlite3@13.0.2)':
+  '@mikro-orm/knex@6.6.14(@mikro-orm/core@6.6.16)(better-sqlite3@13.0.2)(pg@8.20.0)':
     dependencies:
       '@mikro-orm/core': 6.6.16
       fs-extra: 11.3.3
-      knex: 3.2.10(better-sqlite3@13.0.2)
+      knex: 3.2.10(better-sqlite3@13.0.2)(pg@8.20.0)
       sqlstring: 2.3.3
     optionalDependencies:
       better-sqlite3: 13.0.2
@@ -4167,6 +4262,44 @@ snapshots:
       - mysql
       - mysql2
       - pg
+      - pg-native
+      - pg-query-stream
+      - sqlite3
+      - supports-color
+      - tedious
+
+  '@mikro-orm/knex@6.6.16(@mikro-orm/core@6.6.16)(better-sqlite3@13.0.2)(pg@8.20.0)':
+    dependencies:
+      '@mikro-orm/core': 6.6.16
+      fs-extra: 11.3.3
+      knex: 3.2.10(better-sqlite3@13.0.2)(pg@8.20.0)
+      sqlstring: 2.3.3
+    optionalDependencies:
+      better-sqlite3: 13.0.2
+    transitivePeerDependencies:
+      - mysql
+      - mysql2
+      - pg
+      - pg-native
+      - pg-query-stream
+      - sqlite3
+      - supports-color
+      - tedious
+
+  '@mikro-orm/postgresql@6.6.16(@mikro-orm/core@6.6.16)(better-sqlite3@13.0.2)':
+    dependencies:
+      '@mikro-orm/core': 6.6.16
+      '@mikro-orm/knex': 6.6.16(@mikro-orm/core@6.6.16)(better-sqlite3@13.0.2)(pg@8.20.0)
+      pg: 8.20.0
+      postgres-array: 3.0.4
+      postgres-date: 2.1.0
+      postgres-interval: 4.0.2
+    transitivePeerDependencies:
+      - better-sqlite3
+      - libsql
+      - mariadb
+      - mysql
+      - mysql2
       - pg-native
       - pg-query-stream
       - sqlite3
@@ -5818,7 +5951,7 @@ snapshots:
 
   kleur@3.0.3: {}
 
-  knex@3.2.10(better-sqlite3@13.0.2):
+  knex@3.2.10(better-sqlite3@13.0.2)(pg@8.20.0):
     dependencies:
       colorette: 2.0.19
       commander: 10.0.1
@@ -5836,6 +5969,7 @@ snapshots:
       tildify: 2.0.0
     optionalDependencies:
       better-sqlite3: 13.0.2
+      pg: 8.20.0
     transitivePeerDependencies:
       - supports-color
 
@@ -6183,6 +6317,10 @@ snapshots:
 
   pg-int8@1.0.1: {}
 
+  pg-pool@3.14.0(pg@8.20.0):
+    dependencies:
+      pg: 8.20.0
+
   pg-pool@3.14.0(pg@8.22.0):
     dependencies:
       pg: 8.22.0
@@ -6196,6 +6334,16 @@ snapshots:
       postgres-bytea: 1.0.1
       postgres-date: 1.0.7
       postgres-interval: 1.2.0
+
+  pg@8.20.0:
+    dependencies:
+      pg-connection-string: 2.14.0
+      pg-pool: 3.14.0(pg@8.20.0)
+      pg-protocol: 1.15.0
+      pg-types: 2.2.0
+      pgpass: 1.0.5
+    optionalDependencies:
+      pg-cloudflare: 1.4.0
 
   pg@8.22.0:
     dependencies:
@@ -6237,13 +6385,19 @@ snapshots:
 
   postgres-array@2.0.0: {}
 
+  postgres-array@3.0.4: {}
+
   postgres-bytea@1.0.1: {}
 
   postgres-date@1.0.7: {}
 
+  postgres-date@2.1.0: {}
+
   postgres-interval@1.2.0:
     dependencies:
       xtend: 4.0.2
+
+  postgres-interval@4.0.2: {}
 
   preact@10.29.7: {}
 

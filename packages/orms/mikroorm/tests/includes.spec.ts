@@ -45,12 +45,17 @@ class Note {
 
   @ManyToOne(() => Article, { nullable: true })
   article: Article | null = null;
+
+  /** Soft-deletable too, so a nested include has a marker at *both* levels. */
+  @Property({ type: "Date", nullable: true })
+  deletedAt: Date | null = null;
 }
 
 let orm: MikroORM;
 let kavo: KavoInstance;
 let blogs: DefaultKavoService<Blog>;
 let articles: DefaultKavoService<Article>;
+let notes: DefaultKavoService<Note>;
 
 beforeAll(async () => {
   orm = await newTestOrm([Blog, Article, Note]);
@@ -65,7 +70,10 @@ beforeAll(async () => {
     // independent of whether the relation may be included.
     allowlists: { filterable: ["id", "title", "blog.name"] },
   } as never) as DefaultKavoService<Article>;
-  kavo.createCrud(Note, { relations: { edges: { article: { includable: true } } } });
+  notes = kavo.createCrud(Note, {
+    softDelete: { strategy: "soft", field: "deletedAt" },
+    relations: { edges: { article: { includable: true } } },
+  }) as DefaultKavoService<Note>;
 });
 
 afterAll(async () => {
@@ -191,6 +199,53 @@ describe("Includes and soft delete", () => {
       (row) => row.id === articleId,
     );
     expect(deleted?.notes).toHaveLength(1);
+  });
+});
+
+describe("Includes and soft delete, two levels down", () => {
+  it("excludes soft-deleted rows at every level of a nested include", async () => {
+    // `includeSoftDeleteWhere` merges a node's own `{ field: null }` with its
+    // children's nested conditions. With only one soft-deletable level the
+    // children half is always `undefined`, so the merge never actually runs —
+    // this is the case that exercises both halves together.
+    const { articleId } = await seed();
+    const em = orm.em.fork();
+    const extra = em.create(Note, { body: "second note", article: em.getReference(Article, articleId) });
+    await em.flush();
+    await notes.deleteOne(extra.id);
+
+    const list = await blogs.findMany({ include: ["articles.notes" as never] });
+    const embedded = (list.items[0] as unknown as { articles: { title: string; notes: { body: string }[] }[] })
+      .articles;
+    const includes = embedded.find((article) => article.title === "Includes")!;
+    // The live note survives; the soft-deleted one is gone from the nested level.
+    expect(includes.notes.map((note) => note.body)).toEqual(["typo on line 3"]);
+  });
+});
+
+describe("Nested includes keep parents that have no surviving children", () => {
+  it("returns an article with no live notes, rather than dropping it", async () => {
+    // The trap `populateWhere` walked into: expressing the deeper level's
+    // soft-delete scope as a nested condition made MikroORM read it as a
+    // relation-path predicate on the *parent*, so an article whose notes were
+    // all deleted (or which had none) vanished from the blog's collection
+    // entirely instead of coming back with `notes: []`.
+    const { articleId } = await seed();
+    const em = orm.em.fork();
+    const note = em.create(Note, { body: "doomed", article: em.getReference(Article, articleId) });
+    await em.flush();
+    await notes.deleteOne(note.id);
+
+    const list = await blogs.findMany({ include: ["articles.notes" as never] });
+    const embedded = (list.items[0] as unknown as { articles: { title: string; notes: { body: string }[] }[] })
+      .articles;
+
+    // Both articles survive: one with its remaining live note, one with none.
+    expect(embedded.map((article) => article.title).sort()).toEqual(["Includes", "Soft delete"]);
+    expect(embedded.find((article) => article.title === "Includes")!.notes.map((n) => n.body)).toEqual([
+      "typo on line 3",
+    ]);
+    expect(embedded.find((article) => article.title === "Soft delete")!.notes).toEqual([]);
   });
 });
 

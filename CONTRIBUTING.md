@@ -21,12 +21,13 @@ globally:
 corepack enable
 ```
 
-Docker is not optional. Three test suites provision a real database with
+Docker is not optional. Four test suites provision a real database with
 [Testcontainers](https://testcontainers.com/) rather than mocking one:
 
 - `examples/nest-typeorm/tests/app-postgres.e2e.spec.ts` — Postgres
 - `examples/nest-typeorm/tests/app-mariadb.e2e.spec.ts` — MariaDB
 - `examples/nest-mongoose/tests/app-mongo.e2e.spec.ts` — MongoDB
+- `examples/nest-mikroorm/tests/app-postgres.e2e.spec.ts` — Postgres
 
 They start their own containers and need no manual database setup, but they do
 need a Docker daemon the current user can talk to. Without one, `pnpm check`
@@ -201,7 +202,8 @@ Eight published packages in a strict hub-and-spoke topology:
 
 Plus, not published:
 
-- `examples/` — runnable reference apps (`nest-typeorm`, `nest-mongoose`) that
+- `examples/` — runnable reference apps (`nest-typeorm`, `nest-mongoose`,
+  `nest-mikroorm`) that
   double as the e2e suites.
 - `extensions/` — Claude Code skills shipped as a plugin via this repo's own
   marketplace.

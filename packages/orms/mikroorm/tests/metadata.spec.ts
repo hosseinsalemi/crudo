@@ -1,7 +1,18 @@
 import "reflect-metadata";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { Embeddable, Embedded, Entity, Enum, MikroORM, PrimaryKey, Property } from "@mikro-orm/core";
-import type { FieldMetadata } from "@kavo/core";
+import {
+  Collection,
+  Embeddable,
+  Embedded,
+  Entity,
+  Enum,
+  ManyToOne,
+  MikroORM,
+  OneToMany,
+  PrimaryKey,
+  Property,
+} from "@mikro-orm/core";
+import { ConfigurationException, type FieldMetadata } from "@kavo/core";
 import { buildEntityMetadata } from "@kavo/mikroorm";
 import { newTestOrm } from "./support/database.js";
 
@@ -48,6 +59,14 @@ class Widget {
 
   @Property({ type: "string", persist: false })
   computed!: string;
+
+  /** MikroORM's "never expose this" — a password hash, an API key. */
+  @Property({ type: "string", hidden: true, nullable: true })
+  secret: string | null = null;
+
+  /** Not loaded with the entity, so a filter on it would outrun the DTO. */
+  @Property({ type: "string", lazy: true, nullable: true })
+  bulky: string | null = null;
 }
 
 let orm: MikroORM;
@@ -113,6 +132,21 @@ describe("buildEntityMetadata — generated properties", () => {
   });
 });
 
+describe("buildEntityMetadata — never-expose properties", () => {
+  it.each(["secret", "bulky"])("drops the %s property from the metadata seam entirely", (field) => {
+    // Not merely hidden from responses: excluded from `fields`, so it never
+    // reaches the derived DTOs *or* the default filterable/sortable
+    // allowlists. A column that is invisible in the body but filterable in
+    // the database is a blind extraction oracle —
+    // `filter[secret][like]=sk_live_9%` answered by the row count.
+    expect(byName[field]).toBeUndefined();
+  });
+
+  it("still exposes ordinary properties alongside them", () => {
+    expect(byName["name"]).toBeDefined();
+  });
+});
+
 describe("buildEntityMetadata — embeddables", () => {
   it("exposes the embeddable property and drops its inner columns", async () => {
     @Embeddable()
@@ -150,6 +184,77 @@ describe("buildEntityMetadata — embeddables", () => {
   });
 });
 
+describe("buildEntityMetadata — relation targets", () => {
+  it("resolves a target declared by name, not just by class thunk", async () => {
+    // `@ManyToOne(() => Owner)` leaves `property.entity` a thunk, but
+    // `@ManyToOne("Owner")` — the spelling that keeps a bidirectional
+    // relation's import cycle off the runtime graph, which
+    // `.dependency-cruiser.cjs` forbids — leaves it a plain *string*.
+    // Calling it would throw, and core matches relation targets by class
+    // identity, so a string would break include projection outright.
+    @Entity()
+    class Kennel {
+      @PrimaryKey({ type: "number" })
+      id!: number;
+
+      @OneToMany("Hound", "kennel")
+      hounds = new Collection<object>(this);
+    }
+
+    @Entity()
+    class Hound {
+      @PrimaryKey({ type: "number" })
+      id!: number;
+
+      @ManyToOne("Kennel", { nullable: true })
+      kennel: object | null = null;
+    }
+
+    const named = await newTestOrm([Kennel, Hound]);
+    try {
+      expect(buildEntityMetadata(named, Hound).relations[0]!.target()).toBe(Kennel);
+      expect(buildEntityMetadata(named, Kennel).relations[0]!.target()).toBe(Hound);
+    } finally {
+      await named.close();
+    }
+  });
+});
+
+describe("buildEntityMetadata — single-table inheritance", () => {
+  it("reports inherited columns and marks the discriminator generated", async () => {
+    @Entity({ abstract: true, discriminatorColumn: "species" })
+    abstract class Beast {
+      @PrimaryKey({ type: "number" })
+      id!: number;
+
+      @Property({ type: "string" })
+      name!: string;
+    }
+
+    @Entity({ discriminatorValue: "feline" })
+    class Feline extends Beast {
+      @Property({ type: "boolean", nullable: true })
+      indoor!: boolean;
+    }
+
+    const sti = await newTestOrm([Beast, Feline]);
+    try {
+      const byField = Object.fromEntries(buildEntityMetadata(sti, Feline).fields.map((field) => [field.name, field]));
+      // The subtype's own column and the base's both surface.
+      expect(byField["name"]).toMatchObject({ kind: "string", generated: false });
+      expect(byField["indoor"]).toMatchObject({ kind: "boolean", generated: false });
+      // The discriminator is write-only bookkeeping MikroORM manages from
+      // the subtype being persisted. Marking it generated is what keeps it
+      // out of the *writable* projection: a client sending `species` for a
+      // different subtype would produce a row this entity's own repository
+      // can no longer load.
+      expect(byField["species"]).toMatchObject({ generated: true });
+    } finally {
+      await sti.close();
+    }
+  });
+});
+
 describe("buildEntityMetadata — refusals", () => {
   it("refuses a composite primary key", async () => {
     @Entity()
@@ -166,9 +271,15 @@ describe("buildEntityMetadata — refusals", () => {
 
     const composite = await newTestOrm([Membership]);
     try {
-      expect(() => buildEntityMetadata(composite, Membership)).toThrowError(
-        /requires exactly one primary key; found 2/,
-      );
+      let thrown: unknown;
+      try {
+        buildEntityMetadata(composite, Membership);
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toBeInstanceOf(ConfigurationException);
+      expect((thrown as ConfigurationException).code).toBe("KAVO_CONFIG_INVALID");
+      expect((thrown as Error).message).toMatch(/requires exactly one primary key; found 2/);
     } finally {
       await composite.close();
     }

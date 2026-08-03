@@ -29,7 +29,7 @@ through `orm.getMetadata()`.
 `createInfrastructure(orm)` therefore takes nothing but the ORM instance —
 no `entities` list, no datamodel — and neither does `createMikroOrmKavo`.
 An entity MikroORM never registered is refused at bootstrap with
-`KAVO_CONFIGURATION_ERROR` rather than failing per request.
+`KAVO_CONFIG_INVALID` rather than failing per request.
 
 ### Metadata mapping
 
@@ -41,7 +41,7 @@ An entity MikroORM never registered is refused at bootstrap with
 | `relations`           | properties with any other `kind` (`m:1`, `1:1`, `1:m`, `m:n`) |
 | `softDeleteField`     | always `null` — see §5                                        |
 
-Three details are less obvious than the table suggests:
+Five details are less obvious than the table suggests:
 
 **Field kind comes from `runtimeType`, not the column type.** MikroORM
 normalizes `runtimeType` to the JavaScript type a property actually holds,
@@ -57,6 +57,35 @@ auto-increment or database-generated column, a property with an
 `onCreate`/`onUpdate` hook (the equivalent of TypeORM's
 `@CreateDateColumn`/`@UpdateDateColumn`), an optimistic-lock
 `version: true`, and `persist: false`.
+
+**A relation target is resolved from `targetMeta`, never by calling the
+declaration.** MikroORM accepts two spellings, and they do not arrive the
+same: `@ManyToOne(() => Owner)` leaves `property.entity` a thunk, while
+`@ManyToOne("Owner")` leaves it a plain **string**. The string spelling is
+not exotic — it is what keeps a bidirectional relation's import cycle off
+the runtime graph, so it is exactly what a codebase with a `no-circular`
+dependency rule (this one included, see doc 02 §3) reaches for. Calling
+`property.entity()` would therefore throw for half the codebases using this
+adapter. `targetMeta` is what both spellings have in common; a
+metadata-storage lookup by entity name backs it up, and the declared thunk
+is the last resort. Resolution is deferred until the thunk core holds is
+actually called, because a bidirectional relation's target may not be
+registered yet when this entity's metadata is derived.
+
+**The single-table-inheritance discriminator is reported generated.** With
+`@Entity({ discriminatorColumn: "species" })` on a base and
+`discriminatorValue` on each subtype, MikroORM synthesizes a `species`
+property on every subtype's metadata. It is write-only bookkeeping: MikroORM
+sets it from the subtype being persisted, never hydrates it onto a loaded
+entity, and never emits it from `toObject` — so it cannot reach a response
+whatever Kavo does, matching `@kavo/typeorm`, where the discriminator has no
+entity property at all. What the flag stops is the _inbound_ direction. Left
+un-generated it would join the writable projection, and a client sending
+`species: "cat"` when creating a Dog would write a row that entity's own
+repository can no longer load. Note the column is read from the inheritance
+**root**'s metadata: MikroORM records `discriminatorColumn` only there,
+while the property itself is inherited by every subtype — and a subtype is
+what a caller passes to `createCrud`.
 
 **Embeddable child properties are dropped.** An `@Embedded()` property
 contributes both the object-valued parent (`kind: "embedded"`) and one
@@ -134,12 +163,32 @@ option is per-query rather than per-relation anyway, so it could not
 express a mixed include tree even if it were wanted.
 
 The include tree is flattened to MikroORM's dotted `populate` paths
-(`["articles", "articles.notes"]`). Soft-deleted related rows are excluded
-from every include, to-one and to-many alike, through a nested
-`populateWhere` mirroring the tree's shape — the same rule the other
-adapters apply, and a root `withDeleted` never widens an included relation.
-When no included relation is soft-deletable, `populateWhere` is omitted
-entirely so MikroORM's own default (`PopulateHint.ALL`) stands.
+(`["articles", "articles.notes"]`).
+
+**Soft-deleted related rows are pruned in memory, not in the query** — the
+one place this adapter does something the other two do in SQL, and it is
+forced. `populateWhere` looks like the right tool and is a trap at more than
+one level: a nested condition
+(`{ articles: { deletedAt: null, notes: { deletedAt: null } } }`) is read by
+MikroORM as a relation-path predicate on the **parent**, so an article whose
+notes are all deleted — or which simply has none — is dropped from the
+blog's collection entirely instead of arriving with `notes: []`. The dotted
+spelling (`{ "articles.notes": … }`) MikroORM rejects outright, and the
+parent-only spelling silently leaves every deeper level unscoped. So the
+adapter populates everything and walks the loaded tree, which is correct at
+any depth.
+
+The rule itself is unchanged from the other adapters: soft-deleted related
+rows are excluded from every include, to-one and to-many alike, and a root
+`withDeleted` never widens an included relation — the prune runs regardless
+of the root's scope. The same walk also guarantees every included relation
+is _present_ (`[]` for a to-many, `null` for a to-one), because core's
+serializer reads an absent key as "never hydrated" and skips it.
+
+The cost is that soft-deleted related rows are fetched and then discarded.
+Soft-deleted _roots_ are still excluded in SQL by `scopeToLive`, which is
+where the volume is; the alternatives here are wrong rather than merely
+slower.
 
 ## 4. The EntityManager is forked per operation
 
@@ -187,10 +236,17 @@ unwrapped to the bare key before reaching `create`/`assign`.
 `softDeleteField` is always `null` on this adapter's metadata. MikroORM
 declares no delete-date column: its soft-delete pattern is a user-defined
 `@Filter`, which is a query concern rather than a column declaration, so
-there is nothing for the metadata seam to detect. Soft delete therefore
-needs an explicit `softDelete.field` in Kavo config — the same position
+there is nothing for the metadata seam to detect — the same position
 `@kavo/prisma` and `@kavo/mongoose` are in, and unlike `@kavo/typeorm`,
-whose `@DeleteDateColumn` makes zero-config soft delete work.
+whose `@DeleteDateColumn` the seam reports.
+
+**That is not the same as "soft delete is off until you configure it."**
+`softDelete` defaults to `{ field: "deletedAt", strategy: "auto" }`, and
+`resolveSoftDelete` matches the configured _name_ against the entity's own
+columns before falling back to `softDeleteField`. So an entity carrying a
+plain `deletedAt` property is soft-deletable with no config whatsoever. What
+reporting `null` actually costs is narrower and sharper: the adapter cannot
+mark the marker column generated, so it stays **client-writable** — see §7.
 
 There is consequently one marker shape to handle rather than TypeORM's two:
 the marker is always an ordinary property, so the `IS NULL` /
@@ -240,14 +296,53 @@ character, so `filter[name][like]=100\%` matches the literal text `100\`
 followed by anything rather than the string `100%`. `@kavo/typeorm` emits
 `ESCAPE '\'` explicitly and does not have this gap.
 
-**The soft-delete marker is writable.** Because nothing declares it, the
-marker is an ordinary property: a plain `PATCH` of it will soft-delete a
-row, bypassing `deleteOne`'s already-deleted check. It cannot _revive_ one
-— writes are scoped to the live set, so a soft-deleted row 404s on
-`PUT`/`PATCH`. This is the shared hole `@kavo/prisma` and `@kavo/mongoose`
-have; the fix (excluding the resolved `softDelete.field` from the writable
-projection) belongs in core. Until then, register an explicit
-`update`/`patch` DTO that omits the marker whenever `purgeOne` is enabled.
+**The soft-delete marker is writable, and it is enabled by default.**
+Because nothing declares it, the marker is an ordinary non-generated
+property, so it joins the derived writable projection: a plain `PATCH` of it
+soft-deletes a row, bypassing `deleteOne`'s already-deleted check, any
+per-operation override on `deleteOne`, and even
+`operations: { deleteOne: false }`. With `purgeOne` enabled that is a
+two-request permanent delete through the update route. It cannot _revive_ a
+row — writes are scoped to the live set, so a soft-deleted row 404s on
+`PUT`/`PATCH`.
+
+Read that together with §5: because `strategy: "auto"` matches the column
+_name_, this surface is live on any entity with a `deletedAt` property and
+no `dto` block — nobody has to opt in. This is the shared hole
+`@kavo/prisma` and `@kavo/mongoose` have (only `@kavo/typeorm` escapes it,
+because `@DeleteDateColumn` is detectable and therefore markable), and the
+real fix — subtracting the resolved `softDelete.field` from
+`DefaultDeserializer`'s writable projection — belongs in core. Until then,
+register an explicit `update`/`patch` DTO that omits the marker, as
+`examples/nest-mikroorm`'s `OwnerController` does.
+
+**A primary key that is not auto-increment is client-writable.**
+`isGenerated` reads MikroORM's own flags, and `@PrimaryKey() id: string =
+v4()` — the idiomatic UUID spelling — carries none of them, so the key lands
+in the writable projection and a `PATCH` can rewrite a row's identity. A
+numeric `@PrimaryKey()` gets `autoincrement: true` and is safe.
+`@kavo/typeorm` has the same gap for `@PrimaryColumn`, so this is parity
+rather than a regression, but the risky spelling is the common one here.
+Name the write DTOs explicitly for any entity with a caller-assigned key.
+
+**A `hidden` or `lazy` property is dropped from the seam entirely.** Not
+just from responses: excluding it from `fields` is what keeps it off the
+_default allowlists_, because a column that is invisible in the body but
+filterable in the database is a blind extraction oracle
+(`filter[passwordHash][like]=a%` answered by the row count). The trade is
+the one `@kavo/mongoose` documents for `select: false` (doc 15 §1): Kavo
+does not manage such a property at all — not readable, writable, filterable,
+or sortable — so write it through a custom operation or the ORM directly.
+
+**`findOne` by query goes through `em.find` with `limit: 1`.** MikroORM's
+entity validator rejects `em.findOne` with an empty `where` outright, while
+`em.find` accepts it — and an unfiltered query is a legitimate shape here,
+since `EntityReader.findOne`'s contract is "first match of the query, or
+`null`" and a query with no filter matches everything. Routing through
+`em.find` keeps that contract without an empty-where special case; the two
+are otherwise the same query. (No generated route reaches this — the standard
+`findOne` operation is by id — but a custom handler calling
+`service.engine.execute` does.)
 
 **Composite primary keys are refused** at bootstrap, matching every other
 adapter — single-identifier entities are a v6 scope decision, not a
@@ -273,3 +368,19 @@ counts. Metadata derivation and adapter construction are cached per entity
 at bootstrap, not repeated per request. The per-operation `em.fork()` is
 cheap — it allocates a manager and an empty identity map, it does not touch
 the connection pool.
+
+## 9. The reference application
+
+`examples/nest-mikroorm` serves the **same Pet domain** as
+`examples/nest-typeorm` — single-table inheritance, an `Owner` relation both
+ways, a one-to-one `Address`, a many-to-many `Tag` edge — through
+`@Kavo`-generated Nest routes over this adapter. Running one domain under two
+SQL adapters is the point: where the two apps behave identically, the seam is
+carrying its weight; where they differ (soft delete declared rather than
+inferred, relation paths filterable rather than refused), the difference is
+real and documented above.
+
+Its e2e suite runs twice from one set of assertions — in-memory SQLite with
+no Docker, and a Testcontainers Postgres. The Postgres run is the only place
+`caseInsensitiveFilters: true` is exercised, which is what keeps §2's claim
+about the `false` default honest rather than merely asserted.

@@ -119,4 +119,6 @@ That declaration is what generates the `PATCH /books/:id/restore` route ([ADR-00
 
 **`@Property({ hidden: true })` wins over a Kavo DTO.** Rows are converted with MikroORM's own `toObject()`, so a hidden property is gone before core sees it, even if a DTO names it.
 
+A complete, runnable app using all of the above lives in [`examples/nest-mikroorm`](https://github.com/kavo-labs/kavo/tree/main/examples/nest-mikroorm) — the same Pet domain `examples/nest-typeorm` serves, under this adapter.
+
 Full design notes, including the metadata mapping and the error-mapping table: [MikroORM adapter](/internals/architecture/17-mikroorm-adapter).
