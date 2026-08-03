@@ -56,9 +56,9 @@ workflow.
    | `packages/orms/typeorm`      | `@kavo/typeorm`  |
    | `packages/orms/prisma`       | `@kavo/prisma`   |
    | `packages/orms/mongoose`     | `@kavo/mongoose` |
-   | `packages/frameworks/nest`   | `@kavo/nest`     |
    | `packages/protocols/graphql` | `@kavo/graphql`  |
    | `packages/protocols/mcp`     | `@kavo/mcp`      |
+   | `packages/frameworks/nest`   | `@kavo/nest`     |
 
    If this table and `PACKAGE_DIRS` ever disagree, `PACKAGE_DIRS` wins — it is
    what actually publishes — and the table is a bug to fix in the same pass.
@@ -88,11 +88,13 @@ workflow.
    ```
 
    If anything prints, **stop and tell the user before tagging.** Skipping this
-   is not a cosmetic risk: `publish.yml` publishes `PACKAGE_DIRS` in order and
-   `@kavo/nest` depends on `@kavo/graphql` and `@kavo/mcp` as hard
-   `dependencies`, so a late failure can leave an already-published
-   `@kavo/nest` pointing at a version of a sibling that does not exist —
-   uninstallable, and past npm's unpublish window it cannot be withdrawn.
+   is not a cosmetic risk: the run dies on the package that has no trusted
+   publisher, by which point everything ahead of it in `PACKAGE_DIRS` is
+   already public and, past npm's unpublish window, cannot be withdrawn.
+   `PACKAGE_DIRS` is ordered so that a package publishes only after the
+   packages it depends on, which at least keeps what did go out internally
+   consistent — nothing published pointing at a sibling version that does not
+   exist — but half a lockstep release is still a broken release.
 
    To bootstrap one: publish it by hand — **`pnpm pack` first, then
    `npm publish` the resulting tarball**, exactly as `publish.yml` does:
@@ -174,10 +176,13 @@ workflow.
    rather than by enumerating packages — step 1 already refused to run on a
    dirty tree, so the only modified files are the version bumps from step 3 and
    the lockfile. A hardcoded list here is the same drift hazard as a hardcoded
-   list at the gate, and a worse one, because a missed package fails _green_:
-   the release commit lands without that bump, `publish.yml` only compares
-   `packages/core`'s version to the tag, and the publish loop then sees the old
-   version already on the registry and prints `already published, skipping`.
+   list at the gate. A missed package no longer fails _green_: step 4's
+   `pnpm check` fails on it first (`tests/release-workflow.spec.ts` asserts
+   every `PACKAGE_DIRS` package carries one version), which is the point at
+   which nothing irreversible has happened yet. `publish.yml`'s
+   `Verify lockstep versions` step is the backstop behind it, and by the time
+   that one speaks the tag is already pushed — the fix then costs a commit on
+   `main` and a re-tag.
 
    ```bash
    git add packages pnpm-lock.yaml
