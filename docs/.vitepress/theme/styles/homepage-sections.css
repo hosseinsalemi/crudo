@@ -188,6 +188,7 @@
 
 .ai-install div[class*="language-"] {
   border-radius: 12px;
+  margin: 0;
 }
 
 .query-section {
