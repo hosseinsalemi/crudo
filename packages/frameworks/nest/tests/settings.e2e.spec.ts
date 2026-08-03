@@ -6,6 +6,7 @@ import { Test } from "@nestjs/testing";
 import type { KavoModuleOptions } from "@kavo/nest";
 import { Kavo, KavoModule } from "@kavo/nest";
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
+import { listen } from "./support/listen.js";
 
 /**
  * End-to-end coverage for `@Kavo`/`KavoSettings` knobs that
@@ -20,6 +21,7 @@ import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-in
 
 let app: INestApplication;
 let adapter: InMemoryTodoAdapter;
+let httpServer: Parameters<typeof request>[0];
 
 interface BootstrapOptions {
   readonly defaults?: KavoModuleOptions["defaults"];
@@ -37,15 +39,19 @@ async function bootstrap(controller: unknown, options: BootstrapOptions = {}): P
     imports: [rootModule, KavoModule.forFeature([controller as never])],
   }).compile();
   app = moduleRef.createNestApplication();
-  await app.init();
+  httpServer = await listen(app);
 }
 
 afterEach(async () => {
   await app.close();
 });
 
+/**
+ * The bound server `bootstrap` listened on — see the same helper in
+ * `binding.e2e.spec.ts`.
+ */
 function server(): Parameters<typeof request>[0] {
-  return app.getHttpServer() as Parameters<typeof request>[0];
+  return httpServer;
 }
 
 describe("@Kavo allowlists — filterable/sortable/selectable enforced over HTTP", () => {

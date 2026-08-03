@@ -6,6 +6,7 @@ import type { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { AppModule } from "../src/app.module.js";
 import { registerCrudE2eSuite } from "./crud-e2e.suite.js";
+import { listen } from "./listen.js";
 
 /**
  * Same suite as `app.e2e.spec.ts`, run against a real, pinned MongoDB
@@ -39,7 +40,7 @@ beforeAll(async () => {
     imports: [AppModule.forRoot()],
   }).compile();
   app = moduleRef.createNestApplication();
-  await app.init();
+  await listen(app);
 }, 240_000);
 
 afterAll(async () => {

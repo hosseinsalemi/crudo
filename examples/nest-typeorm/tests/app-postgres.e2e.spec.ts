@@ -5,6 +5,7 @@ import { Test } from "@nestjs/testing";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { AppModule } from "../src/app.module.js";
 import { registerCrudE2eSuite } from "./crud-e2e.suite.js";
+import { listen } from "./listen.js";
 
 /**
  * Same suite as `app.e2e.spec.ts`, run against a real Postgres instead of
@@ -31,7 +32,7 @@ beforeAll(async () => {
     ],
   }).compile();
   app = moduleRef.createNestApplication();
-  await app.init();
+  await listen(app);
 }, 120_000);
 
 afterAll(async () => {

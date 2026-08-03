@@ -6,6 +6,7 @@ import { Test } from "@nestjs/testing";
 import type { DefaultKavoService } from "@kavo/core";
 import { Kavo, KavoModule, getKavoServiceToken } from "@kavo/nest";
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
+import { listen } from "./support/listen.js";
 
 /**
  * `KavoModule.forFeature()` called with no arguments provides every
@@ -36,12 +37,9 @@ describe("KavoModule.forFeature() — no-arg, discovery-driven registry", () => 
       controllers: [OnlyTodoController],
     }).compile();
     app = moduleRef.createNestApplication();
-    await app.init();
+    const server = await listen(app);
 
-    const created = await request(app.getHttpServer() as Parameters<typeof request>[0])
-      .post("/todos")
-      .send({ title: "x" })
-      .expect(201);
+    const created = await request(server).post("/todos").send({ title: "x" }).expect(201);
     expect(created.body).toMatchObject({ title: "x" });
 
     const service = app.get<DefaultKavoService<Todo>>(getKavoServiceToken(Todo));

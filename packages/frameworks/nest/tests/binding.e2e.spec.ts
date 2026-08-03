@@ -9,9 +9,11 @@ import { ConfigurationException, WireQuery } from "@kavo/core";
 import type { KavoModuleOptions } from "@kavo/nest";
 import { Kavo, KavoModule, Override, enumProp, flattenQuery, getKavoServiceToken, oneOfArray } from "@kavo/nest";
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
+import { listen } from "./support/listen.js";
 
 let app: INestApplication;
 let adapter: InMemoryTodoAdapter;
+let httpServer: Parameters<typeof request>[0];
 
 interface BootstrapOptions {
   readonly defaults?: KavoModuleOptions["defaults"];
@@ -38,15 +40,20 @@ async function bootstrap(controller: unknown, options: BootstrapOptions = {}): P
       "extended",
     );
   }
-  await app.init();
+  httpServer = await listen(app);
 }
 
 afterEach(async () => {
   await app.close();
 });
 
+/**
+ * The bound server `bootstrap` listened on — not `app.getHttpServer()`,
+ * which would also answer for an app that was only `init()`ed and send
+ * supertest back to binding a wildcard port per request (see `listen`).
+ */
 function server(): Parameters<typeof request>[0] {
-  return app.getHttpServer() as Parameters<typeof request>[0];
+  return httpServer;
 }
 
 describe("@Kavo route generation", () => {

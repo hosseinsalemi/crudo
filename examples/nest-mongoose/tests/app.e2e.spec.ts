@@ -6,6 +6,7 @@ import type { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { AppModule } from "../src/app.module.js";
 import { registerCrudE2eSuite } from "./crud-e2e.suite.js";
+import { listen } from "./listen.js";
 
 /**
  * The default suite: `mongodb-memory-server` runs a `mongod` against an
@@ -27,7 +28,7 @@ beforeAll(async () => {
     imports: [AppModule.forRoot()],
   }).compile();
   app = moduleRef.createNestApplication();
-  await app.init();
+  await listen(app);
 }, 60_000);
 
 afterAll(async () => {

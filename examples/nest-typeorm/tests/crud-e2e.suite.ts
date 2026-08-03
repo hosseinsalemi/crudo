@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import request from "supertest";
+import type { Server } from "node:http";
 import type { INestApplication } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import type { DataSource } from "typeorm";
@@ -21,7 +22,15 @@ import { Address } from "../src/address/address.entity.js";
  */
 export function registerCrudE2eSuite(getApp: () => INestApplication): void {
   function server(): Parameters<typeof request>[0] {
-    return getApp().getHttpServer() as Parameters<typeof request>[0];
+    const httpServer = getApp().getHttpServer() as Server;
+    // The spec that registered this suite must have bootstrapped with
+    // `listen(app)`, not `app.init()`: an unbound server makes supertest
+    // bind a wildcard port per request and then connect to `127.0.0.1`,
+    // which is the collision behind issue #91.
+    if (httpServer.address() === null) {
+      throw new Error("app is not listening — bootstrap the spec with listen(app) instead of app.init()");
+    }
+    return httpServer as Parameters<typeof request>[0];
   }
 
   async function seed(): Promise<void> {
