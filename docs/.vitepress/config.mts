@@ -118,6 +118,7 @@ export default defineConfig({
               { text: "Soft delete", link: "/internals/architecture/11-soft-delete" },
               { text: "Relations and includes", link: "/internals/architecture/12-relations-and-includes" },
               { text: "GraphQL binding", link: "/internals/architecture/13-graphql-binding" },
+              { text: "MCP binding", link: "/internals/architecture/14-mcp-binding" },
               { text: "Prisma adapter", link: "/internals/architecture/14-prisma-adapter" },
               { text: "Mongoose adapter", link: "/internals/architecture/15-mongoose-adapter" },
             ],
