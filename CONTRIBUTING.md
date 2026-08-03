@@ -95,7 +95,7 @@ CI runs the identical gate on three Node versions (`lts/-1`, `lts/*`,
 ```bash
 pnpm prettify      # writes formatting fixes
 pnpm format:check  # what CI actually runs
-pnpm docs:build    # only if you touched docs/ — a separate CI job gates it
+pnpm docs:build    # a separate CI job gates it — see "Working on the docs"
 ```
 
 One thing the gate does **not** cover: CI installs with
@@ -316,12 +316,14 @@ pnpm docs:preview  # serve the production build
 `pnpm check` does not build the site, but CI does: a separate `docs` job runs
 `pnpm docs:build` on every pull request. VitePress fails that build on dead
 links _between pages under `docs/`_, so a broken cross-reference there fails the
-PR rather than the Pages deploy on `main`. Run it locally before pushing a docs
-change.
+PR rather than the Pages deploy on `main`. The job is deliberately not
+path-filtered — `docs/.vitepress/config.mts` reads `packages/core/package.json`
+at build time — so run it locally before pushing, docs change or not.
 
 The gate's reach stops at what VitePress renders, so these still need a human
-eye: links in files it never renders — this one, the root `README.md`, and
-`docs/README.md` (`srcExclude`d in `config.mts`) — and links pointing at
+eye: links in files it never renders — everything outside `docs/` (this one, the
+root `README.md`, each package's and example's `README.md`) plus
+`docs/README.md`, which `config.mts` `srcExclude`s — and links pointing at
 `CLAUDE.md`, which `ignoreDeadLinks` exempts.
 
 `docs/` has two audiences, and it is worth keeping them separate:
