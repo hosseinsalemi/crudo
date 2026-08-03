@@ -2,7 +2,13 @@
   <div class="tool-logos-section">
     <div class="tool-logos">
       <span v-for="tool in tools" :key="tool.name" class="tool-chip">
-        <svg class="tool-chip-icon" :viewBox="tool.viewBox" fill="#fff" xmlns="http://www.w3.org/2000/svg" v-html="tool.markup" />
+        <svg
+          class="tool-chip-icon"
+          :viewBox="tool.viewBox"
+          fill="currentColor"
+          xmlns="http://www.w3.org/2000/svg"
+          v-html="tool.markup"
+        />
         <span>{{ tool.name }}</span>
       </span>
     </div>
@@ -30,7 +36,7 @@ const tools = [
   {
     name: "Mongoose",
     viewBox: "16 9 280 211",
-    markup: `<g transform="translate(0,310) scale(0.1,-0.1)" fill="#fff" stroke="none"><path d="M942 2990 c-205 -29 -379 -132 -484 -288 -19 -29 -38 -49 -41 -45 -4
+    markup: `<g transform="translate(0,310) scale(0.1,-0.1)" fill="currentColor" stroke="none"><path d="M942 2990 c-205 -29 -379 -132 -484 -288 -19 -29 -38 -49 -41 -45 -4
 3 -7 58 -7 122 0 172 8 161 -120 161 -103 0 -108 -1 -114 -22 -8 -30 -8 -1956
 0 -1986 6 -21 11 -22 114 -22 l108 0 6 31 c3 17 6 292 6 610 0 354 4 608 11
 656 40 295 158 460 394 549 60 22 87 26 190 27 212 3 312 -44 379 -179 60
@@ -70,7 +76,6 @@ const tools = [
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--vp-c-text-3);
   opacity: 0.5;
 }
 
@@ -79,7 +84,7 @@ const tools = [
   align-items: center;
   gap: 10px;
   padding: 10px 18px;
-  color: #fff;
+  color: var(--vp-c-text-1);
   font-size: 16px;
   font-weight: 500;
   letter-spacing: -0.005em;
@@ -90,5 +95,6 @@ const tools = [
   width: 24px;
   height: 24px;
   flex: none;
+  color: var(--vp-c-text-1);
 }
 </style>
