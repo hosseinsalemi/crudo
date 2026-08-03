@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
 
+# Every job here only reads the checkout — nothing comments, pushes, or
+# deploys. pages.yml and publish.yml already declare their permissions; this
+# was the one workflow still inheriting the repo default.
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
