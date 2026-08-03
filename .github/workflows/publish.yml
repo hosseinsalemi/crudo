@@ -28,6 +28,7 @@ jobs:
         packages/orms/typeorm
         packages/orms/prisma
         packages/orms/mongoose
+        packages/orms/mikroorm
         packages/protocols/graphql
         packages/protocols/mcp
         packages/frameworks/nest

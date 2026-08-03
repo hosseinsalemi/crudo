@@ -1,0 +1,40 @@
+{
+  "name": "@kavo/mikroorm",
+  "version": "0.6.0",
+  "description": "Kavo MikroORM adapter — implements @kavo/core's RepositoryAdapter over a MikroORM EntityManager.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kavo-labs/kavo.git",
+    "directory": "packages/orms/mikroorm"
+  },
+  "homepage": "https://github.com/kavo-labs/kavo/tree/main/packages/orms/mikroorm#readme",
+  "type": "module",
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@kavo/core": "workspace:^"
+  },
+  "peerDependencies": {
+    "@mikro-orm/core": "^6.0.0"
+  },
+  "devDependencies": {
+    "@mikro-orm/core": "^6.6.14",
+    "@mikro-orm/better-sqlite": "^6.6.14",
+    "reflect-metadata": "^0.2.2"
+  }
+}

@@ -1,0 +1,445 @@
+import "reflect-metadata";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { Collection, Entity, ManyToOne, MikroORM, OneToMany, PrimaryKey, Property } from "@mikro-orm/core";
+import {
+  ConflictException,
+  NotFoundException,
+  PersistenceException,
+  QueryValidationException,
+  type DefaultKavoService,
+  type KavoInstance,
+} from "@kavo/core";
+import { buildEntityMetadata, createMikroOrmKavo } from "@kavo/mikroorm";
+import { clearDatabase, newTestOrm } from "./support/database.js";
+
+// Explicit property types throughout: the swc test transform emits decorator
+// metadata, but explicit types keep entities transform-agnostic — the same
+// reason `@kavo/typeorm`'s suite spells its column types out.
+@Entity()
+class Author {
+  @PrimaryKey({ type: "number" })
+  id!: number;
+
+  @Property({ type: "string", unique: true })
+  email!: string;
+
+  @Property({ type: "string" })
+  name!: string;
+
+  @Property({ type: "number" })
+  age!: number;
+
+  @Property({ type: "string" })
+  status: string = "active";
+
+  @Property({ type: "string", nullable: true })
+  bio: string | null = null;
+
+  @Property({ type: "Date", onCreate: () => new Date() })
+  createdAt!: Date;
+
+  @OneToMany(() => Book, (book) => book.author)
+  books = new Collection<Book>(this);
+}
+
+@Entity()
+class Book {
+  @PrimaryKey({ type: "number" })
+  id!: number;
+
+  @Property({ type: "string" })
+  title!: string;
+
+  @ManyToOne(() => Author)
+  author!: Author;
+}
+
+let orm: MikroORM;
+let kavo: KavoInstance;
+let authors: DefaultKavoService<Author>;
+
+beforeAll(async () => {
+  orm = await newTestOrm([Author, Book]);
+  kavo = createMikroOrmKavo(orm);
+  authors = kavo.createCrud(Author) as DefaultKavoService<Author>;
+});
+
+afterAll(async () => {
+  await orm.close();
+});
+
+beforeEach(async () => {
+  await clearDatabase(orm);
+});
+
+/** The persisted foreign key of one book, read straight from the database. */
+async function readAuthorId(bookId: number): Promise<number | undefined> {
+  const row = await orm.em.fork().findOne(Book, { id: bookId }, { populate: ["author"] });
+  return row?.author.id;
+}
+
+async function seed(): Promise<void> {
+  const rows = [
+    { email: "ada@x.io", name: "Ada", age: 36, status: "active" },
+    { email: "grace@x.io", name: "Grace", age: 45, status: "active" },
+    { email: "alan@x.io", name: "Alan", age: 41, status: "banned" },
+    { email: "joan@x.io", name: "Joan", age: 28, status: "pending" },
+  ];
+  for (const row of rows) await authors.createOne(row as never);
+}
+
+describe("metadata derivation seam", () => {
+  it("derives fields, id, generated flags, and relations", () => {
+    const metadata = buildEntityMetadata(orm, Author);
+    expect(metadata.name).toBe("Author");
+    expect(metadata.idField).toBe("id");
+    const byName = Object.fromEntries(metadata.fields.map((field) => [field.name, field]));
+    expect(byName["id"]).toMatchObject({ kind: "number", generated: true });
+    expect(byName["email"]).toMatchObject({ kind: "string", generated: false });
+    expect(byName["age"]).toMatchObject({ kind: "number", generated: false });
+    expect(byName["createdAt"]).toMatchObject({ kind: "date", generated: true });
+    expect(byName["bio"]).toMatchObject({ nullable: true });
+    expect(byName["books"]).toBeUndefined(); // relations are not fields
+    expect(metadata.relations.map((relation) => relation.name)).toEqual(["books"]);
+    expect(metadata.relations[0]).toMatchObject({ cardinality: "many", includable: false });
+    // The lazy target thunk resolves to the class itself — the identity core
+    // matches registered entities by, with no marker class in sight.
+    expect(metadata.relations[0]!.target()).toBe(Book);
+  });
+
+  it("reports the to-one side of the same relation as cardinality 'one'", () => {
+    const metadata = buildEntityMetadata(orm, Book);
+    expect(metadata.relations).toMatchObject([{ name: "author", cardinality: "one" }]);
+    expect(metadata.relations[0]!.target()).toBe(Author);
+  });
+
+  it("refuses an entity MikroORM never registered", () => {
+    class Ghost {
+      id!: number;
+    }
+    expect(() => buildEntityMetadata(orm, Ghost)).toThrowError(/no registered entity named 'Ghost'/);
+  });
+});
+
+describe("MikroOrmRepositoryAdapter — CRUD", () => {
+  it("creates, reads, updates, patches, deletes against the real database", async () => {
+    const created = await authors.createOne({
+      email: "ada@x.io",
+      name: "Ada",
+      age: 36,
+    } as never);
+    expect(created).toMatchObject({ name: "Ada", status: "active" });
+    const id = (created as Author).id;
+
+    const fetched = await authors.findOne(id);
+    expect(fetched).toMatchObject({ email: "ada@x.io" });
+
+    await authors.updateOne(id, { email: "ada@x.io", name: "Ada L", age: 37 } as never);
+    const patched = await authors.patchOne(id, { age: 38 } as never);
+    expect(patched).toMatchObject({ name: "Ada L", age: 38 });
+
+    await authors.deleteOne(id);
+    await expect(authors.findOne(id)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it("throws NotFound for updates/deletes on missing rows", async () => {
+    await expect(authors.updateOne(4242, { name: "x" } as never)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(authors.deleteOne(4242)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it("maps unique violations to ConflictException (error-mapping table)", async () => {
+    await authors.createOne({ email: "dup@x.io", name: "A", age: 1 } as never);
+    await expect(authors.createOne({ email: "dup@x.io", name: "B", age: 2 } as never)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+  });
+
+  it("returns plain objects, never live MikroORM entities", async () => {
+    // The adapter converts at its boundary: a `Collection` would break core's
+    // `Array.isArray` branch in the serializer, and a managed entity would
+    // carry an identity map into the response.
+    await seed();
+    const list = await authors.findMany();
+    for (const item of list.items) {
+      expect(Object.getPrototypeOf(item)).toBe(Object.prototype);
+    }
+  });
+
+  it("does not leak a stale identity map between calls", async () => {
+    // Every operation forks its own EntityManager; a shared one would answer
+    // the second read from the first read's identity map.
+    const created = (await authors.createOne({ email: "a@x.io", name: "Ada", age: 36 } as never)) as Author;
+    await orm.em.fork().nativeUpdate(Author, { id: created.id }, { name: "Renamed outside Kavo" });
+    expect(await authors.findOne(created.id)).toMatchObject({ name: "Renamed outside Kavo" });
+  });
+
+  it("associates a relation by id on create and on patch", async () => {
+    // Core's deserializer narrows a relation to `{ id }` (ADR-0014); MikroORM
+    // associates by the bare primary key, so the adapter unwraps it.
+    const books = kavo.createCrud(Book) as DefaultKavoService<Book>;
+    const ada = (await authors.createOne({ email: "ada@x.io", name: "Ada", age: 36 } as never)) as Author;
+    const alan = (await authors.createOne({ email: "alan@x.io", name: "Alan", age: 41 } as never)) as Author;
+
+    // The association is asserted against the database, not the response:
+    // core's serializer emits a relation key only for an included node, so a
+    // written-but-not-included relation is correctly absent from the result.
+    const created = (await books.createOne({ title: "Notes", author: ada.id } as never)) as Book;
+    expect(created).toMatchObject({ title: "Notes" });
+    expect(await readAuthorId(created.id)).toBe(ada.id);
+
+    await books.patchOne(created.id, { author: { id: alan.id } } as never);
+    expect(await readAuthorId(created.id)).toBe(alan.id);
+  });
+});
+
+describe("MikroOrmRepositoryAdapter — relation writes are association-only", () => {
+  it("refuses to deep-write a relation whose target Kavo never registered", async () => {
+    // Core narrows a relation to `{ id }` only when the *target* entity is in
+    // its catalog; a target that was never `createCrud`-ed arrives at the
+    // adapter as whatever the client sent. Handing that object to
+    // `em.create` would leave a nested write one cascade setting away from
+    // working — ADR-0014 says relations are associated by id, never
+    // deep-written, so the object is dropped instead.
+    const isolated = createMikroOrmKavo(orm);
+    const books = isolated.createCrud(Book) as DefaultKavoService<Book>;
+    const before = await orm.em.fork().count(Author, {});
+
+    await expect(
+      books.createOne({ title: "smuggled", author: { email: "evil@x.io", name: "Injected", age: 1 } } as never),
+    ).rejects.toBeInstanceOf(PersistenceException);
+
+    expect(await orm.em.fork().count(Author, {})).toBe(before);
+  });
+});
+
+describe("MikroOrmRepositoryAdapter — query translation", () => {
+  it("filters, sorts, and paginates in the database", async () => {
+    await seed();
+    const list = await authors.findMany({
+      filter: {
+        kind: "condition",
+        field: "status",
+        operator: "EQ",
+        value: "active",
+      },
+      sort: [{ field: "age", direction: "desc" }],
+      limit: 1,
+      offset: 1,
+    });
+    expect(list.items.map((author) => (author as Author).name)).toEqual(["Ada"]);
+    expect(list.total).toBe(2); // total counts all matches, not the page
+    expect(list.limit).toBe(1);
+    expect(list.offset).toBe(1);
+  });
+
+  it("translates OR groups and NOT nodes", async () => {
+    await seed();
+    const either = await authors.findMany({
+      filter: {
+        kind: "group",
+        operator: "OR",
+        children: [
+          { kind: "condition", field: "name", operator: "EQ", value: "Ada" },
+          { kind: "condition", field: "status", operator: "EQ", value: "banned" },
+        ],
+      },
+      sort: [{ field: "name", direction: "asc" }],
+    });
+    expect(either.items.map((author) => (author as Author).name)).toEqual(["Ada", "Alan"]);
+
+    const negated = await authors.findMany({
+      filter: {
+        kind: "group",
+        operator: "NOT",
+        children: [{ kind: "condition", field: "status", operator: "EQ", value: "active" }],
+      },
+      sort: [{ field: "age", direction: "asc" }],
+    });
+    expect(negated.items.map((author) => (author as Author).name)).toEqual(["Joan", "Alan"]);
+  });
+
+  it("translates IN, BETWEEN, LIKE, ILIKE and null checks", async () => {
+    await seed();
+    const joan = (await authors.findMany()).items
+      .map((author) => author as Author)
+      .find((author) => author.name === "Joan")!;
+    await authors.patchOne(joan.id, { bio: "wrote code" } as never);
+
+    const inSet = await authors.findMany({
+      filter: {
+        kind: "condition",
+        field: "status",
+        operator: "IN",
+        value: ["banned", "pending"],
+      },
+    });
+    expect(inSet.items).toHaveLength(2);
+
+    const notIn = await authors.findMany({
+      filter: {
+        kind: "condition",
+        field: "status",
+        operator: "NOT_IN",
+        value: ["banned", "pending"],
+      },
+    });
+    expect(notIn.items).toHaveLength(2);
+
+    const between = await authors.findMany({
+      filter: {
+        kind: "condition",
+        field: "age",
+        operator: "BETWEEN",
+        value: [40, 50],
+      },
+    });
+    expect(between.items.map((author) => (author as Author).name).sort()).toEqual(["Alan", "Grace"]);
+
+    const like = await authors.findMany({
+      filter: { kind: "condition", field: "name", operator: "LIKE", value: "A%" },
+    });
+    expect(like.items.map((author) => (author as Author).name).sort()).toEqual(["Ada", "Alan"]);
+
+    // SQLite's own LIKE is ASCII case-insensitive, so ILIKE degrading to
+    // `$like` under the default `caseInsensitiveFilters: false` still matches
+    // — see the adapter doc's note on why that default is the portable one.
+    const ilike = await authors.findMany({
+      filter: { kind: "condition", field: "name", operator: "ILIKE", value: "a%" },
+    });
+    expect(ilike.items.map((author) => (author as Author).name).sort()).toEqual(["Ada", "Alan"]);
+
+    const withBio = await authors.findMany({
+      filter: { kind: "condition", field: "bio", operator: "IS_NOT_NULL", value: true },
+    });
+    expect(withBio.items.map((author) => (author as Author).name)).toEqual(["Joan"]);
+
+    const withoutBio = await authors.findMany({
+      filter: { kind: "condition", field: "bio", operator: "IS_NULL", value: true },
+    });
+    expect(withoutBio.items).toHaveLength(3);
+  });
+
+  it("matches nothing on an empty IN set instead of erroring", async () => {
+    await seed();
+    const list = await authors.findMany({
+      filter: { kind: "condition", field: "status", operator: "IN", value: [] },
+    });
+    expect(list.items).toHaveLength(0);
+  });
+
+  it("matches everything on an empty NOT IN set", async () => {
+    await seed();
+    const list = await authors.findMany({
+      filter: { kind: "condition", field: "status", operator: "NOT_IN", value: [] },
+    });
+    expect(list.items).toHaveLength(4);
+  });
+
+  it("applies the configured defaultSort when the caller supplies no sort", async () => {
+    await seed();
+    const withDefault = kavo.createCrud(Author, {
+      query: { defaultSort: [{ field: "age", direction: "asc" }] },
+    }) as DefaultKavoService<Author>;
+    const list = await withDefault.findMany();
+    expect(list.items.map((author) => (author as Author).name)).toEqual(["Joan", "Ada", "Alan", "Grace"]);
+  });
+
+  it("keeps defaultSort-ordered pages disjoint and stable across offsets", async () => {
+    await seed();
+    const withDefault = kavo.createCrud(Author, {
+      query: { defaultSort: [{ field: "age", direction: "asc" }] },
+    }) as DefaultKavoService<Author>;
+    const page1 = await withDefault.findMany({ limit: 2, offset: 0 });
+    const page2 = await withDefault.findMany({ limit: 2, offset: 2 });
+    const names1 = page1.items.map((author) => (author as Author).name);
+    const names2 = page2.items.map((author) => (author as Author).name);
+    expect(names1).toEqual(["Joan", "Ada"]);
+    expect(names2).toEqual(["Alan", "Grace"]);
+    expect(new Set([...names1, ...names2]).size).toBe(4); // disjoint, no repeats/skips
+  });
+
+  it("skips the count query when counting is disabled", async () => {
+    await seed();
+    const list = await authors.findMany(undefined, {
+      settings: { pagination: { count: false } },
+    });
+    expect(list.total).toBeNull();
+    expect(list.items).toHaveLength(4);
+  });
+
+  it("refuses an operator outside the AST enum rather than dropping the predicate", async () => {
+    await seed();
+    // The parser can never emit this, but a programmatic caller hand-builds
+    // the AST and `validateExpression` checks allowlists, not operators.
+    // Falling through the translator's switch would add no predicate at all —
+    // the caller asked to narrow to one row and would silently get all four
+    // back. The guard surfaces as PersistenceException: a forged AST is an
+    // internal contract violation (500), not a bad request.
+    await expect(
+      authors.findMany({
+        filter: {
+          kind: "condition",
+          field: "status",
+          operator: "SOUNDS_LIKE" as never,
+          value: "active",
+        },
+      }),
+    ).rejects.toBeInstanceOf(PersistenceException);
+  });
+
+  it("still rejects non-allowlisted programmatic filters", async () => {
+    await expect(
+      authors.findMany({
+        filter: {
+          kind: "condition",
+          field: "books.title" as never,
+          operator: "EQ",
+          value: "x",
+        },
+      }),
+    ).rejects.toBeInstanceOf(QueryValidationException);
+  });
+
+  it("filters on relation paths when explicitly allowlisted", async () => {
+    const scoped = kavo.createCrud(Book, {
+      allowlists: { filterable: ["title", "author.name" as never] },
+    }) as DefaultKavoService<Book>;
+    await seed();
+    const all = (await authors.findMany()).items.map((author) => author as Author);
+    const ada = all.find((author) => author.name === "Ada")!;
+    const alan = all.find((author) => author.name === "Alan")!;
+
+    const em = orm.em.fork();
+    em.create(Book, { title: "Notes", author: em.getReference(Author, ada.id) });
+    em.create(Book, { title: "Other", author: em.getReference(Author, alan.id) });
+    await em.flush();
+
+    const list = await scoped.findMany({
+      filter: {
+        kind: "condition",
+        field: "author.name" as never,
+        operator: "EQ",
+        value: "Ada",
+      },
+    });
+    expect(list.items.map((book) => (book as Book).title)).toEqual(["Notes"]);
+  });
+
+  it("sorts on an allowlisted relation path", async () => {
+    const scoped = kavo.createCrud(Book, {
+      allowlists: { sortable: ["title", "author.name" as never] },
+    }) as DefaultKavoService<Book>;
+    await seed();
+    const all = (await authors.findMany()).items.map((author) => author as Author);
+    const ada = all.find((author) => author.name === "Ada")!;
+    const alan = all.find((author) => author.name === "Alan")!;
+
+    const em = orm.em.fork();
+    em.create(Book, { title: "By Alan", author: em.getReference(Author, alan.id) });
+    em.create(Book, { title: "By Ada", author: em.getReference(Author, ada.id) });
+    await em.flush();
+
+    const list = await scoped.findMany({ sort: [{ field: "author.name" as never, direction: "asc" }] });
+    expect(list.items.map((book) => (book as Book).title)).toEqual(["By Ada", "By Alan"]);
+  });
+});

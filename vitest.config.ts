@@ -30,6 +30,7 @@ export default defineConfig({
       "@kavo/typeorm": new URL("./packages/orms/typeorm/src/index.ts", import.meta.url).pathname,
       "@kavo/prisma": new URL("./packages/orms/prisma/src/index.ts", import.meta.url).pathname,
       "@kavo/mongoose": new URL("./packages/orms/mongoose/src/index.ts", import.meta.url).pathname,
+      "@kavo/mikroorm": new URL("./packages/orms/mikroorm/src/index.ts", import.meta.url).pathname,
       "@kavo/nest": new URL("./packages/frameworks/nest/src/index.ts", import.meta.url).pathname,
       "@kavo/graphql": new URL("./packages/protocols/graphql/src/index.ts", import.meta.url).pathname,
       "@kavo/mcp": new URL("./packages/protocols/mcp/src/index.ts", import.meta.url).pathname,

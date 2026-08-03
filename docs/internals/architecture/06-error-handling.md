@@ -63,8 +63,8 @@ params; core ships the English defaults.
 
 Adapter errors are translated by the adapter's own table — each adapter
 has one, keyed on whatever its driver reports (`@kavo/typeorm` doc 09 §5,
-`@kavo/prisma` doc 14 §5, `@kavo/mongoose` doc 15 §6) — _inside_ the
-adapter;
+`@kavo/prisma` doc 14 §5, `@kavo/mongoose` doc 15 §6, `@kavo/mikroorm`
+doc 17 §6) — _inside_ the adapter;
 whatever reaches the engine unrecognized becomes `PersistenceException`
 with the original as `cause` — never swallowed. Whether `cause` details
 leak into responses is governed by `errors.exposeInternals` (default

@@ -1,0 +1,147 @@
+import type { ClassRef, EntityMetadata, FieldKind, FieldMetadata, RelationDescriptor } from "@kavo/core";
+import { ConfigurationException } from "@kavo/core";
+import type { EntityProperty, MikroORM } from "@mikro-orm/core";
+
+/**
+ * Translate a MikroORM property's declared type into the ORM-independent
+ * `FieldKind` core coerces against.
+ *
+ * `runtimeType` is preferred over `type`: MikroORM normalizes the former to
+ * the JavaScript type the property actually holds (`"string"`, `"Date"`),
+ * which is what core must coerce toward — a `bigint` or `decimal` column
+ * surfaces as `"string"` there, and `string` is genuinely the right target
+ * for it. The declared `type` is still consulted as a fallback, because
+ * `runtimeType` is `"any"` for the custom types that carry no JavaScript
+ * equivalent (`JsonType`). An unrecognized type degrades to `string` —
+ * comparison still works, coercion just doesn't narrow.
+ */
+function fieldKindOf(property: EntityProperty): FieldKind {
+  if (property.enum === true) return "enum";
+  const type = String(property.runtimeType ?? property.type).toLowerCase();
+  if (type === "date") return "date";
+  if (type === "boolean" || type === "bool") return "boolean";
+  if (type === "number" || type === "bigint") return "number";
+  if (type === "string") return "string";
+  if (type === "object" || type === "json" || type === "jsonb") return "json";
+  // Fall back to the declared column type for anything `runtimeType` did not
+  // already answer (a custom `type: "int8"`, a driver-native column type).
+  const declared = String(property.type).toLowerCase();
+  if (/^(int|integer|tinyint|smallint|mediumint|bigint|float|double|real|decimal|numeric|number)/.test(declared)) {
+    return "number";
+  }
+  if (/^(bool|boolean)/.test(declared)) return "boolean";
+  if (/^(date|datetime|timestamp|time)/.test(declared)) return "date";
+  if (/^(json|jsonb)/.test(declared)) return "json";
+  return "string";
+}
+
+/**
+ * Whether a property is written by the database or the ORM rather than by
+ * the caller — excluded from the derived `create`/`update`/`patch` defaults
+ * and stripped from write payloads by the default deserializer.
+ *
+ * MikroORM has no single flag for this, so the four independent ways a
+ * property becomes non-caller-writable are each checked: an auto-increment
+ * or database-generated column, an `onCreate`/`onUpdate` hook (the
+ * equivalent of TypeORM's `@CreateDateColumn`/`@UpdateDateColumn`), an
+ * optimistic-lock `@Property({ version: true })`, and `persist: false`,
+ * which is not stored at all.
+ */
+function isGenerated(property: EntityProperty): boolean {
+  return (
+    property.autoincrement === true ||
+    property.generated !== undefined ||
+    property.onCreate !== undefined ||
+    property.onUpdate !== undefined ||
+    property.version === true ||
+    property.persist === false
+  );
+}
+
+/** MikroORM's relation `kind` discriminators that carry many rows. */
+const TO_MANY = new Set(["1:m", "m:n"]);
+
+/**
+ * Build the core `EntityMetadata` for one entity from MikroORM's own
+ * `MetadataStorage`: the adapter feeds core's metadata seam; core never sees
+ * MikroORM types.
+ *
+ * Unlike `@kavo/prisma`, no marker class is needed (ADR-0017 exists because
+ * Prisma erases its models at compile time) — a MikroORM entity is a real
+ * runtime class that already carries its own metadata, so the class the
+ * caller passes to `createCrud` *is* the identity, exactly as in
+ * `@kavo/typeorm`.
+ */
+export function buildEntityMetadata<Entity extends object>(
+  orm: MikroORM,
+  entity: ClassRef<Entity>,
+): EntityMetadata<Entity> {
+  const metadata = orm.getMetadata().find(entity.name);
+  if (metadata === undefined) {
+    throw new ConfigurationException(
+      entity.name,
+      "entity",
+      `MikroORM has no registered entity named '${entity.name}'; ` +
+        `add it to the 'entities' array the ORM was initialized with`,
+    );
+  }
+
+  if (metadata.primaryKeys.length !== 1) {
+    throw new ConfigurationException(
+      metadata.className,
+      "primaryKeys",
+      `Kavo v6 requires exactly one primary key; found ${metadata.primaryKeys.length}`,
+    );
+  }
+
+  const properties = Object.values(metadata.properties) as EntityProperty[];
+
+  const fields: FieldMetadata[] = properties
+    // An embeddable contributes *two* kinds of property: the object-valued
+    // parent (`kind: "embedded"`, what a caller addresses) and one child per
+    // inner column, carrying an `embedded: [parent, child]` back-reference
+    // and a name that is an implementation detail (`addr~city`,
+    // `inline_city`). Only the parent belongs on the wire, so the children
+    // are dropped rather than leaked into DTOs and allowlists.
+    .filter((property) => property.embedded === undefined)
+    .filter((property) => property.kind === "scalar" || property.kind === "embedded")
+    .map((property) => ({
+      name: property.name,
+      kind: property.kind === "embedded" ? "json" : fieldKindOf(property),
+      nullable: property.nullable === true,
+      generated: isGenerated(property),
+      ...(property.items !== undefined && {
+        enumValues: property.items.map((value) => String(value)),
+      }),
+    }));
+
+  const relations: RelationDescriptor[] = properties
+    .filter((property) => property.kind !== "scalar" && property.kind !== "embedded")
+    .map((property) => ({
+      name: property.name,
+      // `property.entity` is MikroORM's own lazy target thunk, which is what
+      // keeps a bidirectional relation off the runtime import graph — and it
+      // resolves to the *class*, which is the identity core matches
+      // registered entities by.
+      target: () => property.entity() as ClassRef,
+      cardinality: TO_MANY.has(property.kind) ? ("many" as const) : ("one" as const),
+      // Inclusion is an opt-in allowlist; ORM metadata only supplies shape,
+      // never permission.
+      includable: false,
+      strategy: "auto" as const,
+    }));
+
+  return {
+    entity,
+    name: metadata.className,
+    idField: metadata.primaryKeys[0]!,
+    fields,
+    relations,
+    // MikroORM declares no delete-date marker of its own — its soft-delete
+    // pattern is a user-defined `@Filter`, which is a query concern rather
+    // than a column declaration, so there is nothing here to detect. Soft
+    // delete therefore needs an explicit `softDelete.field` in Kavo config;
+    // see doc 17, "Adapter-specific caveats".
+    softDeleteField: null,
+  };
+}
