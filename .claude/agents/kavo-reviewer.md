@@ -64,16 +64,46 @@ and doc sync.
 
 ```
 @kavo/nest ──▶ @kavo/core ◀── @kavo/typeorm
+   │            ▲ ▲ ▲ ▲
+   │            │ │ │ └───── @kavo/prisma
+   │            │ │ └─────── @kavo/mongoose
+   │            │ └───────── @kavo/mcp     ◀─┐
+   │            └─────────── @kavo/graphql ◀─┤
+   └──────────── the one sanctioned sideways edge ──┘
+                 (frameworks/* → protocols/*, ADR-0016)
 ```
 
 - **`@kavo/core` imports nothing** — zero runtime dependencies (ADR-0005).
   Not TypeORM, not Nest, not a utility library. Type-only imports from outside
   core are violations too: core owns its contracts.
-- **Barrel-only consumption** — `@kavo/typeorm` and `@kavo/nest` import from
+- **Barrel-only consumption** — every spoke (`@kavo/typeorm`, `@kavo/prisma`,
+  `@kavo/mongoose`, `@kavo/nest`, `@kavo/graphql`, `@kavo/mcp`) imports from
   the `@kavo/core` barrel. Any `@kavo/core/src/...` or relative reach into
   core's internals is a violation.
-- **The spokes never meet** — the TypeORM adapter must not import the Nest
-  binding, and vice versa. They compose only through Nest's DI container.
+- **The spokes mostly never meet** — the one sanctioned sideways edge is
+  `@kavo/nest` → the protocol packages, for its `BaseKavoGraphQLController` /
+  `BaseKavoMcpController` glue, and it is one-directional: a protocol binding
+  never imports `@kavo/nest` back (ADR-0016), which is what keeps it
+  host-framework-agnostic. A framework binding importing an **ORM adapter** is
+  genuinely forbidden — adapters reach Nest's container through DI, never an
+  import. Know which half of this the gate actually holds up, because they are
+  not the same:
+
+  | Edge                     | Enforced by                    |
+  | ------------------------ | ------------------------------ |
+  | ORM → framework          | `<orm>-only-imports-core`      |
+  | protocol → ORM/framework | `<protocol>-only-imports-core` |
+  | framework → ORM          | `nest-only-imports-core`       |
+  | **ORM → protocol**       | **nothing — review only**      |
+  | **protocol → protocol**  | **nothing — review only**      |
+
+  The last two rows are the trap. `packages/orms/*/src` importing
+  `@kavo/graphql` or `@kavo/mcp`, or `@kavo/graphql` importing `@kavo/mcp`,
+  **passes `pnpm depcruise` today** — the adapter rules' `to` covers
+  `packages/frameworks` only, and the protocol rules omit each other. Still a
+  violation; you are the thing that catches it. See the footnote under
+  `CONTRIBUTING.md`'s boundary table, which says the same.
+
 - **No leakage through types** — a TypeORM type (`QueryRunner`,
   `EntityMetadata`, `SelectQueryBuilder`) or a Nest type appearing in a core
   signature is a leak even when it compiles. Core's escape hatch for
@@ -83,9 +113,10 @@ and doc sync.
   named list (ADR-0010). No `export *`. Every added export is a public
   commitment; every removed one is potentially breaking.
 
-Run the mechanical gate first — it is cheap and authoritative:
-`pnpm depcruise`. A pass here does **not** end the check: dependency-cruiser
-catches import graphs, not type leakage or barrel intent. Grep changed files
+Run the mechanical gate first — it is cheap, and authoritative for the edges it
+covers: `pnpm depcruise`. A pass here does **not** end the check:
+dependency-cruiser catches import graphs, not type leakage or barrel intent,
+and it does not cover the two edges tabled above. Grep changed files
 for the leak patterns directly: imports of `typeorm`, `@nestjs/*`, or
 `@kavo/core/` (deep) in the wrong package; `export *` anywhere in core's
 barrel. Diff the barrel specifically:
@@ -100,19 +131,20 @@ as breaking.
 because the next planner or reviewer trusts the docs over re-deriving behavior
 from source.
 
-- **`docs/adr/0001`–`0014`** — one ADR per load-bearing decision.
+- **`docs/internals/adr/0001`–`0018`** — one ADR per load-bearing decision.
   A change that introduces a new load-bearing invariant (a new seam, a new
   precedence rule, a new mechanically-enforced boundary) with no corresponding
   ADR is a finding. A change that _contradicts_ an existing ADR without
   superseding it (ADRs are point-in-time decisions; superseding one needs an
   explicit new ADR referencing the old one, not a silent code change) is a
   finding.
-- **`docs/architecture/*.md`** — mirrors the packages (query
-  grammar, error handling, engine, TypeORM adapter, Nest integration, soft
-  delete, relations). If the change alters behavior one of these documents
-  describes in specifics (not just "engine gets faster" but "the pipeline now
-  has a new stage", "the wire token mapping changed", "a new config key exists
-  at this precedence level"), the matching doc should have moved too.
+- **`docs/internals/architecture/*.md`** — mirrors the packages (query
+  grammar, error handling, engine, the TypeORM/Prisma/Mongoose adapters, Nest
+  integration, the GraphQL and MCP bindings, soft delete, relations). If the
+  change alters behavior one of these documents describes in specifics (not just
+  "engine gets faster" but "the pipeline now has a new stage", "the wire token
+  mapping changed", "a new config key exists at this precedence level"), the
+  matching doc should have moved too.
 - **`docs/glossary.md`** — one canonical name per concept. A new
   operation, config key, or exception introduces a term; check it either
   reuses an existing glossary term or the glossary gained an entry. A rename

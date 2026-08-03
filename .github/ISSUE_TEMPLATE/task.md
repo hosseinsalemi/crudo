@@ -19,7 +19,9 @@ labels: ""
 
 ## Affected packages
 
-<!-- @kavo/core | @kavo/typeorm | @kavo/nest | docs -->
+<!-- Any combination of: @kavo/core | @kavo/typeorm | @kavo/prisma |
+     @kavo/mongoose | @kavo/nest | @kavo/graphql | @kavo/mcp | docs
+     Write "None" for repo-wiring-only work (.claude/, .github/, tooling). -->
 
 ## Constraints
 

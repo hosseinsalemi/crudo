@@ -1,11 +1,11 @@
 ---
 name: add-adr
-description: When and how to write a new ADR in docs/adr/ — numbering, required sections, and how it must connect to code and the architecture docs. Use when a change makes a load-bearing decision (a seam, an invariant, a boundary rule) rather than just implementing one already on record.
+description: When and how to write a new ADR in docs/internals/adr/ — numbering, required sections, and how it must connect to code and the architecture docs. Use when a change makes a load-bearing decision (a seam, an invariant, a boundary rule) rather than just implementing one already on record.
 ---
 
 # Writing an ADR
 
-Kavo records one ADR per load-bearing decision (`docs/adr/0001`…`0014`).
+Kavo records one ADR per load-bearing decision (`docs/internals/adr/0001`…`0018`).
 They are read before changing the behavior they govern (CLAUDE.md), so an ADR
 is only worth writing when a future change could plausibly get the decision
 wrong without it.
@@ -29,7 +29,7 @@ foreclose.
 
 ## Numbering and location
 
-- File: `docs/adr/00NN-kebab-title.md`, next sequential number —
+- File: `docs/internals/adr/00NN-kebab-title.md`, next sequential number —
   check the highest existing file first, never reuse or renumber.
 - ADRs are **never superseded by editing in place**. If a later decision
   overturns one, the old ADR's `Status` becomes `superseded by ADR-00MM` and
@@ -66,7 +66,7 @@ itself.
 
 An ADR that nothing points to is dead weight:
 
-- Reference it from the relevant `docs/architecture/NN-*.md` doc,
+- Reference it from the relevant `docs/internals/architecture/NN-*.md` doc,
   the way doc 08 §2 and §4 would reference a config ADR.
 - Reference it from the code that implements the decision, the way existing
   comments cite `ADR-0012` or `ADR-0006` — a future reader hitting the
