@@ -164,8 +164,16 @@ The packages form one tightly coupled contract surface — a core contract
 change almost always touches an edge package, and a single version answers
 "which adapter works with which core" permanently. Cost: occasional no-op
 version bumps for an untouched package — accepted as trivially cheap next
-to cross-package version-matrix support. Release mechanics (changesets,
-publish order) are future work.
+to cross-package version-matrix support.
+
+Release mechanics live in `.github/workflows/publish.yml`, triggered by a
+pushed `v*.*.*` tag and nothing else. Its `PACKAGE_DIRS` is the single source
+of truth for the released set, and two guards run before anything reaches the
+registry: every package's `version` must equal `@kavo/core`'s (lockstep, this
+section), and every packed tarball's manifest must be free of `workspace:`
+ranges. The second one exists because only `pnpm pack` rewrites `workspace:^`
+into a real semver range — a package published any other way is uninstallable,
+and npm does not allow republishing a version to fix it.
 
 ## 8. Dependency classification (decided now, executed later)
 
