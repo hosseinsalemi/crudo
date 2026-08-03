@@ -106,10 +106,17 @@ jobs:
       # released that package, which is how @kavo/prisma sat at 0.5.0 while
       # everything else moved to 0.6.0. Fail here, before anything is packed
       # or published.
-      - name: Verify lockstep versions
+      #
+      # The same loop asserts PACKAGE_DIRS is topological, because the ordering
+      # the env comment promises is otherwise enforced by nothing: the coverage
+      # guard above sorts both sides, so it sees membership and not order, and
+      # re-alphabetizing this list would silently put @kavo/nest back ahead of
+      # its own dependencies while every check stayed green.
+      - name: Verify lockstep versions and publish order
         run: |
           CORE_VERSION=$(node -p "require('./packages/core/package.json').version")
           status=0
+          PUBLISHED=""
           for dir in $PACKAGE_DIRS; do
             NAME=$(node -p "require('./$dir/package.json').name")
             VERSION=$(node -p "require('./$dir/package.json').version")
@@ -119,6 +126,16 @@ jobs:
               echo "$NAME is at $VERSION, expected $CORE_VERSION (ADR-0004 lockstep versioning)" >&2
               status=1
             fi
+            for dep in $(node -p "Object.keys(require('./$dir/package.json').dependencies ?? {}).filter((name) => name.startsWith('@kavo/')).join(' ')"); do
+              case " $PUBLISHED " in
+                *" $dep "*) ;;
+                *)
+                  echo "$NAME publishes before its dependency $dep — PACKAGE_DIRS must list a package after everything it depends on" >&2
+                  status=1
+                  ;;
+              esac
+            done
+            PUBLISHED="$PUBLISHED $NAME"
           done
           exit $status
 
@@ -151,11 +168,19 @@ jobs:
       # manifests, not the source ones: the source manifests always say
       # `workspace:^`, which is exactly right in the repo and only wrong on
       # the registry.
-      - name: Verify packed manifests resolve workspace deps
+      # The entry-point check is the other half of "installable". `pnpm pack`
+      # runs no build (no package here has a prepack script), so packing a
+      # tree with no dist/ produces a manifest-only tarball and exits 0. That
+      # cannot happen while `Check` runs before `Pack` — but that is a step
+      # ordering, not a check, so assert the artifact directly rather than
+      # trusting the order to survive the next edit of this file.
+      - name: Verify packed tarballs are installable
         run: |
           status=0
           for tarball in "$TARBALL_DIR"/*.tgz; do
-            OFFENDERS=$(tar -xzOf "$tarball" package/package.json | node -e '
+            NAME=$(basename "$tarball")
+            MANIFEST=$(tar -xzOf "$tarball" package/package.json)
+            OFFENDERS=$(printf '%s' "$MANIFEST" | node -e '
               let raw = "";
               process.stdin.on("data", (chunk) => (raw += chunk));
               process.stdin.on("end", () => {
@@ -167,12 +192,25 @@ jobs:
                 }
               });
             ')
+            ENTRY="package/$(printf '%s' "$MANIFEST" | node -e '
+              let raw = "";
+              process.stdin.on("data", (chunk) => (raw += chunk));
+              process.stdin.on("end", () => {
+                const pkg = JSON.parse(raw);
+                const entry = pkg.exports?.["."]?.default ?? pkg.main ?? "index.js";
+                console.log(entry.replace(/^\.\//, ""));
+              });
+            ')"
             if [ -n "$OFFENDERS" ]; then
-              echo "$(basename "$tarball") ships unresolved workspace: ranges and would be uninstallable:" >&2
+              echo "$NAME ships unresolved workspace: ranges and would be uninstallable:" >&2
               echo "$OFFENDERS" >&2
               status=1
+            fi
+            if tar -tzf "$tarball" | grep -qx "$ENTRY"; then
+              [ -n "$OFFENDERS" ] || echo "$NAME ok"
             else
-              echo "$(basename "$tarball") ok"
+              echo "$NAME has no build output at $ENTRY — it was packed without a build" >&2
+              status=1
             fi
           done
           exit $status
@@ -185,8 +223,10 @@ jobs:
       # The tarball is named exactly, not globbed: `pnpm pack` writes
       # <name-with-@-and-/-flattened>-<version>.tgz, and a `<prefix>-*.tgz`
       # glob would also match a sibling whose name extends this one
-      # (`kavo-core-*` matching a future `kavo-core-utils-…`), handing
-      # `npm publish` two paths and publishing the wrong package.
+      # (`kavo-core-*` matching a future `kavo-core-utils-…`). `npm publish`
+      # takes exactly one spec, so the extra path aborts the release with
+      # EUSAGE rather than mispublishing — noisy, but only after the packages
+      # ahead of it went out. Naming the file removes the ambiguity.
       - name: Publish packages
         run: |
           for dir in $PACKAGE_DIRS; do
