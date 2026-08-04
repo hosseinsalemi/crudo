@@ -743,6 +743,48 @@ describe("@Kavo soft-delete routes", () => {
     expect(response.body.items).toHaveLength(1);
   });
 
+  it("narrows the list to the trash for onlyDeleted=true", async () => {
+    // The flag is unit-tested in core; what this pins down is that it
+    // survives the wire — the binding hands the engine flat query params,
+    // and a flag that never reached the normalizer would read as a
+    // plain live listing instead of a 400.
+    await request(server()).post("/todos").send({ title: "still here" }).expect(201);
+    await request(server()).delete("/todos/1").expect(204);
+
+    const trash = await request(server()).get("/todos?onlyDeleted=true").expect(200);
+    expect(trash.body).toMatchObject({ total: 1 });
+    expect(trash.body.items).toEqual([expect.objectContaining({ id: 1, title: "x" })]);
+    expect(adapter.lastQuery).toMatchObject({ onlyDeleted: true, withDeleted: false });
+
+    // …and the default view is still its complement.
+    const live = await request(server()).get("/todos").expect(200);
+    expect(live.body.items).toEqual([expect.objectContaining({ id: 2, title: "still here" })]);
+  });
+
+  it("maps withDeleted+onlyDeleted together to a 400 problem-details document", async () => {
+    const response = await request(server())
+      .get("/todos?withDeleted=true&onlyDeleted=true")
+      .expect(400)
+      .expect("Content-Type", /application\/problem\+json/);
+    expect(response.body).toMatchObject({ status: 400, code: "KAVO_QUERY_INVALID" });
+    expect(response.body.errors).toContainEqual(
+      expect.objectContaining({ field: "onlyDeleted", code: "KAVO_QUERY_CONFLICTING_PARAMS" }),
+    );
+  });
+
+  it("rejects onlyDeleted on an entity that is not soft-deletable", async () => {
+    @Kavo(Todo, { softDelete: { strategy: "hard" } })
+    @Controller("todos")
+    class HardDeleteController {}
+
+    await app.close();
+    await bootstrap(HardDeleteController);
+    const response = await request(server()).get("/todos?onlyDeleted=true").expect(400);
+    expect(response.body.errors).toContainEqual(
+      expect.objectContaining({ field: "onlyDeleted", code: "KAVO_QUERY_UNSUPPORTED_PARAM" }),
+    );
+  });
+
   it("restores through PATCH /:id/restore, returning the item", async () => {
     await request(server()).delete("/todos/1").expect(204);
     const restored = await request(server()).patch("/todos/1/restore").expect(200);
@@ -817,6 +859,46 @@ describe("@Kavo relation includes", () => {
       code: "KAVO_QUERY_INVALID",
       errors: [{ field: "list", code: "KAVO_QUERY_INVALID_FIELD" }],
     });
+  });
+
+  it("carries filter, sort, include and pagination through one request", async () => {
+    // Each of these is covered on its own above; what a single request adds
+    // is that they survive *together* — one query string, one flatten, one
+    // normalization pass. A regression where one section's parse consumed or
+    // clobbered another's params is invisible to any single-feature test.
+    for (let i = 1; i <= 3; i++) {
+      await request(server())
+        .post("/todos")
+        .send({ title: `t${i}`, priority: i, list: 7 })
+        .expect(201);
+    }
+
+    const response = await request(server())
+      .get("/todos?filter[done][eq]=false&filter[priority][gte]=1&sort=-priority,title&include=list&limit=2&offset=1")
+      .expect(200);
+
+    expect(adapter.lastQuery?.filter.root).toMatchObject({
+      kind: "group",
+      operator: "AND",
+      children: [
+        { field: "done", operator: "EQ", value: false },
+        { field: "priority", operator: "GTE", value: 1 },
+      ],
+    });
+    expect(adapter.lastQuery?.sort).toEqual([
+      { field: "priority", direction: "desc" },
+      { field: "title", direction: "asc" },
+    ]);
+    expect(adapter.lastQuery?.pagination).toEqual({ limit: 2, offset: 1 });
+    expect(Object.keys(adapter.lastQuery?.include ?? {})).toEqual(["list"]);
+
+    // The envelope mirrors the request, and the included relation is still
+    // embedded on every item of the page.
+    expect(response.body).toMatchObject({ limit: 2, offset: 1, total: 3 });
+    expect(response.body.items).toHaveLength(2);
+    for (const item of response.body.items) {
+      expect(item).toMatchObject({ list: { id: 7 } });
+    }
   });
 
   it("documents include and fields[relation] in the OpenAPI schema", async () => {
