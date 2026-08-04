@@ -59,7 +59,7 @@ export class InMemoryAccountAdapter implements RepositoryAdapter<Account> {
   async findMany(query: NormalizedQueryContext<Account>, context: KavoContext<Account>): Promise<readonly Account[]> {
     const visible = this.rows.filter((row) => this.visible(row, context, query.withDeleted, query.onlyDeleted));
     const { limit } = query.pagination;
-    // Offset-only fixture: narrow rather than assume (ADR-0019).
+    // Offset-only fixture: narrow rather than assume (ADR-0021).
     const offset = isCursorPagination(query.pagination) ? 0 : query.pagination.offset;
     return visible.slice(offset, offset + limit);
   }

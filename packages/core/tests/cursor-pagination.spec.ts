@@ -1,24 +1,24 @@
 import { describe, expect, it } from "vitest";
-import type { DeepPartial, KavoSettings, ListResultDto, ResolvedEntityConfig, Sort } from "@kavo/core";
+import type { DeepPartial, EntityMetadata, KavoSettings, ListResultDto, ResolvedEntityConfig, Sort } from "@kavo/core";
 import {
+  ConfigurationException,
   CursorPaginationStrategy,
   QueryNormalizer,
   WireQuery,
-  builtInHandlers,
   createKavo,
   cursorValuesOf,
-  decodeCursor,
   encodeCursor,
   isCursorPagination,
-  keysetExpression,
   readFilter,
-  withListMeta,
 } from "@kavo/core";
+// Not on the barrel: both are `QueryNormalizer` internals whose contracts
+// only hold once the effective sort has been validated (ADR-0010, ADR-0021).
+import { decodeCursor, keysetExpression } from "../src/query/cursor.js";
 import { InMemoryUserAdapter, User, userMetadata } from "./support/user-fixture.js";
 import { issuesOf } from "./support/query-issues.js";
 
 /**
- * Cursor (keyset) pagination — ADR-0019.
+ * Cursor (keyset) pagination — ADR-0021.
  *
  * The suite drives the real composition root and the real engine wherever
  * it can: cursor paging is an interaction between the strategy, the
@@ -105,7 +105,7 @@ describe("cursor codec — opaque, not signed", () => {
       { field: "name", direction: "asc" },
       { field: "id", direction: "asc" },
     ];
-    for (const name of ["Zoë", "田中", "a🙂b", "\u0000edge"]) {
+    for (const name of ["Zoë", "田中", "a🙂b", " edge"]) {
       expect(roundTrip([name, 1], sort)).toEqual([name, 1]);
     }
   });
@@ -115,10 +115,63 @@ describe("cursor codec — opaque, not signed", () => {
     expect(token).toMatch(/^[A-Za-z0-9_-]+$/);
   });
 
-  it("rejects a token that is not base64url", () => {
+  it("rejects a token carrying a character outside the base64url alphabet", () => {
+    // 10 characters, so `length % 4 === 2` and the *length* guard passes —
+    // it is the alphabet check that has to reject this one.
     const issues: { field: string; code: string }[] = [];
-    expect(decodeCursor("not a cursor!", SORT_BY_ID, fields, issues as never)).toBeNull();
+    expect(decodeCursor("tampered!!", SORT_BY_ID, fields, issues as never)).toBeNull();
     expect(issues[0]).toMatchObject({ field: "cursor", code: "KAVO_QUERY_INVALID_VALUE" });
+  });
+
+  it("rejects a truncated token — a trailing group of one character encodes nothing", () => {
+    // Every character is in the alphabet; only `length % 4 === 1` is wrong.
+    const issues: { field: string; code: string }[] = [];
+    expect(decodeCursor("AAAAA", SORT_BY_ID, fields, issues as never)).toBeNull();
+    expect(issues[0]).toMatchObject({ field: "cursor", code: "KAVO_QUERY_INVALID_VALUE" });
+  });
+
+  it("rejects a well-formed token whose decoded bytes are not JSON", () => {
+    const issues: { field: string; code: string }[] = [];
+    expect(decodeCursor("AAAA", SORT_BY_ID, fields, issues as never)).toBeNull();
+    expect(issues[0]).toMatchObject({ field: "cursor", code: "KAVO_QUERY_INVALID_VALUE" });
+  });
+
+  it("round-trips a boolean key", () => {
+    const withFlag = new Map(fields);
+    withFlag.set("verified", { name: "verified", kind: "boolean", nullable: false, generated: false });
+    const sort = [{ field: "verified", direction: "asc" }, ...SORT_BY_ID] as readonly Sort<User>[];
+    expect(decodeCursor(encodeCursor([true, 4]), sort, withFlag, [] as never)).toEqual([true, 4]);
+  });
+
+  it("rejects a non-boolean value for a boolean key", () => {
+    const withFlag = new Map(fields);
+    withFlag.set("verified", { name: "verified", kind: "boolean", nullable: false, generated: false });
+    const sort = [{ field: "verified", direction: "asc" }, ...SORT_BY_ID] as readonly Sort<User>[];
+    const issues: { detail: string }[] = [];
+    expect(decodeCursor(encodeCursor(["yes" as never, 4]), sort, withFlag, issues as never)).toBeNull();
+    expect(issues[0]?.detail).toContain("'verified'");
+  });
+
+  it("refuses a json key outright — it has no portable ordering to revive against", () => {
+    // Unreachable through the normalizer, which rejects a `json` sort key
+    // first; pinned here because `reviveValue`'s default arm is what makes
+    // the codec fail *closed* rather than passing an object straight through.
+    const withJson = new Map(fields);
+    withJson.set("profile", { name: "profile", kind: "json", nullable: false, generated: false });
+    const sort = [{ field: "profile", direction: "asc" }, ...SORT_BY_ID] as readonly Sort<User>[];
+    const issues: { detail: string }[] = [];
+    expect(decodeCursor(encodeCursor(["{}" as never, 4]), sort, withJson, issues as never)).toBeNull();
+    expect(issues[0]?.detail).toContain("'profile'");
+  });
+
+  it("reports a query issue, not a TypeError, for a sort key that is not a column", () => {
+    // `decodeCursor` is reachable on its own; `resolveKeyset`'s guard is not
+    // its guard.
+    const sort = [{ field: "posts.title", direction: "asc" }] as unknown as readonly Sort<User>[];
+    const issues: { field: string; code: string; detail: string }[] = [];
+    expect(decodeCursor(encodeCursor(["x"]), sort, fields, issues as never)).toBeNull();
+    expect(issues[0]).toMatchObject({ field: "cursor", code: "KAVO_QUERY_INVALID_VALUE" });
+    expect(issues[0]?.detail).toContain("posts.title");
   });
 
   it("rejects a well-formed token whose payload is not an array", () => {
@@ -135,8 +188,9 @@ describe("cursor codec — opaque, not signed", () => {
   });
 
   it("rejects a value whose type does not match the column", () => {
-    const issues: { detail: string }[] = [];
+    const issues: { field: string; code: string; detail: string }[] = [];
     expect(decodeCursor(encodeCursor(["seven" as never]), SORT_BY_ID, fields, issues as never)).toBeNull();
+    expect(issues[0]).toMatchObject({ field: "cursor", code: "KAVO_QUERY_INVALID_VALUE" });
     expect(issues[0]?.detail).toContain("'id'");
   });
 
@@ -145,14 +199,17 @@ describe("cursor codec — opaque, not signed", () => {
       { field: "status", direction: "asc" },
       { field: "id", direction: "asc" },
     ];
-    const issues: unknown[] = [];
+    const issues: { field: string; code: string; detail: string }[] = [];
     expect(decodeCursor(encodeCursor(["superuser", 1]), sort, fields, issues as never)).toBeNull();
-    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({ field: "cursor", code: "KAVO_QUERY_INVALID_VALUE" });
+    expect(issues[0]?.detail).toContain("'status'");
   });
 
   it("rejects a null sort-key value — a keyset predicate cannot position one", () => {
-    const issues: { detail: string }[] = [];
+    const issues: { field: string; code: string; detail: string }[] = [];
     expect(decodeCursor(encodeCursor([null]), SORT_BY_ID, fields, issues as never)).toBeNull();
+    expect(issues[0]).toMatchObject({ field: "cursor", code: "KAVO_QUERY_INVALID_VALUE" });
+    expect(issues[0]?.detail).toContain("'id'");
     expect(issues[0]?.detail).toContain("null sort key");
   });
 
@@ -161,33 +218,58 @@ describe("cursor codec — opaque, not signed", () => {
       { field: "createdAt", direction: "asc" },
       { field: "id", direction: "asc" },
     ];
-    const issues: unknown[] = [];
+    const issues: { field: string; code: string; detail: string }[] = [];
     expect(decodeCursor(encodeCursor(["not-a-date", 1]), sort, fields, issues as never)).toBeNull();
-    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({ field: "cursor", code: "KAVO_QUERY_INVALID_VALUE" });
+    expect(issues[0]?.detail).toContain("'createdAt'");
   });
 });
 
-// ── Projecting a row onto the sort ────────────────────────────────────
+// ── Encoding a row: the declared kind must match the runtime value ─────
 
-describe("cursorValuesOf — the payload the next page's token carries", () => {
+describe("cursorValuesOf — a cursor key's runtime type must match its declared kind", () => {
   const fields = new Map(userMetadata.fields.map((field) => [field.name, field]));
-  const sort: readonly Sort<User>[] = [
-    { field: "name", direction: "asc" },
-    { field: "id", direction: "asc" },
-  ];
 
-  it("reads the entity, so a narrowed fieldset cannot strip a sort key", () => {
-    expect(cursorValuesOf(Object.assign(new User(), { id: 4, name: "Ada" }), sort)).toEqual(["Ada", 4]);
+  it("projects a row onto the effective sort", () => {
+    const when = new Date("2024-05-05T00:00:00.000Z");
+    const sort: readonly Sort<User>[] = [
+      { field: "createdAt", direction: "desc" },
+      { field: "id", direction: "asc" },
+    ];
+    expect(cursorValuesOf({ ...new User(), id: 9, createdAt: when }, sort, fields, "User")).toEqual([when, 9]);
   });
 
-  it("degrades a null sort key to null, which the next request rejects by name", () => {
-    // The documented failure mode: paging works until a page boundary
-    // lands on a row whose sort key is null, and then says which field.
-    const row = Object.assign(new User(), { id: 4, name: null });
-    const issues: { detail: string }[] = [];
-    expect(decodeCursor(encodeCursor(cursorValuesOf(row, sort)), sort, fields, issues as never)).toBeNull();
-    expect(issues[0]?.detail).toContain("'name'");
-    expect(issues[0]?.detail).toContain("null sort key");
+  it("degrades an absent property to null rather than inventing a position", () => {
+    expect(cursorValuesOf({} as User, SORT_BY_ID, fields, "User")).toEqual([null]);
+  });
+
+  it("refuses a bigint id — JSON.stringify would throw, and a 500 names nothing", () => {
+    // Every adapter declares a `bigint` primary key as `kind: "number"`;
+    // MikroORM v7 and Prisma hand back a JS `bigint` at runtime. Without
+    // this check the first page is an opaque 500 out of `JSON.stringify`.
+    expect(() => cursorValuesOf({ id: 1n } as unknown as User, SORT_BY_ID, fields, "User")).toThrow(
+      ConfigurationException,
+    );
+    expect(() => cursorValuesOf({ id: 1n } as unknown as User, SORT_BY_ID, fields, "User")).toThrow(/bigint/);
+  });
+
+  it("refuses a stringified numeric id — TypeORM returns bigint columns as strings", () => {
+    // This one round-trips silently into a *page-two* 400 blaming the
+    // field's type, which points the adopter at the wrong thing.
+    expect(() => cursorValuesOf({ id: "1" } as unknown as User, SORT_BY_ID, fields, "User")).toThrow(
+      /declared 'number'.*runtime value is a string/s,
+    );
+  });
+
+  it("refuses a Decimal-like object for a numeric key", () => {
+    class Decimal {}
+    expect(() => cursorValuesOf({ id: new Decimal() } as unknown as User, SORT_BY_ID, fields, "User")).toThrow(
+      /Decimal object/,
+    );
+  });
+
+  it("names the entity and the column it could not encode", () => {
+    expect(() => cursorValuesOf({ id: 1n } as unknown as User, SORT_BY_ID, fields, "User")).toThrow(/'id'/);
   });
 });
 
@@ -216,15 +298,74 @@ describe("keysetExpression — row-wise comparison as an ordinary filter AST", (
     ];
     expect(keysetExpression(sort, [30, 5])).toEqual({
       kind: "group",
-      operator: "OR",
+      operator: "AND",
       children: [
-        { kind: "condition", field: "age", operator: "LT", value: 30 },
+        // The redundant leading bound — logically implied by every branch
+        // below it, and the only part of this shape a btree can *start* on.
+        { kind: "condition", field: "age", operator: "LTE", value: 30 },
         {
           kind: "group",
-          operator: "AND",
+          operator: "OR",
           children: [
-            { kind: "condition", field: "age", operator: "EQ", value: 30 },
-            { kind: "condition", field: "id", operator: "GT", value: 5 },
+            { kind: "condition", field: "age", operator: "LT", value: 30 },
+            {
+              kind: "group",
+              operator: "AND",
+              children: [
+                { kind: "condition", field: "age", operator: "EQ", value: 30 },
+                { kind: "condition", field: "id", operator: "GT", value: 5 },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("uses a non-strict GTE bound when the leading key ascends", () => {
+    const sort: readonly Sort<User>[] = [
+      { field: "name", direction: "asc" },
+      { field: "id", direction: "asc" },
+    ];
+    expect(keysetExpression(sort, ["Ada", 5])).toMatchObject({
+      operator: "AND",
+      children: [{ field: "name", operator: "GTE", value: "Ada" }, { operator: "OR" }],
+    });
+  });
+
+  it("chains three keys, the deepest branch being the full AND of equalities", () => {
+    const sort: readonly Sort<User>[] = [
+      { field: "status", direction: "asc" },
+      { field: "age", direction: "desc" },
+      { field: "id", direction: "asc" },
+    ];
+    expect(keysetExpression(sort, ["active", 30, 5])).toEqual({
+      kind: "group",
+      operator: "AND",
+      children: [
+        { kind: "condition", field: "status", operator: "GTE", value: "active" },
+        {
+          kind: "group",
+          operator: "OR",
+          children: [
+            { kind: "condition", field: "status", operator: "GT", value: "active" },
+            {
+              kind: "group",
+              operator: "AND",
+              children: [
+                { kind: "condition", field: "status", operator: "EQ", value: "active" },
+                { kind: "condition", field: "age", operator: "LT", value: 30 },
+              ],
+            },
+            {
+              kind: "group",
+              operator: "AND",
+              children: [
+                { kind: "condition", field: "status", operator: "EQ", value: "active" },
+                { kind: "condition", field: "age", operator: "EQ", value: 30 },
+                { kind: "condition", field: "id", operator: "GT", value: 5 },
+              ],
+            },
           ],
         },
       ],
@@ -303,7 +444,17 @@ describe("CursorPaginationStrategy", () => {
 describe("QueryNormalizer — cursor pagination requires a total order", () => {
   const normalizer = new QueryNormalizer<User>(userMetadata);
 
-  function configWith(defaultSort: readonly Sort<User>[], strategy = "cursor"): ResolvedEntityConfig<User> {
+  const DEFAULT_ALLOWLISTS = {
+    filterable: ["id", "name", "age", "status", "createdAt"],
+    sortable: ["id", "name", "age", "status", "createdAt"],
+    selectable: ["id", "name", "email", "age", "status", "createdAt"],
+  };
+
+  function configWith(
+    defaultSort: readonly Sort<User>[],
+    strategy = "cursor",
+    allowlists: Partial<typeof DEFAULT_ALLOWLISTS> = {},
+  ): ResolvedEntityConfig<User> {
     const settings = {
       pagination: { defaultLimit: 20, maxLimit: 100, strategy, count: true },
       query: { maxFilterDepth: 5, maxInValues: 100, defaultSort },
@@ -316,11 +467,7 @@ describe("QueryNormalizer — cursor pagination requires a total order", () => {
       entityName: "User",
       settings,
       settingsFor: () => settings,
-      allowlists: {
-        filterable: ["id", "name", "age", "status", "createdAt"],
-        sortable: ["id", "name", "age", "status", "createdAt"],
-        selectable: ["id", "name", "email", "age", "status", "createdAt"],
-      },
+      allowlists: { ...DEFAULT_ALLOWLISTS, ...allowlists },
       softDelete: { strategy: "hard", field: "deletedAt" },
       dto: { resolve: () => null },
       relations: { all: () => [], get: () => undefined },
@@ -402,6 +549,106 @@ describe("QueryNormalizer — cursor pagination requires a total order", () => {
     );
     expect(issues[0]).toMatchObject({ field: "cursor", code: "KAVO_QUERY_UNSUPPORTED_PARAM" });
   });
+
+  it("rejects a wire cursor under a non-cursor strategy too — both paths share the check", () => {
+    // Silently dropping `?cursor=` would hand back page 1 forever while the
+    // client believed it was paging.
+    const issues = issuesOf(() =>
+      normalizer.normalizeWire({ cursor: encodeCursor([3]) }, configWith(SORT_BY_ID, "offset")),
+    );
+    expect(issues[0]).toMatchObject({ field: "cursor", code: "KAVO_QUERY_UNSUPPORTED_PARAM" });
+    expect(issues[0]?.detail).toContain("'offset'");
+  });
+
+  it("leaves an empty wire cursor alone under a non-cursor strategy — it means 'first page'", () => {
+    expect(() => normalizer.normalizeWire({ cursor: "" }, configWith(SORT_BY_ID, "offset"))).not.toThrow();
+  });
+
+  // ── The allowlists a cursor sort key must clear ─────────────────────
+
+  it("rejects a cursor sort key that is not on the filterable allowlist", () => {
+    // `keysetExpression` mints EQ/GT/LT nodes over every sort key and
+    // `readFilter` ANDs them in *after* the filter parser has run, so
+    // without this gate `?sort=email,id&cursor=…` is a comparison oracle
+    // over a field `?filter[email][gt]=…` is a 400 for.
+    const config = configWith([], "cursor", {
+      sortable: ["id", "email"],
+      filterable: ["id", "status"],
+      selectable: ["id", "email", "status"],
+    });
+    const issues = issuesOf(() => normalizer.normalizeWire({ sort: "email,id" }, config));
+    expect(issues[0]).toMatchObject({ field: "email", code: "KAVO_QUERY_INVALID_FIELD" });
+    expect(issues[0]?.detail).toContain("filtering");
+  });
+
+  it("rejects a cursor sort key that is not on the selectable allowlist", () => {
+    // `cursorValuesOf` reads the raw entity and `meta` never passes through
+    // the serializer, so a non-selectable key would land in
+    // `meta.nextCursor` base64-encoded regardless of the item DTO.
+    const config = configWith([], "cursor", {
+      sortable: ["id", "email"],
+      filterable: ["id", "email"],
+      selectable: ["id", "status"],
+    });
+    const issues = issuesOf(() => normalizer.normalizeWire({ sort: "email,id" }, config));
+    expect(issues[0]).toMatchObject({ field: "email", code: "KAVO_QUERY_INVALID_FIELD" });
+    expect(issues[0]?.detail).toContain("selection");
+  });
+
+  it("rejects rather than omits — dropping the key would break the total order", () => {
+    const config = configWith([], "cursor", {
+      sortable: ["id", "email"],
+      filterable: ["id"],
+      selectable: ["id"],
+    });
+    expect(() => normalizer.normalizeWire({ sort: "email,id" }, config)).toThrow();
+  });
+
+  it("applies the same three allowlists on the programmatic path", () => {
+    const config = configWith([], "cursor", {
+      sortable: ["id", "email"],
+      filterable: ["id", "status"],
+      selectable: ["id", "email", "status"],
+    });
+    const issues = issuesOf(() =>
+      normalizer.normalizeInput({ sort: [{ field: "email", direction: "asc" }, ...SORT_BY_ID] } as never, config),
+    );
+    expect(issues.map((issue) => issue.field)).toContain("email");
+  });
+
+  it("accepts a sort key that clears sortable, filterable and selectable alike", () => {
+    const config = configWith([], "cursor", {
+      sortable: ["id", "name"],
+      filterable: ["id", "name"],
+      selectable: ["id", "name"],
+    });
+    expect(() => normalizer.normalizeWire({ sort: "name,id" }, config)).not.toThrow();
+  });
+
+  // ── The two `cursorSortIssue` branches ──────────────────────────────
+
+  it("rejects a sort key that is not a scalar column of the entity", () => {
+    const config = configWith([], "cursor", { sortable: ["id", "posts"], filterable: ["id", "posts"] });
+    const issues = issuesOf(() => normalizer.normalizeWire({ sort: "posts,id" }, config));
+    expect(issues[0]).toMatchObject({ field: "sort", code: "KAVO_QUERY_CONFLICTING_PARAMS" });
+    expect(issues[0]?.detail).toContain("not a scalar column");
+  });
+
+  it("rejects a json sort key — no portable ordering", () => {
+    const withJson: EntityMetadata<User> = {
+      ...userMetadata,
+      fields: [...userMetadata.fields, { name: "profile", kind: "json", nullable: false, generated: false }],
+    };
+    const jsonNormalizer = new QueryNormalizer<User>(withJson);
+    const config = configWith([], "cursor", {
+      sortable: ["id", "profile"],
+      filterable: ["id", "profile"],
+      selectable: ["id", "profile"],
+    });
+    const issues = issuesOf(() => jsonNormalizer.normalizeWire({ sort: "profile,id" }, config));
+    expect(issues[0]).toMatchObject({ field: "sort", code: "KAVO_QUERY_CONFLICTING_PARAMS" });
+    expect(issues[0]?.detail).toContain("'json'");
+  });
 });
 
 // ── End to end, through the engine ────────────────────────────────────
@@ -441,14 +688,25 @@ describe("cursor pagination end to end", () => {
   });
 
   it("never leaks the over-fetched sentinel row into the response", async () => {
-    const { crud, adapter } = cursorCrud();
+    const { crud } = cursorCrud();
     await seed(crud, 10);
 
     const page = await crud.findMany({ limit: 3 } as never);
     expect(page.items).toHaveLength(3);
     expect(page.limit).toBe(3);
-    // The adapter really was asked for one more than the page.
-    expect(adapter.lastQuery?.pagination.limit).toBe(4);
+    expect((page.items as User[]).map((user) => user.name)).toEqual(["user-1", "user-2", "user-3"]);
+  });
+
+  it("still drops the sentinel when limit lands exactly on maxLimit", async () => {
+    // The `limit + 1` over-fetch asks for `maxLimit + 1`; the response must
+    // still be capped at the page size the client was granted.
+    const { crud } = cursorCrud({ pagination: { maxLimit: 3, defaultLimit: 3 } });
+    await seed(crud, 8);
+
+    const page = await crud.findMany({ limit: 3 } as never);
+    expect(page.items).toHaveLength(3);
+    expect(page.limit).toBe(3);
+    expect(typeof page.meta["nextCursor"]).toBe("string");
   });
 
   it("returns an empty page with no cursor for an empty match set", async () => {
@@ -561,26 +819,97 @@ describe("cursor pagination end to end", () => {
     ).rejects.toMatchObject({ code: "KAVO_QUERY_INVALID", status: 400 });
   });
 
-  it("lets a handler that names nextCursor itself win over the engine's (ADR-0019 §5)", async () => {
-    // The strategy's key is the *base*; a handler's `meta` merges over it.
+  it("does not shift or repeat rows when one is inserted before the cursor", async () => {
+    // The whole selling point over offset paging: with `?offset=2` the
+    // insert would push `user-2` down into page 2 and the client would see
+    // it twice.
+    const { crud, adapter } = cursorCrud();
+    await seed(crud, 4);
+
+    const first = await crud.findMany({ limit: 2 } as never);
+    expect((first.items as User[]).map((user) => user.name)).toEqual(["user-1", "user-2"]);
+    adapter.rows.unshift({ ...new User(), id: 0, name: "user-0", age: 0 });
+
+    const second = await crud.findMany({ limit: 2, cursor: first.meta["nextCursor"] } as never);
+    expect((second.items as User[]).map((user) => user.name)).toEqual(["user-3", "user-4"]);
+  });
+
+  it("resumes correctly when the row the cursor names is deleted between pages", async () => {
+    // A keyset is a *value* comparison, not a row reference, so the boundary
+    // row disappearing costs nothing.
+    const { crud } = cursorCrud();
+    await seed(crud, 5);
+
+    const first = await crud.findMany({ limit: 2 } as never);
+    await crud.deleteOne((first.items[1] as User).id);
+
+    const second = await crud.findMany({ limit: 2, cursor: first.meta["nextCursor"] } as never);
+    expect((second.items as User[]).map((user) => user.name)).toEqual(["user-3", "user-4"]);
+  });
+
+  it("emits a cursor carrying null for a null sort key, and 400s naming the column on replay", async () => {
+    // `cursorValuesOf` degrades an absent/null key to `null`; the *next*
+    // request is where that becomes an error. This is the loud half of the
+    // null story — ADR-0021 §4 records the quiet half (a NULLS-LAST
+    // ordering omits the null-keyed rows entirely, with no error at all).
+    const { crud, adapter } = cursorCrud({
+      query: {
+        defaultSort: [
+          { field: "name", direction: "asc" },
+          { field: "id", direction: "asc" },
+        ],
+      },
+    });
+    await seed(crud, 4);
+    // sqlite-style NULLS FIRST: the null-named row sorts to the front and
+    // lands on the page-1 boundary.
+    adapter.rows[0]!.name = null as never;
+    adapter.rows[1]!.name = null as never;
+
+    const first = await crud.findMany({ limit: 2 } as never);
+    const token = first.meta["nextCursor"];
+    expect(typeof token).toBe("string");
+
+    await expect(crud.findMany({ limit: 2, cursor: token } as never)).rejects.toMatchObject({
+      code: "KAVO_QUERY_INVALID",
+      status: 400,
+      issues: [{ field: "cursor", code: "KAVO_QUERY_INVALID_VALUE" }],
+    });
+    await expect(crud.findMany({ limit: 2, cursor: token } as never)).rejects.toMatchObject({
+      issues: [{ detail: expect.stringContaining("'name'") as unknown as string }],
+    });
+  });
+
+  it("reports nextCursor: null when a replacement findMany handler omits hasMore", async () => {
+    // The engine takes a handler at its word: no has-more signal, no next
+    // page. A handler that forgets `hasMore` degrades to one page rather
+    // than looping.
     const adapter = new InMemoryUserAdapter();
     const crud = createKavo({
-      defaults: { pagination: { strategy: "cursor" }, query: { defaultSort: SORT_BY_ID } },
+      defaults: {
+        pagination: { strategy: "cursor" },
+        query: { defaultSort: SORT_BY_ID },
+      },
     } as never).createCrud(
       User,
       {
         operations: {
           findMany: {
-            handler: withListMeta<User>(builtInHandlers<User>(adapter)("findMany"), () => ({ nextCursor: "mine" })),
+            handler: {
+              async execute(_input: unknown, context: { query: { pagination: { limit: number } } }) {
+                return { entities: adapter.rows.slice(0, context.query.pagination.limit), total: adapter.rows.length };
+              },
+            },
           },
         },
       } as never,
       { adapter, metadata: userMetadata },
     );
-    await seed(crud, 4);
+    await seed(crud as never, 5);
 
-    const page = await crud.findMany({ limit: 2 } as never);
-    expect(page.meta["nextCursor"]).toBe("mine");
+    const page = await (crud as never as ReturnType<typeof cursorCrud>["crud"]).findMany({ limit: 2 } as never);
+    expect(page.items).toHaveLength(2);
+    expect(page.meta["nextCursor"]).toBeNull();
   });
 
   it("accepts the wire spelling of a cursor page", async () => {

@@ -7,7 +7,7 @@ import { createMikroOrmKavo } from "@kavo/mikroorm";
 import { clearDatabase, newTestOrm } from "./support/database.js";
 
 /**
- * Keyset pagination against a real MikroORM `EntityManager` (ADR-0019).
+ * Keyset pagination against a real MikroORM `EntityManager` (ADR-0021).
  *
  * MikroORM's query surface is declarative like Prisma's, so the keyset
  * predicate goes through the same `translateFilter` path as any other
@@ -29,6 +29,10 @@ class Post {
 
   @Property({ type: "string" })
   status!: string;
+
+  /** Set explicitly by the seeds, so several rows can share a timestamp. */
+  @Property({ type: "Date" })
+  createdAt!: Date;
 
   @Property({ type: "Date", nullable: true })
   deletedAt: Date | null = null;
@@ -75,12 +79,16 @@ beforeEach(async () => {
   await clearDatabase(orm);
 });
 
+/** Two distinct timestamps across the seeded rows, so the date key really has ties to break. */
+const EPOCH = new Date("2024-01-01T00:00:00.000Z");
+
 async function seed(count: number): Promise<void> {
   for (let index = 1; index <= count; index++) {
     await posts.createOne({
       title: `post-${index}`,
       score: index % 3,
       status: index % 2 === 0 ? "published" : "draft",
+      createdAt: new Date(EPOCH.getTime() + Math.floor((index - 1) / 3) * 86_400_000),
     } as never);
   }
 }
@@ -164,11 +172,102 @@ describe("MikroOrmRepositoryAdapter — keyset pagination", () => {
     expect(await walk(2)).toEqual(["post-1", "post-3", "post-5", "post-6"]);
   });
 
+  it("pages a date-typed cursor key, ties and all — the Date survives the driver", async () => {
+    // `?sort=-createdAt,id` is the canonical example in the docs, and a
+    // revived `Date` has to survive as a bound parameter: sqlite stores a
+    // datetime as text, so a cursor that came back as a string would either
+    // compare lexically or blow up.
+    await seed(7);
+    const titles = await walk(2, {
+      sort: [
+        { field: "createdAt", direction: "desc" },
+        { field: "id", direction: "asc" },
+      ],
+    } as never);
+    // Day 2 holds posts 4–6, day 1 holds 1–3, and post 7 is alone on day 3.
+    expect(titles).toEqual(["post-7", "post-4", "post-5", "post-6", "post-1", "post-2", "post-3"]);
+    expect(new Set(titles).size).toBe(7);
+  });
+
+  it("pages a text cursor key — the ORDER BY collation and the keyset agree", async () => {
+    // If the database's collation for `>` disagreed with its `ORDER BY`, a
+    // page boundary would skip or repeat a row rather than fail loudly.
+    for (const title of ["delta", "Bravo", "alpha", "Echo", "charlie"]) {
+      await posts.createOne({ title, score: 0, status: "draft", createdAt: EPOCH } as never);
+    }
+    const titles = await walk(2, {
+      sort: [
+        { field: "title", direction: "asc" },
+        { field: "id", direction: "asc" },
+      ],
+    } as never);
+    const oneShot = await posts.findMany({
+      limit: 50,
+      sort: [
+        { field: "title", direction: "asc" },
+        { field: "id", direction: "asc" },
+      ],
+    } as never);
+    expect(titles).toEqual(oneShot.items.map((item) => (item as Post).title));
+    expect(new Set(titles).size).toBe(5);
+  });
+
+  it("pages a three-key sort whose deepest AND chain actually decides a boundary", async () => {
+    // `status` and `score` both tie across rows, so the final `id > …` link
+    // of the chain is the only thing separating two adjacent pages.
+    for (let index = 1; index <= 6; index++) {
+      await posts.createOne({ title: `tied-${index}`, score: 1, status: "draft", createdAt: EPOCH } as never);
+    }
+    const titles = await walk(2, {
+      sort: [
+        { field: "status", direction: "asc" },
+        { field: "score", direction: "desc" },
+        { field: "id", direction: "asc" },
+      ],
+    } as never);
+    expect(titles).toEqual(["tied-1", "tied-2", "tied-3", "tied-4", "tied-5", "tied-6"]);
+  });
+
+  it("pages filter, include and soft delete together in one walk", async () => {
+    // Each of the three is covered alone above; this is the interaction —
+    // where a join-induced duplicate or a scope-vs-keyset precedence bug
+    // would hide.
+    await seed(10);
+    const all = await posts.findMany({ limit: 20 } as never);
+    const published = (all.items as Post[]).filter((post) => post.status === "published");
+    await posts.deleteOne(published[1]!.id);
+    await posts.deleteOne(published[3]!.id);
+    const em = orm.em.fork();
+    const target = await em.findOneOrFail(Post, { id: published[0]!.id });
+    em.persist([em.create(Comment, { body: "a", post: target }), em.create(Comment, { body: "b", post: target })]);
+    await em.flush();
+
+    const titles = await walk(2, {
+      filter: { kind: "condition", field: "status", operator: "EQ", value: "published" },
+      include: ["comments"],
+    });
+    expect(titles).toEqual(["post-2", "post-6", "post-10"]);
+    expect(new Set(titles).size).toBe(3);
+  });
+
+  it("pages live and soft-deleted rows together under withDeleted", async () => {
+    await seed(5);
+    const all = await posts.findMany({ limit: 10 } as never);
+    await posts.deleteOne((all.items[1] as Post).id);
+    await posts.deleteOne((all.items[3] as Post).id);
+
+    expect(await walk(2, { withDeleted: true })).toEqual(["post-1", "post-2", "post-3", "post-4", "post-5"]);
+  });
+
   it("rejects a tampered cursor as a query validation error", async () => {
     await seed(2);
     await expect(posts.findMany({ limit: 1, cursor: "tampered!!" } as never)).rejects.toBeInstanceOf(
       QueryValidationException,
     );
+    await expect(posts.findMany({ limit: 1, cursor: "tampered!!" } as never)).rejects.toMatchObject({
+      code: "KAVO_QUERY_INVALID",
+      status: 400,
+    });
   });
 
   it("rejects a sort with no unique tiebreaker", async () => {

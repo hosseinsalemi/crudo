@@ -88,6 +88,7 @@ model Post {
   title     String
   score     Int
   status    String
+  createdAt DateTime
   deletedAt DateTime?
   comments  Comment[]
 }
