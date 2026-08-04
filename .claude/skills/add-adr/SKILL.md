@@ -5,7 +5,7 @@ description: When and how to write a new ADR in docs/internals/adr/ — numberin
 
 # Writing an ADR
 
-Kavo records one ADR per load-bearing decision (`docs/internals/adr/0001`…`0018`).
+Kavo records one ADR per load-bearing decision, in `docs/internals/adr/`.
 They are read before changing the behavior they govern (CLAUDE.md), so an ADR
 is only worth writing when a future change could plausibly get the decision
 wrong without it.

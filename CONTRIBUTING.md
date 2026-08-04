@@ -241,16 +241,17 @@ that explains why.
   Beyond that, the allowed directions are specific, and it is worth learning them
   precisely rather than as "nothing imports anything":
 
-  | Package kind                        | May import                         | Never imports                   | Blocked by                     |
-  | ----------------------------------- | ---------------------------------- | ------------------------------- | ------------------------------ |
-  | `@kavo/core`                        | nothing                            | anything                        | `core-imports-nothing`         |
-  | ORM adapters (`orms/*`)             | the `@kavo/core` barrel            | a framework or protocol binding | `<orm>-only-imports-core`\*    |
-  | Protocol bindings (`protocols/*`)   | the `@kavo/core` barrel            | a framework binding             | `<protocol>-only-imports-core` |
-  | Framework bindings (`frameworks/*`) | core **and its own protocol glue** | an ORM adapter                  | `nest-only-imports-core`       |
+  | Package kind                        | May import                             | Never imports                                | Blocked by                                            |
+  | ----------------------------------- | -------------------------------------- | -------------------------------------------- | ----------------------------------------------------- |
+  | `@kavo/core`                        | nothing, type-only included            | anything                                     | `core-imports-nothing`                                |
+  | ORM adapters (`orms/*`)             | the `@kavo/core` barrel + its ORM peer | a framework, a protocol, **another adapter** | `orm-adapters-only-import-core`                       |
+  | Protocol bindings (`protocols/*`)   | the `@kavo/core` barrel + its own peer | a framework, an ORM, **another protocol**    | `protocol-bindings-only-import-core`                  |
+  | Framework bindings (`frameworks/*`) | core **and the two protocol barrels**  | an ORM adapter, any barrel _subpath_         | `framework-bindings-import-core-and-protocol-barrels` |
 
-  \* The adapter rules currently block only framework packages. An adapter
-  importing a _protocol_ package would pass `pnpm depcruise` today — it is
-  still wrong, and review is what catches it.
+  Every row is machine-checked; none of it is review-only. The rules are
+  written against the directory layout and back-reference the package they
+  came from, so a new adapter or protocol binding is covered the day its
+  directory exists rather than when someone remembers to extend a list.
 
   So `@kavo/nest` really does import `@kavo/graphql` and `@kavo/mcp` directly —
   that is the sanctioned `frameworks/* → protocols/*` edge from
@@ -261,19 +262,21 @@ that explains why.
   container through DI, never through an import.
 
   Packages meet at the `@kavo/core` barrel rather than reaching into each
-  other's `src/`. Two rules enforce that around core specifically —
-  `no-cross-package-deep-imports-core` (an edge deep-importing core) and
-  `no-cross-package-deep-imports-adapters` (core deep-importing an edge) — so an
-  edge-to-edge deep import is convention held up by review, not by the gate.
-  (Where packages live on disk is
+  other's `src/`. Three rules enforce that: `no-cross-package-deep-imports-core`
+  (an edge deep-importing core), `no-cross-package-deep-imports-adapters` (core
+  deep-importing an edge), and `no-deep-imports-through-a-barrel`, which
+  generalizes both to every remaining pair — including one edge deep-importing
+  another, and `@kavo/nest` reaching past a protocol barrel it is otherwise
+  allowed to import. (Where packages live on disk is
   [ADR-0002](docs/internals/adr/0002-package-topology.md) for `orms/` and
   `frameworks/`, and ADR-0016 for `protocols/`.)
 
 - **The core barrel is an explicit named list** —
   [ADR-0010](docs/internals/adr/0010-explicit-named-barrel.md).
   `packages/core/src/index.ts` uses no `export *`, so the public surface changes
-  only on purpose. Adding an export there is a deliberate API decision and
-  belongs in the PR's "Public API impact" section.
+  only on purpose. `tests/core-barrel.spec.ts` fails if one appears. Adding an
+  export there is still a deliberate API decision that no test can judge for
+  you, and belongs in the PR's "Public API impact" section.
 - **Operations are registry-driven** —
   [ADR-0006](docs/internals/adr/0006-registry-driven-operations.md). The engine
   loops over registry entries and special-cases no verb. Adding an operation
@@ -285,11 +288,12 @@ that explains why.
 
 The first two are checked by `.dependency-cruiser.cjs` — an illegal import fails
 `pnpm depcruise`, which is part of `pnpm check`, and the error names the violated
-rule. Read that file before assuming a boundary is machine-checked: as the two
-notes above show, its coverage is deliberately narrower than the invariants it
-supports, so a green `depcruise` is not proof a change respects them.
+rule. The third is checked by `tests/core-barrel.spec.ts`. What a green gate
+does **not** prove is the part no import graph can see: an ORM or Nest type
+leaking into a core signature, and whether a newly named barrel export was
+meant to be public. Those two are review's job.
 
-The others are checked in review. Before changing behavior an ADR governs, read
+The rest are checked in review. Before changing behavior an ADR governs, read
 that ADR — several are referenced by name from code comments.
 
 ## When to write an ADR

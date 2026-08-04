@@ -181,7 +181,11 @@ particular tend to leak types into public signatures, making third-party
 types part of Kavo's API contract. Framework/ORM independence is the same
 rule at its extreme: core not importing TypeORM or NestJS (directly or
 transitively) is what makes the adapter seam real rather than aspirational.
-Enforced by dependency-cruiser (`core-imports-nothing`), not convention.
+Enforced by dependency-cruiser (`core-imports-nothing`), not convention —
+and type-only edges are inside the rule, not exempt from it. A type reached
+for from outside is a contract core does not own (ADR-0001) whether or not it
+survives compilation, and "utility libraries leak types into public
+signatures" is precisely the failure an exemption would have allowed.
 
 ## 5. Contract inventory
 

@@ -26,14 +26,14 @@ prevent between adapter and framework.
 A new parent folder, `packages/protocols/`, holds wire-protocol bindings
 that are host-framework-agnostic: `@kavo/graphql` is the first. These
 packages depend on `@kavo/core` only (dependency-cruiser:
-`graphql-only-imports-core`) — exactly like an ORM adapter's constraint,
+`protocol-bindings-only-import-core`) — exactly like an ORM adapter's constraint,
 never a host framework package.
 
 Host framework packages (`packages/frameworks/*`) may depend on a
 protocol package to build framework-specific glue — `@kavo/nest` depends
 on `@kavo/graphql` to provide `BaseKavoGraphQLController` and
 `createDefaultGraphQLController` — but never the reverse.
-`graphql-only-imports-core` enforces the reverse direction by blocking
+`protocol-bindings-only-import-core` enforces the reverse direction by blocking
 `@kavo/graphql` from importing `packages/frameworks` or `@kavo/nest`. The
 resulting dependency direction is `frameworks/* → protocols/*`, mirroring
 `frameworks/* → core` and `orms/* → core`: protocols and ORMs are both
@@ -45,7 +45,7 @@ Cases:
 
 - `@kavo/graphql` may depend on `@kavo/core` and the `graphql` peer only.
 - `@kavo/nest` may depend on `@kavo/core`, its `@nestjs/*` peers, and
-  `@kavo/graphql` — never an ORM adapter (`nest-only-imports-core`
+  `@kavo/graphql` — never an ORM adapter (`framework-bindings-import-core-and-protocol-barrels`
   unchanged).
 - A future `@kavo/grpc` follows the `protocols/` shape above. A future
   `@kavo/express`/`@kavo/fastify`/`@kavo/nextjs` follows the `frameworks/`

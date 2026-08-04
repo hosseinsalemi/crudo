@@ -14,7 +14,7 @@ governs `@kavo/graphql`) — this doc covers what the binding actually does.
 
 `@kavo/mcp` is host-framework-agnostic: it imports `@kavo/core` and the
 `@modelcontextprotocol/sdk` peer only, never `@kavo/nest` or any other
-framework package (`mcp-only-imports-core` in `.dependency-cruiser.cjs`). It
+framework package (`protocol-bindings-only-import-core` in `.dependency-cruiser.cjs`). It
 has no idea Nest, Express, or any other host exists. This is what makes its
 discovery helper (§2) reusable by a future host binding with zero changes to
 `@kavo/mcp` itself.

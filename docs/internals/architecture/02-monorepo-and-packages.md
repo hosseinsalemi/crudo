@@ -119,17 +119,23 @@ Two independent enforcement layers:
    the reverse — ADR-0016.
 
    Three properties of that rule set are load-bearing and easy to lose:
-   - **Coverage is narrower than the invariants it supports.** The adapter
-     rules' `to` covers `packages/frameworks` only and the protocol rules omit
-     each other, so an ORM adapter importing a protocol package, one ORM
-     adapter importing another, and one protocol importing another all pass
-     today. So does a type-only import out of core spelled as a bare specifier
-     or a barrel (`core-imports-nothing` carries
-     `dependencyTypesNot: ["type-only"]`), and one edge's `src` deep-importing
-     another edge's `src` (both deep-import rules are anchored on core). Each
-     is still a violation — review is what catches it. A green `depcruise` is
-     not proof a change respects the boundaries; see the footnotes under
-     `CONTRIBUTING.md`'s boundary table.
+   - **Coverage is total, and stays total without edits.** Every edge in the
+     topology is checked, including the four that were review-only for most of
+     this repo's life: an ORM adapter importing a protocol package, one ORM
+     adapter importing another, one protocol importing another, and one edge's
+     `src` deep-importing another edge's. `core-imports-nothing` covers
+     type-only edges too — core owning its contracts (ADR-0001) does not stop
+     at what survives compilation. The three per-tier rules capture the
+     package directory in `from` and refer back to it as `$1` in
+     `to.pathNot`, so they are written against the _layout_ rather than
+     against a list of package names: a new adapter or protocol binding is
+     constrained the day its directory exists. The previous spelling was
+     one rule per package, which meant every new package had to hand-edit
+     every other package's rule, and the prose describing the set drifted out
+     of sync with it twice. What a green `depcruise` still does not prove is
+     the part no import graph can see — an ORM or Nest type leaking into a
+     core signature, and whether a newly named barrel export was meant to be
+     public.
    - **Both spellings are matched.** A workspace package specifier does not
      resolve to a path for dependency-cruiser, so a path-only rule silently
      misses `from "@kavo/nest"` — the spelling anyone would actually write.
