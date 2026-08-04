@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BUILT_IN_DEFAULTS, ConfigurationException, mergeSettings, resolveEntityConfig } from "@kavo/core";
+import { BUILT_IN_DEFAULTS, ConfigurationException, createKavo, mergeSettings, resolveEntityConfig } from "@kavo/core";
 import { User, userMetadata } from "./support/user-fixture.js";
 
 describe("mergeSettings — merge algebra", () => {
@@ -199,5 +199,48 @@ describe("resolveEntityConfig — bootstrap", () => {
 describe("User fixture sanity", () => {
   it("has runtime shape (initialized fields)", () => {
     expect(Object.keys(new User())).toContain("email");
+  });
+});
+
+/**
+ * Issue #7: a bootstrap failure has to name the call that fixes it,
+ * including for the framework the developer is actually holding — the core
+ * message named only the core API, which is not what a Nest app wrote.
+ */
+describe("bootstrap wiring errors", () => {
+  const detailOf = (fn: () => unknown): string => {
+    try {
+      fn();
+    } catch (error) {
+      expect(error).toBeInstanceOf(ConfigurationException);
+      return (error as ConfigurationException).detail;
+    }
+    throw new Error("expected ConfigurationException");
+  };
+
+  it("names both the core and the NestJS entry point when metadata is missing", () => {
+    const detail = detailOf(() => createKavo().createCrud(User));
+    expect(detail).toContain("createKavo");
+    expect(detail).toContain("createInfrastructure(dataSource)");
+    expect(detail).toContain("KavoModule.forRoot({ infrastructure })");
+  });
+
+  it("names them again when only the adapter is missing", () => {
+    const detail = detailOf(() => createKavo().createCrud(User, undefined, { metadata: userMetadata }));
+    expect(detail).toContain("runtime.adapter");
+    expect(detail).toContain("KavoModule.forRoot({ infrastructure })");
+  });
+
+  it("never reports a configuration error against the entity named 'unknown'", () => {
+    // The registry used to hardcode that literal, so every config error it
+    // raised blamed an entity nobody had declared.
+    const detail = detailOf(() =>
+      createKavo().createCrud(User, { operations: { restoreOne: true } } as never, {
+        metadata: userMetadata,
+        adapter: {} as never,
+      }),
+    );
+    expect(detail).toContain("User");
+    expect(detail).not.toContain("'unknown'");
   });
 });

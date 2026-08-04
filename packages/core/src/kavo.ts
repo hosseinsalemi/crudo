@@ -90,7 +90,9 @@ export function createKavo(options: KavoOptions = {}): KavoInstance {
           "infrastructure",
           "no metadata source: pass `infrastructure` to createKavo " +
             "(e.g. createInfrastructure(dataSource) from " +
-            "@kavo/typeorm) or `runtime.metadata` to createCrud",
+            "@kavo/typeorm) or `runtime.metadata` to createCrud — " +
+            "in a NestJS app that is KavoModule.forRoot({ infrastructure }) " +
+            "or forRootAsync({ useFactory })",
         );
       }
       const adapter = runtime?.adapter ?? options.infrastructure?.adapterFor(entity);
@@ -98,7 +100,9 @@ export function createKavo(options: KavoOptions = {}): KavoInstance {
         throw new ConfigurationException(
           metadata.name,
           "infrastructure",
-          "no repository adapter: pass `infrastructure` to createKavo or " + "`runtime.adapter` to createCrud",
+          "no repository adapter: pass `infrastructure` to createKavo or " +
+            "`runtime.adapter` to createCrud — in a NestJS app that is " +
+            "KavoModule.forRoot({ infrastructure }) or forRootAsync({ useFactory })",
         );
       }
 
@@ -111,6 +115,7 @@ export function createKavo(options: KavoOptions = {}): KavoInstance {
         config as EntityConfig<Entity> | undefined,
         builtInHandlers(adapter as unknown as RepositoryAdapter<Entity>),
         resolved.settings.operations,
+        resolved.entityName,
       );
       requireSoftDeletable(resolved, registry);
 

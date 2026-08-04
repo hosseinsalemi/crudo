@@ -109,6 +109,23 @@ describe("DefaultOperationRegistry — the operation table (ADR-0006)", () => {
       }
     }
   });
+
+  it("names the entity it was built for, never the literal 'unknown' (issue #7)", () => {
+    const registry = new DefaultOperationRegistry<User>("User");
+    registry.register(descriptor());
+    try {
+      registry.disable("ghost");
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toMatchObject({
+        code: "KAVO_CONFIG_INVALID",
+        messageParams: { entity: "User" },
+        context: { entityName: "User" },
+      });
+      // …and says what *is* registered, so the typo is visible.
+      expect((error as ConfigurationException).detail).toContain("registered: activate");
+    }
+  });
 });
 
 describe("STANDARD_OPERATIONS — the default table", () => {
@@ -182,6 +199,14 @@ describe("createOperationRegistry — inspection-only mode (ADR-0012)", () => {
       messageParams: { path: "operations.createOne" },
     });
     await expect(async () => handler?.execute({}, contextStub())).rejects.toBeInstanceOf(ConfigurationException);
+  });
+
+  it("threads the entity name through to the unbound handler's error", async () => {
+    const registry = createOperationRegistry<User>(undefined, undefined, undefined, "User");
+    const handler = registry.get("createOne")?.handler;
+    await expect(async () => handler?.execute({}, contextStub())).rejects.toMatchObject({
+      messageParams: { entity: "User" },
+    });
   });
 });
 
