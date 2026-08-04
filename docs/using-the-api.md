@@ -79,6 +79,38 @@ The default strategy is flat `limit`/`offset` (0-based) — the same field names
 
 A 1-indexed page-based alternative is also built in — `page[number]`/`page[size]` — for entities configured to use it (see [Configuration](/integrations/nest/configuration)). It normalizes to the same `limit`/`offset` internally, so the response envelope always reports `limit`/`offset` either way.
 
+### Cursor (keyset) pagination
+
+```
+GET /books?limit=20
+GET /books?limit=20&cursor=WzE3MTIzNDU2Nzg5LDQyXQ
+```
+
+For entities configured with `pagination.strategy: "cursor"`, a page is defined by the row it continues _after_ rather than by a count of rows to skip. That makes it `O(limit)` however deep the page is, and stable while rows are being inserted and deleted — offset paging can skip or repeat a row when the data shifts underneath it.
+
+The next page's token comes back as **`meta.nextCursor`**, and is `null` on the last page:
+
+```json
+{
+  "items": [{ "id": 41, "title": "Dune" }],
+  "limit": 20,
+  "offset": 0,
+  "total": 137,
+  "meta": { "nextCursor": "WzE3MTIzNDU2Nzg5LDQyXQ" }
+}
+```
+
+Pass it straight back as `?cursor=…` to get the next page, and keep every other parameter (`sort`, `filter`, `include`, `fields`) identical.
+
+Four things to know:
+
+- **A cursor is opaque.** It encodes the previous page's last row projected onto the effective sort. Do not parse it, construct one, or store it as a permanent bookmark — the encoding is an implementation detail and may change. It is _not_ signed and is not a security boundary: everything inside it is a comparison value against a field the client can already filter on, so forging one grants nothing `filter[…]` does not.
+- **The sort must end in the id field.** Keyset paging needs a total order, so `sort` (or the entity's `query.defaultSort`) has to end in the entity's primary key: `?sort=-createdAt,id`. A request without one is a 400 naming the field it needs. The sort keys must also be plain scalar columns of the entity — not relation paths, and not JSON columns.
+- **A bad cursor is a 400,** exactly like a malformed `page[number]`: `KAVO_QUERY_INVALID` with a `cursor` issue. That includes a token from a _different_ sort, which is why changing `sort` means starting from the first page again.
+- **`offset` is always `0`** on a cursor page. A keyset page knows what comes after a row, not how many rows precede it; the field stays in the envelope because the envelope's shape is fixed. `total` is unaffected — it still counts the whole match set, and still respects `pagination.count`.
+
+One caveat: a sort key that is `null` on some rows has no portable ordering, and a cursor cannot resume from one. Paging works right up until a page boundary lands on such a row, and then returns a 400 naming the field. Sort on columns that are never null.
+
 ## Field selection
 
 ```
@@ -119,7 +151,7 @@ A list response (`GET /books`) always has the same shape:
 
 `total` is omitted (and its `COUNT` query skipped) if `pagination.count` is turned off.
 
-`meta` is an open bag for anything the API wants to say about the list that isn't a row: a facet count, a "results are approximate" flag, a cursor. It is `{}` unless the entity's `findMany` handler puts something there — see [custom list metadata](/integrations/nest/configuration#custom-list-metadata) for how. Kavo never writes to it itself, and nothing in it is projected, filtered, or renamed on the way out: what the handler returns is what the client receives.
+`meta` is an open bag for anything the API wants to say about the list that isn't a row: a facet count, a "results are approximate" flag, the next cursor. It carries `nextCursor` under [cursor pagination](#cursor-keyset-pagination), and is otherwise `{}` unless the entity's `findMany` handler puts something there — see [custom list metadata](/integrations/nest/configuration#custom-list-metadata) for how. Kavo never writes to it itself, and nothing in it is projected, filtered, or renamed on the way out: what the handler returns is what the client receives.
 
 ## Errors
 

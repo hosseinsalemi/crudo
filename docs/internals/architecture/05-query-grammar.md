@@ -149,8 +149,29 @@ LOWER(:v)`), identical on every driver. Both operators apply to string
   `limit`/`offset` (0-based) — the same field names the response envelope
   reports, so request and response mirror each other. Built-in
   alternative `page`: `page[number]`/`page[size]` (1-indexed), normalized
-  internally to `limit`/`offset`. Missing `limit` → `defaultLimit`;
+  internally to the same `limit`/`offset`. Missing `limit` → `defaultLimit`;
   `limit` above `maxLimit` → clamped; malformed or negative → 400.
+
+  The third built-in, `cursor`, is the one that does **not** normalize to
+  `limit`/`offset`: `Pagination` is a union, and its keyset variant carries
+  `{ limit, cursor, keyset }` with no `offset` at all (ADR-0019). Consumers
+  narrow with `isCursorPagination` before reading `offset`. Wire form is
+  flat `limit` plus an opaque `cursor` token; the next page's token comes
+  back as `meta.nextCursor` on the list envelope, `null` on the last page.
+
+  Two pieces of the cursor pipeline are deliberately _not_ in the strategy,
+  because `normalize(rawParams, limits)` sees neither sort nor metadata:
+  `QueryNormalizer` enforces that the effective sort ends in `idField` and
+  consists of root scalar columns, then decodes the token into
+  `pagination.keyset` — a plain filter AST node (`OR` of `AND` chains,
+  `LT` for each `desc` key). Adapters compose it by calling
+  `readFilter(query)` in `findMany`; `count` keeps using `query.filter`, so
+  `total` still spans the whole match set. A malformed, stale, or forged
+  token is a `KAVO_QUERY_INVALID_VALUE` issue on `cursor`; a sort that
+  cannot support keyset paging is `KAVO_QUERY_CONFLICTING_PARAMS` on
+  `sort`. Cursors are opaque, never signed — ADR-0019 §2 explains why that
+  is sufficient.
+
 - **Field selection:** `fields=id,name,email` — sparse fieldset for the
   root resource, validated against the selectable allowlist.
   `fields[<relation path>]=id,title` narrows an included node, validated
