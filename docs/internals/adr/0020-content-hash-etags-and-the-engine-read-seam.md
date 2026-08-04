@@ -33,11 +33,11 @@ Two further tensions come with the hash approach:
 - A hash depends on key order unless something makes it not. A DTO field
   reorder would otherwise silently invalidate every cached copy.
 - An ETag identifies a **representation**, not a resource (RFC 9110
-  §8.8.3). `GET /users/1?select=name` and `GET /users/1` are different
+  §8.8.3). `GET /users/1?fields=name` and `GET /users/1` are different
   representations, so hashing what is actually sent gives them different
   tags — which is correct, and also means the tag from a narrowed read
   cannot be used as an `If-Match` token, because a write has no
-  `select` to narrow by.
+  `fields` to narrow by.
 
 ## Decision
 
@@ -52,7 +52,7 @@ typed `globalThis` accessor, the way `randomUuid` already reaches
 fail `pnpm depcruise`, not merely bend a convention.
 
 **2. Tags are per representation.** A response's `etag` is the hash of
-that response's own serialized item, so `select`/`include` change it.
+that response's own serialized item, so `fields`/`include` change it.
 Collection responses (`findMany`) carry none — a list's identity spans
 pagination, sort and filter, which is a different feature.
 
@@ -146,10 +146,16 @@ its own value is untouched.
   writes is the change that would, and it is deliberately out of scope —
   if it ever lands, it supersedes point 1 here, not the reader seam.
 - **An `If-Match` token must come from an unnarrowed read.** An ETag
-  taken from `GET /users/1?select=name` identifies a different
+  taken from `GET /users/1?fields=name` identifies a different
   representation and will not match the canonical one, so it 412s. This
   is spec-conformant and surprising in equal measure, which is why it is
-  documented for adopters and not only here.
+  documented for adopters and not only here. A **write** response's tag
+  is usable as a token for the same reason and with the same limit: it
+  is the tag of that response's own body, which matches the canonical
+  read only while the two representations agree. They stop agreeing the
+  moment a relation is `defaultInclude`d — a write resolves no query, so
+  a write response never carries relations while the canonical read
+  does. On such an entity only a plain read yields a usable token.
 - **`KavoEngineDependencies` gained a required member.** Anything
   constructing a `KavoEngine` by hand must now supply a reader; in-repo
   that is only `createKavo`.

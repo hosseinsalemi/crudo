@@ -489,6 +489,73 @@ describe("If-Match on a soft-deleted row", () => {
   });
 });
 
+describe("a write response's tag describes that response, not the canonical read", () => {
+  /**
+   * `defaultInclude` is where the two representations part ways: a write
+   * resolves no query, so its response never carries relations while the
+   * canonical read the pre-read hashes always does. So on such an entity a
+   * write response's tag is *not* an `If-Match` token — the limit
+   * ADR-0020 and `docs/using-the-api.md` both spell out, pinned here so
+   * the advice cannot drift away from the behavior.
+   */
+  function seededAuthor() {
+    const adapter = new SeededAdapter<Author>([
+      Object.assign(new Author(), {
+        id: 1,
+        name: "Ada",
+        posts: [Object.assign(new Post(), { id: 10, title: "First", authorId: 1 })],
+      }),
+    ]);
+    const metadata = new Map<unknown, EntityMetadata<object>>([
+      [Author, authorMetadata as EntityMetadata<object>],
+      [Post, postMetadata as EntityMetadata<object>],
+    ]);
+    const adapters = new Map<unknown, unknown>([
+      [Author, adapter],
+      [Post, new SeededAdapter<Post>([])],
+    ]);
+    const kavo = createKavo({
+      infrastructure: {
+        metadataFor: (entity) => metadata.get(entity) as never,
+        adapterFor: (entity) => adapters.get(entity) as never,
+      },
+    });
+    const crud = kavo.createCrud(Author, {
+      relations: { edges: { posts: { includable: true, defaultInclude: true } } },
+    } as never);
+    kavo.createCrud(Post);
+    return { crud, adapter };
+  }
+
+  const patch = (crud: ReturnType<typeof seededAuthor>["crud"], name: string) =>
+    crud.engine.execute({ operation: "patchOne", id: 1, body: { name } as never, query: null, options: null });
+
+  it("differs from the read's, because only the read carries the default include", async () => {
+    const { crud } = seededAuthor();
+
+    const read = await crud.engine.execute({ operation: "findOne", id: 1, body: null, query: null, options: null });
+    const patched = await patch(crud, "Ada L");
+
+    expect(read.item).toMatchObject({ posts: [{ title: "First" }] });
+    expect(patched.item).not.toHaveProperty("posts");
+    expect(patched.etag).not.toBe(read.etag);
+  });
+
+  it("so the If-Match token has to come from the read", async () => {
+    const { crud } = seededAuthor();
+    const patched = await patch(crud, "Ada L");
+
+    await expect(
+      crud.patchOne(1, { name: "Ada Lovelace" } as never, { preconditions: { ifMatch: [patched.etag as string] } }),
+    ).rejects.toBeInstanceOf(PreconditionFailedException);
+
+    const read = await crud.engine.execute({ operation: "findOne", id: 1, body: null, query: null, options: null });
+    await expect(
+      crud.patchOne(1, { name: "Ada Lovelace" } as never, { preconditions: { ifMatch: [read.etag as string] } }),
+    ).resolves.toMatchObject({ name: "Ada Lovelace" });
+  });
+});
+
 describe("If-Match the engine cannot evaluate is refused, never dropped", () => {
   it("refuses it on createOne, which targets no existing row", async () => {
     const { crud, adapter } = makeCrud();

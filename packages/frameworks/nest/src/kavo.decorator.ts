@@ -121,10 +121,10 @@ interface ResolvedRoute {
  * `createOperationRegistry` the engine uses) and generates one route per
  * **enabled** entry: disabled operations get no route, and
  * `meta.routes.enabled: false` keeps an operation service-only. A new
- * standard operation needs a default shape in `STANDARD_ROUTES`, a
- * delegation arm in `makeHandler`, and, if it takes no body, an entry in
- * `BODYLESS_WRITES` — those three tables are keyed by `StandardOperationId`,
- * so a typo fails the build.
+ * standard operation needs a default shape in `STANDARD_ROUTES` and, if it
+ * takes no body, an entry in `BODYLESS_WRITES` — both tables are keyed by
+ * `StandardOperationId`, so a typo fails the build. `makeHandler` needs
+ * nothing: it builds one handler shape from the descriptor.
  *
  * **Manual-method-wins:** a hand-written controller method whose name
  * matches an operation id suppresses that generated route entirely — no
