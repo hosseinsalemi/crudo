@@ -4,7 +4,7 @@
  * The tag is a **content hash of the serialized representation**, not a
  * version column read from the database — which is what keeps the whole
  * feature inside core plus the framework layer, with nothing asked of any
- * ORM adapter. The cost of that choice is stated plainly in ADR-0019: an
+ * ORM adapter. The cost of that choice is stated plainly in ADR-0020: an
  * `If-Match` check is application-level check-then-write, never an atomic
  * compare-and-swap.
  */
@@ -22,8 +22,13 @@ export interface RequestPreconditions {
   readonly ifNoneMatch?: readonly string[];
 }
 
-/** `If-Match: *` / `If-None-Match: *` — "any current representation". */
-const WILDCARD = "*";
+/**
+ * `If-Match: *` / `If-None-Match: *` — "any current representation".
+ * Exported for the engine, which short-circuits the `If-Match` pre-read on
+ * it: `strongMatch` answers the wildcard without looking at the tag, so
+ * computing one is provably wasted work.
+ */
+export const WILDCARD = "*";
 
 const WEAK_PREFIX = "W/";
 
@@ -47,6 +52,13 @@ interface WebGlobals {
 const webGlobals = globalThis as unknown as WebGlobals;
 
 /**
+ * One encoder for the process: `TextEncoder` is stateless (`encode` reads
+ * no instance state and returns a fresh array), so allocating one per
+ * response was pure garbage on the hot path.
+ */
+const textEncoder = new webGlobals.TextEncoder();
+
+/**
  * The strong entity-tag for one serialized representation — quoted, so the
  * value is what an `ETag` header carries verbatim and what an `If-Match`
  * token is compared against without re-parsing.
@@ -56,7 +68,7 @@ const webGlobals = globalThis as unknown as WebGlobals;
  * failure mode this feature exists to prevent.
  */
 export async function computeEtag(representation: unknown): Promise<string> {
-  const bytes = new webGlobals.TextEncoder().encode(canonicalize(representation));
+  const bytes = textEncoder.encode(canonicalize(representation));
   const digest = new Uint8Array(await webGlobals.crypto.subtle.digest("SHA-256", bytes));
   let hex = "";
   for (let index = 0; index < digest.length; index++) {
@@ -72,12 +84,18 @@ export async function computeEtag(representation: unknown): Promise<string> {
  * `JSON.stringify` would make an ETag change when a DTO's field order
  * changed, which is a spurious cache miss and a spurious 412.
  *
- * Otherwise it follows `JSON.stringify`'s conventions — `undefined` object
- * members are dropped, `undefined` array members become `null`, dates
- * render as ISO strings — because the representation being hashed is the
- * one about to be JSON-encoded onto the wire.
+ * Otherwise it follows `JSON.stringify`'s conventions — `toJSON` is
+ * honored, `undefined` object members are dropped, `undefined` array
+ * members become `null`, dates render as ISO strings — because the
+ * representation being hashed is the one about to be JSON-encoded onto the
+ * wire. `toJSON` is not a nicety: a value type whose `toJSON` distinguishes
+ * states its own enumerable keys do not (a `Decimal` renders as `"12.50"`
+ * but carries `{ d, e, s }`) would otherwise hash two different wire forms
+ * to the same tag — an ETag collision, which for `If-Match` is a lost
+ * update.
  */
-export function canonicalize(value: unknown): string {
+export function canonicalize(input: unknown): string {
+  const value = unwrapToJson(input);
   if (value === null || value === undefined) return "null";
   switch (typeof value) {
     case "string":
@@ -104,6 +122,20 @@ export function canonicalize(value: unknown): string {
     members.push(`${JSON.stringify(key)}:${canonicalize(member)}`);
   }
   return `{${members.join(",")}}`;
+}
+
+/**
+ * `JSON.stringify`'s first step on every node: call `toJSON()` when the
+ * value has one. Applied **once per node** — a `toJSON` that returns the
+ * receiver is then canonicalized by its own keys rather than looping,
+ * which is stricter than `JSON.stringify`, and the members it yields are
+ * unwrapped by their own `canonicalize` call.
+ */
+function unwrapToJson(value: unknown): unknown {
+  if (value === null || value === undefined) return value;
+  const candidate = (value as { toJSON?: unknown }).toJSON;
+  if (typeof candidate !== "function") return value;
+  return (candidate as (this: unknown) => unknown).call(value);
 }
 
 /**

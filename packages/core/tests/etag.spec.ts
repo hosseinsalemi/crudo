@@ -34,6 +34,35 @@ describe("canonicalize", () => {
   it("renders non-finite numbers as null, like JSON.stringify", () => {
     expect(canonicalize({ a: Number.NaN })).toBe(canonicalize({ a: null }));
   });
+
+  it("honors toJSON, so the tag follows the wire form and not the internals", () => {
+    // The shape a Prisma `Decimal` has: two values that render identically
+    // on the wire but carry different enumerable keys, and two that render
+    // differently but share them. Hashing the keys would tag the second
+    // pair alike — an ETag collision, which for `If-Match` is a lost
+    // update.
+    class Decimal {
+      constructor(
+        private readonly digits: readonly number[],
+        private readonly text: string,
+      ) {}
+      toJSON(): string {
+        return this.text;
+      }
+    }
+    expect(canonicalize(new Decimal([1, 2], "12.50"))).toBe('"12.50"');
+    expect(canonicalize({ price: new Decimal([1], "12.50") })).toBe(
+      canonicalize({ price: new Decimal([9, 9, 9], "12.50") }),
+    );
+    expect(canonicalize({ price: new Decimal([1], "12.50") })).not.toBe(
+      canonicalize({ price: new Decimal([1], "12.51") }),
+    );
+  });
+
+  it("canonicalizes a toJSON result that is itself an object, keys sorted", () => {
+    const wrapped = { toJSON: () => ({ b: 2, a: 1 }) };
+    expect(canonicalize(wrapped)).toBe(canonicalize({ a: 1, b: 2 }));
+  });
 });
 
 describe("computeEtag", () => {
