@@ -3,12 +3,14 @@ import type { DeepPartial } from "../types/utility.js";
 import type { ComputedFieldDescriptor, ComputedFieldMap } from "./computed-field.js";
 import type { EntityConfig, OperationConfig, QueryFieldSelector } from "./entity-config.js";
 import type { ResolvedEntityConfig, ResolvedQueryAllowlists } from "./resolved-entity-config.js";
+import type { DtoClass } from "../dto/dto.js";
 import type { EntityMetadata } from "../metadata/entity-metadata.js";
 import type { FieldPath } from "../types/field-path.js";
 import type { OperationId, StandardOperationId } from "../operations/operation.js";
 import { BUILT_IN_DEFAULTS } from "./defaults.js";
 import { deepFreeze, mergeSettings } from "./merge-settings.js";
 import { validateSettings } from "./validate-settings.js";
+import { dtoShapeKeys } from "../dto/dto-shape.js";
 import { DefaultDtoResolver } from "../dto/default-dto-resolver.js";
 import { DefaultRelationRegistry } from "../relations/default-relation-registry.js";
 import { resolveSoftDelete } from "../persistence/soft-delete.js";
@@ -62,6 +64,7 @@ export function resolveEntityConfig<Entity extends object>(
 ): ResolvedEntityConfig<Entity> {
   const entityName = metadata.name;
   const computed = resolveComputedFields(metadata, entityConfig);
+  rejectComputedWriteDtoKeys(entityName, entityConfig, computed);
   const allowlists = resolveAllowlists(metadata, entityConfig, computed);
   const entitySettings = mergeSettings(
     BUILT_IN_DEFAULTS,
@@ -113,6 +116,13 @@ export function resolveEntityConfig<Entity extends object>(
 /** Assignable to `ComputedFieldMap<Entity>` for every `Entity`. */
 const NO_COMPUTED_FIELDS: Readonly<Record<string, never>> = Object.freeze({});
 
+const PROTO_NOT_A_NAME =
+  `'__proto__' cannot name a computed field — it is not an ordinary object key, ` +
+  `so the declaration would silently disappear instead of producing a response field`;
+
+/** The DTO slots whose classes describe a **write** payload (ADR-0019 §4). */
+const WRITE_DTO_SLOTS = ["create", "update", "patch"] as const;
+
 /**
  * Computed-field resolution (ADR-0019). `computed` carries functions, so
  * like `dto` it sits outside `SETTINGS_KEYS` and never merges through the
@@ -139,18 +149,25 @@ function resolveComputedFields<Entity extends object>(
   const declared = (entityConfig as { readonly computed?: ComputedFieldMap<Entity> } | undefined)?.computed;
   if (declared === undefined) return NO_COMPUTED_FIELDS;
 
+  // `__proto__` has two spellings and only one of them is a key. The
+  // computed form (`{ ["__proto__"]: … }`) creates an own key and is caught
+  // in the loop below; the literal form (`{ __proto__: … }`) invokes the
+  // prototype *setter* instead, so it never reaches `Object.keys` — the
+  // declaration would register nothing and throw nothing, which is exactly
+  // the outcome the message promises to prevent. A non-standard prototype
+  // on the declared record is that spelling's only observable trace.
+  const prototype = Object.getPrototypeOf(declared) as object | null;
+  if (prototype !== null && prototype !== Object.prototype) {
+    throw new ConfigurationException(entityName, "computed.__proto__", PROTO_NOT_A_NAME);
+  }
+
   const columns = new Set(metadata.fields.map((field) => field.name));
   const relations = new Set(metadata.relations.map((relation) => relation.name));
   const resolved: Record<string, ComputedFieldDescriptor<Entity>> = {};
   for (const name of Object.keys(declared)) {
     const descriptor = declared[name];
     if (name === "__proto__") {
-      throw new ConfigurationException(
-        entityName,
-        `computed.${name}`,
-        `'__proto__' cannot name a computed field — it is not an ordinary object key, ` +
-          `so the declaration would silently disappear instead of producing a response field`,
-      );
+      throw new ConfigurationException(entityName, `computed.${name}`, PROTO_NOT_A_NAME);
     }
     if (typeof descriptor?.resolve !== "function") {
       throw new ConfigurationException(
@@ -187,6 +204,45 @@ function resolveComputedFields<Entity extends object>(
     resolved[name] = descriptor;
   }
   return Object.freeze(resolved);
+}
+
+/**
+ * A registered `create`/`update`/`patch` DTO naming a computed field is a
+ * bootstrap error, like every other computed misconfiguration (ADR-0019).
+ *
+ * `DefaultDeserializer` would strip the key anyway — that strip stays, as
+ * the defence for anyone constructing a deserializer directly — but a
+ * silent per-request drop is the wrong report for a declaration that can
+ * be judged wrong once, at the moment it is made. It also has a wire
+ * consequence the strip cannot reach: `@kavo/nest` builds `@ApiBody` from
+ * the DTO's runtime shape, so OpenAPI would advertise a property the
+ * engine unconditionally discards.
+ *
+ * Only classes with a runtime shape are checkable; a purely declarative
+ * DTO yields `null` from `dtoShapeKeys` and falls back to the derived
+ * writable projection, which never contains a computed name.
+ */
+function rejectComputedWriteDtoKeys<Entity extends object>(
+  entityName: string,
+  entityConfig: EntityConfig<Entity> | undefined,
+  computed: ComputedFieldMap<Entity>,
+): void {
+  const names = new Set(Object.keys(computed));
+  if (names.size === 0) return;
+  const dto = entityConfig?.dto as Readonly<Record<string, DtoClass | undefined>> | undefined;
+  if (dto === undefined) return;
+  for (const slot of WRITE_DTO_SLOTS) {
+    const declared = dtoShapeKeys(dto[slot] ?? null)?.find((key) => names.has(key));
+    if (declared === undefined) continue;
+    throw new ConfigurationException(
+      entityName,
+      `dto.${slot}`,
+      `the '${slot}' DTO declares '${declared}', which is a computed field on '${entityName}' — ` +
+        `a computed field has no column behind it, so the value is stripped from every write ` +
+        `payload while the generated OpenAPI body still advertises the property; drop it from the ` +
+        `DTO, or make it a real column if it is meant to be written`,
+    );
+  }
 }
 
 /**
@@ -257,19 +313,21 @@ export function validateDefaultSort<Entity>(
 }
 
 /**
- * Resolves one allowlist key's raw selector against the entity's own
- * columns: an explicit array is used as-is; `{ exclude }` resolves to
- * `ownColumns` minus the named paths, so a column outside `ownColumns` can
- * never appear via `exclude` and stays fail-closed like the plain default.
+ * Resolves one allowlist key's raw selector against that key's **base
+ * set** — own columns for `filterable`/`sortable`, own columns plus the
+ * selectable computed fields for `selectable`. An explicit array is used
+ * as-is; `{ exclude }` resolves to `base` minus the named paths, so a path
+ * outside `base` can never appear via `exclude` and stays fail-closed like
+ * the plain default.
  */
 function resolveFieldSelector<Entity>(
-  ownColumns: readonly FieldPath<Entity>[],
+  base: readonly FieldPath<Entity>[],
   selector: QueryFieldSelector<Entity> | undefined,
 ): readonly FieldPath<Entity>[] {
-  if (selector === undefined) return ownColumns;
+  if (selector === undefined) return base;
   if (!("exclude" in selector)) return selector;
   const excluded = new Set(selector.exclude);
-  return ownColumns.filter((column) => !excluded.has(column));
+  return base.filter((path) => !excluded.has(path));
 }
 
 /**
