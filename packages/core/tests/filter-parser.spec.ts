@@ -75,15 +75,8 @@ describe("DefaultFilterParser — isNull / isNotNull symmetry", () => {
 });
 
 describe("DefaultFilterParser — bracket grammar", () => {
-  it("parses a single comparison with coercion", () => {
-    const filter = parse({ "filter[age][gte]": "18" });
-    expect(filter.root).toEqual({
-      kind: "condition",
-      field: "age",
-      operator: "GTE",
-      value: 18,
-    });
-  });
+  // The single-comparison case is the `gte` row of the operator table above;
+  // repeating it here would mean two tests to update for one contract.
 
   it("ANDs multiple filter params implicitly", () => {
     const filter = parse({
@@ -111,14 +104,6 @@ describe("DefaultFilterParser — bracket grammar", () => {
       (child): child is FilterCondition => child.kind === "condition" && child.operator === "IN",
     );
     expect(inCondition?.value).toEqual(["active", "pending"]);
-  });
-
-  it("accepts the repeated-key form for IN", () => {
-    const filter = parse({ "filter[status][in][]": ["active", "pending"] });
-    expect(filter.root).toMatchObject({
-      operator: "IN",
-      value: ["active", "pending"],
-    });
   });
 
   it("builds NOT groups with a single child", () => {
@@ -232,10 +217,11 @@ describe("DefaultFilterParser — IN / NOT_IN value lists", () => {
   });
 
   it("carries an empty value list through as an empty array", () => {
-    // The repeated-key form is the only spelling that can produce one (a
-    // bare `in=` splits to `[""]`, which fails coercion). Adapters spell the
-    // empty set as a contradiction/tautology rather than emitting `IN ()`,
-    // so the AST has to reach them able to say "no values" at all.
+    // No wire spelling produces one — `in=` splits to `[""]` and `in[]=` to
+    // `[""]` too — so this shape reaches the parser only from a
+    // programmatic caller. It still has to survive: adapters spell the empty
+    // set as a contradiction/tautology rather than emitting `IN ()`, so the
+    // AST must be able to say "no values" at all.
     for (const [token, operator] of [
       ["in", "IN"],
       ["notIn", "NOT_IN"],
@@ -249,9 +235,23 @@ describe("DefaultFilterParser — IN / NOT_IN value lists", () => {
     }
   });
 
-  it("rejects a bare empty value rather than reading it as the empty set", () => {
+  it("rejects a bare empty value on a typed column", () => {
     const issues = issuesOf(() => parse({ "filter[age][in]": "" }));
     expect(issues[0]).toMatchObject({ field: "age", code: "KAVO_QUERY_INVALID_VALUE" });
+  });
+
+  it("reads a bare empty value on a string column as a one-element list", () => {
+    // Current behavior, pinned so a change is visible rather than silent:
+    // string coercion accepts "", so `filter[name][in]=` is `IN ('')` — a
+    // live filter for the empty string, not the empty set and not a 400. A
+    // UI submitting an empty multi-select gets rows named "" rather than
+    // either of the two things it might have meant. Tracked in #113.
+    expect(parse({ "filter[name][in]": "" }).root).toEqual({
+      kind: "condition",
+      field: "name",
+      operator: "IN",
+      value: [""],
+    });
   });
 });
 
@@ -271,14 +271,29 @@ describe("DefaultFilterParser — malformed bracket keys", () => {
     expect(filter.root).toEqual({ kind: "condition", field: "age", operator: "GTE", value: 18 });
   });
 
-  it("rejects an empty operator segment as an unknown operator", () => {
-    const issues = issuesOf(() => parse({ "filter[age][]": "18" }));
+  // Both spellings below fail the *shape* check in `convertConditions` — the
+  // value is not an operator map — rather than the unknown-token branch in
+  // `buildCondition` (covered separately under "security posture"). They
+  // share `KAVO_QUERY_INVALID_OPERATOR`, so the `detail` is what tells the
+  // two branches apart and is asserted here for that reason.
+  it.each([
+    ["an empty operator segment", "filter[age][]", ["18"]],
+    ["no operator segment at all", "filter[age]", "18"],
+  ])("rejects %s as not an operator map", (_label, key, value) => {
+    const issues = issuesOf(() => parse({ [key]: value }));
     expect(issues[0]).toMatchObject({ field: "age", code: "KAVO_QUERY_INVALID_OPERATOR" });
+    expect(issues[0]?.detail).toContain("filter[age][operator]=value");
   });
 
-  it("rejects a field with no operator segment at all", () => {
-    const issues = issuesOf(() => parse({ "filter[age]": "18" }));
-    expect(issues[0]).toMatchObject({ field: "age", code: "KAVO_QUERY_INVALID_OPERATOR" });
+  it("reports a malformed logical group under its bracketed wire key", () => {
+    // The one issue shape whose `field` is a bracketed key rather than a
+    // bare column name — worth pinning, since a client parses these.
+    const notAGroup = issuesOf(() => parse({ "filter[or]": "banned" }));
+    expect(notAGroup[0]).toMatchObject({ field: "filter[or]", code: "KAVO_QUERY_INVALID_VALUE" });
+
+    const badBranch = issuesOf(() => parse({ filter: JSON.stringify({ or: ["x"] }) }));
+    expect(badBranch[0]).toMatchObject({ field: "filter[or]", code: "KAVO_QUERY_INVALID_VALUE" });
+    expect(badBranch[0]?.detail).toContain("branch");
   });
 });
 
@@ -351,6 +366,24 @@ describe("DefaultFilterParser — JSON escape hatch", () => {
     const issues = issuesOf(() => parse({ filter: "{nope" }));
     expect(issues[0]?.code).toBe("KAVO_QUERY_INVALID_VALUE");
   });
+
+  it("ANDs the two forms together when a request carries both", () => {
+    // Doc 05 §3 promises this explicitly, and it is the only place the two
+    // parse paths meet — `collectBracketTree` and `parseJsonFilter` each
+    // contribute a root, which `parse` folds into one AND.
+    const filter = parse({
+      "filter[age][gte]": "18",
+      filter: JSON.stringify({ status: { eq: "active" } }),
+    });
+    expect(filter.root).toEqual({
+      kind: "group",
+      operator: "AND",
+      children: [
+        { kind: "condition", field: "age", operator: "GTE", value: 18 },
+        { kind: "condition", field: "status", operator: "EQ", value: "active" },
+      ],
+    });
+  });
 });
 
 describe("DefaultFilterParser — security posture", () => {
@@ -405,8 +438,8 @@ describe("DefaultFilterParser — security posture", () => {
     expect(issues).toHaveLength(2);
   });
 
-  it("restricts LIKE to string columns", () => {
-    const issues = issuesOf(() => parse({ "filter[age][like]": "%1%" }));
-    expect(issues[0]?.code).toBe("KAVO_QUERY_INVALID_VALUE");
+  it.each(["like", "ilike"])("restricts '%s' to string columns", (token) => {
+    const issues = issuesOf(() => parse({ [`filter[age][${token}]`]: "%1%" }));
+    expect(issues[0]).toMatchObject({ field: "age", code: "KAVO_QUERY_INVALID_VALUE" });
   });
 });

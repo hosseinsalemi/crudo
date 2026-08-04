@@ -18,10 +18,6 @@ function translate(root: FilterExpression | null, opts = options): unknown {
   return translateFilter({ root } as Filter, opts);
 }
 
-function ilikeFilter(value: string): Filter {
-  return { root: { kind: "condition", field: "name", operator: "ILIKE", value } };
-}
-
 describe("translateFilter — shape", () => {
   it("returns undefined for an empty filter, so no `where` is sent at all", () => {
     expect(translate(null)).toBeUndefined();
@@ -54,10 +50,16 @@ describe("translateFilter — operators", () => {
 
 /**
  * Prisma has no raw pattern operator — only
- * `contains`/`startsWith`/`endsWith`/`equals` — so the wildcard *position*
- * in the caller's SQL pattern decides which one is emitted. Collapsing
- * everything to `contains` would turn `A%` ("starts with A") into "has an A
- * somewhere", which is a wider result set than the caller asked for.
+ * `contains`/`startsWith`/`endsWith`/`equals` — so a leading and/or trailing
+ * `%` picks which one is emitted. Collapsing everything to `contains` would
+ * turn `A%` ("starts with A") into "has an A somewhere", which is a wider
+ * result set than the caller asked for.
+ *
+ * These four are the patterns the mapping handles, and *only* those:
+ * `likeToPrismaStringFilter` inspects the two ends and nothing else, so an
+ * interior `%`, any `_`, and the backslash escape doc 05 §3 promises are all
+ * mistranslated today — see #114. Those cases are deliberately not asserted
+ * here, because pinning the current output would bless it as the contract.
  */
 describe("translateFilter — LIKE wildcard positions", () => {
   it.each([
@@ -72,19 +74,19 @@ describe("translateFilter — LIKE wildcard positions", () => {
 
 describe("translateFilter — caseInsensitiveFilters", () => {
   it("adds Prisma's mode: 'insensitive' for ILIKE when the connector supports it (default)", () => {
-    const where = translateFilter(ilikeFilter("a%"), { caseInsensitiveFilters: true });
-    expect(where).toEqual({ name: { startsWith: "a", mode: "insensitive" } });
+    expect(translate(condition("name", "ILIKE", "a%"), insensitive)).toEqual({
+      name: { startsWith: "a", mode: "insensitive" },
+    });
   });
 
   it("omits mode entirely when the connector doesn't support it (e.g. SQLite)", () => {
-    const where = translateFilter(ilikeFilter("a%"), { caseInsensitiveFilters: false });
-    expect(where).toEqual({ name: { startsWith: "a" } });
+    expect(translate(condition("name", "ILIKE", "a%"), options)).toEqual({ name: { startsWith: "a" } });
   });
 
   it("leaves plain LIKE untouched by the setting either way", () => {
-    const filter: Filter = { root: { kind: "condition", field: "name", operator: "LIKE", value: "a%" } };
-    expect(translateFilter(filter, { caseInsensitiveFilters: true })).toEqual({ name: { startsWith: "a" } });
-    expect(translateFilter(filter, { caseInsensitiveFilters: false })).toEqual({ name: { startsWith: "a" } });
+    for (const opts of [insensitive, options]) {
+      expect(translate(condition("name", "LIKE", "a%"), opts)).toEqual({ name: { startsWith: "a" } });
+    }
   });
 
   it("carries the mode onto every ILIKE wildcard position, not just the prefix one", () => {
@@ -110,6 +112,7 @@ describe("translateFilter — logical groups", () => {
     });
   });
 
+  // Single child only — see the note in the typeorm spec and #115.
   it("maps a NOT group onto NOT over its single child", () => {
     expect(translate(group("NOT", [left]))).toEqual({ NOT: { name: { equals: "Ada" } } });
   });

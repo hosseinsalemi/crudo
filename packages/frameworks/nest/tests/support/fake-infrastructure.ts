@@ -202,7 +202,7 @@ export class InMemoryTodoAdapter implements RepositoryAdapter<Todo> {
    * default), everything (`withDeleted`), and the trash (`onlyDeleted`).
    * Driven by the resolved strategy rather than this fake's own opinion.
    */
-  private visible(row: Todo, context: KavoContext<Todo>, withDeleted: boolean, onlyDeleted = false): boolean {
+  private visible(row: Todo, context: KavoContext<Todo>, withDeleted: boolean, onlyDeleted: boolean): boolean {
     if (context.config.softDelete.strategy !== "soft") return true;
     if (onlyDeleted) return row.deletedAt !== null;
     return withDeleted || row.deletedAt === null;

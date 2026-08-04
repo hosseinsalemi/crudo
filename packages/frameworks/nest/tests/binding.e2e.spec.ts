@@ -761,6 +761,17 @@ describe("@Kavo soft-delete routes", () => {
     expect(live.body.items).toEqual([expect.objectContaining({ id: 2, title: "still here" })]);
   });
 
+  it("applies onlyDeleted to a single-row read too", async () => {
+    // The list and the by-id path resolve visibility separately, in every
+    // real adapter as well as this fake, so the trash view has to be
+    // asserted on both — a by-id read that ignored the flag would 404 the
+    // row the list just handed the client.
+    await request(server()).delete("/todos/1").expect(204);
+    await request(server()).get("/todos/1").expect(404);
+    const trashed = await request(server()).get("/todos/1?onlyDeleted=true").expect(200);
+    expect(trashed.body).toMatchObject({ id: 1, title: "x" });
+  });
+
   it("maps withDeleted+onlyDeleted together to a 400 problem-details document", async () => {
     const response = await request(server())
       .get("/todos?withDeleted=true&onlyDeleted=true")
@@ -893,7 +904,11 @@ describe("@Kavo relation includes", () => {
     expect(Object.keys(adapter.lastQuery?.include ?? {})).toEqual(["list"]);
 
     // The envelope mirrors the request, and the included relation is still
-    // embedded on every item of the page.
+    // embedded on every item of the page. `total: 3` is not evidence the
+    // filter ran — this fake's `count()` ignores the filter, and all three
+    // rows match it anyway. The load-bearing assertions are the
+    // `adapter.lastQuery` ones above; filter *evaluation* belongs to the
+    // real adapters.
     expect(response.body).toMatchObject({ limit: 2, offset: 1, total: 3 });
     expect(response.body.items).toHaveLength(2);
     for (const item of response.body.items) {

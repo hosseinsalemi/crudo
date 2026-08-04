@@ -52,11 +52,13 @@ class Book {
 let dataSource: DataSource;
 
 beforeAll(async () => {
+  // No `synchronize` — this spec builds SQL and never executes it, so the
+  // tables need not exist. The DataSource is here for its metadata and its
+  // driver-accurate identifier quoting.
   dataSource = new DataSource({
     type: "better-sqlite3",
     database: ":memory:",
     entities: [Author, Book],
-    synchronize: true,
   });
   await dataSource.initialize();
 });
@@ -90,9 +92,12 @@ function builderFor() {
 }
 
 /** Just the predicate — the SELECT list is the driver's business, not ours. */
-function whereOf(root: FilterExpression | null): string {
-  const { sql } = translate(root);
+function predicateOf(sql: string): string {
   return sql.split(" WHERE ")[1] ?? "";
+}
+
+function whereOf(root: FilterExpression | null): string {
+  return predicateOf(translate(root).sql);
 }
 
 describe("FilterTranslator — comparison operators", () => {
@@ -104,25 +109,28 @@ describe("FilterTranslator — comparison operators", () => {
     ["LT", "pages", 100, `("root"."pages" < :p0)`, 100],
     ["LTE", "pages", 100, `("root"."pages" <= :p0)`, 100],
   ])("maps %s onto its SQL comparison with a bound parameter", (operator, field, value, sql, bound) => {
-    const { parameters } = translate(condition(field, operator, value));
-    expect(whereOf(condition(field, operator, value))).toBe(sql);
+    const { sql: generated, parameters } = translate(condition(field, operator, value));
+    expect(predicateOf(generated)).toBe(sql);
     expect(parameters["p0"]).toBe(bound);
   });
 
+  // `toBe` on the whole predicate throughout, not `toContain`: an extra
+  // clause emitted alongside the expected one (a leaked `1 = 0`, a doubled
+  // ESCAPE) would satisfy a substring match while quietly emptying the page.
   it("maps IN and NOT_IN onto a spread parameter list", () => {
     const inSet = translate(condition("title", "IN", ["Dune", "Emma"]));
-    expect(inSet.sql).toContain(`("root"."title" IN (:...p0))`);
+    expect(predicateOf(inSet.sql)).toBe(`("root"."title" IN (:...p0))`);
     expect(inSet.parameters["p0"]).toEqual(["Dune", "Emma"]);
 
     const notIn = translate(condition("title", "NOT_IN", ["Dune"]));
-    expect(notIn.sql).toContain(`("root"."title" NOT IN (:...p0))`);
+    expect(predicateOf(notIn.sql)).toBe(`("root"."title" NOT IN (:...p0))`);
     expect(notIn.parameters["p0"]).toEqual(["Dune"]);
   });
 
   it("maps BETWEEN onto two independently named bound parameters", () => {
     const { sql, parameters } = translate(condition("pages", "BETWEEN", [100, 200]));
-    expect(sql).toContain(`("root"."pages" BETWEEN :p0_lo AND :p0_hi)`);
-    expect(parameters).toMatchObject({ p0_lo: 100, p0_hi: 200 });
+    expect(predicateOf(sql)).toBe(`("root"."pages" BETWEEN :p0_lo AND :p0_hi)`);
+    expect(parameters).toEqual({ p0_lo: 100, p0_hi: 200 });
   });
 
   it("maps IS_NULL and IS_NOT_NULL onto SQL null tests with no parameter", () => {
@@ -167,13 +175,13 @@ describe("FilterTranslator — LIKE and ILIKE", () => {
     // default sql_mode treats it as an escape character, Postgres does not),
     // so `ESCAPE '\'` is not portable — a bound parameter is.
     const { sql, parameters } = translate(condition("title", "LIKE", "100\\%"));
-    expect(sql).toContain(`("root"."title" LIKE :p0 ESCAPE :p0Escape)`);
+    expect(predicateOf(sql)).toBe(`("root"."title" LIKE :p0 ESCAPE :p0Escape)`);
     expect(parameters).toEqual({ p0: "100\\%", p0Escape: "\\" });
   });
 
   it("translates ILIKE portably as LOWER() LIKE LOWER(), with the same escape", () => {
     const { sql, parameters } = translate(condition("title", "ILIKE", "a%"));
-    expect(sql).toContain(`(LOWER("root"."title") LIKE LOWER(:p0) ESCAPE :p0Escape)`);
+    expect(predicateOf(sql)).toBe(`(LOWER("root"."title") LIKE LOWER(:p0) ESCAPE :p0Escape)`);
     expect(parameters).toEqual({ p0: "a%", p0Escape: "\\" });
   });
 
@@ -191,6 +199,8 @@ describe("FilterTranslator — logical groups", () => {
     expect(whereOf(group("OR", [left, right]))).toBe(`(("root"."title" = :p0) OR ("root"."pages" > :p1))`);
   });
 
+  // Single child only: a multi-child NOT silently drops everything past
+  // children[0] today, which is #115 rather than a contract to pin here.
   it("wraps a NOT group in SQL NOT over its single child", () => {
     expect(whereOf(group("NOT", [left]))).toBe(`NOT(("root"."title" = :p0))`);
   });
@@ -220,8 +230,10 @@ describe("FilterTranslator — relation paths", () => {
     expect(sql).toContain(`LEFT JOIN "author" "root__author"`);
     expect(sql).toContain(`("root__author"."name" = :p0)`);
     // Non-selecting: the join restricts root rows, it never loads the
-    // relation — that is what `include=` is for.
-    expect(sql).not.toContain(`"root__author"."name" AS`);
+    // relation — that is what `include=` is for. Asserted over the whole
+    // select list rather than one column, so a join projecting only the id
+    // cannot slip through.
+    expect(sql.split(" FROM ")[0]).not.toContain("root__author");
   });
 
   it("chains a join per segment of a multi-segment path", () => {
@@ -242,10 +254,14 @@ describe("FilterTranslator — relation paths", () => {
   });
 
   it("reuses a join someone else registered rather than duplicating it", () => {
-    // An include join selects its relation; a filter join only restricts. If
-    // both were added under the same alias the query would be invalid, and
-    // if the filter's non-selecting join won, the include would come back
-    // empty.
+    // An include join selects its relation; a filter join only restricts.
+    // TypeORM does not deduplicate aliases itself — adding both emits two
+    // LEFT JOINs and duplicates the select columns, which fails at execution
+    // ("ambiguous column name" on SQLite, "table name specified more than
+    // once" on Postgres). `registerJoin` is what prevents that, and the
+    // adapter joins includes before applying filters
+    // (typeorm-repository-adapter.ts) so the selecting join is the one in
+    // place by the time the translator looks.
     const { sql } = translate(condition("author.name", "EQ", "Ada"), (translator, qb) => {
       qb.leftJoinAndSelect("root.author", "root__author");
       translator.registerJoin("root__author");
@@ -253,6 +269,23 @@ describe("FilterTranslator — relation paths", () => {
     expect(sql.match(/LEFT JOIN/g)).toHaveLength(1);
     expect(sql).toContain(`"root__author"."name" AS "root__author_name"`);
     expect(sql).toContain(`("root__author"."name" = :p0)`);
+  });
+
+  it("shares one join between a filter and a sort on the same path", () => {
+    // `columnRef` has two callers: `applyCondition` here, and the adapter's
+    // `addOrderBy` for a sort on an allowlisted relation path. Only the
+    // filter side goes through `apply()`, so scoping the join cache per
+    // `apply()` call would leave every other test in this file green while
+    // the sort re-joined the relation under a second alias — k² raw rows per
+    // parent, invisible after `getMany()` dedupes entities.
+    const qb = builderFor();
+    const translator = new FilterTranslator<Book>(qb, "root");
+    translator.apply({ root: condition("author.name", "EQ", "Ada") } as Filter<Book>);
+    qb.addOrderBy(translator.columnRef("author.name"), "DESC");
+
+    const sql = qb.getQuery();
+    expect(sql.match(/LEFT JOIN/g)).toHaveLength(1);
+    expect(sql).toContain(`ORDER BY "root__author"."name" DESC`);
   });
 
   it("leaves an undotted field on the root alias", () => {

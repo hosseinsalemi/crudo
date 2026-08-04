@@ -20,8 +20,8 @@ const softDeletableNormalizer = new QueryNormalizer(accountMetadata);
  * soft-delete flags — can meet in a single normalized request.
  */
 const postCatalog = new DefaultEntityCatalog((entity: ClassRef) => {
-  if ((entity as ClassRef) === Comment) return commentMetadata as unknown as EntityMetadata<object>;
-  if ((entity as ClassRef) === Author) return authorMetadata as unknown as EntityMetadata<object>;
+  if (entity === Comment) return commentMetadata as unknown as EntityMetadata<object>;
+  if (entity === Author) return authorMetadata as unknown as EntityMetadata<object>;
   return undefined;
 });
 const postConfig = resolveEntityConfig(
@@ -259,17 +259,21 @@ describe("QueryNormalizer — the whole grammar in one request", () => {
   });
 
   it("still collects issues from every section when they are combined", () => {
+    // Distinct bad names per section on purpose: with one shared name the
+    // three `KAVO_QUERY_INVALID_FIELD` issues are indistinguishable, so a
+    // regression where one section double-reported while another stopped
+    // reporting would produce the same multiset and pass.
     const issues = issuesOf(() =>
       postNormalizer.normalizeWire(
-        { ...wire, "filter[secret][eq]": "x", sort: "-secret", fields: "secret", limit: "abc" },
+        { ...wire, "filter[secretA][eq]": "x", sort: "-secretB", fields: "secretC", limit: "abc" },
         postConfig,
       ),
     );
-    expect(issues.map((issue) => issue.code).sort()).toEqual([
-      "KAVO_QUERY_INVALID_FIELD",
-      "KAVO_QUERY_INVALID_FIELD",
-      "KAVO_QUERY_INVALID_FIELD",
-      "KAVO_QUERY_INVALID_VALUE",
+    expect(issues).toEqual([
+      expect.objectContaining({ field: "secretA", code: "KAVO_QUERY_INVALID_FIELD" }),
+      expect.objectContaining({ field: "secretB", code: "KAVO_QUERY_INVALID_FIELD" }),
+      expect.objectContaining({ field: "secretC", code: "KAVO_QUERY_INVALID_FIELD" }),
+      expect.objectContaining({ field: "limit", code: "KAVO_QUERY_INVALID_VALUE" }),
     ]);
   });
 });
