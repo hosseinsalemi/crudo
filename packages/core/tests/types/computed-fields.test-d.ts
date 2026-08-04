@@ -28,6 +28,16 @@ void kavo.createCrud(Author, {
   },
 });
 
+// ADR-0019's one explicit *negative* claim: declaring a computed field does
+// not change the static response type — the entity-derived `ItemDto` stays
+// `Entity`. Every runtime test casts its way past this, so a drift in either
+// direction (silently growing the key, or losing `Author`) is invisible
+// without a type-level assertion.
+const derived = kavo.createCrud(Author, {
+  computed: { initials: { resolve: (author) => author.name.slice(0, 2) } },
+});
+expectTypeOf(derived.findOne).returns.resolves.toEqualTypeOf<Author>();
+
 // A declared computed name is usable in `selectable` alongside real paths.
 void kavo.createCrud(Author, {
   computed: { initials: { resolve: (author) => author.name.slice(0, 2) } },

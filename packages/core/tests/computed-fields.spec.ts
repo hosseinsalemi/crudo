@@ -43,6 +43,25 @@ async function seeded(config: EntityConfig<User> = {}) {
   return fixture;
 }
 
+/**
+ * Every config error names the entity, the key path and the offending
+ * value (the bar `config-validation.spec.ts` sets) — `messageParams` is
+ * where the first two live, so asserting the rendered message alone
+ * would leave the key path free to drift.
+ */
+function expectConfigError(build: () => unknown, path: string, fragment: string, entity = "User"): void {
+  try {
+    build();
+  } catch (error) {
+    expect(error).toBeInstanceOf(ConfigurationException);
+    expect((error as ConfigurationException).code).toBe("KAVO_CONFIG_INVALID");
+    expect((error as ConfigurationException).messageParams).toMatchObject({ entity, path });
+    expect((error as ConfigurationException).message).toContain(fragment);
+    return;
+  }
+  throw new Error("expected a ConfigurationException");
+}
+
 describe("computed fields — default projection (ADR-0019)", () => {
   it("appears in a findOne response with no DTO registered", async () => {
     const { crud } = await seeded({ computed: { shout } } as never);
@@ -66,6 +85,46 @@ describe("computed fields — default projection (ADR-0019)", () => {
       metadata: userMetadata,
     }) as DefaultKavoService<User>;
     expect(await crud.findOne(1)).toEqual({ id: 1, name: "Ada", email: "a@x.io", age: 36, shout: "ADA" });
+  });
+
+  it("beats a row that already carries the key — resolving wins over reading", async () => {
+    // The branch order in `DefaultSerializer.project` is normative, and a
+    // row really can carry a computed key: a Prisma/Mongoose row with a
+    // column the metadata seam does not describe, or an ORM that hydrates
+    // extra properties. Reading the row instead would put the response back
+    // where ADR-0019's Context section found it.
+    const { crud, adapter } = makeCrud({ computed: { shout } } as never);
+    adapter.rows.push(Object.assign(new User(), { id: 1, name: "Ada", shout: "FROM ROW" }));
+    expect(await crud.findOne(1)).toMatchObject({ id: 1, name: "Ada", shout: "ADA" });
+  });
+
+  it("beats a class getter of the same name — ADR-0019's motivating case", async () => {
+    // The superseded workaround was exactly this: a DTO naming a property
+    // the entity class exposes as a getter, which the serializer copied
+    // because `key in source` was true. A declared computed field is the
+    // replacement, so it has to win over the thing it replaces.
+    class Legacy extends User {
+      get shout(): string {
+        return "FROM GETTER";
+      }
+    }
+    const { crud, adapter } = makeCrud({ computed: { shout } } as never);
+    adapter.rows.push(Object.assign(new Legacy(), { id: 1, name: "Ada" }));
+    expect(await crud.findOne(1)).toMatchObject({ id: 1, name: "Ada", shout: "ADA" });
+  });
+
+  it("does not mistake an inherited name for a declared computed field", async () => {
+    // `project` consults the computed table with `hasOwnProperty`, not
+    // `in`: with `in`, `toString` would hit `Object.prototype`, `.resolve`
+    // would be `undefined`, and the row's own value would silently vanish
+    // from the response instead of being emitted.
+    class UserItemDto {
+      id = 0;
+      toString = "";
+    }
+    const { crud, adapter } = makeCrud({ dto: { item: UserItemDto } } as never);
+    adapter.rows.push(Object.assign(new User(), { id: 1, toString: "shadowed" }) as User);
+    expect(await crud.findOne(1)).toEqual({ id: 1, toString: "shadowed" });
   });
 
   it("receives the same KavoContext a custom handler gets, so it can vary by caller", async () => {
@@ -124,6 +183,19 @@ describe("computed fields — selection", () => {
   it("is dropped by a fieldset that does not name it — selection narrows uniformly", async () => {
     const { crud } = await seeded({ computed: { shout } } as never);
     expect(await crud.findOne(1, { fields: ["name"] } as never)).toEqual({ name: "Ada" });
+  });
+
+  it("never runs a deselected field's resolver", async () => {
+    // Load-bearing ordering, not an implementation detail: `resolve` is
+    // caller code with an unbounded cost, so the selection check has to
+    // come *before* the computed branch. Seeded through the adapter,
+    // because `createOne` serializes its own result with no fieldset and
+    // would call the resolver before the read under test.
+    const resolve = vi.fn((user: User) => user.name.toUpperCase());
+    const { crud, adapter } = makeCrud({ computed: { shout: { resolve } } } as never);
+    adapter.rows.push(Object.assign(new User(), { id: 1, name: "Ada" }));
+    expect(await crud.findOne(1, { fields: ["name"] } as never)).toEqual({ name: "Ada" });
+    expect(resolve).not.toHaveBeenCalled();
   });
 
   it("opts out of the selectable allowlist with `selectable: false` and is then a 400", async () => {
@@ -190,25 +262,6 @@ describe("computed fields — selection", () => {
 });
 
 describe("computed fields — bootstrap validation", () => {
-  /**
-   * Every config error names the entity, the key path and the offending
-   * value (the bar `config-validation.spec.ts` sets) — `messageParams` is
-   * where the first two live, so asserting the rendered message alone
-   * would leave the key path free to drift.
-   */
-  const expectConfigError = (build: () => unknown, path: string, fragment: string, entity = "User") => {
-    try {
-      build();
-    } catch (error) {
-      expect(error).toBeInstanceOf(ConfigurationException);
-      expect((error as ConfigurationException).code).toBe("KAVO_CONFIG_INVALID");
-      expect((error as ConfigurationException).messageParams).toMatchObject({ entity, path });
-      expect((error as ConfigurationException).message).toContain(fragment);
-      return;
-    }
-    throw new Error("expected a ConfigurationException");
-  };
-
   it("rejects a computed field listed as filterable", () => {
     expectConfigError(
       () => makeCrud({ computed: { shout }, allowlists: { filterable: ["shout"] } } as never),
@@ -263,12 +316,25 @@ describe("computed fields — bootstrap validation", () => {
     );
   });
 
-  it("rejects `__proto__` as a name rather than losing the declaration", () => {
+  it("rejects the computed-key `__proto__` spelling rather than losing the declaration", () => {
     // Assigning it into the accumulator would set that object's prototype
     // instead of adding a key, so the field would vanish with no error —
     // the same class of hazard as the filter parser's bracket segments.
     expectConfigError(
       () => makeCrud({ computed: { ["__proto__"]: shout } } as never),
+      "computed.__proto__",
+      "'__proto__' cannot name a computed field",
+    );
+  });
+
+  it("rejects the object-literal `__proto__` spelling too — the one people actually write", () => {
+    // `{ __proto__: … }` invokes the prototype *setter* rather than
+    // creating an own key, so the name never reaches `Object.keys` and the
+    // per-key loop above cannot see it. Without the prototype check the
+    // declaration registers nothing and throws nothing — precisely the
+    // outcome the message promises to prevent.
+    expectConfigError(
+      () => makeCrud({ computed: { __proto__: shout } } as never),
       "computed.__proto__",
       "'__proto__' cannot name a computed field",
     );
@@ -347,21 +413,47 @@ describe("computed fields — never writable (ADR-0019)", () => {
     expect(patch.mock.calls[0]?.[1]).toEqual({});
   });
 
-  it("stays stripped when a registered create DTO names it", async () => {
-    // The derived writable projection alone is not enough: a registered DTO
-    // *replaces* it (`dtoShapeKeys(dto) ?? this.writableProjection`), so
-    // without the explicit strip this key would reach the adapter as if it
-    // were a column.
+  /**
+   * The outer of the two layers. A write DTO naming a computed field is
+   * the one computed misuse that used to be handled silently — a per-
+   * request drop — while every other one is a bootstrap error naming the
+   * key path. It is judgeable once, at `createCrud`, and it has a wire
+   * consequence the strip cannot reach: `@kavo/nest` builds `@ApiBody`
+   * from the DTO's runtime shape, so OpenAPI advertised a property the
+   * engine unconditionally discarded.
+   */
+  for (const slot of ["create", "update", "patch"] as const) {
+    it(`rejects a registered ${slot} DTO that declares it, at bootstrap`, () => {
+      class WriteUserDto {
+        name = "";
+        shout = "";
+      }
+      expectConfigError(
+        () => makeCrud({ computed: { shout }, dto: { [slot]: WriteUserDto } } as never),
+        `dto.${slot}`,
+        `the '${slot}' DTO declares 'shout', which is a computed field on 'User'`,
+      );
+    });
+  }
+
+  it("accepts a write DTO that omits it, so the check is not just 'any DTO'", async () => {
     class CreateUserDto {
       name = "";
-      shout = "";
+      email = "";
     }
     const { crud, adapter } = makeCrud({ computed: { shout }, dto: { create: CreateUserDto } } as never);
     const create = vi.spyOn(adapter, "create");
-    await crud.createOne({ name: "Ada", shout: "NOPE" } as never);
-    expect(create.mock.calls[0]?.[0]).toEqual({ name: "Ada" });
+    await crud.createOne({ name: "Ada", email: "a@x.io", shout: "NOPE" } as never);
+    expect(create.mock.calls[0]?.[0]).toEqual({ name: "Ada", email: "a@x.io" });
   });
 
+  /**
+   * The inner layer, and the only place it is reachable now that the outer
+   * one rejects the config that produced it. `DefaultDeserializer` is
+   * exported, so its contract is "a computed name never reaches the
+   * adapter" on its own terms — not "the config resolver checked first".
+   * Deleting the strip in `deserialize` fails exactly this test.
+   */
   it("is stripped by DefaultDeserializer directly, whichever projection is in force", () => {
     class UpdateUserDto {
       name = "";

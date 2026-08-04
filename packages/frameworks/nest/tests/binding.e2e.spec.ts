@@ -1007,8 +1007,11 @@ describe("@Kavo relation includes", () => {
  */
 describe("@Kavo computed fields over the wire (ADR-0019)", () => {
   @Kavo(Todo, {
+    // Defensive by construction: `resolve` must be *total* over anything the
+    // column can hold, because `serializeList` maps it over every row and one
+    // throw takes the whole collection response down (ADR-0019 §1).
     computed: {
-      slug: { resolve: (todo: Todo) => todo.title.toLowerCase().replaceAll(" ", "-") },
+      slug: { resolve: (todo: Todo) => todo.title?.toLowerCase().replaceAll(" ", "-") ?? null },
     },
   })
   @Controller("todos")
@@ -1047,15 +1050,36 @@ describe("@Kavo computed fields over the wire (ADR-0019)", () => {
     expect(adapter.rows[1]).not.toHaveProperty("slug");
   });
 
-  it("omits the key over the wire when the resolver returns undefined", async () => {
-    @Kavo(Todo, { computed: { note: { resolve: () => undefined } } })
-    @Controller("todos")
-    class UndefinedComputedController {}
+  it("fails at bind time when a registered create DTO declares the computed field", async () => {
+    // The wire consequence this closes: `@ApiBody` is built from the DTO's
+    // runtime shape, so a DTO naming a computed field made OpenAPI advertise
+    // a property the engine unconditionally discards. Rejected at
+    // `createCrud` now, which in a Nest app is provider instantiation.
+    class CreateTodoDto {
+      title = "";
+      slug = "";
+    }
 
-    await app.close();
-    await bootstrap(UndefinedComputedController);
-    await request(server()).post("/todos").send({ title: "x" }).expect(201);
-    expect((await request(server()).get("/todos/1").expect(200)).body).not.toHaveProperty("note");
+    @Kavo(Todo, {
+      computed: { slug: { resolve: (todo: Todo) => todo.title?.toLowerCase() ?? null } },
+      dto: { create: CreateTodoDto },
+    })
+    @Controller("todos")
+    class ComputedDtoController {}
+
+    const bind = async (): Promise<unknown> => {
+      const moduleRef = await Test.createTestingModule({
+        imports: [
+          KavoModule.forRoot({ infrastructure: fakeInfrastructure(new InMemoryTodoAdapter()) }),
+          KavoModule.forFeature([ComputedDtoController as never]),
+        ],
+      }).compile();
+      return moduleRef.createNestApplication().init();
+    };
+    await expect(bind()).rejects.toMatchObject({
+      code: "KAVO_CONFIG_INVALID",
+      messageParams: { entity: "Todo", path: "dto.create" },
+    });
   });
 
   it("turns a throwing resolver into problem details without leaking the message", async () => {
