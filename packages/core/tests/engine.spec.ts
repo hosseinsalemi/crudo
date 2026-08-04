@@ -3,6 +3,7 @@ import {
   ConfigurationException,
   NotFoundException,
   OperationDisabledException,
+  OperationNotRegisteredException,
   createKavo,
   toProblemDetails,
 } from "@kavo/core";
@@ -17,6 +18,13 @@ function makeCrud(config?: Parameters<ReturnType<typeof createKavo>["createCrud"
   });
   return { crud, adapter, kavo };
 }
+
+/**
+ * A call naming an operation the registry has no entry for. Only reachable
+ * through the engine: the typed service surface has no such method, and
+ * route generation walks the same registry, so no route exists either.
+ */
+const unregisteredRequest = () => ({ operation: "findAll", id: null, body: null, query: null, options: null }) as never;
 
 describe("KavoEngine pipeline", () => {
   it("runs createOne → findOne → updateOne → patchOne → deleteOne", async () => {
@@ -132,6 +140,42 @@ describe("KavoEngine pipeline", () => {
   it("raises OperationDisabledException for config-disabled operations", async () => {
     const { crud } = makeCrud({ operations: { deleteOne: false } } as never);
     await expect(crud.deleteOne(1)).rejects.toBeInstanceOf(OperationDisabledException);
+  });
+
+  it("names the config key that would switch a disabled operation back on", async () => {
+    const { crud } = makeCrud({ operations: { deleteOne: false } } as never);
+    await expect(crud.deleteOne(1)).rejects.toMatchObject({
+      code: "KAVO_OPERATION_DISABLED",
+      messageParams: { operation: "deleteOne", entity: "User" },
+    });
+    await expect(crud.deleteOne(1)).rejects.toThrow("operations.deleteOne");
+  });
+
+  it("separates an unregistered operation from a disabled one (issue #7)", async () => {
+    // Both are 405, but "disabled" is a lie about an id the registry never
+    // had — and `messageKey` is the code, so a localizing consumer would
+    // re-render that lie. Unreachable over HTTP (no route is generated for
+    // an id the registry does not hold), so only this path can prove it.
+    const { crud } = makeCrud();
+    await expect(crud.engine.execute(unregisteredRequest())).rejects.toMatchObject({
+      code: "KAVO_OPERATION_NOT_REGISTERED",
+      status: 405,
+      context: { entityName: "User", operation: "findAll" },
+    });
+  });
+
+  it("lists what a caller could have called instead", async () => {
+    const { crud } = makeCrud();
+    try {
+      await crud.engine.execute(unregisteredRequest());
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(OperationNotRegisteredException);
+      const { detail } = error as OperationNotRegisteredException;
+      expect(detail).toContain("Registered operations:");
+      expect(detail).toContain("findMany");
+      expect(detail).not.toContain("disabled");
+    }
   });
 
   it("dispatches overridden handlers through the same pipeline", async () => {

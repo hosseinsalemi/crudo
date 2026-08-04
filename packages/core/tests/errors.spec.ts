@@ -11,6 +11,7 @@ import {
   NotDeletedException,
   NotFoundException,
   OperationDisabledException,
+  OperationNotRegisteredException,
   PersistenceException,
   QueryValidationException,
   TransactionException,
@@ -39,6 +40,7 @@ const CATALOG: Readonly<Record<CatalogedErrorCode, { status: number; title: stri
   KAVO_ALREADY_DELETED: { status: 409, title: "Already deleted" },
   KAVO_NOT_DELETED: { status: 409, title: "Not deleted" },
   KAVO_OPERATION_DISABLED: { status: 405, title: "Operation disabled" },
+  KAVO_OPERATION_NOT_REGISTERED: { status: 405, title: "Operation not registered" },
   KAVO_PERSISTENCE_FAILED: { status: 500, title: "Persistence failure" },
   KAVO_TRANSACTION_FAILED: { status: 500, title: "Transaction failure" },
   KAVO_CONFIG_INVALID: { status: 500, title: "Invalid configuration" },
@@ -122,6 +124,7 @@ describe("exception hierarchy", () => {
     { exception: new AlreadyDeletedException(), code: "KAVO_ALREADY_DELETED", status: 409 },
     { exception: new NotDeletedException(), code: "KAVO_NOT_DELETED", status: 409 },
     { exception: new OperationDisabledException(), code: "KAVO_OPERATION_DISABLED", status: 405 },
+    { exception: new OperationNotRegisteredException(), code: "KAVO_OPERATION_NOT_REGISTERED", status: 405 },
     { exception: new PersistenceException(), code: "KAVO_PERSISTENCE_FAILED", status: 500 },
     { exception: new TransactionException(), code: "KAVO_TRANSACTION_FAILED", status: 500 },
     { exception: new QueryValidationException([]), code: "KAVO_QUERY_INVALID", status: 400 },
@@ -194,6 +197,31 @@ describe("exception hierarchy", () => {
   it("marks a transaction retryable only when told so", () => {
     expect(new TransactionException().retryable).toBe(false);
     expect(new TransactionException({ retryable: true }).retryable).toBe(true);
+  });
+
+  it("bakes the fix into the disabled-operation template, not into a caller-supplied hint", () => {
+    // Issue #7: `messageKey` *is* the code, so a consumer that localizes by
+    // re-rendering key + params has to get the actionable half too — it
+    // cannot live only in the English string a throw site pasted together.
+    const exception = new OperationDisabledException({
+      messageParams: { operation: "purgeOne", entity: "User" },
+    });
+    expect(exception.detail).toContain("Operation 'purgeOne' is disabled for User.");
+    expect(exception.detail).toContain("Enable it with 'operations.purgeOne' in the entity config.");
+    expect(renderMessage("KAVO_OPERATION_DISABLED", exception.messageParams)).toBe(exception.detail);
+  });
+
+  it("never calls an unregistered operation 'disabled'", () => {
+    const exception = new OperationNotRegisteredException({
+      messageParams: { operation: "findAll", entity: "User", available: "findMany, findOne" },
+    });
+    expect(exception.detail).toContain("is not registered for User");
+    expect(exception.detail).toContain("Registered operations: findMany, findOne.");
+    expect(exception.detail).not.toContain("disabled");
+    // The two share a status but never a code — the code is what a
+    // localizing consumer keys off.
+    expect(exception.status).toBe(new OperationDisabledException().status);
+    expect(exception.code).not.toBe("KAVO_OPERATION_DISABLED");
   });
 
   it("names the entity, key path, and problem on a configuration error", () => {

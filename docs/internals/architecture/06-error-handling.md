@@ -14,6 +14,7 @@ KavoException (abstract; implements the KavoExceptionShape contract)
 ├─ AlreadyDeletedException      soft delete of a deleted row → 409
 ├─ NotDeletedException          restore/purge of a live row → 409
 ├─ OperationDisabledException
+├─ OperationNotRegisteredException   registry miss, never "disabled"
 ├─ BulkOperationException       carries items[] (reserved)
 ├─ PersistenceException
 ├─ TransactionException         carries retryable: boolean
@@ -45,6 +46,7 @@ policy). Source of truth: `ERROR_CATALOG` in
 | `KAVO_ALREADY_DELETED`          | 409  | Soft-deleting an already-deleted row                                                             | —                                 |
 | `KAVO_NOT_DELETED`              | 409  | Restoring or purging a row that is not deleted                                                   | —                                 |
 | `KAVO_OPERATION_DISABLED`       | 405  | Programmatic call to a disabled registry entry (no route exists over HTTP)                       | —                                 |
+| `KAVO_OPERATION_NOT_REGISTERED` | 405  | Programmatic call naming an operation the registry has no entry for at all                       | —                                 |
 | `KAVO_BULK_FAILED`              | 422  | Atomic bulk failure (reserved — bulk is not built)                                               | `items[]` per-index issues        |
 | `KAVO_PERSISTENCE_FAILED`       | 500  | Unrecognized adapter/driver error                                                                | `cause` kept internally           |
 | `KAVO_TRANSACTION_FAILED`       | 500  | Deadlock/serialization failure                                                                   | `retryable` flag                  |

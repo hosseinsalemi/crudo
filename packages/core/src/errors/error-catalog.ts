@@ -84,7 +84,23 @@ export const ERROR_CATALOG = {
   KAVO_OPERATION_DISABLED: {
     status: 405,
     title: "Operation disabled",
-    message: "Operation '{operation}' is disabled for {entity}.",
+    // `{operation}` twice is safe: `renderMessage` replaces globally, and
+    // the one throw site (`KavoEngine.run`) always supplies it. A
+    // placeholder for text a *caller* might omit would render verbatim —
+    // which is why the fix is baked into the template rather than passed
+    // in as a free-form hint.
+    message:
+      "Operation '{operation}' is disabled for {entity}. Enable it with 'operations.{operation}' in the entity config.",
+  },
+  KAVO_OPERATION_NOT_REGISTERED: {
+    status: 405,
+    title: "Operation not registered",
+    // Distinct from `KAVO_OPERATION_DISABLED` because `messageKey` *is* the
+    // code: a consumer localizing from key + params would otherwise
+    // re-render "is disabled" for an operation nobody ever disabled.
+    // `{available}` is the whole registry (eight standard entries), which
+    // subsumes a "did you mean" — the near miss is right there in the list.
+    message: "Operation '{operation}' is not registered for {entity}. Registered operations: {available}.",
   },
   KAVO_PERSISTENCE_FAILED: {
     status: 500,

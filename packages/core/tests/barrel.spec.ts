@@ -114,6 +114,7 @@ const PUBLIC_SURFACE: readonly string[] = [
   "OperationConfig",
   "OperationDescriptor",
   "OperationDisabledException",
+  "OperationNotRegisteredException",
   "OperationDtoMap",
   "OperationHandler",
   "OperationId",
