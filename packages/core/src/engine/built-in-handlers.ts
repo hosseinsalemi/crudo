@@ -5,7 +5,9 @@ import type { OperationHandler } from "../operations/operation-handler.js";
 import type { RepositoryAdapter } from "../persistence/repository-adapter.js";
 import type { StandardOperationId } from "../operations/operation.js";
 import type { StandardHandlerFactory } from "../operations/default-operation-registry.js";
+import type { NormalizedQueryContext } from "../query/query-context.js";
 import { NotFoundException } from "../errors/exceptions.js";
+import { isCursorPagination } from "../query/pagination.js";
 
 /** What `findMany` hands back to the engine for envelope assembly. */
 export interface FindManyResult<Entity> {
@@ -24,6 +26,16 @@ export interface FindManyResult<Entity> {
    * existing handler stays valid and the field stays additive.
    */
   readonly meta?: ListMetaDto;
+  /**
+   * Whether at least one more row exists past this page — the has-more
+   * signal `meta.nextCursor` needs, since "null on the last page" cannot be
+   * answered by the page itself (ADR-0019).
+   *
+   * Only the cursor-paginated path sets it, by over-fetching `limit + 1` and
+   * dropping the sentinel row. Offset paging answers the same question from
+   * `total` and leaves this `undefined`.
+   */
+  readonly hasMore?: boolean;
 }
 
 /** Input shape for the id-plus-body operations (update/patch). */
@@ -73,9 +85,20 @@ export function builtInHandlers<Entity extends object>(
         if (query === null) {
           throw new Error("findMany requires a normalized query on the context");
         }
-        const entities = await adapter.findMany(query, context);
+        // Over-fetch by one for cursor paging, then drop the sentinel. It
+        // lives here rather than in each adapter for two reasons: the four
+        // adapters would otherwise implement the same off-by-one four times,
+        // and `findMany`'s contract stays "return exactly what the query
+        // asks for" — a custom adapter needs no cursor awareness at all
+        // beyond honoring `readFilter` (ADR-0019).
+        const cursorPaged = isCursorPagination(query.pagination);
+        const fetched = await adapter.findMany(cursorPaged ? overFetch(query) : query, context);
+        const hasMore = cursorPaged && fetched.length > query.pagination.limit;
+        const entities = hasMore ? fetched.slice(0, query.pagination.limit) : fetched;
+        // Counting deliberately uses the *unmodified* query: `total` is the
+        // size of the whole match set, not of what remains after the cursor.
         const total = query.count ? await adapter.count(query, context) : null;
-        return { entities, total };
+        return cursorPaged ? { entities, total, hasMore } : { entities, total };
       },
     },
     updateOne: {
@@ -113,4 +136,13 @@ export function builtInHandlers<Entity extends object>(
   };
 
   return (id) => handlers[id] as OperationHandler<Entity>;
+}
+
+/**
+ * The same query, asking for one row more than the page — the sentinel that
+ * answers "is there a next page?" without a second query. The envelope still
+ * reports `context.query.pagination.limit`, which this copy never touches.
+ */
+function overFetch<Entity>(query: NormalizedQueryContext<Entity>): NormalizedQueryContext<Entity> {
+  return { ...query, pagination: { ...query.pagination, limit: query.pagination.limit + 1 } };
 }

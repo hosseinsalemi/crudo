@@ -19,7 +19,13 @@ export interface ListResultDto<ListDto> {
   readonly items: readonly ListDto[];
   /** Effective page size the server applied. */
   readonly limit: number;
-  /** Zero-based index of `items[0]` within the full match set. */
+  /**
+   * Zero-based index of `items[0]` within the full match set.
+   *
+   * Always `0` under cursor pagination: a keyset page knows only what comes
+   * after a row, not how many rows precede it, and this field is not
+   * nullable (ADR-0019). Cursor clients page with `meta.nextCursor`.
+   */
   readonly offset: number;
   /**
    * Total matching items; `null` when counting is disabled — `COUNT(*)` is

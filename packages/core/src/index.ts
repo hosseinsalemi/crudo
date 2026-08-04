@@ -24,7 +24,15 @@ export type {
   FilterGroup,
   LogicalOperator,
 } from "./query/filter.js";
-export type { Pagination, PaginationLimits, PaginationStrategy } from "./query/pagination.js";
+export type {
+  Pagination,
+  OffsetPagination,
+  CursorPagination,
+  PaginationLimits,
+  PaginationStrategy,
+} from "./query/pagination.js";
+export { isCursorPagination } from "./query/pagination.js";
+export { encodeCursor, decodeCursor, cursorValuesOf, keysetExpression, readFilter } from "./query/cursor.js";
 export type { Sort, SortDirection } from "./query/sort.js";
 export type { FieldSelection, FieldSelectionInput } from "./query/field-selection.js";
 export type { NormalizedQueryContext, QueryContext } from "./query/query-context.js";
@@ -148,6 +156,7 @@ export { DefaultFilterParser } from "./query/default-filter-parser.js";
 export {
   OffsetPaginationStrategy,
   PagePaginationStrategy,
+  CursorPaginationStrategy,
   builtInPaginationStrategies,
 } from "./query/pagination-strategies.js";
 export { QueryNormalizer } from "./query/query-normalizer.js";

@@ -8,6 +8,7 @@ import type { EntityMetadata } from "../metadata/entity-metadata.js";
 import type { ErrorHandler } from "../errors/kavo-exception-shape.js";
 import type { NormalizedQueryContext } from "../query/query-context.js";
 import type { QueryContext } from "../query/query-context.js";
+import type { Pagination } from "../query/pagination.js";
 import type { OperationDescriptor, OperationRegistry } from "../operations/operation-registry.js";
 import type { StandardOperationId } from "../operations/operation.js";
 import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
@@ -19,6 +20,8 @@ import {
 } from "../errors/exceptions.js";
 import { nameList } from "../errors/message-hints.js";
 import { QueryNormalizer } from "../query/query-normalizer.js";
+import { isCursorPagination } from "../query/pagination.js";
+import { cursorValuesOf, encodeCursor } from "../query/cursor.js";
 import { createKavoContext, randomUuid } from "../context/default-kavo-context.js";
 import { mergeSettings } from "../config/merge-settings.js";
 import { validateSettings } from "../config/validate-settings.js";
@@ -255,18 +258,22 @@ export class KavoEngine<Entity extends object> {
     const { serializer, config } = this.deps;
 
     if (descriptor.id === "findMany") {
-      const { entities, total, meta } = result as FindManyResult<Entity>;
+      const listResult = result as FindManyResult<Entity>;
       const listDto = (descriptor.output as DtoClass<object> | null) ?? config.dto.resolve("list", descriptor.id);
-      const pagination = context.query?.pagination ?? { limit: 0, offset: 0 };
+      const pagination: Pagination<Entity> = context.query?.pagination ?? { limit: 0, offset: 0 };
       return {
         operation: descriptor.id,
         item: null,
         list: {
-          items: serializer.serializeList(entities, listDto, context),
+          items: serializer.serializeList(listResult.entities, listDto, context),
           limit: pagination.limit,
-          offset: pagination.offset,
-          total,
-          meta: this.listMeta(meta),
+          // A keyset page has no absolute position in the match set, and
+          // `offset` is a non-nullable envelope field, so cursor pages report
+          // `0` (ADR-0019) — the honest reading of "how many rows precede
+          // `items[0]` *in what this response describes*".
+          offset: isCursorPagination(pagination) ? 0 : pagination.offset,
+          total: listResult.total,
+          meta: this.listMeta(listResult, context),
         },
       };
     }
@@ -291,18 +298,30 @@ export class KavoEngine<Entity extends object> {
    *
    * A named step rather than an inline `?? {}` because this is the single
    * merge point for everything that can contribute to it, and the handler
-   * is only the first contributor: a pagination strategy computing
-   * `meta.nextCursor` (#118) belongs to the engine, not to whatever
-   * handler happens to be configured, and folds in here. `meta` is a
-   * required envelope field, so a handler that contributes nothing still
-   * yields an empty bag — never `undefined`.
+   * is only the first contributor: `meta.nextCursor` under cursor
+   * pagination (ADR-0019) belongs to the engine, not to whatever handler
+   * happens to be configured, and folds in here. `meta` is a required
+   * envelope field, so a handler that contributes nothing still yields an
+   * empty bag — never `undefined`.
+   *
+   * The strategy's keys are the **base**, the handler's merge over them: a
+   * handler (or a `withListMeta` contributor) that names `nextCursor`
+   * explicitly is stating intent, and the same "more specific wins"
+   * direction runs through every other precedence chain in Kavo.
    *
    * `meta` never passes through the serializer: it is the caller's own
    * JSON-serializable data, not entity data, so no DTO projection or
    * field selection applies to it and it reaches the wire verbatim.
    */
-  private listMeta(handlerMeta: ListMetaDto | undefined): ListMetaDto {
-    return handlerMeta ?? {};
+  private listMeta(result: FindManyResult<Entity>, context: KavoContext<Entity>): ListMetaDto {
+    const query = context.query;
+    if (query === null || !isCursorPagination(query.pagination)) return result.meta ?? {};
+    // `hasMore` is the sentinel the built-in handler reports from its
+    // `limit + 1` over-fetch. A replacement handler that does not report it
+    // is taken at its word: no signal, no next page.
+    const last = result.hasMore === true ? result.entities[result.entities.length - 1] : undefined;
+    const nextCursor = last === undefined ? null : encodeCursor(cursorValuesOf(last, query.sort));
+    return { nextCursor, ...result.meta };
   }
 }
 

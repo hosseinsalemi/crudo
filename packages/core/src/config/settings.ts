@@ -13,7 +13,7 @@ import type { Sort } from "../query/sort.js";
  */
 
 /** Built-in pagination strategy names; open for custom strategies. */
-export type PaginationStrategyName = "offset" | "page" | (string & {});
+export type PaginationStrategyName = "offset" | "page" | "cursor" | (string & {});
 
 export interface PaginationSettings {
   readonly defaultLimit: number;

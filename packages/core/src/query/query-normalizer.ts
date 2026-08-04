@@ -1,11 +1,11 @@
 import type { FieldSelection, FieldSelectionInput } from "./field-selection.js";
 import type { Filter, FilterExpression } from "./filter.js";
 import type { NormalizedQueryContext, QueryContext } from "./query-context.js";
-import type { PaginationStrategy } from "./pagination.js";
+import type { CursorPagination, Pagination, PaginationStrategy } from "./pagination.js";
 import type { Sort } from "./sort.js";
 import type { FieldPath } from "../types/field-path.js";
 import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
-import type { EntityMetadata } from "../metadata/entity-metadata.js";
+import type { EntityMetadata, FieldMetadata } from "../metadata/entity-metadata.js";
 import type { QueryIssueDto } from "../errors/problem-details.js";
 import type { IncludeResolver } from "../relations/include-resolver.js";
 import type { IncludeTree } from "../relations/include-tree.js";
@@ -14,6 +14,8 @@ import { ConfigurationException, QueryValidationException } from "../errors/exce
 import { pushAllowlistIssue } from "../errors/message-hints.js";
 import { DefaultFilterParser } from "./default-filter-parser.js";
 import { builtInPaginationStrategies } from "./pagination-strategies.js";
+import { isCursorPagination } from "./pagination.js";
+import { decodeCursor, keysetExpression } from "./cursor.js";
 import { parseBracketKey } from "./bracket-notation.js";
 
 /**
@@ -32,6 +34,8 @@ export class QueryNormalizer<Entity = unknown> {
   private readonly filterParser: DefaultFilterParser<Entity>;
   private readonly strategies: ReadonlyMap<string, PaginationStrategy>;
   private readonly includeResolver: IncludeResolver<Entity> | null;
+  private readonly metadata: EntityMetadata<Entity>;
+  private readonly fields: ReadonlyMap<string, FieldMetadata>;
 
   constructor(
     metadata: EntityMetadata<Entity>,
@@ -40,6 +44,8 @@ export class QueryNormalizer<Entity = unknown> {
   ) {
     this.filterParser = new DefaultFilterParser(metadata);
     this.includeResolver = includeResolver;
+    this.metadata = metadata;
+    this.fields = new Map(metadata.fields.map((field) => [field.name, field]));
     const strategies = new Map(builtInPaginationStrategies());
     for (const strategy of extraStrategies) {
       strategies.set(strategy.name, strategy);
@@ -70,14 +76,21 @@ export class QueryNormalizer<Entity = unknown> {
     const fields = parseFields(rawParams, config, issues);
     const include = this.resolveIncludes(parseIncludePaths(rawParams["include"], issues), fields, config, issues);
 
-    let pagination = { limit: 0, offset: 0 };
+    let pagination: Pagination<Entity> = { limit: 0, offset: 0 };
     try {
       pagination = this.strategyFor(config).normalize(rawParams, {
         defaultLimit: config.settings.pagination.defaultLimit,
         maxLimit: config.settings.pagination.maxLimit,
-      });
+      }) as Pagination<Entity>;
     } catch (error) {
       collectIssues(error, issues);
+    }
+    // Keyset resolution runs *after* sort, not inside the strategy: a
+    // strategy is handed raw params and limits alone, and widening its
+    // signature to take sort and metadata would break every custom one
+    // (ADR-0019).
+    if (isCursorPagination(pagination)) {
+      pagination = this.resolveKeyset(pagination, sort, config, issues);
     }
 
     if (issues.length > 0) {
@@ -146,6 +159,24 @@ export class QueryNormalizer<Entity = unknown> {
         detail: `Pagination values must be integers (limit ≥ 1, offset ≥ 0).`,
       });
     }
+    // The programmatic path does not run the strategy — its input is already
+    // typed, so there is nothing to parse — but it must reach the *same*
+    // normalized form, or calling the service directly would silently fall
+    // back to offset paging on a cursor-configured entity.
+    const cursorPaged = config.settings.pagination.strategy === "cursor";
+    const token = input.cursor ?? null;
+    if (token !== null && !cursorPaged) {
+      issues.push({
+        field: "cursor",
+        code: "KAVO_QUERY_UNSUPPORTED_PARAM",
+        detail:
+          `Query parameter 'cursor' is not supported: ${config.entityName} paginates with ` +
+          `strategy '${config.settings.pagination.strategy}'. Set 'pagination.strategy' to 'cursor' to page by keyset.`,
+      });
+    }
+    const pagination: Pagination<Entity> = cursorPaged
+      ? this.resolveKeyset({ limit, cursor: token, keyset: null }, sort, config, issues)
+      : { limit, offset };
 
     if (issues.length > 0) {
       throw new QueryValidationException(issues, {
@@ -155,13 +186,70 @@ export class QueryNormalizer<Entity = unknown> {
     return {
       filter: { root },
       sort,
-      pagination: { limit, offset },
+      pagination,
       fields,
       include,
       withDeleted,
       onlyDeleted,
       count: config.settings.pagination.count,
     };
+  }
+
+  /**
+   * Enforce what cursor pagination needs from the effective sort, then
+   * decode the token against it.
+   *
+   * Keyset paging is only correct over a **total** order, and
+   * `EntityMetadata` carries no uniqueness information beyond `idField`
+   * (composite keys are out of scope) — so "ends in a unique tiebreaker"
+   * is read here as "ends in the primary key", the one field Kavo can prove
+   * unique. The other two rules exist for the same reason: a relation path
+   * has no value to read off the returned row, and a `json` column has no
+   * portable ordering.
+   *
+   * A *nullable* sort field is deliberately **not** rejected here. Whether
+   * an ORM calls a column nullable is not a reliable signal (Mongoose
+   * reports every non-`required` path that way), so rejecting on it would
+   * make cursor paging unusable rather than safe. The narrower, accurate
+   * rule lives in `decodeCursor` instead: a cursor may not carry `null` for
+   * any key, so paging works until it actually reaches a row with a null
+   * sort key, and then says so (ADR-0019).
+   */
+  private resolveKeyset(
+    pagination: CursorPagination<Entity>,
+    sort: readonly Sort<Entity>[],
+    config: ResolvedEntityConfig<Entity>,
+    issues: QueryIssueDto[],
+  ): CursorPagination<Entity> {
+    const { idField } = this.metadata;
+    const before = issues.length;
+    for (const entry of sort) {
+      const field = this.fields.get(entry.field as string);
+      if (field === undefined) {
+        issues.push(cursorSortIssue(entry.field as string, "is not a scalar column of this entity"));
+      } else if (field.kind === "json") {
+        issues.push(cursorSortIssue(field.name, "is a 'json' column, which has no portable ordering"));
+      }
+    }
+    if (sort.length === 0 || sort[sort.length - 1]!.field !== idField) {
+      issues.push({
+        field: "sort",
+        code: "KAVO_QUERY_CONFLICTING_PARAMS",
+        detail:
+          `Cursor pagination needs a total order, so the effective sort must end in the unique field ` +
+          `'${idField}' — e.g. 'sort=-createdAt,${idField}'. ` +
+          (sort.length === 0
+            ? `This request has no sort and ${config.entityName} declares no 'query.defaultSort'.`
+            : `This request sorts by '${sort.map((entry) => entry.field as string).join(", ")}'.`),
+      });
+    }
+    // A cursor decoded against a sort that was itself rejected would report
+    // a second, misleading issue ("3 values but the sort has 2"), so the
+    // first page's worth of problems is reported alone.
+    if (issues.length > before || pagination.cursor === null) return pagination;
+    const values = decodeCursor(pagination.cursor, sort, this.fields, issues);
+    if (values === null) return pagination;
+    return { ...pagination, keyset: keysetExpression(sort, values) };
   }
 
   /**
@@ -204,6 +292,15 @@ export class QueryNormalizer<Entity = unknown> {
     }
     return strategy;
   }
+}
+
+/** Why one effective-sort entry disqualifies the whole request from keyset paging. */
+function cursorSortIssue(field: string, reason: string): QueryIssueDto {
+  return {
+    field: "sort",
+    code: "KAVO_QUERY_CONFLICTING_PARAMS",
+    detail: `Cursor pagination cannot order by '${field}': it ${reason}.`,
+  };
 }
 
 function unsupportedIssue(param: string): QueryIssueDto {
