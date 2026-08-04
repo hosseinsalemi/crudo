@@ -27,17 +27,28 @@ export interface MariaDbOptions extends ConnectionOptions {
   type: "mariadb";
 }
 
+/**
+ * CockroachDB's default `--insecure` mode (used locally and in the e2e
+ * container) has no password, so unlike the other two drivers it is
+ * optional here.
+ */
+export interface CockroachDbOptions extends Omit<ConnectionOptions, "password"> {
+  type: "cockroachdb";
+  password?: string;
+}
+
 /** The driver a real (non-SQLite) `forRoot(...)` call picks. */
-export type SqlOptions = PostgresOptions | MariaDbOptions;
+export type SqlOptions = PostgresOptions | MariaDbOptions | CockroachDbOptions;
 
 /**
  * One `DataSource` for the whole app. `forRoot()` (no argument) defaults to
  * an in-memory SQLite database, keeping the demo (and its e2e suite)
- * dependency-free; `forRoot(sql)` switches the same app to a real Postgres
- * or MariaDB instance instead, picked by `sql.type` — see
+ * dependency-free; `forRoot(sql)` switches the same app to a real Postgres,
+ * MariaDB, or CockroachDB instance instead, picked by `sql.type` — see
  * `examples/nest-typeorm/README.md` for the `docker run` used locally for
  * each, and `tests/app-postgres.e2e.spec.ts` / `tests/app-mariadb.e2e.spec.ts`
- * for how the e2e suite self-provisions one via Testcontainers.
+ * / `tests/app-cockroach.e2e.spec.ts` for how the e2e suite self-provisions
+ * one via Testcontainers.
  *
  * Global so `DATA_SOURCE` is injectable straight into any `@Kavo`
  * controller (e.g. `AddressController`'s `@Override`'d methods), not just
@@ -55,11 +66,11 @@ export class DatabaseModule {
           provide: DATA_SOURCE,
           useFactory: async (): Promise<DataSource> => {
             const dataSource = sql
-              ? new DataSource({
-                  ...sql,
-                  entities,
-                  synchronize: true,
-                })
+              ? new DataSource(
+                  sql.type === "cockroachdb"
+                    ? { ...sql, entities, synchronize: true, timeTravelQueries: false }
+                    : { ...sql, entities, synchronize: true },
+                )
               : new DataSource({
                   type: "better-sqlite3",
                   database: ":memory:",
