@@ -52,7 +52,8 @@ export type ListMetaContributor<Entity = unknown> = (
  * `builtInHandlers(adapter)("findMany")` and `OperationConfig.handler`
  * are — so the wrap composes with either without a cast. That erases the
  * inner output type, so the shape is checked at run time instead:
- * wrapping a handler that returns anything but a `FindManyResult` raises
+ * wrapping a handler that returns anything but a `FindManyResult` — both
+ * an `entities` array and a `total` that is a number or `null` — raises
  * `ConfigurationException` (`KAVO_CONFIG_INVALID`) naming the operation,
  * rather than assembling a broken envelope.
  */
@@ -77,12 +78,25 @@ export function withListMeta<Entity = unknown>(
   };
 }
 
+/**
+ * Both envelope-bearing fields are checked, not just `entities`.
+ * `ListResultDto.total` is `number | null` and required, so a handler that
+ * returns `{ entities }` alone would leave `total` `undefined` — a key
+ * `JSON.stringify` then drops entirely, shipping a REST body with no
+ * `total` at all. The engine normalizes `total ?? null` as a second line of
+ * defense; this is the first, and it fails loudly where the mistake is.
+ */
 function isFindManyResult<Entity>(value: unknown): value is FindManyResult<Entity> {
-  return typeof value === "object" && value !== null && Array.isArray((value as { entities?: unknown }).entities);
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as { entities?: unknown; total?: unknown };
+  return Array.isArray(candidate.entities) && (typeof candidate.total === "number" || candidate.total === null);
 }
 
 function describeValue(value: unknown): string {
   if (value === null) return "null";
   if (Array.isArray(value)) return "an array";
-  return typeof value === "object" ? "an object with no 'entities' array" : typeof value;
+  if (typeof value !== "object") return typeof value;
+  return Array.isArray((value as { entities?: unknown }).entities)
+    ? "an object whose 'total' is neither a number nor null"
+    : "an object with no 'entities' array";
 }

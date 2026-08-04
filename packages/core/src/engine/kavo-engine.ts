@@ -265,7 +265,11 @@ export class KavoEngine<Entity extends object> {
           items: serializer.serializeList(entities, listDto, context),
           limit: pagination.limit,
           offset: pagination.offset,
-          total,
+          // `total` is a required envelope field typed `number | null`, but
+          // a custom handler can return `{ entities }` alone. Left
+          // `undefined` the key would vanish from the JSON body entirely,
+          // so normalize the absent case to the documented `null`.
+          total: total ?? null,
           meta: this.listMeta(meta),
         },
       };
@@ -300,9 +304,19 @@ export class KavoEngine<Entity extends object> {
    * `meta` never passes through the serializer: it is the caller's own
    * JSON-serializable data, not entity data, so no DTO projection or
    * field selection applies to it and it reaches the wire verbatim.
+   *
+   * The copy is deliberate, and it is *not* the same situation as `items`:
+   * `items` is a fresh array of freshly serialized DTOs on every request,
+   * whereas `handlerMeta` can be the very same object each time — a
+   * hand-written handler returning a module-scope constant is the
+   * documented alternative to `withListMeta`. Handing that object out by
+   * reference would let one response's consumer mutate every later
+   * response's bag. Shallow is the right depth: it makes the envelope's
+   * own key set private without deep-cloning caller data that only has to
+   * survive `JSON.stringify`.
    */
   private listMeta(handlerMeta: ListMetaDto | undefined): ListMetaDto {
-    return handlerMeta ?? {};
+    return { ...handlerMeta };
   }
 }
 
