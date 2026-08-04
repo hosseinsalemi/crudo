@@ -94,19 +94,12 @@ after it is extra instructions or corrections to fold in during implementation.
 
 11. **On explicit approval**, and not before:
 
-    a. **Commit** using the `commit` skill's own logic: analyze the changes,
-    group them into cohesive logical commits (config/tooling separate from
-    source, docs separate from implementation), stage each group precisely
-    with explicit pathspecs (never `git add -A`), and commit with a
-    Conventional Commits message per the `conventions` skill. Do not push
-    here, do not amend, and do not add co-author trailers unless recent
-    commits on this branch already use them.
+    a. **Commit** — invoke the `commit` command and follow it. Do not
+    reimplement its rules here; it owns them, and a second copy in this file
+    is a copy that drifts out of sync with the first.
 
-    b. **Open the PR** using the `pr` skill's own logic: refuse if the branch
-    is `main`, there's no remote, or there are no commits; re-run
-    `pnpm check` for real and stop if it's red; `git push -u origin HEAD`;
-    then `gh pr create` (or update the existing PR) with what/why, `Closes
-#<n>`, public-API impact, testing, and review notes.
+    b. **Open the PR** — invoke the `pr` command and follow it, passing the
+    issue number so the body can close it.
 
     c. **Print the PR URL** and tell the user to run `/review` on it or
     `/merge` once CI and review are green.

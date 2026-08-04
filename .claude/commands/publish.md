@@ -133,6 +133,12 @@ workflow.
    before an irreversible public write — do not widen the entry to
    `Bash(pnpm:*)` or add `Bash(npm:*)` to get rid of it.
 
+   `.claude/settings.json` backs the same gate up with a `permissions.ask`
+   entry for both spellings, so it holds in every session rather than only in
+   one that happened to load this file. It is deliberately **ask** and not
+   **deny**: the first-publish bootstrap below is a legitimate `npm publish`,
+   and denying the command outright would break the one path that needs it.
+
    A bare `npm publish` from the package directory is **not** equivalent and
    must never be used: only `pnpm pack` rewrites `workspace:^` into a real
    semver range, so a directly-published package ships
