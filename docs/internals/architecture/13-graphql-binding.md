@@ -13,7 +13,7 @@ ADR-0016's subject — this doc covers what the binding actually does.
 
 `@kavo/graphql` is host-framework-agnostic: it imports `@kavo/core` and
 the `graphql` peer only, never `@kavo/nest` or any other framework
-package (`graphql-only-imports-core` in `.dependency-cruiser.cjs`). It has
+package (`protocol-bindings-only-import-core` in `.dependency-cruiser.cjs`). It has
 no idea Nest, Express, or any other host exists. This is what makes its
 discovery helper (§4) reusable by a future host binding with zero changes
 to `@kavo/graphql` itself.

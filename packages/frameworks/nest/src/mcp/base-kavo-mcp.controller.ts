@@ -55,7 +55,7 @@ import { getKavoServiceToken } from "../tokens.js";
  * ```
  *
  * `@kavo/mcp` itself stays framework-agnostic — it never imports
- * `@kavo/nest` (`mcp-only-imports-core` in `.dependency-cruiser.cjs`,
+ * `@kavo/nest` (`protocol-bindings-only-import-core` in `.dependency-cruiser.cjs`,
  * ADR-0016) — so this class is the only place the two meet.
  */
 export abstract class BaseKavoMcpController implements OnModuleInit {

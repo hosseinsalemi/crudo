@@ -1,6 +1,6 @@
 ---
 name: quick-start
-description: Fastest path to a working Kavo API in a brand-new project — npm install list, minimal tsconfig, a single plain entity (no DTOs), and a zero-config @Kavo controller over SQLite. Use when scaffolding a new Kavo app from scratch or answering "how do I get started with Kavo" questions.
+description: Fastest path to a working Kavo API in a brand-new project, using TypeORM and SQLite specifically — npm install list, minimal tsconfig, a single plain entity (no DTOs), and a zero-config @Kavo controller. Use when scaffolding a new Kavo app from scratch or answering "how do I get started with Kavo" questions. For a project on Prisma, Mongoose, or MikroORM, the wiring differs — read prisma-adapter, mongoose-adapter, or mikroorm-adapter for that step instead of adapting this one.
 ---
 
 # Quick start — new project, SQLite + Nest + TypeORM only
@@ -10,6 +10,16 @@ on-disk SQLite file. No Postgres, no GraphQL, no bulk — add those later
 from the other skills (`kavo-decorator`, `global-config`, `dto-slots`,
 `graphql-binding`) once this runs. Swagger docs are one optional step,
 covered at the end (§9).
+
+**This page is the TypeORM path.** Steps 1–3 and 5–9 are the same whatever
+ORM you use, but the entity in §4 and the wiring in §6 are TypeORM-specific
+and do not carry over. On another ORM, read its skill for those two steps:
+
+| ORM      | Skill              | The part that differs                                |
+| -------- | ------------------ | ---------------------------------------------------- |
+| Prisma   | `prisma-adapter`   | Needs a marker class per model — no runtime class    |
+| Mongoose | `mongoose-adapter` | The model _is_ the entity; ids are hex strings       |
+| MikroORM | `mikroorm-adapter` | Pass the `MikroORM` instance, not an `EntityManager` |
 
 ## 1. Create the project
 
@@ -246,4 +256,7 @@ hand-written `@ApiQuery()`/`@ApiOperation()`) is in the `swagger` skill.
   → `global-config`.
 - Soft delete / restore / purge → `soft-delete`.
 - OpenAPI docs → `swagger`. GraphQL → install the optional `graphql` peer
-  and see `graphql-binding`.
+  and see `graphql-binding`. Exposing the same entities as MCP tools →
+  `mcp-binding`.
+- A different ORM → `prisma-adapter`, `mongoose-adapter`, or
+  `mikroorm-adapter`; only §4 and §6 above change.

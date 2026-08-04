@@ -62,67 +62,47 @@ and doc sync.
 
 ## Package boundaries and public API
 
-```
-@kavo/nest ──▶ @kavo/core ◀── @kavo/typeorm
-   │            ▲ ▲ ▲ ▲
-   │            │ │ │ └───── @kavo/prisma
-   │            │ │ └─────── @kavo/mongoose
-   │            │ └───────── @kavo/mcp     ◀─┐
-   │            └─────────── @kavo/graphql ◀─┤
-   └───── the one sanctioned sideways edge ──┘
-          (frameworks/* → protocols/*, ADR-0016; never the reverse)
-```
+The topology, the package list, and the one sanctioned sideways edge are in
+`CLAUDE.md`'s Architecture section, which you already have in context. Read
+them there — a second copy in this file is a copy that drifts.
 
-- **`@kavo/core` imports nothing** — zero runtime dependencies (ADR-0005).
-  Not TypeORM, not Nest, not a utility library. Type-only imports from outside
-  core are violations too: core owns its contracts.
-- **Barrel-only consumption** — every spoke (`@kavo/typeorm`, `@kavo/prisma`,
-  `@kavo/mongoose`, `@kavo/nest`, `@kavo/graphql`, `@kavo/mcp`) imports from
-  the `@kavo/core` barrel. Any `@kavo/core/src/...` or relative reach into
-  core's internals is a violation.
-- **The spokes mostly never meet** — the one sanctioned sideways edge is
-  `@kavo/nest` → the protocol packages, for its `BaseKavoGraphQLController` /
-  `BaseKavoMcpController` glue, and it is one-directional: a protocol binding
-  never imports `@kavo/nest` back (ADR-0016), which is what keeps it
-  host-framework-agnostic. A framework binding importing an **ORM adapter** is
-  genuinely forbidden — adapters reach Nest's container through DI, never an
-  import. Know which half of this the gate actually holds up, because they are
-  not the same:
+**`.dependency-cruiser.cjs` is authoritative for every import edge**, and its
+coverage is now total: core imports nothing (type-only included), an ORM
+adapter and a protocol binding each import the `@kavo/core` barrel and nothing
+else in the workspace, `@kavo/nest` may additionally import the two protocol
+barrels and only at the barrel (ADR-0016), and nothing deep-imports through
+another package's barrel. Run `pnpm depcruise` — it is cheap and it is the
+answer on import edges. If you want the detail, read the rule comments in that
+file rather than re-deriving the rule set here.
 
-  | Edge                     | Enforced by                    |
-  | ------------------------ | ------------------------------ |
-  | ORM → framework          | `<orm>-only-imports-core`      |
-  | protocol → ORM/framework | `<protocol>-only-imports-core` |
-  | framework → ORM          | `nest-only-imports-core`       |
-  | **ORM → protocol**       | **nothing — review only**      |
-  | **protocol → protocol**  | **nothing — review only**      |
+So do not spend the review re-checking **workspace** import edges by eye — a
+green `depcruise` settles those. It does not settle npm edges: the rules gate
+on `@kavo/*` and `packages/*` paths, so a dependency pulled from node_modules
+is outside what they look at, with one exception
+(`only-framework-bindings-import-a-host-framework`, which blocks `@nestjs/*`
+in an adapter or protocol binding). Spend the review on that gap and on the
+two things an import graph cannot show:
 
-  The last two rows are the trap. `packages/orms/*/src` importing
-  `@kavo/graphql` or `@kavo/mcp`, or `@kavo/graphql` importing `@kavo/mcp`,
-  **passes `pnpm depcruise` today** — the adapter rules' `to` covers
-  `packages/frameworks` only, and the protocol rules omit each other. Still a
-  violation; you are the thing that catches it. See the footnote under
-  `CONTRIBUTING.md`'s boundary table, which says the same.
+- **Wrong-peer imports** — each edge package adapts exactly one external
+  technology, so `typeorm` inside `@kavo/prisma`, `graphql` inside
+  `@kavo/mcp`, or any new hard `dependencies` entry where a peer was intended
+  is a finding the gate will not raise. Grep the changed files for bare
+  specifiers directly. `@kavo/mcp` is the sharpest case: it consumes
+  `@modelcontextprotocol/sdk` for **types only** (doc 16 §5), so a runtime
+  import of it there is a real regression.
 
 - **No leakage through types** — a TypeORM type (`QueryRunner`,
-  `EntityMetadata`, `SelectQueryBuilder`) or a Nest type appearing in a core
-  signature is a leak even when it compiles. Core's escape hatch for
-  adapter-owned values is `unknown` behind a named contract, as
-  `TransactionContext.handle` does.
+  `EntityMetadata`, `SelectQueryBuilder`), a Mongoose or MikroORM type, or a
+  Nest type appearing in a **core** signature is a leak even when it compiles.
+  Core's escape hatch for adapter-owned values is `unknown` behind a named
+  contract, as `TransactionContext.handle` does.
 - **The barrel is deliberate** — `packages/core/src/index.ts` is an explicit
-  named list (ADR-0010). No `export *`. Every added export is a public
-  commitment; every removed one is potentially breaking.
-
-Run the mechanical gate first — it is cheap, and authoritative for the edges it
-covers: `pnpm depcruise`. A pass here does **not** end the check:
-dependency-cruiser catches import graphs, not type leakage or barrel intent,
-and it does not cover the two edges tabled above. Grep changed files
-for the leak patterns directly: imports of `typeorm`, `@nestjs/*`, or
-`@kavo/core/` (deep) in the wrong package; `export *` anywhere in core's
-barrel. Diff the barrel specifically:
-`git diff main...HEAD -- packages/core/src/index.ts` — for each added export,
-ask whether it is meant to be public; for each removed or renamed one, flag it
-as breaking.
+  named list (ADR-0010). `tests/core-barrel.spec.ts` now fails on `export *`,
+  but no mechanical check can judge whether a _newly named_ export was meant
+  to be public. Diff it specifically:
+  `git diff main...HEAD -- packages/core/src/index.ts` — for each added
+  export, ask whether it is a public commitment; for each removed or renamed
+  one, flag it as breaking.
 
 ## Docs sync
 
@@ -131,16 +111,18 @@ as breaking.
 because the next planner or reviewer trusts the docs over re-deriving behavior
 from source.
 
-- **`docs/internals/adr/0001`–`0018`** — one ADR per load-bearing decision.
+- **[`docs/internals/adr/`](../../docs/internals/adr/)** — one ADR per
+  load-bearing decision; list the directory rather than trusting a range
+  written down somewhere, which goes stale the day the next one lands.
   A change that introduces a new load-bearing invariant (a new seam, a new
   precedence rule, a new mechanically-enforced boundary) with no corresponding
   ADR is a finding. A change that _contradicts_ an existing ADR without
   superseding it (ADRs are point-in-time decisions; superseding one needs an
   explicit new ADR referencing the old one, not a silent code change) is a
   finding.
-- **`docs/internals/architecture/*.md`** — mirrors the packages (query
-  grammar, error handling, engine, the TypeORM/Prisma/Mongoose adapters, Nest
-  integration, the GraphQL and MCP bindings, soft delete, relations). If the
+- **`docs/internals/architecture/*.md`** — mirrors the packages: one document
+  per adapter, per protocol binding, and per engine concern (query grammar,
+  error handling, soft delete, relations). If the
   change alters behavior one of these documents describes in specifics (not just
   "engine gets faster" but "the pipeline now has a new stage", "the wire token
   mapping changed", "a new config key exists at this precedence level"), the
@@ -163,18 +145,14 @@ people to ignore this section.
 
 ## Naming (normative — deviations are findings)
 
-- DTO slots are bare verbs: `create`, `update`, `patch`, `query`, `item`, `list`.
-- Request bodies `<Verb><Entity>Dto`; query/response shapes `<Entity><Slot>Dto`.
-  Every wire-crossing shape carries `Dto`; behavioral contracts never do.
-- Operations are camelCase and always name cardinality: `<verb>One` /
-  `<verb>Many`. "Bulk" is a feature term, never a method prefix.
-- Filter operators: `SCREAMING_SNAKE` in the AST enum, camelCase on the wire,
-  exact-case matched.
-- Exceptions are `*Exception` with stable `KAVO_SNAKE_CASE` codes.
-- Config keys are camelCase with positively-phrased booleans (`exposeInternals`,
-  never `hideInternals`). No `I` prefix on interfaces.
-- One canonical name per concept — check `CLAUDE.md`'s Conventions section.
-  A synonym is a finding.
+The rules are `CLAUDE.md`'s **Conventions** section, which you already have in
+context and which is the normative source. Check the change against it there;
+restating the list here would only give it a second copy to drift from.
+
+What that section cannot tell you, and you should: one canonical name per
+concept. A change that introduces a _synonym_ for a concept the Conventions
+section already names — or a rename that leaves the old term behind
+somewhere — is a finding, and only reading the diff surfaces it.
 
 ## Output
 

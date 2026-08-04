@@ -62,10 +62,10 @@ for the full walkthrough, including NestJS wiring and a soft-delete example.
 ## Built for agentic development
 
 Built with Claude Code, and shipped with skills so your agent moves just as
-fast. [`extensions`](extensions) has nine ready-made skills covering
+fast. [`extensions`](extensions) has ready-made skills for the whole surface —
 `@Kavo()`, global config, the query grammar, DTOs, errors, soft delete,
-Swagger, and GraphQL — published as a plugin via this repo's own
-marketplace:
+Swagger, the GraphQL and MCP bindings, and per-ORM wiring for each supported
+adapter — published as a plugin via this repo's own marketplace:
 
 ```
 /plugin marketplace add kavo-labs/kavo

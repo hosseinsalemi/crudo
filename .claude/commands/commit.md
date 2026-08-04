@@ -15,26 +15,32 @@ You are creating one or more well-scoped git commits from the current working ch
 
 ## Your task
 
-1. **Analyze** all changed files (both staged and unstaged). Read diffs as needed with `git diff` / `git diff --cached` to understand what each change does.
+Split every change in the working tree — staged and unstaged — into cohesive
+logical commits, grouped by intent rather than by folder, until the tree is
+clean or only intentionally-excluded files remain.
 
-2. **Group** the changes into cohesive, logical commits. Group by intent, not by folder. Good boundaries:
-   - One feature / bugfix / refactor per commit
-   - Config & tooling separate from source code
-   - Docs separate from implementation (unless trivially coupled)
-   - Never mix unrelated concerns in one commit
-
-3. **Stage precisely** for each group using explicit pathspecs: `git reset` first to clear the index, then `git add <specific files>` for the group. Do NOT use `git add -A` / `git add .`. Verify with `git status --short` before committing.
-
-4. **Commit** each group with a Conventional Commits message — see the `conventions` skill for the type vocabulary and format.
-
-5. Repeat until the working tree is clean (or only intentionally-excluded files remain).
+Message format is Conventional Commits; the type vocabulary is in the
+`conventions` skill.
 
 ## Rules
 
-- Order commits so the history is sensible (e.g. tooling/config before code that depends on it).
-- Do NOT push. Do NOT amend existing commits. Only create new commits.
-- Do NOT add co-author trailers unless the repo's recent commits already use them.
-- If a single file contains unrelated changes, use `git add -p` style patch staging only if truly necessary; otherwise keep the file whole in the most-fitting commit.
-- After finishing, print a summary: the list of commits created (hash + subject) and confirm `git status` is clean.
+These are the parts that are specific to this repo, or that differ from what
+you would otherwise do by default:
+
+- **Stage with explicit pathspecs.** `git reset` to clear the index, then
+  `git add <specific files>` per group. Never `git add -A` or `git add .` —
+  they silently sweep in whatever else is in the tree.
+- **Config and tooling go in their own commit**, ahead of the code that
+  depends on them, and docs stay separate from implementation unless the two
+  are trivially coupled.
+- **Do NOT push, and do NOT amend.** This command only ever creates new
+  commits; `/pr` is what pushes.
+- **No co-author trailers** unless this repo's recent commits already use them
+  — check `git log`, do not assume.
+- Keep a file whole in its best-fitting commit rather than reaching for patch
+  staging; split a single file across commits only when its changes are
+  genuinely unrelated.
+- Finish by printing each commit (hash + subject) and confirming
+  `git status` is clean.
 
 $ARGUMENTS

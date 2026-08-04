@@ -28,7 +28,7 @@ import { loadGraphQL } from "./load-graphql.js";
  * setting `KavoModule`'s `graphql` option.
  *
  * `@kavo/graphql` itself stays framework-agnostic — it never imports
- * `@kavo/nest` (`graphql-only-imports-core` in `.dependency-cruiser.cjs`,
+ * `@kavo/nest` (`protocol-bindings-only-import-core` in `.dependency-cruiser.cjs`,
  * ADR-0016) — so this controller is the only place the two meet. A
  * concrete controller just adds the `@Controller` decorator and a route:
  *

@@ -111,7 +111,8 @@ Two independent enforcement layers:
    cross-package import a compile error.
 2. **dependency-cruiser** (`.dependency-cruiser.cjs`, run in `pnpm check`)
    forbids: core importing anything, adapter↔framework imports in either
-   direction, cross-package deep imports past a barrel, and runtime import
+   direction, cross-package deep imports past a barrel, an adapter or
+   protocol binding importing `@nestjs/*`, and runtime import
    cycles (type-only cycles are exempt — core's contracts are mutually
    referential by design and erase at compile time). One exception to
    "no cross-edge imports": a `frameworks/*` package may depend on a
@@ -119,17 +120,34 @@ Two independent enforcement layers:
    the reverse — ADR-0016.
 
    Three properties of that rule set are load-bearing and easy to lose:
-   - **Coverage is narrower than the invariants it supports.** The adapter
-     rules' `to` covers `packages/frameworks` only and the protocol rules omit
-     each other, so an ORM adapter importing a protocol package, one ORM
-     adapter importing another, and one protocol importing another all pass
-     today. So does a type-only import out of core spelled as a bare specifier
-     or a barrel (`core-imports-nothing` carries
-     `dependencyTypesNot: ["type-only"]`), and one edge's `src` deep-importing
-     another edge's `src` (both deep-import rules are anchored on core). Each
-     is still a violation — review is what catches it. A green `depcruise` is
-     not proof a change respects the boundaries; see the footnotes under
-     `CONTRIBUTING.md`'s boundary table.
+   - **Every workspace edge is checked, and stays checked without edits.**
+     That includes the four that were review-only for most of
+     this repo's life: an ORM adapter importing a protocol package, one ORM
+     adapter importing another, one protocol importing another, and one edge's
+     `src` deep-importing another edge's. `core-imports-nothing` covers
+     type-only edges too — core owning its contracts (ADR-0001) does not stop
+     at what survives compilation. The three per-tier rules capture the
+     package directory in `from` and refer back to it as `$1` in
+     `to.pathNot`, so they are written against the _layout_ rather than
+     against a list of package names: a new adapter or protocol binding is
+     constrained the day its directory exists. The previous spelling was
+     one rule per package, which meant every new package had to hand-edit
+     every other package's rule, and the prose describing the set drifted out
+     of sync with it twice.
+
+     Two limits are part of the design rather than oversights.
+     `framework-bindings-import-core-and-protocol-barrels` still names
+     `@kavo/(core|graphql|mcp)` explicitly, because it is an _allowlist_ of
+     sanctioned sideways edges — a new `protocols/*` package that `@kavo/nest`
+     glues must be added to it, and that edit is the architectural decision
+     being reviewed. And the rules match `@kavo/*` and `packages/*` only, so
+     npm edges are outside them: `only-framework-bindings-import-a-host-`
+     `framework` blocks `@nestjs/*` in an adapter or protocol binding, but a
+     wrong _peer_ (`typeorm` inside `@kavo/prisma`) is review's job. So is
+     the part no import graph can see — an ORM or Nest type leaking into a
+     core signature, and whether a newly named barrel export was meant to be
+     public.
+
    - **Both spellings are matched.** A workspace package specifier does not
      resolve to a path for dependency-cruiser, so a path-only rule silently
      misses `from "@kavo/nest"` — the spelling anyone would actually write.

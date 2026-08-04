@@ -47,6 +47,13 @@ Push this branch and create or update its PR. Notes: **$ARGUMENTS**
      or if anything non-blocking is still open. The description should say:
      - **What** changed and **why**, in a short paragraph — not a file list.
      - `Closes #<n>` for the issue, so the merge closes it automatically.
+       Get `<n>` from the branch name, which the `conventions` skill fixes as
+       `<type>/<issue-number>-<short-slug>` — the `Branch:` line in the
+       context above is enough to read it off. If `$ARGUMENTS` names an issue
+       explicitly (`#123`), that wins; if neither yields a number, say so and
+       open the PR without the trailer rather than guessing one, since a
+       wrong `Closes` silently closes someone else's issue on merge. A PR
+       covering more than one issue gets one `Closes #<n>` line each.
      - **Public API impact** — barrel changes, and whether they are breaking.
        Write "none" when there are none; do not omit the line.
      - **Testing** — what was added, and the verified `pnpm check` result.
