@@ -32,7 +32,12 @@ export type {
   PaginationStrategy,
 } from "./query/pagination.js";
 export { isCursorPagination } from "./query/pagination.js";
-export { encodeCursor, decodeCursor, cursorValuesOf, keysetExpression, readFilter } from "./query/cursor.js";
+// `decodeCursor` and `keysetExpression` are deliberately *not* exported:
+// they are `QueryNormalizer` internals whose contracts only hold when the
+// effective sort has already been validated, and the barrel is an explicit
+// public surface (ADR-0010). Adapters need `readFilter`/`isCursorPagination`;
+// a custom `findMany` handler needs `encodeCursor`/`cursorValuesOf`.
+export { encodeCursor, cursorValuesOf, readFilter } from "./query/cursor.js";
 export type { Sort, SortDirection } from "./query/sort.js";
 export type { FieldSelection, FieldSelectionInput } from "./query/field-selection.js";
 export type { NormalizedQueryContext, QueryContext } from "./query/query-context.js";

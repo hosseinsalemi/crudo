@@ -1,7 +1,8 @@
 /**
  * Open, extensible metadata bag on the list envelope. Core never writes to
- * it — it is the extension seam for pagination strategies (`meta.cursor`)
- * and consumer middleware, kept out of the envelope's first-class fields.
+ * it — it is the extension seam for pagination strategies
+ * (`meta.nextCursor`) and consumer middleware, kept out of the envelope's
+ * first-class fields.
  */
 export interface ListMetaDto {
   readonly [key: string]: unknown;
@@ -24,7 +25,7 @@ export interface ListResultDto<ListDto> {
    *
    * Always `0` under cursor pagination: a keyset page knows only what comes
    * after a row, not how many rows precede it, and this field is not
-   * nullable (ADR-0019). Cursor clients page with `meta.nextCursor`.
+   * nullable (ADR-0021). Cursor clients page with `meta.nextCursor`.
    */
   readonly offset: number;
   /**
