@@ -65,17 +65,51 @@ export class FilterTranslator<Entity extends ObjectLiteral> implements FilterBui
     if (expression.kind === "condition") {
       return new Brackets((where) => this.applyCondition(where, expression));
     }
+    const children = expression.children;
+
     if (expression.operator === "NOT") {
-      const child = expression.children[0];
+      // `NOT` is variadic and means `NOT(AND(children))` (doc 05 §1), so no
+      // child past the first is dropped. The empty case falls out of the
+      // same rule rather than needing one: the empty conjunction is `true`,
+      // and `NOT(true)` matches nothing.
+      const negated = this.conjunction(children);
       return new NotBrackets((where) => {
-        if (child !== undefined) where.where(this.toBrackets(child));
+        where.where(negated);
       });
     }
+
+    if (children.length === 0) {
+      // The identity of the connective, spelled as a *real* predicate.
+      // Emitting nothing would drop the `Brackets` entirely — TypeORM
+      // discards one whose callback added no condition — which silently
+      // widened an empty `OR` from "matches nothing" to every row (#111).
+      return new Brackets((where) => {
+        where.where(expression.operator === "OR" ? "1 = 0" : "1 = 1");
+      });
+    }
+
     const connect = expression.operator === "OR" ? "orWhere" : "andWhere";
-    const children = expression.children;
     return new Brackets((where) => {
       for (const child of children) {
         where[connect](this.toBrackets(child));
+      }
+    });
+  }
+
+  /**
+   * `AND` over `children`, as the thing `NOT` negates. A single child is
+   * returned unwrapped so the common unary `NOT` keeps its exact SQL, and
+   * the empty conjunction is the tautology `1 = 1`.
+   */
+  private conjunction(children: readonly FilterExpression<Entity>[]): Brackets {
+    if (children.length === 1) return this.toBrackets(children[0]!);
+    return new Brackets((where) => {
+      if (children.length === 0) {
+        where.where("1 = 1");
+        return;
+      }
+      for (const child of children) {
+        where.andWhere(this.toBrackets(child));
       }
     });
   }

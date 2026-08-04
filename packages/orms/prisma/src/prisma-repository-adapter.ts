@@ -30,12 +30,17 @@ import { delegateName, type PrismaClientLike, type PrismaModelDelegate } from ".
 export class PrismaRepositoryAdapter<Entity extends object> implements RepositoryAdapter<Entity> {
   private readonly delegate: PrismaModelDelegate;
   private readonly idField: string;
+  private readonly filterOptions: FilterTranslatorOptions;
 
   constructor(
     private readonly prismaClient: PrismaClientLike,
     private readonly metadata: EntityMetadata<Entity>,
-    private readonly filterOptions: FilterTranslatorOptions = { caseInsensitiveFilters: true },
+    // `model` is not the caller's to supply — it is the entity this adapter
+    // already describes, and a mismatched one would nest relation paths
+    // against the wrong model's edges.
+    filterOptions: Omit<FilterTranslatorOptions, "model">,
   ) {
+    this.filterOptions = { ...filterOptions, model: metadata.name };
     const name = delegateName(metadata.name);
     const delegate = prismaClient[name];
     if (delegate === undefined) {

@@ -74,6 +74,16 @@ describe("translateFilter — logical groups", () => {
     });
   });
 
+  it("conjoins a multi-child NOT before negating it, rather than $nor-ing the children", () => {
+    // `NOT` means `NOT(AND(children))` (doc 05 §1, #115). `$nor: [a, b]`
+    // would be `NOT(a OR b)` — a *narrower* set than asked for, and the
+    // mirror of the widening the other two adapters had.
+    const children = [condition("a", "EQ", 1), condition("b", "EQ", 2)];
+    expect(translate({ kind: "group", operator: "NOT", children } as FilterExpression)).toEqual({
+      $nor: [{ $and: [{ a: { $eq: 1 } }, { b: { $eq: 2 } }] }],
+    });
+  });
+
   it("spells the identity of an empty group rather than emitting one MongoDB rejects", () => {
     // MongoDB errors outright on `{ $and: [] }` / `{ $or: [] }`. The parser
     // enforces arity, so this only guards hand-built ASTs.

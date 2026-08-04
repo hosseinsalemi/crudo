@@ -240,17 +240,37 @@ describe("DefaultFilterParser — IN / NOT_IN value lists", () => {
     expect(issues[0]).toMatchObject({ field: "age", code: "KAVO_QUERY_INVALID_VALUE" });
   });
 
-  it("reads a bare empty value on a string column as a one-element list", () => {
-    // Current behavior, pinned so a change is visible rather than silent:
-    // string coercion accepts "", so `filter[name][in]=` is `IN ('')` — a
-    // live filter for the empty string, not the empty set and not a 400. A
-    // UI submitting an empty multi-select gets rows named "" rather than
-    // either of the two things it might have meant. Tracked in #113.
-    expect(parse({ "filter[name][in]": "" }).root).toEqual({
+  it("rejects a bare empty value on a string column too, not just a typed one", () => {
+    // The decision recorded in doc 05 §3 (#113). Left to coercion the two
+    // column kinds disagreed: string coercion accepts "", so
+    // `filter[name][in]=` used to build a live `IN ('')` — a search for the
+    // empty string — while `filter[age][in]=` was a 400. A cleared
+    // multi-select must not silently become "rows whose value is ''".
+    for (const [key, field] of [
+      ["filter[name][in]", "name"],
+      ["filter[name][notIn]", "name"],
+    ] as const) {
+      const issues = issuesOf(() => parse({ [key]: "" }));
+      expect(issues[0]).toMatchObject({ field, code: "KAVO_QUERY_INVALID_VALUE" });
+    }
+  });
+
+  it("rejects the bare empty value in the repeated-key spelling as well", () => {
+    // `filter[name][in][]=` arrives as `[""]`, the same absent operand in a
+    // different spelling — one answer for both.
+    const issues = issuesOf(() => parse({ "filter[name][in][]": [""] }));
+    expect(issues[0]).toMatchObject({ field: "name", code: "KAVO_QUERY_INVALID_VALUE" });
+  });
+
+  it("still admits an interior empty element, which is a different question", () => {
+    // `in=a,,b` is a malformed list rather than an absent one; #113 scoped
+    // itself to the bare spelling, so this keeps its per-element coercion
+    // behavior rather than being swept up by the new check.
+    expect(parse({ "filter[name][in]": "a,,b" }).root).toEqual({
       kind: "condition",
       field: "name",
       operator: "IN",
-      value: [""],
+      value: ["a", "", "b"],
     });
   });
 });

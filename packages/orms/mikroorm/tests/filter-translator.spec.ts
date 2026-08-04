@@ -93,6 +93,14 @@ describe("translateFilter — groups", () => {
     });
   });
 
+  it("conjoins a multi-child NOT rather than dropping every child past the first", () => {
+    // `NOT` means `NOT(AND(children))` (doc 05 §1, #115). Negating only
+    // `children[0]` returned rows the caller asked to exclude.
+    expect(translate({ kind: "group", operator: "NOT", children: [left, right] } as FilterExpression)).toEqual({
+      $not: { $and: [{ name: { $eq: "Ada" } }, { age: { $gt: 30 } }] },
+    });
+  });
+
   it("nests groups without losing precedence", () => {
     const nested = {
       kind: "group",

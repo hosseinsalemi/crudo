@@ -28,6 +28,18 @@ aliases (`GTE`/`Gte` are 400s). Logical operators: `AND`, `OR`, `NOT`
 registry mapping tokens to AST factories is a natural extension point but
 is deliberately not built in v6.
 
+**`NOT` is variadic and means `NOT(AND(children))`.** All three logical
+operators take a child list — `FilterGroup.children` is
+`readonly FilterExpression[]` for every operator — so `NOT` needed an
+arity answer rather than an assumption. The wire parser only ever builds
+the unary shape (`convertLogical` wraps exactly one converted node), but a
+programmatic caller hand-builds the AST and `QueryNormalizer` validates
+allowlists and limits, not arity. Conjoining is what makes the unary case
+a special case of the general one instead of the only legal one, and it
+gives the degenerate group below its meaning for free. Reading
+`children[0]` and dropping the rest — which `@kavo/typeorm` and
+`@kavo/prisma` used to do — returned rows the caller asked to exclude.
+
 ## 2. Reference example
 
 ```
@@ -59,7 +71,19 @@ fields:     root: [id, name, email]
   AND (`filter[age][gte]=18&filter[age][lt]=65`).
 - **Multi-value operators** (`in`, `notIn`): comma-separated by default;
   the repeated-key form `filter[status][in][]=a&filter[status][in][]=b`
-  is also accepted.
+  is also accepted. A **bare empty operand** — `filter[status][in]=`, or
+  its repeated-key spelling `filter[status][in][]=` — is a
+  `KAVO_QUERY_INVALID_VALUE` **400 on every column kind**. It is neither
+  "no filter" nor "the empty set": a client that wants no filter omits the
+  parameter. Left to coercion the two column kinds disagreed — string
+  coercion accepts `""`, so `filter[name][in]=` built a live `IN ('')`
+  (a search for the empty string, usually zero rows and no error), while
+  `filter[age][in]=` was already a 400. A UI that submits a cleared
+  multi-select now gets an error it can see rather than a silently empty
+  page. An _interior_ empty element (`in=a,,b`) is a different question
+  and keeps its per-element coercion behavior. The genuinely empty array a
+  programmatic caller can pass (`value: []`) is unaffected — that is the
+  empty set, and it round-trips as one.
 - **`between`:** exactly two comma-separated bounds, in the order given —
   the pair is never sorted, so `between=65,18` is an empty range rather
   than a silently corrected one.
@@ -75,11 +99,39 @@ fields:     root: [id, name, email]
   escape character, Postgres does not — so a parameter is the portable
   spelling). `ilike` is translated portably (`LOWER(col) LIKE
 LOWER(:v)`), identical on every driver. Both operators apply to string
-  columns only.
+  columns only. Two adapters cannot honor the whole pattern language:
+  `@kavo/prisma` has no raw pattern operator, so an interior `%` and any
+  `_` are **rejected with a 400** rather than mistranslated (doc 14 §6),
+  and `@kavo/mikroorm` cannot attach an `ESCAPE` clause, so the backslash
+  escape there is driver-dependent (doc 17 §7).
 - **Relation-path filtering:** dot notation
   (`filter[profile.city][eq]=Helsinki`), permitted only for paths on the
   filterable allowlist. Relation-path filters **restrict root rows** (a
   non-selecting join); they never load or filter the included collection.
+  On a **to-many** segment that reads as "at least one" — SQL gets it from
+  a `LEFT JOIN` plus a `WHERE`, and the declarative adapters spell it as
+  Prisma's `some` / MikroORM's nested list match.
+- **Degenerate empty groups.** A group with **zero** children is
+  unreachable from the wire (the parser only emits a group once a child
+  converted), but a programmatic caller hand-builds the AST and
+  `QueryNormalizer` checks allowlists and limits, not arity — so every
+  adapter has to answer for it, and **all four agree**:
+
+  | AST      | Matches       | Why                                           |
+  | -------- | ------------- | --------------------------------------------- |
+  | `AND []` | **every row** | `true` is the identity of conjunction         |
+  | `OR []`  | **no row**    | `false` is the identity of disjunction        |
+  | `NOT []` | **no row**    | `NOT(AND [])` — the negation of the tautology |
+
+  Each adapter emits a **real predicate** for these, never an omitted one:
+  an omitted predicate is exactly how an empty `OR` silently widened to
+  every row in `@kavo/typeorm`. The spellings differ because the targets
+  do — `1 = 0` in SQL, `$nor: [{}]` in MongoDB, an empty `$in` on the
+  primary key in MikroORM, `{ OR: [] }` in Prisma (whose `NOT` over an
+  empty operand is dropped rather than honored, doc 14 §2) — but the
+  result sets do not, and each adapter's translator spec pins its own row
+  of this table.
+
 - **Nested boolean trees:** `filter` also accepts one JSON-encoded value
   — `?filter={"or":[{"name":{"eq":"admin"}},{"not":{"status":{"eq":"x"}}}]}` —
   parsed into the same AST. Bracket notation is sugar for the common flat

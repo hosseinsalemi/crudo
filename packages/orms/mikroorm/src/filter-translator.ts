@@ -80,9 +80,12 @@ function translateExpression(expression: FilterExpression, options: FilterTransl
   const children = expression.children.map((child) => translateExpression(child, options));
 
   if (expression.operator === "NOT") {
-    // Core's parser gives a NOT group exactly one child. With no child there
-    // is nothing to negate, and "not (anything)" matches nothing.
-    return children.length === 0 ? matchesNothing(options.idField) : { $not: children[0]! };
+    // `NOT` is variadic and means `NOT(AND(children))` (doc 05 §1), so more
+    // than one child is conjoined first rather than having everything past
+    // `children[0]` dropped. Core's wire parser only ever builds the unary
+    // shape; this guards a hand-built AST.
+    if (children.length === 0) return matchesNothing(options.idField);
+    return { $not: children.length === 1 ? children[0]! : { $and: children } };
   }
 
   // The parser enforces arity, so the empty cases only guard hand-built ASTs

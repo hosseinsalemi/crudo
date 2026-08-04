@@ -287,6 +287,22 @@ export class DefaultFilterParser<Entity = unknown> implements FilterParser<Entit
       case "IN":
       case "NOT_IN": {
         const parts = splitMultiValue(raw);
+        if (isBareEmptyOperand(parts)) {
+          // `filter[status][in]=` is neither "no filter" nor "the empty set".
+          // Left alone it splits to `[""]`, which string coercion accepts, so
+          // on a string column it became a live `IN ('')` — a search for the
+          // empty string — while a typed column 400'd on coercion. One answer
+          // for every column kind, and the loud one: a UI that submits a
+          // cleared multi-select gets an error it can see rather than a
+          // silently empty page. Omitting the parameter is how a caller says
+          // "no filter". See doc 05 §3.
+          issues.push({
+            field,
+            code: "KAVO_QUERY_INVALID_VALUE",
+            detail: `'${token}' takes at least one value; '${field}' was given an empty one. Omit the parameter to apply no filter.`,
+          });
+          return null;
+        }
         const max = config.settings.query.maxInValues;
         if (parts.length > max) {
           issues.push({
@@ -371,6 +387,21 @@ function splitMultiValue(raw: unknown): readonly unknown[] {
   if (Array.isArray(raw)) return raw;
   if (typeof raw === "string") return raw.split(",");
   return [raw];
+}
+
+/**
+ * Whether a multi-value operand is the *bare* empty spelling — `in=` or
+ * `in[]=`, which both split to a single empty string.
+ *
+ * Deliberately not "contains an empty element": `in=a,,b` is a different
+ * question (a malformed list rather than an absent one) and keeps its
+ * existing per-element coercion behavior. The genuinely empty array a
+ * programmatic caller can build (`value: []`) never reaches here either —
+ * `filter[status][in][]` with no values arrives as `[]`, length zero, which
+ * is the empty set and round-trips as one.
+ */
+function isBareEmptyOperand(parts: readonly unknown[]): boolean {
+  return parts.length === 1 && parts[0] === "";
 }
 
 function expressionDepth(expression: FilterExpression<unknown>): number {

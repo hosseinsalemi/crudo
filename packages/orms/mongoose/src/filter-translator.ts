@@ -57,10 +57,13 @@ function translateExpression(expression: FilterExpression, options: FilterTransl
   const children = expression.children.map((child) => translateExpression(child, options));
 
   if (expression.operator === "NOT") {
-    // Core's parser gives a NOT group exactly one child. `$nor` over that
-    // child is MongoDB's negation; with no child there is nothing to
-    // negate, and "not (anything)" matches nothing.
-    return children.length === 0 ? MATCHES_NOTHING : { $nor: children };
+    // `NOT` is variadic and means `NOT(AND(children))` (doc 05 §1). `$nor`
+    // is MongoDB's negation, but `$nor: [a, b]` is `NOT(a OR b)` — so more
+    // than one child is conjoined *first* and the conjunction negated,
+    // rather than handed to `$nor` as siblings. Core's wire parser only
+    // ever builds the unary shape; this guards a hand-built AST.
+    if (children.length === 0) return MATCHES_NOTHING;
+    return { $nor: [children.length === 1 ? children[0]! : { $and: children }] };
   }
 
   // MongoDB rejects an empty `$and`/`$or` outright, so the identity for

@@ -8,7 +8,7 @@ import type {
 } from "@kavo/core";
 import { createKavo } from "@kavo/core";
 import type { PrismaDatamodel } from "./datamodel.js";
-import { buildEntityMetadata } from "./metadata.js";
+import { buildEntityMetadata, buildRelationGraph } from "./metadata.js";
 import type { PrismaClientLike } from "./prisma-client-like.js";
 import { PrismaRepositoryAdapter } from "./prisma-repository-adapter.js";
 
@@ -52,6 +52,11 @@ export function createInfrastructure(
   const byName = new Map(options.entities.map((entity) => [entity.name, entity]));
   const metadataCache = new Map<ClassRef, EntityMetadata>();
   const adapterCache = new Map<ClassRef, RepositoryAdapter>();
+  // Derived once for the whole datamodel, not per entity: a relation-path
+  // filter walks models the queried entity's own metadata cannot describe
+  // (`author.posts.title` needs Author's edges too). Bootstrap work, like
+  // metadata derivation and adapter construction.
+  const relations = buildRelationGraph(options.datamodel);
 
   function metadataFor<Entity extends object>(entity: ClassRef<Entity>): EntityMetadata<Entity> {
     let metadata = metadataCache.get(entity);
@@ -69,6 +74,7 @@ export function createInfrastructure(
       if (adapter === undefined) {
         adapter = new PrismaRepositoryAdapter(prismaClient, metadataFor(entity), {
           caseInsensitiveFilters: options.caseInsensitiveFilters ?? true,
+          relations,
         }) as RepositoryAdapter;
         adapterCache.set(entity, adapter);
       }

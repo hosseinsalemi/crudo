@@ -253,6 +253,28 @@ describe("PrismaRepositoryAdapter — query translation", () => {
     expect(list.items.map((b) => (b as Book).title)).toEqual(["Notes"]);
   });
 
+  it("filters on a to-many relation path, restricting root rows rather than 500ing", async () => {
+    // Prisma requires `some`/`every`/`none` on a list relation and rejects
+    // the bare nested form with `Unknown argument`, which reached the client
+    // as a 500 (#116). doc 05 §3 defines a relation-path filter as
+    // restricting root rows — "an author with at least one book titled X" —
+    // which is `some`.
+    const scoped = kavo.createCrud(Author, {
+      allowlists: { filterable: ["name", "books.title" as never] },
+    }) as DefaultKavoService<Author>;
+    await seed();
+    const all = (await authors.findMany()).items.map((a) => a as Author);
+    const ada = all.find((a) => a.name === "Ada")!;
+    const grace = all.find((a) => a.name === "Grace")!;
+    await client.book.create({ data: { title: "Notes", authorId: ada.id } });
+    await client.book.create({ data: { title: "Other", authorId: grace.id } });
+
+    const list = await scoped.findMany({
+      filter: { kind: "condition", field: "books.title" as never, operator: "EQ", value: "Notes" },
+    });
+    expect(list.items.map((a) => (a as Author).name)).toEqual(["Ada"]);
+  });
+
   it("associates a relation by writing its scalar foreign-key field (ADR-0014)", async () => {
     const books = kavo.createCrud(Book, {
       relations: { edges: { author: { includable: true } } },
@@ -264,5 +286,62 @@ describe("PrismaRepositoryAdapter — query translation", () => {
 
     const fetched = await books.findOne(created.id, { include: ["author"] } as never);
     expect(fetched).toMatchObject({ author: { id: author.id, name: "Assoc" } });
+  });
+});
+
+/**
+ * The corners of the grammar that only a real engine can settle: what
+ * Prisma actually does with the degenerate empty groups (#111 left the
+ * `NOT []` cell of the cross-adapter table unverified), and whether the
+ * translated `LIKE` filters match the rows SQL `LIKE` would.
+ */
+describe("PrismaRepositoryAdapter — grammar corners against a real engine", () => {
+  const empty = (operator: "AND" | "OR" | "NOT") =>
+    authors.findMany({ filter: { kind: "group", operator, children: [] } as never });
+
+  it("agrees with the other three adapters on every degenerate empty group", async () => {
+    await seed(); // four rows
+    // Identity of conjunction is `true`, of disjunction `false`; `NOT []` is
+    // `NOT(AND [])`, so it negates the tautology. doc 05 §3.
+    expect((await empty("AND")).items).toHaveLength(4);
+    expect((await empty("OR")).items).toHaveLength(0);
+    expect((await empty("NOT")).items).toHaveLength(0);
+  });
+
+  it("excludes rows matching every child of a multi-child NOT", async () => {
+    // `NOT(AND(children))` (doc 05 §1). Negating only `children[0]` would
+    // have kept Ada out on her name alone and let the second condition go.
+    await seed();
+    const list = await authors.findMany({
+      filter: {
+        kind: "group",
+        operator: "NOT",
+        children: [
+          { kind: "condition", field: "name", operator: "EQ", value: "Ada" },
+          { kind: "condition", field: "age", operator: "EQ", value: 36 },
+        ],
+      } as never,
+    });
+    // Only Ada is both named Ada and 36, so only Ada is excluded.
+    expect(list.items.map((a) => (a as Author).name).sort()).toEqual(["Alan", "Grace", "Joan"]);
+  });
+
+  it("matches a literal % through the backslash escape, not rows beginning with a backslash", async () => {
+    // The grammar's `\%` escape (doc 05 §3) is what the other three adapters
+    // honor; Prisma used to leave the backslash in the operand (#114).
+    await authors.createOne({ email: "pct@x.io", name: "100%", age: 1 } as never);
+    await authors.createOne({ email: "plain@x.io", name: "1000", age: 1 } as never);
+
+    const list = await authors.findMany({
+      filter: { kind: "condition", field: "name", operator: "LIKE", value: "100\\%" },
+    });
+    expect(list.items.map((a) => (a as Author).name)).toEqual(["100%"]);
+  });
+
+  it("rejects a pattern Prisma cannot express with a 400, not a driver error", async () => {
+    await seed();
+    await expect(
+      authors.findMany({ filter: { kind: "condition", field: "name", operator: "LIKE", value: "A%a" } }),
+    ).rejects.toBeInstanceOf(QueryValidationException);
   });
 });
