@@ -4,7 +4,7 @@ import type { KavoResponse } from "../context/kavo-response.js";
 import type { DtoClass, DtoSlot } from "../dto/dto.js";
 import type { ListMetaDto } from "../dto/list-result.js";
 import type { Deserializer, Serializer } from "../serialization/serializer.js";
-import type { EntityMetadata } from "../metadata/entity-metadata.js";
+import type { EntityMetadata, FieldMetadata } from "../metadata/entity-metadata.js";
 import type { ErrorHandler } from "../errors/kavo-exception-shape.js";
 import type { NormalizedQueryContext } from "../query/query-context.js";
 import type { QueryContext } from "../query/query-context.js";
@@ -14,6 +14,7 @@ import type { StandardOperationId } from "../operations/operation.js";
 import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
 import type { KavoSettings } from "../config/settings.js";
 import {
+  ConfigurationException,
   OperationDisabledException,
   OperationNotRegisteredException,
   QueryValidationException,
@@ -79,7 +80,17 @@ const INPUT_SLOTS: Readonly<Partial<Record<StandardOperationId, DtoSlot>>> = {
  * — `createCrud` supplies the defaults, callers may supply their own.
  */
 export class KavoEngine<Entity extends object> {
-  constructor(private readonly deps: KavoEngineDependencies<Entity>) {}
+  /**
+   * `EntityMetadata.fields` by name — the lookup `cursorValuesOf` needs to
+   * check a page token's values against their declared `FieldKind`. Built
+   * once here rather than per response; the metadata is frozen at
+   * `createCrud`.
+   */
+  private readonly cursorFields: ReadonlyMap<string, FieldMetadata>;
+
+  constructor(private readonly deps: KavoEngineDependencies<Entity>) {
+    this.cursorFields = new Map(deps.metadata.fields.map((field) => [field.name, field]));
+  }
 
   get registry(): OperationRegistry<Entity> {
     return this.deps.registry;
@@ -269,7 +280,7 @@ export class KavoEngine<Entity extends object> {
           limit: pagination.limit,
           // A keyset page has no absolute position in the match set, and
           // `offset` is a non-nullable envelope field, so cursor pages report
-          // `0` (ADR-0019) — the honest reading of "how many rows precede
+          // `0` (ADR-0021) — the honest reading of "how many rows precede
           // `items[0]` *in what this response describes*".
           offset: isCursorPagination(pagination) ? 0 : pagination.offset,
           total: listResult.total,
@@ -299,7 +310,7 @@ export class KavoEngine<Entity extends object> {
    * A named step rather than an inline `?? {}` because this is the single
    * merge point for everything that can contribute to it, and the handler
    * is only the first contributor: `meta.nextCursor` under cursor
-   * pagination (ADR-0019) belongs to the engine, not to whatever handler
+   * pagination (ADR-0021) belongs to the engine, not to whatever handler
    * happens to be configured, and folds in here. `meta` is a required
    * envelope field, so a handler that contributes nothing still yields an
    * empty bag — never `undefined`.
@@ -320,7 +331,23 @@ export class KavoEngine<Entity extends object> {
     // `limit + 1` over-fetch. A replacement handler that does not report it
     // is taken at its word: no signal, no next page.
     const last = result.hasMore === true ? result.entities[result.entities.length - 1] : undefined;
-    const nextCursor = last === undefined ? null : encodeCursor(cursorValuesOf(last, query.sort));
+    const nextCursor =
+      last === undefined ? null : encodeCursor(cursorValuesOf(last, query.sort, this.cursorFields, context.entityName));
+    // A token identical to the one that produced this page means the page
+    // did not advance — the signature of an adapter that honours the
+    // `limit + 1` over-fetch but still reads `query.filter` instead of
+    // `readFilter(query)`, so every page is page 1 and `hasMore` never goes
+    // false. A client following `nextCursor` would loop forever; erroring
+    // beats looping (ADR-0021).
+    if (nextCursor !== null && nextCursor === query.pagination.cursor) {
+      throw new ConfigurationException(
+        context.entityName,
+        "pagination.strategy",
+        `cursor pagination did not advance: the page produced the same token it was given, which means the ` +
+          `repository adapter ignored the keyset predicate. An adapter's 'findMany' must filter by ` +
+          `'readFilter(query)', not by 'query.filter'`,
+      );
+    }
     return { nextCursor, ...result.meta };
   }
 }

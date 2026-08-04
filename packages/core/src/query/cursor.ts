@@ -5,19 +5,21 @@ import type { FieldMetadata } from "../metadata/entity-metadata.js";
 import type { QueryIssueDto } from "../errors/problem-details.js";
 import type { FieldPath } from "../types/field-path.js";
 import { isCursorPagination } from "./pagination.js";
+import { ConfigurationException } from "../errors/exceptions.js";
 
 /**
- * Cursor pagination, in one module (ADR-0019).
+ * Cursor pagination, in one module (ADR-0021).
  *
  * A cursor is the previous page's last row projected onto the effective
  * sort: `[lastRow.createdAt, lastRow.id]` for `sort=-createdAt,id`. It is
  * **opaque, not signed** — base64url-encoded JSON, strictly shape-validated
- * on decode. Core imports nothing (ADR-0005), which rules out `node:crypto`,
- * and `SubtleCrypto` is async while `PaginationStrategy.normalize` is sync;
- * but the security argument is the real one: the payload is a tuple of
- * comparison values against sortable — therefore already filterable —
- * fields, and a client can inject the same values through `filter[…]`
- * without forging anything. A signature would protect nothing.
+ * on decode. Core imports nothing outside itself (ADR-0005), which rules out
+ * `node:crypto`, and `SubtleCrypto` is async while
+ * `PaginationStrategy.normalize` is sync; but the security argument is the
+ * real one: the payload is a tuple of comparison values against fields the
+ * normalizer has already required to be on the *filterable* allowlist, so a
+ * client can inject the same values through `filter[…]` without forging
+ * anything. A signature would protect nothing.
  *
  * The base64 codec is hand-rolled for the same reason `packages/core/
  * tsconfig.json` sets `"types": []`: `btoa`/`TextEncoder` are ambient
@@ -71,7 +73,17 @@ export function decodeCursor<Entity>(
 
   const values: FilterScalar[] = [];
   for (const [index, entry] of sort.entries()) {
-    const field = fields.get(entry.field as string)!;
+    const field = fields.get(entry.field as string);
+    // `QueryNormalizer.resolveKeyset` rejects a non-scalar sort key before
+    // it ever gets here, but `decodeCursor` is reachable on its own, and a
+    // caller that passes a relation path deserves a query issue rather than
+    // a `TypeError` out of a non-null assertion.
+    if (field === undefined) {
+      return invalidCursor(
+        issues,
+        `the effective sort orders by '${entry.field as string}', which is not a scalar column of this entity`,
+      );
+    }
     if (payload[index] === null) {
       // A null sort key has no position a keyset predicate can express:
       // `column > NULL` is UNKNOWN in SQL and orders arbitrarily elsewhere.
@@ -96,14 +108,47 @@ export function decodeCursor<Entity>(
  * {@link encodeCursor} turns into the next page's token.
  *
  * Reads the **entity**, before serialization and field selection, because a
- * client selecting `fields=title` still needs `id` in its cursor. An absent
- * property degrades to `null`, which {@link decodeCursor} then rejects on the
- * next request: a loud 400 beats silently paging from the wrong place.
+ * client selecting `fields=title` still needs `id` in its cursor. That is
+ * also why the normalizer requires every cursor sort key to be *selectable*:
+ * `meta` never passes through the serializer, so a value read here reaches
+ * the wire base64-encoded whether or not the DTO would have carried it
+ * (ADR-0021).
+ *
+ * An absent property degrades to `null`, which {@link decodeCursor} then
+ * rejects on the next request: a loud 400 beats silently paging from the
+ * wrong place.
+ *
+ * Every non-null value is checked against the column's declared
+ * {@link FieldMetadata.kind} using the same predicate {@link decodeCursor}
+ * revives with. The mismatch this catches is real and otherwise silent: a
+ * `bigint` primary key is declared `kind: "number"` by every adapter, but
+ * arrives as a JS `bigint` (MikroORM v7, Prisma) — which `JSON.stringify`
+ * throws on — or as a `string` (TypeORM), which round-trips into a
+ * permanent 400 on page 2 blaming the wrong thing. Failing here names the
+ * column and says what is actually wrong.
  */
-export function cursorValuesOf<Entity>(entity: Entity, sort: readonly Sort<Entity>[]): readonly FilterScalar[] {
+export function cursorValuesOf<Entity>(
+  entity: Entity,
+  sort: readonly Sort<Entity>[],
+  fields: ReadonlyMap<string, FieldMetadata>,
+  entityName: string,
+): readonly FilterScalar[] {
   return sort.map((entry) => {
-    const value = (entity as Record<string, unknown>)[entry.field as string];
-    return value === undefined ? null : (value as FilterScalar);
+    const name = entry.field as string;
+    const value = (entity as Record<string, unknown>)[name];
+    if (value === undefined || value === null) return null;
+    const field = fields.get(name);
+    if (field === undefined || !isEncodable(value, field)) {
+      throw new ConfigurationException(
+        entityName,
+        "pagination.strategy",
+        `cursor pagination cannot encode a page token for '${name}': the column is declared ` +
+          `'${field?.kind ?? "unknown"}' but its runtime value is a ${describeRuntimeType(value)}. ` +
+          `Cursor sort keys must be string, finite number, boolean, or Date at runtime — ` +
+          `bigint and decimal columns are not supported as cursor keys`,
+      );
+    }
+    return value as FilterScalar;
   });
 }
 
@@ -112,13 +157,25 @@ export function cursorValuesOf<Entity>(entity: Entity, sort: readonly Sort<Entit
  * ordinary filter AST node:
  *
  * ```
- * (a > va) OR (a = va AND b < vb) OR (a = va AND b = vb AND id > vid)
+ * (a >= va) AND ( (a > va) OR (a = va AND b < vb) OR (a = va AND b = vb AND id > vid) )
  * ```
  *
  * for `sort=a,-b,id`. Building it in core rather than per adapter is what
  * makes mixed `asc`/`desc` sorts work everywhere at once, and what makes the
  * predicate compose with the client filter, includes, and soft-delete scope
  * for free — every adapter already translates this AST.
+ *
+ * The `OR` of `AND` chains is the part that is *correct*; the leading
+ * non-strict range is the part that is *fast*. A bare disjunction is not a
+ * btree start condition, so PostgreSQL and MySQL take an ordered index scan
+ * with the `OR` as a filter — reading and discarding every row before the
+ * cursor, which is exactly the offset cost keyset paging exists to remove —
+ * or a bitmap OR that loses the ordering and forces a sort. AND-ing the
+ * leading key's non-strict bound (`>=` ascending, `<=` descending) hands the
+ * planner a real range qualification. It is logically implied by every
+ * branch of the disjunction, so it narrows nothing and changes no result;
+ * it only lets the scan *start* at the cursor. Single-key sorts already emit
+ * a bare range condition and need no help (ADR-0021).
  */
 export function keysetExpression<Entity>(
   sort: readonly Sort<Entity>[],
@@ -134,7 +191,14 @@ export function keysetExpression<Entity>(
     chain.push(condition(entry.field, entry.direction === "desc" ? "LT" : "GT", values[boundary]!));
     branches.push(chain.length === 1 ? chain[0]! : { kind: "group", operator: "AND", children: chain });
   }
-  return branches.length === 1 ? branches[0]! : { kind: "group", operator: "OR", children: branches };
+  if (branches.length === 1) return branches[0]!;
+  const lead = sort[0]!;
+  const startable = condition(lead.field, lead.direction === "desc" ? "LTE" : "GTE", values[0]!);
+  return {
+    kind: "group",
+    operator: "AND",
+    children: [startable, { kind: "group", operator: "OR", children: branches }],
+  };
 }
 
 /**
@@ -155,10 +219,41 @@ export function readFilter<Entity>(query: NormalizedQueryContext<Entity>): Filte
 
 function condition<Entity>(
   field: FieldPath<Entity>,
-  operator: "EQ" | "GT" | "LT",
+  operator: "EQ" | "GT" | "LT" | "GTE" | "LTE",
   value: FilterScalar,
 ): FilterExpression<Entity> {
   return { kind: "condition", field, operator, value };
+}
+
+/**
+ * Whether a runtime value can be encoded as this column's cursor key — the
+ * encode-side mirror of {@link reviveValue}, minus the `enum` membership
+ * check (a value already in the database is not the encoder's to second-guess).
+ */
+function isEncodable(value: unknown, field: FieldMetadata): boolean {
+  switch (field.kind) {
+    case "number":
+      return typeof value === "number" && Number.isFinite(value);
+    case "boolean":
+      return typeof value === "boolean";
+    case "string":
+    case "enum":
+      return typeof value === "string";
+    case "date":
+      return value instanceof Date && !Number.isNaN(value.getTime());
+    default:
+      // `json` — the normalizer rejects it as a cursor sort key already.
+      return false;
+  }
+}
+
+/** The runtime type of a rejected cursor value, for the error message. */
+function describeRuntimeType(value: unknown): string {
+  if (value instanceof Date) return "Date";
+  const type = typeof value;
+  if (type !== "object") return type;
+  const name = (value as { constructor?: { name?: string } }).constructor?.name;
+  return name === undefined || name === "" ? "object" : `${name} object`;
 }
 
 /**
