@@ -1,6 +1,6 @@
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 import type { DefaultKavoService, EntityId } from "@kavo/core";
-import { KavoException } from "@kavo/core";
+import { ConfigurationException, KavoException } from "@kavo/core";
 
 /**
  * `sort: ["-createdAt", "name"]` → `[{ field: "createdAt", direction: "desc" }, { field: "name", direction: "asc" }]`
@@ -27,6 +27,40 @@ export type BoundKavoService<Entity extends object, Id extends EntityId, CreateD
   DefaultKavoService<Entity, Id, CreateDto, UpdateDto, PatchDto, unknown, unknown, unknown>,
   "findOne" | "findMany" | "createOne" | "updateOne" | "patchOne" | "deleteOne" | "restoreOne" | "purgeOne"
 >;
+
+/**
+ * Refuse to bind an entity this protocol cannot page (ADR-0021 §7).
+ *
+ * `<name>.findMany` accepts `limit`/`offset` only, and `QueryNormalizer`
+ * ignores `offset` under the cursor strategy — so a model calling
+ * `todo.findMany({ limit: 20, offset: 40 })` gets rows 1–20 back with no
+ * error and no way to tell, and the `nextCursor` it would need is not in the
+ * tool's result shape. Failing at bootstrap beats answering wrongly.
+ * `@kavo/graphql` carries the identical guard; the two packages may not
+ * import each other, so it is duplicated rather than shared.
+ */
+/**
+ * The bound entity's configured `pagination.strategy`, read structurally —
+ * for the same reason `@kavo/graphql` reads it that way: putting `engine` in
+ * `BoundKavoService`'s `Pick` would drag the entity-typed
+ * `ResolvedEntityConfig` into an invariant position and break every erased
+ * `BoundKavoService<object, …>` call site.
+ */
+function paginationStrategyOf(service: object): string | undefined {
+  const engine = (service as { engine?: { config?: { settings?: { pagination?: { strategy?: string } } } } }).engine;
+  return engine?.config?.settings?.pagination?.strategy;
+}
+
+function requireOffsetPageable(entityName: string, strategy: string | undefined): void {
+  if (strategy !== "cursor") return;
+  throw new ConfigurationException(
+    entityName,
+    "pagination.strategy",
+    `'cursor' is not supported by the MCP binding: '<entity>.findMany' exposes 'limit'/'offset' only, ` +
+      `and a keyset page ignores 'offset' — a paged call would silently return the first page every time. ` +
+      `Either page this entity over REST, or give it an entity-scope 'pagination.strategy' of 'offset'/'page'`,
+  );
+}
 
 /** One entity's MCP tool binding: a `Tool` definition plus the handler that runs it — `crudTools`'s unit of work. */
 export interface KavoMcpToolBinding {
@@ -112,6 +146,7 @@ export function crudTools<Entity extends object, Id extends EntityId, CreateDto,
   options: KavoMcpToolsOptions<Entity, Id, CreateDto, UpdateDto, PatchDto>,
 ): readonly KavoMcpToolBinding[] {
   const { name, service } = options;
+  requireOffsetPageable(name, paginationStrategyOf(service));
   const prefix = lowerFirst(name);
 
   return [

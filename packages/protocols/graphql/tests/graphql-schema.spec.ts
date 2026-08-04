@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createKavo } from "@kavo/core";
+import { ConfigurationException, createKavo } from "@kavo/core";
 import {
   GraphQLBoolean,
   GraphQLInputObjectType,
@@ -251,5 +251,54 @@ describe("createKavoGraphQLSchema", () => {
     expect(purged.data?.purgeNote).toBe(true);
 
     expect(adapter.rows).toHaveLength(0);
+  });
+});
+
+describe("cursor-paginated entities are refused at bootstrap", () => {
+  function cursorTodoType() {
+    return new GraphQLObjectType({
+      name: "Todo",
+      fields: {
+        id: { type: new GraphQLNonNull(GraphQLInt) },
+        title: { type: new GraphQLNonNull(GraphQLString) },
+      },
+    });
+  }
+
+  /** The `<Name>List` type has no `meta`, and `offset` is ignored under a keyset (ADR-0021 §7). */
+  function cursorTodoService() {
+    return createKavo({
+      defaults: {
+        pagination: { strategy: "cursor" },
+        query: { defaultSort: [{ field: "id", direction: "asc" }] },
+      },
+    } as never).createCrud(Todo, undefined, { adapter: new InMemoryTodoAdapter(), metadata: todoMetadata });
+  }
+
+  it("throws rather than silently answering `todos(limit, offset)` with page one", () => {
+    expect(() =>
+      createKavoGraphQLSchema({
+        name: "Todo",
+        service: cursorTodoService(),
+        itemType: cursorTodoType(),
+      }),
+    ).toThrow(ConfigurationException);
+  });
+
+  it("names the entity, the config key, and the way out", () => {
+    expect(() =>
+      createKavoGraphQLSchema({ name: "Todo", service: cursorTodoService(), itemType: cursorTodoType() }),
+    ).toThrow(/pagination\.strategy/);
+    expect(() =>
+      createKavoGraphQLSchema({ name: "Todo", service: cursorTodoService(), itemType: cursorTodoType() }),
+    ).toThrow(/'offset'\/'page'/);
+  });
+
+  it("still binds an offset-paginated entity", () => {
+    const service = createKavo().createCrud(Todo, undefined, {
+      adapter: new InMemoryTodoAdapter(),
+      metadata: todoMetadata,
+    });
+    expect(() => createKavoGraphQLSchema({ name: "Todo", service, itemType: cursorTodoType() })).not.toThrow();
   });
 });
