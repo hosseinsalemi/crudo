@@ -1,8 +1,18 @@
 /**
- * Open, extensible metadata bag on the list envelope. Core never writes to
- * it — it is the extension seam for pagination strategies
- * (`meta.nextCursor`) and consumer middleware, kept out of the envelope's
- * first-class fields.
+ * Open, extensible metadata bag on the list envelope, kept out of the
+ * envelope's first-class fields. It is `{}` until something contributes.
+ *
+ * What fills it is the `findMany` handler's optional `FindManyResult.meta`
+ * — return it and the engine merges it onto the envelope verbatim, with no
+ * DTO projection and no field selection. `withListMeta(handler, compute)`
+ * is the ergonomic wrap for the common "add one stat" case. It is also the
+ * seam pagination strategies and consumer middleware extend: cursor
+ * pagination is the one contributor core itself writes, folding in
+ * `meta.nextCursor` (ADR-0021).
+ *
+ * Not to be confused with `OperationConfig.meta` (`OperationMetadata`,
+ * ADR-0007), which is route/framework metadata and never reaches a
+ * response body.
  */
 export interface ListMetaDto {
   readonly [key: string]: unknown;

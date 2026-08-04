@@ -283,7 +283,11 @@ export class KavoEngine<Entity extends object> {
           // `0` (ADR-0021) — the honest reading of "how many rows precede
           // `items[0]` *in what this response describes*".
           offset: isCursorPagination(pagination) ? 0 : pagination.offset,
-          total: listResult.total,
+          // `total` is a required envelope field typed `number | null`, but
+          // a custom handler can return `{ entities }` alone. Left
+          // `undefined` the key would vanish from the JSON body entirely,
+          // so normalize the absent case to the documented `null`.
+          total: listResult.total ?? null,
           meta: this.listMeta(listResult, context),
         },
       };
@@ -323,10 +327,21 @@ export class KavoEngine<Entity extends object> {
    * `meta` never passes through the serializer: it is the caller's own
    * JSON-serializable data, not entity data, so no DTO projection or
    * field selection applies to it and it reaches the wire verbatim.
+   *
+   * Every path returns a fresh object literal rather than `result.meta`
+   * itself, and the copy is deliberate: it is *not* the same situation as
+   * `items`. `items` is a fresh array of freshly serialized DTOs on every
+   * request, whereas `result.meta` can be the very same object each time —
+   * a hand-written handler returning a module-scope constant is the
+   * documented alternative to `withListMeta`. Handing that object out by
+   * reference would let one response's consumer mutate every later
+   * response's bag. Shallow is the right depth: it makes the envelope's
+   * own key set private without deep-cloning caller data that only has to
+   * survive `JSON.stringify`.
    */
   private listMeta(result: FindManyResult<Entity>, context: KavoContext<Entity>): ListMetaDto {
     const query = context.query;
-    if (query === null || !isCursorPagination(query.pagination)) return result.meta ?? {};
+    if (query === null || !isCursorPagination(query.pagination)) return { ...result.meta };
     // `hasMore` is the sentinel the built-in handler reports from its
     // `limit + 1` over-fetch. A replacement handler that does not report it
     // is taken at its word: no signal, no next page.

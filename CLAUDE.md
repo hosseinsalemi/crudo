@@ -105,6 +105,7 @@ See `examples/nest-typeorm/src/app.module.ts`: `KavoModule.forRootAsync({ provid
 - **Filter operators**: AST enum in `SCREAMING_SNAKE` (`EQ`…`IS_NOT_NULL`); wire tokens in camelCase (`eq`…`isNotNull`), exact-case matched. The mapping table in `docs/internals/architecture/05-query-grammar.md` is the single source of truth.
 - **Envelope fields**: `items`, `limit`, `offset`, `total`, `meta` — the default pagination wire params use the same `limit`/`offset` names, so request and response mirror each other.
 - **Factories** are `create*` (`createKavo`, `createCrud`). **Data access**: `EntityReader` (reads) + `EntityWriter` (writes); `RepositoryAdapter` is both, and adapters are named for what they adapt (`TypeOrmRepositoryAdapter`).
+- **Higher-order wrappers** — a function that takes a handler (or other behavior) and returns a decorated one of the same shape — are `with<Thing>` (`withListMeta`). Never `wrap*`, never `*Wrapper`; a `create*` name is for a factory that builds something from scratch, not for one that decorates what it is handed.
 - **Exceptions**: `*Exception` classes with stable `KAVO_SNAKE_CASE` codes.
 - **Config keys**: camelCase, booleans phrased positively (`exposeInternals`, never `hideInternals`).
 - **No `I` prefix** on interfaces.
