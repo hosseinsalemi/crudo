@@ -999,6 +999,55 @@ describe("@Kavo relation includes", () => {
   });
 });
 
+/**
+ * ADR-0019 claims `@kavo/nest` needs no changes for computed fields:
+ * generated routes go through the same engine, so the serializer produces
+ * them and the allowlists gate them exactly as they do programmatically.
+ * This is the wire-level evidence for that claim.
+ */
+describe("@Kavo computed fields over the wire (ADR-0019)", () => {
+  @Kavo(Todo, {
+    computed: {
+      slug: { resolve: (todo: Todo) => todo.title.toLowerCase().replaceAll(" ", "-") },
+    },
+  })
+  @Controller("todos")
+  class ComputedController {}
+
+  beforeEach(async () => {
+    await bootstrap(ComputedController);
+    await request(server()).post("/todos").send({ title: "Write Docs", priority: 2 }).expect(201);
+  });
+
+  it("emits the computed field on generated read routes with no DTO registered", async () => {
+    expect((await request(server()).get("/todos/1").expect(200)).body).toMatchObject({
+      title: "Write Docs",
+      slug: "write-docs",
+    });
+    expect((await request(server()).get("/todos").expect(200)).body.items[0]).toMatchObject({ slug: "write-docs" });
+  });
+
+  it("is selectable through the wire fieldset", async () => {
+    const response = await request(server()).get("/todos/1?fields=id,slug").expect(200);
+    expect(response.body).toEqual({ id: 1, slug: "write-docs" });
+  });
+
+  it("is rejected as a filter or sort field with problem details", async () => {
+    for (const query of ["filter[slug][eq]=write-docs", "sort=slug"]) {
+      const response = await request(server()).get(`/todos?${query}`).expect(400);
+      expect(response.body).toMatchObject({
+        code: "KAVO_QUERY_INVALID",
+        errors: [{ field: "slug", code: "KAVO_QUERY_INVALID_FIELD" }],
+      });
+    }
+  });
+
+  it("never reaches the adapter from a request body", async () => {
+    await request(server()).post("/todos").send({ title: "Ship It", slug: "hijacked" }).expect(201);
+    expect(adapter.rows[1]).not.toHaveProperty("slug");
+  });
+});
+
 describe("@Kavo Swagger request-body schemas", () => {
   class CreateTodoDto {
     title = "";
