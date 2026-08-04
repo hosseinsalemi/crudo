@@ -199,10 +199,15 @@ describe("FilterTranslator — logical groups", () => {
     expect(whereOf(group("OR", [left, right]))).toBe(`(("root"."title" = :p0) OR ("root"."pages" > :p1))`);
   });
 
-  // Single child only: a multi-child NOT silently drops everything past
-  // children[0] today, which is #115 rather than a contract to pin here.
   it("wraps a NOT group in SQL NOT over its single child", () => {
     expect(whereOf(group("NOT", [left]))).toBe(`NOT(("root"."title" = :p0))`);
+  });
+
+  it("negates every child of a multi-child NOT, not just the first", () => {
+    // `NOT` is variadic and means `NOT(AND(children))` (doc 05 §1). Reading
+    // `children[0]` and discarding the rest returned rows the caller asked
+    // to exclude — a silent widening, #115.
+    expect(whereOf(group("NOT", [left, right]))).toBe(`NOT((("root"."title" = :p0) AND ("root"."pages" > :p1)))`);
   });
 
   it("keeps precedence when an OR nests inside an AND", () => {
@@ -221,6 +226,43 @@ describe("FilterTranslator — logical groups", () => {
     // A dropped predicate widens the result set silently, which is the one
     // failure mode a filter must never have.
     expect(() => whereOf(condition("title", "SOUNDS_LIKE", "x"))).toThrowError(/filter operator/);
+  });
+});
+
+/**
+ * The degenerate zero-child groups, which the wire grammar cannot produce
+ * (`convertLogical` only emits a group once a child converted) but a
+ * programmatic caller hand-building the AST can. All four adapters agree on
+ * the answers, stated once in `docs/internals/architecture/05-query-grammar.md` §3:
+ * `AND []` is the identity of conjunction (every row), `OR []` the identity
+ * of disjunction (no row), and `NOT []` is `NOT(AND [])` — no row.
+ *
+ * The whole predicate is asserted, never a substring: the bug being pinned
+ * here (#111) was an *omitted* predicate, and an omission is exactly what a
+ * `toContain` cannot see.
+ */
+describe("FilterTranslator — degenerate empty groups", () => {
+  it("spells an empty OR as a contradiction, not as no predicate at all", () => {
+    // TypeORM drops a `Brackets` whose callback added no condition, so the
+    // predicate vanished and the empty OR matched *every* row — the silent
+    // widening in #111.
+    expect(whereOf(group("OR", []))).toBe("(1 = 0)");
+  });
+
+  it("keeps an empty AND matching every row, as a real predicate", () => {
+    expect(whereOf(group("AND", []))).toBe("(1 = 1)");
+  });
+
+  it("keeps an empty NOT matching no row", () => {
+    expect(whereOf(group("NOT", []))).toBe("NOT((1 = 1))");
+  });
+
+  it("does not let an empty group leak its identity into its parent", () => {
+    // The identity must scope to its own brackets: an unbracketed `1 = 0`
+    // OR-ed into the parent would empty an unrelated conjunct.
+    expect(whereOf(group("AND", [condition("title", "EQ", "Dune"), group("OR", [])]))).toBe(
+      `(("root"."title" = :p0) AND (1 = 0))`,
+    );
   });
 });
 
