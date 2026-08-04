@@ -1,13 +1,14 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitepress";
+import { withMermaid } from "vitepress-plugin-mermaid";
 
 const hostname = "https://kavo.js.org";
 
 const corePackageJsonUrl = new URL("../../packages/core/package.json", import.meta.url);
 const { version } = JSON.parse(readFileSync(fileURLToPath(corePackageJsonUrl), "utf-8")) as { version: string };
 
-export default defineConfig({
+const config = defineConfig({
   title: "Kavo",
   description: "A production-grade CRUD framework for TypeScript",
   base: "/",
@@ -16,6 +17,15 @@ export default defineConfig({
   cleanUrls: true,
   ignoreDeadLinks: [/CLAUDE(\.md)?$/],
   appearance: "dark",
+
+  // `theme` here is the light-appearance theme only: vitepress-plugin-mermaid
+  // watches the `.dark` class and forces mermaid's own "dark" theme when the
+  // appearance toggle is on. `securityLevel` restores mermaid's default, which
+  // the plugin otherwise relaxes to "loose".
+  mermaid: {
+    theme: "default",
+    securityLevel: "strict",
+  },
 
   sitemap: {
     hostname,
@@ -198,3 +208,5 @@ export default defineConfig({
     },
   },
 });
+
+export default withMermaid(config);
