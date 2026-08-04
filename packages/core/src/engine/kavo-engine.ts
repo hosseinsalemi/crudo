@@ -16,6 +16,7 @@ import {
   OperationNotRegisteredException,
   QueryValidationException,
 } from "../errors/exceptions.js";
+import { nameList } from "../errors/message-hints.js";
 import { QueryNormalizer } from "../query/query-normalizer.js";
 import { createKavoContext, randomUuid } from "../context/default-kavo-context.js";
 import { mergeSettings } from "../config/merge-settings.js";
@@ -291,11 +292,5 @@ export class KavoEngine<Entity extends object> {
  * says so.
  */
 function registeredIds<Entity extends object>(registry: OperationRegistry<Entity>): string {
-  return (
-    registry
-      .all()
-      .map((descriptor) => descriptor.id)
-      .sort()
-      .join(", ") || "none"
-  );
+  return nameList(registry.all().map((descriptor) => descriptor.id));
 }

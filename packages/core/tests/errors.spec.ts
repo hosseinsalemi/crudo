@@ -207,7 +207,14 @@ describe("exception hierarchy", () => {
       messageParams: { operation: "purgeOne", entity: "User" },
     });
     expect(exception.detail).toContain("Operation 'purgeOne' is disabled for User.");
-    expect(exception.detail).toContain("Enable it with 'operations.purgeOne' in the entity config.");
+    expect(exception.detail).toContain("Enable it with 'operations.purgeOne' in the entity config");
+    // The caveat rides the template rather than a param, so it survives
+    // re-rendering and cannot leave a `{placeholder}` in a response when a
+    // caller constructs this exception without it. `purgeOne` is disabled by
+    // default on *every* entity, so the flag alone is the wrong advice more
+    // often than not.
+    expect(exception.detail).toContain("also need the entity to be soft-deletable");
+    expect(exception.detail).not.toContain("{");
     expect(renderMessage("KAVO_OPERATION_DISABLED", exception.messageParams)).toBe(exception.detail);
   });
 

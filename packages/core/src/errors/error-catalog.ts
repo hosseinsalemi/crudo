@@ -89,8 +89,19 @@ export const ERROR_CATALOG = {
     // placeholder for text a *caller* might omit would render verbatim —
     // which is why the fix is baked into the template rather than passed
     // in as a free-form hint.
+    //
+    // The parenthetical is unconditional for the same reason. The config
+    // key alone is not the whole fix for `restoreOne`/`purgeOne`: on an
+    // entity that resolves to hard delete, `requireSoftDeletable` rejects
+    // them at bootstrap (ADR-0013), so advertising `operations.restoreOne`
+    // on its own would send a developer from a 405 to an app that no longer
+    // starts. A conditional clause would have to arrive as a param, and a
+    // param this template can be rendered without is exactly the verbatim
+    // hazard above — so the caveat is carried by the template, where it is
+    // always true and always localizable.
     message:
-      "Operation '{operation}' is disabled for {entity}. Enable it with 'operations.{operation}' in the entity config.",
+      "Operation '{operation}' is disabled for {entity}. Enable it with 'operations.{operation}' in the entity config " +
+      "(restoreOne and purgeOne also need the entity to be soft-deletable).",
   },
   KAVO_OPERATION_NOT_REGISTERED: {
     status: 405,

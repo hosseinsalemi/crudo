@@ -151,6 +151,15 @@ describe("KavoEngine pipeline", () => {
     await expect(crud.deleteOne(1)).rejects.toThrow("operations.deleteOne");
   });
 
+  it("does not send a restoreOne caller toward a config that fails to boot", async () => {
+    // `restoreOne` is disabled here because `User` is not soft-deletable,
+    // and `requireSoftDeletable` rejects `operations.restoreOne = true` on a
+    // hard-delete entity at bootstrap. Naming the flag without the
+    // prerequisite would turn a 405 into an app that no longer starts.
+    const { crud } = makeCrud();
+    await expect(crud.restoreOne(1)).rejects.toThrow("also need the entity to be soft-deletable");
+  });
+
   it("separates an unregistered operation from a disabled one (issue #7)", async () => {
     // Both are 405, but "disabled" is a lie about an id the registry never
     // had — and `messageKey` is the code, so a localizing consumer would
