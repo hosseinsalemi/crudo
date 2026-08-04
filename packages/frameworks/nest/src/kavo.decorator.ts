@@ -169,7 +169,7 @@ export function Kavo<
     Reflect.defineMetadata(KAVO_CONTROLLER_METADATA, metadata, target);
     registeredKavoControllers.set(target, metadata);
 
-    const registry = createOperationRegistry(erasedConfig);
+    const registry = createOperationRegistry(erasedConfig, undefined, undefined, entity.name);
     const overrides = collectOverrides(controller.prototype, entity.name, registry);
 
     for (const descriptor of registry.all()) {

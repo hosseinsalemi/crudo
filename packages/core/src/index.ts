@@ -122,6 +122,7 @@ export {
   NotDeletedException,
   NotFoundException,
   OperationDisabledException,
+  OperationNotRegisteredException,
   PersistenceException,
   QueryValidationException,
   TransactionException,

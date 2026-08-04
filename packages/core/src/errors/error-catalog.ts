@@ -84,7 +84,34 @@ export const ERROR_CATALOG = {
   KAVO_OPERATION_DISABLED: {
     status: 405,
     title: "Operation disabled",
-    message: "Operation '{operation}' is disabled for {entity}.",
+    // `{operation}` twice is safe: `renderMessage` replaces globally, and
+    // the one throw site (`KavoEngine.run`) always supplies it. A
+    // placeholder for text a *caller* might omit would render verbatim —
+    // which is why the fix is baked into the template rather than passed
+    // in as a free-form hint.
+    //
+    // The parenthetical is unconditional for the same reason. The config
+    // key alone is not the whole fix for `restoreOne`/`purgeOne`: on an
+    // entity that resolves to hard delete, `requireSoftDeletable` rejects
+    // them at bootstrap (ADR-0013), so advertising `operations.restoreOne`
+    // on its own would send a developer from a 405 to an app that no longer
+    // starts. A conditional clause would have to arrive as a param, and a
+    // param this template can be rendered without is exactly the verbatim
+    // hazard above — so the caveat is carried by the template, where it is
+    // always true and always localizable.
+    message:
+      "Operation '{operation}' is disabled for {entity}. Enable it with 'operations.{operation}' in the entity config " +
+      "(restoreOne and purgeOne also need the entity to be soft-deletable).",
+  },
+  KAVO_OPERATION_NOT_REGISTERED: {
+    status: 405,
+    title: "Operation not registered",
+    // Distinct from `KAVO_OPERATION_DISABLED` because `messageKey` *is* the
+    // code: a consumer localizing from key + params would otherwise
+    // re-render "is disabled" for an operation nobody ever disabled.
+    // `{available}` is the whole registry (eight standard entries), which
+    // subsumes a "did you mean" — the near miss is right there in the list.
+    message: "Operation '{operation}' is not registered for {entity}. Registered operations: {available}.",
   },
   KAVO_PERSISTENCE_FAILED: {
     status: 500,

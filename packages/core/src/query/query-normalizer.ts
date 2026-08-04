@@ -9,7 +9,9 @@ import type { EntityMetadata } from "../metadata/entity-metadata.js";
 import type { QueryIssueDto } from "../errors/problem-details.js";
 import type { IncludeResolver } from "../relations/include-resolver.js";
 import type { IncludeTree } from "../relations/include-tree.js";
+import type { AllowlistUsage } from "../errors/message-hints.js";
 import { ConfigurationException, QueryValidationException } from "../errors/exceptions.js";
+import { pushAllowlistIssue } from "../errors/message-hints.js";
 import { DefaultFilterParser } from "./default-filter-parser.js";
 import { builtInPaginationStrategies } from "./pagination-strategies.js";
 import { parseBracketKey } from "./bracket-notation.js";
@@ -118,14 +120,14 @@ export class QueryNormalizer<Entity = unknown> {
 
     const clientSort = input.sort ?? [];
     for (const entry of clientSort) {
-      requireAllowlisted(entry.field as string, config.allowlists.sortable, "sorting", issues);
+      requireAllowlisted(entry.field as string, config, "sorting", issues);
     }
     const sort = clientSort.length > 0 ? clientSort : defaultSortOf(config);
 
     const { root: rootFields, relations: relationFields } = collapseFieldSelection<Entity>(input.fields, issues);
     if (rootFields != null) {
       for (const field of rootFields) {
-        requireAllowlisted(field as string, config.allowlists.selectable, "selection", issues);
+        requireAllowlisted(field as string, config, "selection", issues);
       }
     }
     const fields: FieldSelection<Entity> = {
@@ -317,7 +319,7 @@ function parseSort<Entity>(
     if (token === "") continue;
     const descending = token.startsWith("-");
     const field = descending ? token.slice(1) : token;
-    if (requireAllowlisted(field, config.allowlists.sortable, "sorting", issues)) {
+    if (requireAllowlisted(field, config, "sorting", issues)) {
       result.push({
         field: field as FieldPath<Entity>,
         direction: descending ? "desc" : "asc",
@@ -423,7 +425,7 @@ function parseFields<Entity>(
   const root: FieldPath<Entity, 1>[] = [];
   for (const field of raw.split(",")) {
     if (field === "") continue;
-    if (requireAllowlisted(field, config.allowlists.selectable, "selection", issues)) {
+    if (requireAllowlisted(field, config, "selection", issues)) {
       root.push(field as FieldPath<Entity, 1>);
     }
   }
@@ -445,7 +447,7 @@ function validateExpression<Entity>(
     return;
   }
   if (expression.kind === "condition") {
-    requireAllowlisted(expression.field as string, config.allowlists.filterable, "filtering", issues);
+    requireAllowlisted(expression.field as string, config, "filtering", issues);
     const value = expression.value;
     if (Array.isArray(value) && value.length > config.settings.query.maxInValues) {
       issues.push({
@@ -461,18 +463,28 @@ function validateExpression<Entity>(
   }
 }
 
-function requireAllowlisted(
+/** Which allowlist each usage reads, so the caller names only the usage. */
+const ALLOWLIST_FOR: Readonly<Record<AllowlistUsage, "filterable" | "sortable" | "selectable">> = Object.freeze({
+  filtering: "filterable",
+  sorting: "sortable",
+  selection: "selectable",
+});
+
+/**
+ * The single allowlist gate for the programmatic entry point and the wire
+ * one alike. On rejection the issue names the near miss, the permitted set,
+ * and the config key that would permit the field — the leading sentence is
+ * unchanged, everything actionable is appended.
+ */
+function requireAllowlisted<Entity>(
   field: string,
-  allowlist: readonly unknown[],
-  usage: "filtering" | "sorting" | "selection",
+  config: ResolvedEntityConfig<Entity>,
+  usage: AllowlistUsage,
   issues: QueryIssueDto[],
 ): boolean {
-  if ((allowlist as readonly string[]).includes(field)) return true;
-  issues.push({
-    field,
-    code: "KAVO_QUERY_INVALID_FIELD",
-    detail: `Field '${field}' cannot be used for ${usage}.`,
-  });
+  const allowed = config.allowlists[ALLOWLIST_FOR[usage]] as readonly string[];
+  if (allowed.includes(field)) return true;
+  pushAllowlistIssue(field, usage, config.entityName, allowed, issues);
   return false;
 }
 

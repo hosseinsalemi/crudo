@@ -120,6 +120,24 @@ export class OperationDisabledException extends KavoException {
 }
 
 /**
+ * Calling an operation the registry has no entry for at all — a misspelled
+ * id, or a custom operation that was never registered. Distinct from
+ * {@link OperationDisabledException} at the same 405: "disabled" says the
+ * entry exists and can be switched on, which for a registry miss is simply
+ * untrue, and `messageKey` (= the code) is what a localizing consumer
+ * re-renders from.
+ *
+ * Unreachable over HTTP — route generation walks the same registry, so an
+ * unregistered id has no route — which is exactly why the falsehood
+ * survived: only programmatic callers ever saw it.
+ */
+export class OperationNotRegisteredException extends KavoException {
+  constructor(options: KavoExceptionOptions = {}) {
+    super("KAVO_OPERATION_NOT_REGISTERED", options);
+  }
+}
+
+/**
  * Bootstrap-time configuration error. Never a wire response — it fires
  * before the app serves traffic, and it must name the entity, the key
  * path, and the offending value (error quality bar).

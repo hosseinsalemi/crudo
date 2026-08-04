@@ -208,11 +208,7 @@ export class KavoModule {
             "KavoModule.forFeature only accepts @Kavo controllers",
         );
       }
-      return {
-        provide: getKavoServiceToken(metadata.entity),
-        useFactory: (kavo: KavoInstance) => kavo.createCrud(metadata.entity, metadata.config),
-        inject: [KAVO_INSTANCE],
-      };
+      return serviceProvider(metadata);
     });
     return {
       module: KavoModule,
@@ -238,13 +234,37 @@ function providersFromRegistry(): Provider[] {
       );
     }
     ownerByEntity.set(metadata.entity, controller);
-    providers.push({
-      provide: getKavoServiceToken(metadata.entity),
-      useFactory: (kavo: KavoInstance) => kavo.createCrud(metadata.entity, metadata.config),
-      inject: [KAVO_INSTANCE],
-    });
+    providers.push(serviceProvider(metadata));
   }
   return providers;
+}
+
+/**
+ * One entity's `KavoService`, resolved from the root instance.
+ *
+ * `KAVO_INSTANCE` is injected **optionally** so that a module graph with a
+ * `forFeature` but no `forRoot`/`forRootAsync` fails with a
+ * `ConfigurationException` naming the missing call, instead of Nest's
+ * "can't resolve dependencies (?)" — which names an internal token the
+ * developer never wrote and gives no clue what to add (issue #7).
+ */
+function serviceProvider(metadata: KavoControllerMetadata): Provider {
+  return {
+    provide: getKavoServiceToken(metadata.entity),
+    useFactory: (kavo: KavoInstance | undefined) => {
+      if (kavo === undefined) {
+        throw new ConfigurationException(
+          metadata.entity.name,
+          "forFeature",
+          "the Kavo root instance is not in this module graph — " +
+            "KavoModule.forFeature only provides per-entity services and needs it; " +
+            "add KavoModule.forRoot({ infrastructure }) (or forRootAsync) to your root module's imports",
+        );
+      }
+      return kavo.createCrud(metadata.entity, metadata.config);
+    },
+    inject: [{ token: KAVO_INSTANCE, optional: true }],
+  };
 }
 
 /**

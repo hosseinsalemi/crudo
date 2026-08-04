@@ -4,9 +4,19 @@ import type { OperationHandler } from "./operation-handler.js";
 import type { EntityConfig } from "../config/entity-config.js";
 import { ConfigurationException } from "../errors/exceptions.js";
 
-/** Map-backed operation registry, insertion-ordered. */
+/**
+ * Map-backed operation registry, insertion-ordered.
+ *
+ * `entityName` exists purely so the configuration errors below can name the
+ * entity they came from. It defaults the way `DefaultRelationRegistry`'s
+ * does, and both real call sites (`createCrud`, `@Kavo`) supply the real
+ * name — a config error reading `entity 'unknown'` was issue #7's third
+ * finding.
+ */
 export class DefaultOperationRegistry<Entity = unknown> implements OperationRegistry<Entity> {
   private readonly entries = new Map<OperationId, OperationDescriptor<Entity>>();
+
+  constructor(private readonly entityName: string = "entity") {}
 
   get(id: OperationId): OperationDescriptor<Entity> | undefined {
     return this.entries.get(id);
@@ -28,9 +38,9 @@ export class DefaultOperationRegistry<Entity = unknown> implements OperationRegi
     const existing = this.entries.get(id);
     if (existing === undefined) {
       throw new ConfigurationException(
-        "unknown",
+        this.entityName,
         `operations.${id}`,
-        `cannot override '${id}': no such registered operation`,
+        `cannot override '${id}': no such registered operation (registered: ${this.idList()})`,
       );
     }
     this.entries.set(id, { ...existing, handler });
@@ -40,12 +50,16 @@ export class DefaultOperationRegistry<Entity = unknown> implements OperationRegi
     const existing = this.entries.get(id);
     if (existing === undefined) {
       throw new ConfigurationException(
-        "unknown",
+        this.entityName,
         `operations.${id}`,
-        `cannot disable '${id}': no such registered operation`,
+        `cannot disable '${id}': no such registered operation (registered: ${this.idList()})`,
       );
     }
     this.entries.set(id, { ...existing, enabled: false });
+  }
+
+  private idList(): string {
+    return [...this.entries.keys()].sort().join(", ") || "none";
   }
 }
 
@@ -85,10 +99,10 @@ export const STANDARD_OPERATIONS: Readonly<Record<StandardOperationId, StandardO
 /** Provides the handler for one standard operation id. */
 export type StandardHandlerFactory<Entity> = (id: StandardOperationId) => OperationHandler<Entity>;
 
-const unboundHandler = (id: OperationId): OperationHandler<unknown> => ({
+const unboundHandler = (id: OperationId, entityName: string): OperationHandler<unknown> => ({
   execute(): Promise<never> {
     throw new ConfigurationException(
-      "unknown",
+      entityName,
       `operations.${id}`,
       `operation '${id}' has no bound handler — this registry was built ` + `for inspection (route generation) only`,
     );
@@ -121,13 +135,20 @@ const unboundHandler = (id: OperationId): OperationHandler<unknown> => ({
  * config doesn't mention at all, sitting between the unconditional/soft-delete
  * default and the entity's own `operations.<id>` — which always wins when
  * present, boolean shorthand or long form alike.
+ *
+ * `entityName` is only ever read back out in a configuration error's text.
+ * It is a trailing optional rather than a leading one, and the three
+ * optionals were deliberately *not* consolidated into an options bag:
+ * this factory is a barrel export, so a bag would be a breaking change to
+ * public API bought for a nicer call at two internal sites.
  */
 export function createOperationRegistry<Entity extends object>(
   config: EntityConfig<Entity> | undefined,
   handlers?: StandardHandlerFactory<Entity>,
   globalOperations?: Readonly<Partial<Record<StandardOperationId, boolean>>>,
+  entityName?: string,
 ): OperationRegistry<Entity> {
-  const registry = new DefaultOperationRegistry<Entity>();
+  const registry = new DefaultOperationRegistry<Entity>(entityName);
   const operations = config?.operations ?? {};
   const softDeleteDeclared = declaresSoftDelete(config);
 
@@ -141,7 +162,10 @@ export function createOperationRegistry<Entity extends object>(
       kind: shape.kind,
       cardinality: shape.cardinality,
       enabled: typeof operationConfig === "boolean" ? operationConfig : (settings?.enabled ?? defaultForEntity),
-      handler: settings?.handler ?? handlers?.(id) ?? (unboundHandler(id) as unknown as OperationHandler<Entity>),
+      handler:
+        settings?.handler ??
+        handlers?.(id) ??
+        (unboundHandler(id, entityName ?? "entity") as unknown as OperationHandler<Entity>),
       input: null,
       output: null,
       meta: settings?.meta ?? {},

@@ -11,7 +11,12 @@ import type { OperationDescriptor, OperationRegistry } from "../operations/opera
 import type { StandardOperationId } from "../operations/operation.js";
 import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
 import type { KavoSettings } from "../config/settings.js";
-import { OperationDisabledException, QueryValidationException } from "../errors/exceptions.js";
+import {
+  OperationDisabledException,
+  OperationNotRegisteredException,
+  QueryValidationException,
+} from "../errors/exceptions.js";
+import { nameList } from "../errors/message-hints.js";
 import { QueryNormalizer } from "../query/query-normalizer.js";
 import { createKavoContext, randomUuid } from "../context/default-kavo-context.js";
 import { mergeSettings } from "../config/merge-settings.js";
@@ -100,13 +105,28 @@ export class KavoEngine<Entity extends object> {
     // Nothing is special-cased per verb — built-ins are ordinary registry
     // entries (ADR-0006).
     const descriptor = registry.get(request.operation);
-    if (descriptor === undefined || !descriptor.enabled) {
+    const errorContext = { entityName: config.entityName, operation: request.operation };
+    // A registry miss and a disabled entry are different mistakes with
+    // different fixes, so they get different codes (issue #7). Only the
+    // disabled branch is reachable over HTTP: route generation walks this
+    // same registry, so an unregistered id never gets a route.
+    if (descriptor === undefined) {
+      throw new OperationNotRegisteredException({
+        messageParams: {
+          operation: request.operation,
+          entity: config.entityName,
+          available: registeredIds(registry),
+        },
+        context: errorContext,
+      });
+    }
+    if (!descriptor.enabled) {
       throw new OperationDisabledException({
         messageParams: {
           operation: request.operation,
           entity: config.entityName,
         },
-        context: { entityName: config.entityName, operation: request.operation },
+        context: errorContext,
       });
     }
 
@@ -262,4 +282,15 @@ export class KavoEngine<Entity extends object> {
       list: null,
     };
   }
+}
+
+/**
+ * Every id the registry knows, sorted, for the not-registered message. The
+ * list is short (the standard table plus whatever was registered on top)
+ * and it answers "then what *can* I call?" — disabled entries included,
+ * since those are one config flag away from working and their own error
+ * says so.
+ */
+function registeredIds<Entity extends object>(registry: OperationRegistry<Entity>): string {
+  return nameList(registry.all().map((descriptor) => descriptor.id));
 }
