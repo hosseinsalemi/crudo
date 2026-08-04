@@ -13,15 +13,21 @@ declared twice — with the differences below.
 npm install @kavo/core @kavo/nest @kavo/mikroorm
 ```
 
-`@mikro-orm/core` (`^6.0.0`) is a peer dependency, plus whichever driver
+`@mikro-orm/core` (`^7.0.0`) is a peer dependency, plus whichever driver
 package your database needs (`@mikro-orm/postgresql`, `@mikro-orm/mysql`,
-`@mikro-orm/better-sqlite`, …).
+`@mikro-orm/sqlite`, …), and `@mikro-orm/decorators` if you declare entities
+with decorators (below).
 
 ## The entity class is the identity
 
+**Decorators moved out of `@mikro-orm/core` in v7.** They live in
+`@mikro-orm/decorators/legacy` now; `@mikro-orm/core` still exports the
+runtime pieces (`MikroORM`, `Collection`, `wrap`, …). Importing `Entity` from
+`@mikro-orm/core` is the v6 spelling and no longer resolves.
+
 ```ts
 // book.entity.ts
-import { Entity, PrimaryKey, Property } from "@mikro-orm/core";
+import { Entity, PrimaryKey, Property } from "@mikro-orm/decorators/legacy";
 
 @Entity()
 export class Book {

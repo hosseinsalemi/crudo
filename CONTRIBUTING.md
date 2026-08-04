@@ -446,6 +446,23 @@ wiring is committed:
 - `.claude/agents/` — read-only review agents used in the review fan-out.
 - `.claude/skills/` — repo-specific procedures (adding an operation, a config
   key, an exception, an ADR).
+- `.claude/settings.json` — permissions. `npm publish` / `pnpm publish` are
+  `ask` (never `deny` — `/publish`'s first-publish bootstrap legitimately runs
+  one on a packed tarball), and a small allowlist skips the prompt for
+  genuinely read-only commands.
+
+That allowlist is deliberately missing the three you would reach for first —
+`git diff`, `git log`, and `git show`. **Do not add them.** Entries are prefix
+matches, and all three accept git's diff options, which include
+`--output=<file>`: that truncates and overwrites any path on disk, silently,
+exiting 0. `git diff --no-index a b` reads any two files outside the repo, and
+`git difftool -x <cmd>` runs an arbitrary command while still starting with the
+characters `git diff`. Since this file is committed, an entry here applies to
+every contributor's sessions — including ones whose context contains text from
+a fork PR or an issue comment. The commands that need these calls already
+declare them in their own `allowed-tools`, so the only thing the entries buy is
+skipping a prompt on ad-hoc use, which is not worth an unprompted arbitrary
+file write.
 
 None of this is required to contribute — the commands above are the whole story,
 and a PR is judged on its diff and a green gate either way.

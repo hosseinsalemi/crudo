@@ -34,9 +34,18 @@ const BARREL_PATH = resolve(REPO_ROOT, "packages/core/src/index.ts");
  * the string "export *" — it is the doc comment explaining that the file
  * does not use it — so a naive text search reports the rule's own
  * documentation as a violation of the rule.
+ *
+ * **Line comments come out first, and the order is load-bearing.** Stripping
+ * block comments first lets a line comment that contains an unterminated
+ * `/*` open a block the regex then closes at the next `*` + `/` anywhere
+ * below, swallowing every real export in between — including an `export *`.
+ * That is not a contrived bypass: a comment mentioning a glob or a file
+ * pattern is enough, and the resulting file is clean under `tsc`, `prettier`
+ * and `oxlint`, so nothing else in the gate would catch it either. Removing
+ * line comments first means such a `/*` is gone before it can open anything.
  */
 function stripComments(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
+  return source.replace(/^[ \t]*\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
 interface Manifest {
@@ -49,14 +58,22 @@ describe("the @kavo/core barrel is an explicit named list (ADR-0010)", () => {
 
   it("uses no `export *` — including the `as ns` and `type *` forms", () => {
     // Matches `export *`, `export * as ns`, and `export type * from` —
-    // tolerating any whitespace between the keywords and the star, and
     // ignoring `export {}` / `export type {}`, the sanctioned spellings.
     //
     // `export type *` is the one that matters most here despite looking like
     // an edge case: this barrel is overwhelmingly `export type { ... }`, so
     // it is the form someone consolidating type re-exports reaches for first,
     // and it grows the public surface exactly the way ADR-0010 forecloses.
-    const starExports = code.match(/^[ \t]*export[ \t]+(?:type[ \t]+)?\*/gm) ?? [];
+    //
+    // Deliberately not `^`-anchored, and `\s` rather than `[ \t]`: a
+    // line-anchored pattern misses `export {a}; export * from "./b.js"` and
+    // `export\n  * from "./b.js"`, and a tab-or-space class misses a
+    // non-breaking space. Prettier would normalize all three — but
+    // `format:check` is a separate CI job from `pnpm check`, so relying on it
+    // would leave this spec's guarantee borrowed from a gate that does not
+    // run beside it. The comment strip above is what keeps the loose pattern
+    // from matching the header's own prose.
+    const starExports = code.match(/\bexport\s+(?:type\s+)?\*/g) ?? [];
 
     expect(
       starExports,
@@ -66,12 +83,31 @@ describe("the @kavo/core barrel is an explicit named list (ADR-0010)", () => {
   });
 
   it("actually names exports, so the check above cannot pass vacuously", () => {
-    // Guards the assertion itself: if the barrel were emptied or the strip
-    // step over-matched and blanked the file, `export *` would trivially be
-    // absent and the test above would go green on a broken barrel.
-    const namedExports = code.match(/^[ \t]*export[ \t]+(type[ \t]+)?\{/gm) ?? [];
+    // Guards the assertion itself. Two ways the check above could go green on
+    // a barrel it should have failed, and this covers both:
+    //
+    //   1. the barrel is emptied or blanked outright — no `export *` left to
+    //      find because nothing is left at all;
+    //   2. `stripComments` over-matches and eats *part* of the file, taking a
+    //      real `export *` with it while leaving enough behind to look alive.
+    //
+    // Comparing the stripped count against the raw count catches (2), which a
+    // fixed threshold cannot: an over-strip that removes a star export
+    // usually removes named exports either side of it, and any drop at all is
+    // a signal the strip reached past a comment. Requiring a non-zero count
+    // catches (1). Neither needs updating as the barrel grows — a magic
+    // number here would have to be a low bar to stay true, and a low bar is
+    // one a 60%-emptied barrel still clears.
+    const NAMED_EXPORT = /^[ \t]*export[ \t]+(?:type[ \t]+)?\{/gm;
+    const inStripped = code.match(NAMED_EXPORT) ?? [];
+    const inSource = source.match(NAMED_EXPORT) ?? [];
 
-    expect(namedExports.length).toBeGreaterThan(20);
+    expect(inStripped.length, "the barrel names no exports at all — it is empty or was blanked").toBeGreaterThan(0);
+    expect(
+      inStripped.length,
+      "stripComments removed a real `export { ... }`, so it reached past a comment boundary — " +
+        "the `export *` check above cannot be trusted on this file.",
+    ).toBe(inSource.length);
   });
 
   it("is the only entry point the package exposes — deep imports are not API", () => {

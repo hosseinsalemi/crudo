@@ -170,9 +170,18 @@ module.exports = {
         "— they gate on `to.path: ^(@kavo/|packages/)`, so a bare " +
         "`@nestjs/common` is outside what they look at, and a hard import of " +
         "it would break every consumer wiring the package into a non-Nest " +
-        "host with `Cannot find module` at import time.",
+        "host with `Cannot find module` at import time.\n\n" +
+        "The leading `(^|/)` is what makes this rule do anything. An npm " +
+        "dependency has the same two spellings the workspace ones do, and " +
+        "here they split on whether the package is *declared*: undeclared, " +
+        "it stays the bare specifier `@nestjs/common`; declared — which it " +
+        "must be for tsc or Node to resolve it — it becomes " +
+        "`node_modules/.pnpm/@nestjs+common@…/node_modules/@nestjs/common/" +
+        "index.js`. Anchoring on `^` alone matches only the undeclared case, " +
+        "which `tsc -b` already rejects as TS2307, so the rule would fire " +
+        "exclusively where it is redundant and never where it is needed.",
       from: { path: "^packages/(orms|protocols)/[^/]+/src" },
-      to: { path: "^@nestjs/" },
+      to: { path: "(^|/)@nestjs/" },
     },
     {
       name: "tests-no-other-package-internals",

@@ -4,9 +4,6 @@
     "ask": ["Bash(npm publish:*)", "Bash(pnpm publish:*)"],
     "allow": [
       "Bash(git status:*)",
-      "Bash(git diff:*)",
-      "Bash(git log:*)",
-      "Bash(git show:*)",
       "Bash(git rev-parse:*)",
       "Bash(git describe:*)",
       "Bash(git branch --show-current)",
