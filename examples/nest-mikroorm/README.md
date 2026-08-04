@@ -79,26 +79,32 @@ exercising anything MikroORM-specific.
 
 ## The e2e suites
 
-Both suites run the same assertions — `tests/crud-e2e.suite.ts` holds them, and
-each spec differs only in which database it points the app at. One behavioral
-spec, two drivers, no forked assertions (the same split `nest-typeorm` uses).
+All three suites run the same assertions — `tests/crud-e2e.suite.ts` holds
+them, and each spec differs only in which database it points the app at. One
+behavioral spec, three drivers, no forked assertions (the same split
+`nest-typeorm` uses).
 
-| Spec                             | Database                                         |
-| -------------------------------- | ------------------------------------------------ |
-| `tests/app.e2e.spec.ts`          | in-memory SQLite — no Docker, nothing to install |
-| `tests/app-postgres.e2e.spec.ts` | Testcontainers `postgres:18-alpine`              |
+| Spec                                    | Database                                              |
+| --------------------------------------- | ----------------------------------------------------- |
+| `tests/app.e2e.spec.ts`                 | in-memory SQLite — no Docker, nothing to install      |
+| `tests/app-postgres.e2e.spec.ts`        | Testcontainers `postgres:18-alpine`                   |
+| `tests/app-postgres-pglite.e2e.spec.ts` | PGlite, fronted by `pglite-socket` — no Docker either |
 
-The Postgres suite is not merely a second connection string: it is the only
-place `caseInsensitiveFilters: true` is exercised. `ILIKE` maps to MikroORM's
-`$ilike`, which **only PostgreSQL supports** — every other driver receives the
-token verbatim and fails with a syntax error — so the flag is declared rather
-than detected, and defaults to `false`.
+Both Postgres suites exercise `caseInsensitiveFilters: true` — the only place
+it's turned on. `ILIKE` maps to MikroORM's `$ilike`, which **only PostgreSQL
+supports** — every other driver receives the token verbatim and fails with a
+syntax error — so the flag is declared rather than detected, and defaults to
+`false`. The PGlite suite exists to get that same real-Postgres
+`ILIKE`/SQLSTATE-23505 behavior without a Docker daemon; the Testcontainers
+suite remains as the check against an actual `postgres:18-alpine` server.
 
-The suite's ILIKE assertion passes both ways: a real `ILIKE` on Postgres, and a
-degraded `$like` on SQLite, whose own `LIKE` is already ASCII case-insensitive.
-That both hold is exactly the argument for the `false` default.
+The suite's ILIKE assertion passes across all three: a real `ILIKE` on both
+Postgres flavours, and a degraded `$like` on SQLite, whose own `LIKE` is
+already ASCII case-insensitive. That all three hold is exactly the argument
+for the `false` default.
 
 ```bash
-pnpm vitest run examples/nest-mikroorm/tests/app.e2e.spec.ts           # no Docker
-pnpm vitest run examples/nest-mikroorm/tests/app-postgres.e2e.spec.ts  # needs Docker
+pnpm vitest run examples/nest-mikroorm/tests/app.e2e.spec.ts                  # no Docker
+pnpm vitest run examples/nest-mikroorm/tests/app-postgres.e2e.spec.ts         # needs Docker
+pnpm vitest run examples/nest-mikroorm/tests/app-postgres-pglite.e2e.spec.ts  # no Docker
 ```
