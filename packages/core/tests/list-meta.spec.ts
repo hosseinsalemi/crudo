@@ -83,6 +83,80 @@ describe("ListResultDto.meta — the handler's contribution reaches the envelope
     expect(list.meta).toEqual({});
     expect(list.total).toBe(7);
   });
+
+  it("coexists with a null total when counting is disabled", async () => {
+    // Every other meta case runs with counting on; `total: null` and a
+    // populated bag are independent envelope fields and have to co-occur.
+    const adapter = new InMemoryUserAdapter();
+    const crud = createKavo().createCrud(
+      User,
+      {
+        pagination: { count: false },
+        operations: {
+          findMany: {
+            handler: withListMeta<User>(builtInHandlers<User>(adapter)("findMany"), (result) => ({
+              approximate: true,
+              rows: result.entities.length,
+            })),
+          },
+        },
+      } as never,
+      { adapter, metadata: userMetadata },
+    );
+    await crud.createOne(ADA as never);
+
+    const list = await crud.findMany();
+    expect(list.total).toBeNull();
+    expect(list.meta).toEqual({ approximate: true, rows: 1 });
+    expect(list.items).toHaveLength(1);
+  });
+});
+
+describe("the envelope's meta is the caller's to mutate — never the handler's own object", () => {
+  it("copies the handler's bag instead of handing it out by reference", async () => {
+    // Unlike `items` (a fresh array of freshly serialized DTOs per
+    // request), `meta` can be the very same object on every response — a
+    // hand-written handler returning a module-scope constant is the
+    // documented alternative to `withListMeta`.
+    const shared: ListMetaDto = { generatedIn: "3ms" };
+    const { crud } = makeCrud(findManyHandler(fixedHandler({ entities: [], total: 0, meta: shared })));
+
+    const list = await crud.findMany();
+    expect(list.meta).toEqual(shared);
+    expect(list.meta).not.toBe(shared);
+  });
+
+  it("keeps a later response's bag pristine after an earlier one is mutated", async () => {
+    const shared: ListMetaDto = { generatedIn: "3ms" };
+    const { crud } = makeCrud(findManyHandler(fixedHandler({ entities: [], total: 0, meta: shared })));
+
+    const first = await crud.findMany();
+    (first.meta as Record<string, unknown>).generatedIn = "tampered";
+
+    const second = await crud.findMany();
+    expect(second.meta).toEqual({ generatedIn: "3ms" });
+    expect(shared).toEqual({ generatedIn: "3ms" });
+  });
+});
+
+describe("the envelope's total is always present, even when the handler omits it", () => {
+  it("normalizes a missing total to null rather than dropping the key", async () => {
+    // `ListResultDto.total` is `number | null` and required. Left
+    // `undefined`, `JSON.stringify` would drop the key outright and ship a
+    // list body with no `total` at all. This is the unwrapped custom
+    // handler path — `withListMeta` rejects the same shape up front.
+    const noTotal = {
+      async execute() {
+        return { entities: [] };
+      },
+    };
+    const { crud } = makeCrud(findManyHandler(noTotal));
+
+    const list = await crud.findMany();
+    expect(list.total).toBeNull();
+    expect("total" in list).toBe(true);
+    expect(JSON.parse(JSON.stringify(list))).toMatchObject({ total: null });
+  });
 });
 
 describe("withListMeta — wrapping a findMany handler to add envelope metadata", () => {
@@ -201,6 +275,36 @@ describe("withListMeta — wrapping a findMany handler to add envelope metadata"
       context: { entityName: "User" },
     });
     await expect(crud.findMany()).rejects.toThrow("operations.findMany.handler");
+  });
+
+  // The message has to name *what* came back, or the adopter is left
+  // guessing which of their handlers is wrong. One case per branch of the
+  // shape description, so none of them can quietly stop being reached.
+  it.each([
+    { label: "null", returned: null, fragment: "returned null" },
+    { label: "an array", returned: [] as unknown, fragment: "returned an array" },
+    { label: "a primitive", returned: "nope" as unknown, fragment: "returned string" },
+    { label: "a bare object", returned: {} as unknown, fragment: "returned an object with no 'entities' array" },
+    {
+      label: "an entities array with no total",
+      returned: { entities: [] } as unknown,
+      fragment: "returned an object whose 'total' is neither a number nor null",
+    },
+    {
+      label: "an entities array with a non-numeric total",
+      returned: { entities: [], total: "7" } as unknown,
+      fragment: "returned an object whose 'total' is neither a number nor null",
+    },
+  ])("names what the wrapped handler returned instead — $label", async ({ returned, fragment }) => {
+    const wrong = {
+      async execute() {
+        return returned;
+      },
+    };
+    const { crud } = makeCrud(findManyHandler(withListMeta<User>(wrong, () => ({ never: "reached" }))));
+
+    await expect(crud.findMany()).rejects.toMatchObject({ code: "KAVO_CONFIG_INVALID" });
+    await expect(crud.findMany()).rejects.toThrow(fragment);
   });
 
   it("never runs the contributor when the wrapped handler is wrong-shaped", async () => {

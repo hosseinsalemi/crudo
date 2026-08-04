@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createKavo } from "@kavo/core";
+import { builtInHandlers, createKavo, withListMeta } from "@kavo/core";
 import { crudTools } from "@kavo/mcp";
 import {
   InMemoryNoteAdapter,
@@ -78,6 +78,33 @@ describe("crudTools", () => {
     expect(payload.items).toEqual([{ id: 2, title: "b", done: true }]);
     expect(adapter.lastQuery?.sort).toEqual([{ field: "title", direction: "desc" }]);
     expect(adapter.lastQuery?.filter.root).toEqual({ kind: "condition", field: "done", operator: "EQ", value: true });
+  });
+
+  it("carries the list envelope's contributed meta into the tool result unchanged", async () => {
+    // Doc 16 §"A successful call returns" claims the whole envelope is
+    // stringified, so whatever a `findMany` handler contributes to `meta`
+    // (doc 07 §3.1) reaches an MCP client with no per-key schema work
+    // here. Nothing else in this package pins that claim.
+    const CONTRIBUTED = { facets: { done: { true: 1, false: 1 } }, exhausted: false, cursor: null };
+    const adapter = new InMemoryTodoAdapter();
+    const service = createKavo().createCrud(
+      Todo,
+      {
+        operations: {
+          findMany: { handler: withListMeta<Todo>(builtInHandlers<Todo>(adapter)("findMany"), () => CONTRIBUTED) },
+        },
+      } as never,
+      { adapter, metadata: todoMetadata },
+    );
+    adapter.rows.push({ id: 1, title: "a", done: false }, { id: 2, title: "b", done: true });
+
+    const result = await find(crudTools({ name: "Todo", service }), "todo.findMany").handler({});
+
+    expect(result.isError).toBeUndefined();
+    const payload = JSON.parse((result.content[0] as { text: string }).text);
+    expect(payload.meta).toEqual(CONTRIBUTED);
+    expect(payload.items).toHaveLength(2);
+    expect(payload.total).toBe(2);
   });
 
   it("runs update, patch, and delete through the same engine", async () => {

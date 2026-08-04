@@ -47,11 +47,17 @@ void kavo.createCrud(Author, {
 });
 
 // Entity is inferred from the wrapped handler, so an inline contributor
-// is typed without an explicit type argument.
+// is typed without an explicit type argument. The body has to *use* the
+// element type for that to be a real claim — `result.entities.length`
+// compiles just as happily against `readonly unknown[]`, so it would pass
+// even if inference collapsed to `unknown`.
 void kavo.createCrud(Author, {
   operations: {
     findMany: {
-      handler: withListMeta(builtInHandlers(adapter)("findMany"), (result) => ({ count: result.entities.length })),
+      handler: withListMeta(builtInHandlers(adapter)("findMany"), (result) => {
+        expectTypeOf(result.entities).toEqualTypeOf<readonly Author[]>();
+        return { names: result.entities.map((author) => author.name).join(",") };
+      }),
     },
   },
 });
