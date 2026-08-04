@@ -30,11 +30,12 @@
     "@kavo/core": "workspace:^"
   },
   "peerDependencies": {
-    "@mikro-orm/core": "^6.0.0"
+    "@mikro-orm/core": "^7.0.0"
   },
   "devDependencies": {
-    "@mikro-orm/core": "^6.6.14",
-    "@mikro-orm/better-sqlite": "^6.6.14",
+    "@mikro-orm/core": "^7.1.9",
+    "@mikro-orm/decorators": "^7.1.9",
+    "@mikro-orm/sqlite": "^7.1.9",
     "reflect-metadata": "^0.2.2"
   }
 }

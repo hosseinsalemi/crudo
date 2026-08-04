@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { Entity, MikroORM, PrimaryKey, Property } from "@mikro-orm/core";
+import { MikroORM } from "@mikro-orm/core";
+import { Entity, PrimaryKey, Property } from "@mikro-orm/decorators/legacy";
 import {
   AlreadyDeletedException,
   ConfigurationException,
