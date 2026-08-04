@@ -25,6 +25,8 @@ const PUBLIC_SURFACE: readonly string[] = [
   "BUILT_IN_DEFAULTS",
   "CatalogedErrorCode",
   "ClassRef",
+  "ComputedFieldDescriptor",
+  "ComputedFieldMap",
   "ConfigurationException",
   "ConflictException",
   "KavoCallOptions",

@@ -1,4 +1,5 @@
 import type { KavoContext } from "../context/kavo-context.js";
+import type { ComputedFieldMap } from "../config/computed-field.js";
 import type { DtoClass } from "../dto/dto.js";
 import type { Deserializer, Serializer } from "./serializer.js";
 import type { EntityCatalog } from "../metadata/entity-catalog.js";
@@ -6,12 +7,26 @@ import type { EntityMetadata } from "../metadata/entity-metadata.js";
 import type { IncludeNode, IncludeTree } from "../relations/include-tree.js";
 import { dtoShapeKeys } from "../dto/dto-shape.js";
 
+/**
+ * Computed fields as the projector consumes them: entity type erased,
+ * because one serializer projects rows of several entity types — the
+ * root's, and every included relation target's, which it reads off the
+ * catalog. The entity-typed contract is `ComputedFieldDescriptor<Entity>`,
+ * which is what the *caller* declares and what every `ComputedFieldMap`
+ * flowing in here satisfies.
+ */
+type ErasedComputedFields = Readonly<Record<string, { resolve(entity: never, context: never): unknown }>>;
+
+const NO_COMPUTED_FIELDS: ErasedComputedFields = Object.freeze({});
+
 /** The projection rules for one entity type, resolved from the catalog. */
 interface Projection {
   /** Allowed keys, or `null` when the shape is unknown (own keys apply). */
   readonly keys: readonly string[] | null;
   /** Relation property names — never emitted unless the node is included. */
   readonly relations: readonly string[];
+  /** Computed fields, evaluated instead of read off the row (ADR-0019). */
+  readonly computed: ErasedComputedFields;
 }
 
 /**
@@ -22,7 +37,12 @@ interface Projection {
  * Projection sources, in order:
  * 1. An explicit DTO class with initialized fields → its key set.
  * 2. Otherwise the entity-derived default: every scalar column from
- *    adapter metadata.
+ *    adapter metadata, plus every declared computed field (ADR-0019).
+ *
+ * A key that names a computed field is produced by calling the
+ * descriptor's `resolve`, never by reading it off the row — which is what
+ * makes computed fields behave identically over a TypeORM class instance
+ * and a Prisma/Mongoose plain object.
  *
  * Relation properties are emitted **only** for nodes on the request's
  * include tree, each projected through its own target entity's
@@ -36,10 +56,12 @@ export class DefaultSerializer<Entity = unknown> implements Serializer<Entity> {
   constructor(
     metadata: EntityMetadata<Entity>,
     private readonly catalog?: EntityCatalog,
+    computed: ComputedFieldMap<Entity> = {},
   ) {
     this.rootProjection = {
-      keys: metadata.fields.map((field) => field.name),
+      keys: [...metadata.fields.map((field) => field.name), ...Object.keys(computed)],
       relations: metadata.relations.map((relation) => relation.name),
+      computed,
     };
   }
 
@@ -50,8 +72,7 @@ export class DefaultSerializer<Entity = unknown> implements Serializer<Entity> {
   ): ItemDto {
     return this.project(
       entity,
-      dtoShapeKeys(dto) ?? this.rootProjection.keys,
-      this.rootProjection.relations,
+      narrowToDto(this.rootProjection, dto),
       context.query?.fields.root as readonly string[] | null | undefined,
       context.query?.include ?? {},
       context,
@@ -74,18 +95,24 @@ export class DefaultSerializer<Entity = unknown> implements Serializer<Entity> {
    */
   private project(
     entity: unknown,
-    keys: readonly string[] | null,
-    relations: readonly string[],
+    projection: Projection,
     selection: readonly string[] | null | undefined,
     include: IncludeTree,
     context: KavoContext<Entity>,
   ): Record<string, unknown> {
     const source = entity as Record<string, unknown>;
-    const projection = keys ?? Object.keys(source);
+    const keys = projection.keys ?? Object.keys(source);
     const result: Record<string, unknown> = {};
-    for (const key of projection) {
-      if (relations.includes(key)) continue;
+    for (const key of keys) {
+      if (projection.relations.includes(key)) continue;
       if (selection != null && !selection.includes(key)) continue;
+      // Own properties only: `keys` can come from a DTO class or from the
+      // row itself, and an inherited `constructor`/`toString` must not be
+      // mistaken for a declared computed field.
+      if (Object.prototype.hasOwnProperty.call(projection.computed, key)) {
+        result[key] = projection.computed[key]?.resolve(entity as never, context as never);
+        continue;
+      }
       if (key in source) result[key] = source[key];
     }
     for (const [name, node] of Object.entries(include)) {
@@ -103,24 +130,40 @@ export class DefaultSerializer<Entity = unknown> implements Serializer<Entity> {
     }
     const target = this.projectionFor(node);
     const one = (row: unknown): Record<string, unknown> =>
-      this.project(row, target.keys, target.relations, node.fields, node.children, context);
+      this.project(row, target, node.fields, node.children, context);
     return Array.isArray(value) ? value.map(one) : one(value);
   }
 
   /**
    * The target entity's own projection: its registered `item` DTO (or
    * `list` for a to-many, which itself falls back to `item`), else the
-   * target's columns.
+   * target's columns plus its own computed fields — which is how a
+   * computed field on an included relation resolves without this class
+   * ever knowing more than one entity (ADR-0019).
    */
   private projectionFor(node: IncludeNode): Projection {
     const info = this.catalog?.get(node.relation.target());
-    if (info === undefined) return { keys: null, relations: [] };
+    if (info === undefined) return { keys: null, relations: [], computed: NO_COMPUTED_FIELDS };
     const dto = info.config.dto.resolve(node.relation.cardinality === "many" ? "list" : "item", "findMany");
+    const computed: ErasedComputedFields = info.config.computed;
     return {
-      keys: dtoShapeKeys(dto) ?? info.metadata.fields.map((field) => field.name),
+      keys: dtoShapeKeys(dto) ?? [...info.metadata.fields.map((field) => field.name), ...Object.keys(computed)],
       relations: info.metadata.relations.map((relation) => relation.name),
+      computed,
     };
   }
+}
+
+/**
+ * DTO mapping, step one of the normative order: a registered class with a
+ * runtime shape replaces the projection's key set and nothing else — the
+ * relation and computed tables still describe the same entity, so a DTO
+ * that names a computed field still gets it evaluated, and one that omits
+ * it narrows it away like any other field.
+ */
+function narrowToDto(projection: Projection, dto: DtoClass | null): Projection {
+  const keys = dtoShapeKeys(dto);
+  return keys === null ? projection : { ...projection, keys };
 }
 
 /**
@@ -134,12 +177,21 @@ export class DefaultSerializer<Entity = unknown> implements Serializer<Entity> {
  * a scalar id, an `{ id }` reference, or an array of either.
  * A nested object carrying more than the id is narrowed to the id, because
  * a deep nested write is not something this layer should do by accident.
+ *
+ * Computed fields are **never** writable (ADR-0019). Keeping them out of
+ * the derived projection is not enough on its own: a registered
+ * `create`/`update` DTO *replaces* that projection, so a DTO class naming
+ * a computed field would otherwise pass the key straight through to the
+ * adapter as if it were a column. They are stripped explicitly, whichever
+ * projection is in force.
  */
 export class DefaultDeserializer<Entity = unknown> implements Deserializer<Entity> {
   private readonly writableProjection: readonly string[];
   private readonly relationIdFields: ReadonlyMap<string, () => string | undefined>;
+  private readonly computedNames: ReadonlySet<string>;
 
-  constructor(metadata: EntityMetadata<Entity>, catalog?: EntityCatalog) {
+  constructor(metadata: EntityMetadata<Entity>, catalog?: EntityCatalog, computed: ComputedFieldMap<Entity> = {}) {
+    this.computedNames = new Set(Object.keys(computed));
     const columns = metadata.fields.filter((field) => !field.generated).map((field) => field.name);
     const relations = new Map<string, () => string | undefined>();
     for (const relation of metadata.relations) {
@@ -160,6 +212,9 @@ export class DefaultDeserializer<Entity = unknown> implements Deserializer<Entit
     const source = raw as Record<string, unknown>;
     const result: Record<string, unknown> = {};
     for (const key of allowed) {
+      // A computed field has no column behind it, so a value for it could
+      // only ever reach the adapter as an unknown write (ADR-0019).
+      if (this.computedNames.has(key)) continue;
       // Own properties only. `raw` is a wire body, so an inherited key is
       // never something the client sent — but it *is* something a polluted
       // `Object.prototype` would supply, silently adding a writable field to

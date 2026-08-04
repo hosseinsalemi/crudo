@@ -1,5 +1,6 @@
 import type { KavoSettings } from "./settings.js";
 import type { DeepPartial } from "../types/utility.js";
+import type { ComputedFieldDescriptor, ComputedFieldMap } from "./computed-field.js";
 import type { EntityConfig, OperationConfig, QueryFieldSelector } from "./entity-config.js";
 import type { ResolvedEntityConfig, ResolvedQueryAllowlists } from "./resolved-entity-config.js";
 import type { EntityMetadata } from "../metadata/entity-metadata.js";
@@ -36,8 +37,8 @@ const SETTINGS_KEYS = [
 
 /**
  * An `EntityConfig`/`OperationConfig` mixes settings keys with structural
- * keys (`dto`, `allowlists`, `handler`, …); only the settings subset
- * participates in the merge algebra.
+ * keys (`dto`, `allowlists`, `computed`, `handler`, …); only the settings
+ * subset participates in the merge algebra.
  */
 function pickSettings(config: Readonly<Record<string, unknown>> | undefined): DeepPartial<KavoSettings> | undefined {
   if (config === undefined) return undefined;
@@ -60,7 +61,8 @@ export function resolveEntityConfig<Entity extends object>(
   globalDefaults: DeepPartial<KavoSettings> | undefined,
 ): ResolvedEntityConfig<Entity> {
   const entityName = metadata.name;
-  const allowlists = resolveAllowlists(metadata, entityConfig);
+  const computed = resolveComputedFields(metadata, entityConfig);
+  const allowlists = resolveAllowlists(metadata, entityConfig, computed);
   const entitySettings = mergeSettings(
     BUILT_IN_DEFAULTS,
     globalDefaults,
@@ -102,8 +104,61 @@ export function resolveEntityConfig<Entity extends object>(
     allowlists,
     softDelete: resolveSoftDelete(metadata, entitySettings),
     dto: new DefaultDtoResolver<Entity>(entityConfig?.dto),
+    computed,
     relations: new DefaultRelationRegistry<Entity>(metadata.relations, entitySettings.relations.edges, entityName),
   };
+  return Object.freeze(resolved);
+}
+
+/** Assignable to `ComputedFieldMap<Entity>` for every `Entity`. */
+const NO_COMPUTED_FIELDS: Readonly<Record<string, never>> = Object.freeze({});
+
+/**
+ * Computed-field resolution (ADR-0019). `computed` carries functions, so
+ * like `dto` it sits outside `SETTINGS_KEYS` and never merges through the
+ * precedence chain — an entity's declaration is the whole story, resolved
+ * once here.
+ *
+ * Both ways a declaration can be structurally wrong fail at bootstrap
+ * rather than as a surprising response later: a name that shadows a real
+ * column or relation (the shadowed value would silently disappear from
+ * every response), and a descriptor with no `resolve` function.
+ */
+function resolveComputedFields<Entity extends object>(
+  metadata: EntityMetadata<Entity>,
+  entityConfig: EntityConfig<Entity> | undefined,
+): ComputedFieldMap<Entity> {
+  const entityName = metadata.name;
+  // `EntityConfig<Entity>` fixes the `Computed` parameter to `never`, so
+  // the declared record erases to `{}` at this internal call site; the
+  // key/value types are recovered here, once.
+  const declared = (entityConfig as { readonly computed?: ComputedFieldMap<Entity> } | undefined)?.computed;
+  if (declared === undefined) return NO_COMPUTED_FIELDS;
+
+  const columns = new Set(metadata.fields.map((field) => field.name));
+  const relations = new Set(metadata.relations.map((relation) => relation.name));
+  const resolved: Record<string, ComputedFieldDescriptor<Entity>> = {};
+  for (const name of Object.keys(declared)) {
+    const descriptor = declared[name];
+    if (typeof descriptor?.resolve !== "function") {
+      throw new ConfigurationException(
+        entityName,
+        `computed.${name}`,
+        `computed field '${name}' has no 'resolve' function — a computed field is defined by ` +
+          `how it is derived, e.g. { resolve: (entity) => … }`,
+      );
+    }
+    if (columns.has(name) || relations.has(name)) {
+      const kind = columns.has(name) ? "column" : "relation";
+      throw new ConfigurationException(
+        entityName,
+        `computed.${name}`,
+        `computed field '${name}' collides with an existing ${kind} on '${entityName}' — ` +
+          `a computed field must have a name of its own, or the ${kind} would never reach a response`,
+      );
+    }
+    resolved[name] = descriptor;
+  }
   return Object.freeze(resolved);
 }
 
@@ -113,18 +168,42 @@ export function resolveEntityConfig<Entity extends object>(
  * columns** — relation paths are never filterable/sortable/selectable
  * unless opted in explicitly. Anything outside the list is a 400 at query
  * time, never a silent drop.
+ *
+ * Computed fields join the `selectable` base set (so `fields=fullName`
+ * works with no further configuration) unless the descriptor opts out with
+ * `selectable: false`, and are barred from `filterable`/`sortable`
+ * outright — there is no column to translate to `WHERE`/`ORDER BY`
+ * (ADR-0019).
  */
 function resolveAllowlists<Entity extends object>(
   metadata: EntityMetadata<Entity>,
   entityConfig: EntityConfig<Entity> | undefined,
+  computed: ComputedFieldMap<Entity>,
 ): ResolvedQueryAllowlists<Entity> {
   const ownColumns = metadata.fields.map((field) => field.name) as unknown as readonly FieldPath<Entity>[];
+  const selectableBase = [
+    ...(ownColumns as readonly string[]),
+    ...Object.keys(computed).filter((name) => computed[name]?.selectable !== false),
+  ] as unknown as readonly FieldPath<Entity>[];
   const configured = entityConfig?.allowlists;
-  return deepFreeze({
+  const allowlists = {
     filterable: resolveFieldSelector(ownColumns, configured?.filterable),
     sortable: resolveFieldSelector(ownColumns, configured?.sortable),
-    selectable: resolveFieldSelector(ownColumns, configured?.selectable),
-  });
+    selectable: resolveFieldSelector(selectableBase, configured?.selectable),
+  };
+  for (const key of ["filterable", "sortable"] as const) {
+    for (const field of allowlists[key] as readonly string[]) {
+      if (!Object.prototype.hasOwnProperty.call(computed, field)) continue;
+      throw new ConfigurationException(
+        metadata.name,
+        `allowlists.${key}`,
+        `'${field}' is a computed field on '${metadata.name}', which can never be ${
+          key === "filterable" ? "filtered on" : "sorted on"
+        } — it has no column to translate to ${key === "filterable" ? "WHERE" : "ORDER BY"}`,
+      );
+    }
+  }
+  return deepFreeze(allowlists);
 }
 
 /**
@@ -179,6 +258,7 @@ export function describeResolvedConfig<Entity>(
     entityName: config.entityName,
     settings: config.settings,
     allowlists: config.allowlists,
+    computed: Object.keys(config.computed),
     softDelete: config.softDelete,
     relations: config.relations.all().map((relation) => ({
       name: relation.name,
