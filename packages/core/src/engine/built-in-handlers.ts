@@ -29,7 +29,7 @@ export interface FindManyResult<Entity> {
   /**
    * Whether at least one more row exists past this page — the has-more
    * signal `meta.nextCursor` needs, since "null on the last page" cannot be
-   * answered by the page itself (ADR-0019).
+   * answered by the page itself (ADR-0021).
    *
    * Only the cursor-paginated path sets it, by over-fetching `limit + 1` and
    * dropping the sentinel row. Offset paging answers the same question from
@@ -90,7 +90,7 @@ export function builtInHandlers<Entity extends object>(
         // adapters would otherwise implement the same off-by-one four times,
         // and `findMany`'s contract stays "return exactly what the query
         // asks for" — a custom adapter needs no cursor awareness at all
-        // beyond honoring `readFilter` (ADR-0019).
+        // beyond honoring `readFilter` (ADR-0021).
         const cursorPaged = isCursorPagination(query.pagination);
         const fetched = await adapter.findMany(cursorPaged ? overFetch(query) : query, context);
         const hasMore = cursorPaged && fetched.length > query.pagination.limit;

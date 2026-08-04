@@ -62,10 +62,22 @@ Missing rows raise `NotFoundException` (load returns `null`;
 
 ## 4. Pagination & count strategy
 
-`skip`/`take` from the normalized `limit`/`offset`. `count()` is a
-dedicated query built from the same filter (sorting stripped) — never
-`getManyAndCount`: the engine only calls `count` when
-`pagination.count` is true, so `total: null` costs zero extra queries.
+`findMany` filters by `readFilter(query)`, not `query.filter` directly:
+under cursor pagination `readFilter` AND-s in the keyset predicate
+`QueryNormalizer` built from the effective sort onto the client filter
+(ADR-0021); under offset pagination it is the identity function, so this
+adapter's shape is unchanged there. The pagination read itself must
+narrow with `isCursorPagination` before touching `.offset` — a
+`CursorPagination` carries none — and when it is a cursor page, `skip(0)`
+runs instead: the keyset predicate already restricts to rows after the
+cursor, so there is nothing left to skip. Either way `take(pagination.limit)`
+bounds the page.
+
+`count()` is a dedicated query built from `query.filter` (sorting
+stripped) — **not** `readFilter(query)` — since `total` is the size of
+the whole match set, not of what remains after the cursor; never
+`getManyAndCount`: the engine only calls `count` when `pagination.count`
+is true, so `total: null` costs zero extra queries.
 
 ## 5. Error-mapping table
 

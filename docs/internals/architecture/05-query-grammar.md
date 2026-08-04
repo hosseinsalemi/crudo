@@ -154,23 +154,40 @@ LOWER(:v)`), identical on every driver. Both operators apply to string
 
   The third built-in, `cursor`, is the one that does **not** normalize to
   `limit`/`offset`: `Pagination` is a union, and its keyset variant carries
-  `{ limit, cursor, keyset }` with no `offset` at all (ADR-0019). Consumers
+  `{ limit, cursor, keyset }` with no `offset` at all (ADR-0021). Consumers
   narrow with `isCursorPagination` before reading `offset`. Wire form is
   flat `limit` plus an opaque `cursor` token; the next page's token comes
   back as `meta.nextCursor` on the list envelope, `null` on the last page.
 
   Two pieces of the cursor pipeline are deliberately _not_ in the strategy,
   because `normalize(rawParams, limits)` sees neither sort nor metadata:
-  `QueryNormalizer` enforces that the effective sort ends in `idField` and
-  consists of root scalar columns, then decodes the token into
-  `pagination.keyset` — a plain filter AST node (`OR` of `AND` chains,
-  `LT` for each `desc` key). Adapters compose it by calling
+  `QueryNormalizer` enforces what the effective sort has to be, then decodes
+  the token into `pagination.keyset` — a plain filter AST node (`OR` of
+  `AND` chains, `LT` for each `desc` key, AND-ed with a redundant non-strict
+  bound on the leading key so a btree can _start_ the scan there rather than
+  filtering the whole disjunction). Adapters compose it by calling
   `readFilter(query)` in `findMany`; `count` keeps using `query.filter`, so
-  `total` still spans the whole match set. A malformed, stale, or forged
-  token is a `KAVO_QUERY_INVALID_VALUE` issue on `cursor`; a sort that
-  cannot support keyset paging is `KAVO_QUERY_CONFLICTING_PARAMS` on
-  `sort`. Cursors are opaque, never signed — ADR-0019 §2 explains why that
-  is sufficient.
+  `total` still spans the whole match set.
+
+  The sort rules are: it ends in `idField`, every key is a root scalar
+  column, no key is `json`, and **every key is on `filterable` and
+  `selectable` as well as `sortable`**. That last one is the load-bearing
+  security rule rather than a tidiness one — the keyset predicate is
+  AND-ed in _after_ `DefaultFilterParser` and `validateExpression` have run,
+  and `cursorValuesOf` reads the raw entity into `meta`, which never passes
+  through the serializer. Gated on `sortable` alone, the cursor path would
+  be a way around the other two allowlists in both directions (ADR-0021 §2).
+  A key that fails is rejected, never dropped: dropping one would break the
+  total order.
+
+  A malformed, stale, or forged token is a `KAVO_QUERY_INVALID_VALUE` issue
+  on `cursor`; a sort that cannot support keyset paging is
+  `KAVO_QUERY_CONFLICTING_PARAMS` on `sort`, or `KAVO_QUERY_INVALID_FIELD`
+  on the offending field for the allowlist gates. Supplying `?cursor=` to an
+  entity that does not page by keyset is `KAVO_QUERY_UNSUPPORTED_PARAM`,
+  identically on the wire and programmatic paths — ignoring it would hand
+  back page one forever. Cursors are opaque, never signed — ADR-0021 §2
+  explains why that is sufficient.
 
 - **Field selection:** `fields=id,name,email` — sparse fieldset for the
   root resource, validated against the selectable allowlist.

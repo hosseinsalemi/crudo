@@ -192,8 +192,8 @@ const config = defineConfig({
                 link: "/internals/adr/0018-mongoose-models-are-entity-identities",
               },
               {
-                text: "0019 — Cursor pagination is an opaque keyset union",
-                link: "/internals/adr/0019-cursor-pagination-is-an-opaque-keyset-union",
+                text: "0021 — Cursor pagination is an opaque keyset union",
+                link: "/internals/adr/0021-cursor-pagination-is-an-opaque-keyset-union",
               },
             ],
           },

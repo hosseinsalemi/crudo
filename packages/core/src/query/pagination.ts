@@ -19,14 +19,14 @@ export interface OffsetPagination {
  * Keyset semantics: "take `limit` rows ordered after the row the cursor
  * names". There is deliberately **no `offset`** — a keyset page has no
  * absolute position in the match set, and inventing a zero here would hand
- * every adapter a meaningless number to translate (ADR-0019).
+ * every adapter a meaningless number to translate (ADR-0021).
  */
 export interface CursorPagination<Entity = unknown> {
   /** Effective page size, after clamping to the configured `maxLimit`. */
   readonly limit: number;
   /**
    * The opaque token the client sent, verbatim; `null` on the first page.
-   * Opaque, **not** signed — see ADR-0019 for why a forged cursor grants
+   * Opaque, **not** signed — see ADR-0021 for why a forged cursor grants
    * nothing `filter[…]` does not already grant.
    */
   readonly cursor: string | null;
@@ -49,7 +49,7 @@ export interface CursorPagination<Entity = unknown> {
  * Normalized pagination — the internal form every strategy produces and
  * every adapter consumes.
  *
- * A **union**, not one shape (ADR-0019): offset and keyset paging are
+ * A **union**, not one shape (ADR-0021): offset and keyset paging are
  * different enough that collapsing them costs correctness. Narrow with
  * {@link isCursorPagination} before reading `offset`.
  */

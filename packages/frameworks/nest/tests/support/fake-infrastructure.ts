@@ -127,7 +127,7 @@ export class InMemoryTodoAdapter implements RepositoryAdapter<Todo> {
   async findMany(query: NormalizedQueryContext<Todo>, context: KavoContext<Todo>): Promise<readonly Todo[]> {
     this.lastQuery = query;
     const { limit } = query.pagination;
-    // Offset-only fixture: narrow rather than assume (ADR-0019).
+    // Offset-only fixture: narrow rather than assume (ADR-0021).
     const offset = isCursorPagination(query.pagination) ? 0 : query.pagination.offset;
     return this.live(query, context).slice(offset, offset + limit);
   }

@@ -47,9 +47,17 @@ caller didn't forward one), and the typed `state` bag
 
 Ordinary registry entries (ADR-0006), one adapter call each plus the
 "missing vs. error" decision — adapters return `null`, handlers raise
-`NotFoundException`. `findMany` returns `{ entities, total, meta? }` where
-`total` is only computed when `pagination.count` is true (a separate
-count query, never `getManyAndCount`). `deleteOne`/`restoreOne`/
+`NotFoundException`. `findMany` returns `{ entities, total, meta?, hasMore? }`
+where `total` is only computed when `pagination.count` is true (a separate
+count query, never `getManyAndCount`), and `hasMore` is the has-more
+signal `meta.nextCursor` needs under cursor pagination (§3.1, ADR-0021):
+the built-in handler over-fetches `limit + 1` rows from the adapter, drops
+the sentinel row, and reports whether it was there. That over-fetch lives
+in the handler, not in the adapters, so `EntityReader`'s contract stays
+"return exactly what the query asks for" and a third-party adapter needs
+no cursor awareness beyond honouring `readFilter` — only the built-in
+`findMany` handler sets `hasMore`; a replacement handler that omits it is
+taken at its word: no signal, no next page. `deleteOne`/`restoreOne`/
 `purgeOne` are equally ordinary entries — the delete strategy is resolved
 in config and applied by the adapter (doc 11), so no handler branches on
 it. The batch (`*Many`) entries are registered **disabled**: calling one
@@ -72,9 +80,17 @@ it never passes through the serializer — no DTO projection, no `fields=`
 selection, no renaming.
 
 `KavoEngine.listMeta` is that single merge point, named rather than
-inlined because the handler is only the first contributor: a pagination
-strategy computing `meta.nextCursor` belongs to the engine, not to
-whichever handler happens to be configured, and folds in there.
+inlined because the handler is only the first contributor. Under cursor
+pagination it computes `meta.nextCursor` itself (ADR-0021) — `null` on
+the last page, otherwise `encodeCursor` over the last returned row's sort
+values — and that computed value is the **base** that the handler's own
+`meta` (or a `withListMeta` contributor's) merges over: a contributor that
+names `nextCursor` explicitly wins, the same "more specific wins"
+direction every other precedence chain in Kavo runs. `listMeta` also
+raises `ConfigurationException` when the token it just computed equals the
+one the request carried — that equality is what an adapter ignoring
+`readFilter` looks like from here (every page would echo the same cursor),
+and erroring beats looping a client forever.
 `withListMeta(handler, compute)` (`core/src/engine/with-list-meta.ts`) is
 the ergonomic wrap for the common case; its merge precedence is the
 contributor's keys over the wrapped handler's, matching the direction

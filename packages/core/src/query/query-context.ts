@@ -53,7 +53,7 @@ export interface NormalizedQueryContext<Entity = unknown> {
   readonly filter: Filter<Entity>;
   readonly sort: readonly Sort<Entity>[];
   /**
-   * A union (ADR-0019): narrow with `isCursorPagination` before reading
+   * A union (ADR-0021): narrow with `isCursorPagination` before reading
    * `offset`, which a keyset page deliberately does not carry.
    */
   readonly pagination: Pagination<Entity>;

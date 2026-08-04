@@ -45,7 +45,7 @@ export class PagePaginationStrategy implements PaginationStrategy {
 
 /**
  * Keyset pagination: flat `limit` plus an opaque `cursor` token naming the
- * previous page's last row (ADR-0019). `O(limit)` regardless of how deep the
+ * previous page's last row (ADR-0021). `O(limit)` regardless of how deep the
  * page is, and stable under concurrent writes — the two things `offset`
  * cannot give.
  *
