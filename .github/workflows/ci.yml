@@ -15,9 +15,17 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# `pnpm check` runs the whole gate as one command locally. CI splits it in
+# two — `build` (compile, types, boundaries, lint) and `test` — because a
+# status badge can only report a job, never a step: one combined job can say
+# "CI failing" but never "the build is fine, a test regressed". The halves
+# are disjoint and their union is exactly `pnpm check`, which
+# `tests/ci-workflow.spec.ts` asserts against this file so a step added to
+# the gate cannot silently stop running here. They also run in parallel, so
+# the split costs no wall-clock.
 jobs:
-  check:
-    name: check (node ${{ matrix.node }})
+  build:
+    name: build (node ${{ matrix.node }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -39,9 +47,40 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # build + depcruise + test — the same gate as local `pnpm check`.
-      - name: Check
-        run: pnpm check
+      # `generate` first: the Prisma client it emits is what `build` and
+      # `typecheck` compile @kavo/prisma against.
+      - name: Build
+        run: pnpm run generate && pnpm run build && pnpm run typecheck && pnpm run depcruise && pnpm run lint
+
+  test:
+    name: test (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["lts/-1", "lts/*", "current"]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # No `build` step: vitest aliases every `@kavo/*` specifier straight to
+      # package `src/` (see vitest.config.ts), so the suite never reads
+      # `dist/`. `generate` is still required — it emits the Prisma client and
+      # pushes the SQLite fixture schema the @kavo/prisma specs run against.
+      - name: Test
+        run: pnpm run generate && pnpm run test
 
   format:
     name: format
