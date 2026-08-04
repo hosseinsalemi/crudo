@@ -59,6 +59,29 @@ the serializer emits the return value unawaited and the response would
 silently carry `{}`. Returning `undefined` omits the key and `null` emits
 it, the same distinction the column branch draws.
 
+`resolve` must also be **total**, which is a stronger requirement than
+pure and the one that actually bites. `serializeList` is an unguarded
+`entities.map(...)` and nothing downstream catches a resolver, so a
+single row the resolver cannot handle takes down the whole collection
+response — for every caller, not just that row, until the row is
+repaired. `todo.title.toLowerCase()` against a nullable column is
+therefore a latent outage, not a style issue: a client may `POST`
+`title: null` (the computed key is stripped from the payload, `title` is
+an ordinary column, the write succeeds) and `GET /todos` answers 500
+from then on. Resolvers are written defensively —
+`todo.title?.toLowerCase() ?? null`. The serializer deliberately does
+**not** swallow the throw: everything else in the pipeline fails loudly,
+and a caught resolver would turn a config bug into a field that is
+sometimes silently absent.
+
+Because selection is "kept internally, stripped late", `resolve` receives
+the **fully hydrated row**, not the projected object. A computed field
+can therefore surface a column that a narrowed `item` DTO or `selectable`
+list hides. That is intended rather than a leak — `resolve` is
+server-authored code at the same trust level as `exposeInternals` — but
+it means the resolver, not just the DTO, is part of the exposure
+decision.
+
 **2. Present by default, narrowed like any other field.** A declared
 computed field joins the entity-derived `item`/`list` projection with no
 DTO registration, and joins the `selectable` allowlist unless the
@@ -75,21 +98,36 @@ a future option here; a caller who needs to filter or sort on a derived
 value wants a real generated column, which every supported ORM already
 offers.
 
-**4. Never writable.** `DefaultDeserializer` strips computed names from
-every write payload. Keeping them out of the derived writable projection
-is _not_ sufficient on its own: a registered `create`/`update` DTO
-replaces that projection wholesale (`dtoShapeKeys(dto) ??
-this.writableProjection`), so a DTO class declaring the field for
-documentation would otherwise pass the key through to the adapter as if it
-were a column. The strip is explicit and applies whichever projection is
-in force.
+**4. Never writable**, in two layers. A registered
+`create`/`update`/`patch` DTO naming a computed field is a **bootstrap
+`ConfigurationException`**, like every other computed misdeclaration: the
+declaration is judgeable once, at `createCrud`, and a silent per-request
+drop is the wrong report for it. It also has a wire consequence no
+runtime strip can reach — `@kavo/nest` builds `@ApiBody` from the DTO's
+runtime shape, so OpenAPI would advertise a property the engine
+unconditionally discards. (A raw body key naming a computed field is
+still just dropped; that is an unknown key, not a declaration.)
+
+Underneath, `DefaultDeserializer` strips computed names from every write
+payload regardless. Keeping them out of the derived writable projection
+is _not_ sufficient on its own — a registered DTO replaces that
+projection wholesale (`dtoShapeKeys(dto) ?? this.writableProjection`) —
+and `DefaultDeserializer` is exported, so its contract is "a computed
+name never reaches the adapter" on its own terms, not "the config
+resolver checked first". Through `createCrud` the bootstrap error makes
+the strip unreachable; it stays as the guarantee for a deserializer
+constructed directly.
 
 Further declarations are bootstrap errors for the same
 fail-fast-with-the-key-path reason: a computed name colliding with a real
 column or relation (the shadowed value would silently vanish from every
 response), a descriptor with no `resolve` function, and the name
 `__proto__`, which is not an ordinary object key and would disappear from
-the resolved map without a word.
+the resolved map without a word. `__proto__` has to be caught twice: the
+computed-key spelling (`{ ["__proto__"]: … }`) creates an own key and is
+rejected by name, while the object-literal spelling (`{ __proto__: … }`)
+invokes the prototype setter and never reaches `Object.keys` at all — it
+is detected by checking the declared record's prototype.
 
 `computed` carries functions, so — like `dto` and `relations` — it is
 **entity-scope structural config, outside the settings precedence chain**:
@@ -135,6 +173,23 @@ so rule 3 is a compile error before it is a bootstrap error.
   for any other narrowing today. Deriving it automatically was considered
   and left out — it would mean synthesizing a response type from a config
   value, which every other DTO slot deliberately does not do.
+- The **generated OpenAPI response schema** has the same gap for the same
+  reason. `@kavo/nest`'s `successBodyFor` falls back to the entity class
+  when no `item`/`list` DTO is registered, so `GET /todos/1` returns the
+  computed field at runtime while the document does not mention it.
+  Registering an `item`/`list` DTO naming the field is the one escape
+  hatch for both consequences at once.
+- **A throwing resolver is a 500 labelled `KAVO_PERSISTENCE_FAILED`.**
+  Nothing in core catches `resolve`, so it takes the engine's ordinary
+  untranslated-error path: the original error is preserved as `cause` and
+  its message is never leaked into the problem-details body. The code is
+  the existing catch-all rather than a truthful one — "persistence
+  failed" is a poor label for caller code running at response mapping,
+  and a dedicated code was not worth a new entry in the stable catalog
+  for a case the cause already identifies. Note where in the lifecycle
+  this lands: response mapping runs **after** the handler, so on
+  `createOne` the row is already committed when the 500 goes out. A
+  client that retries duplicates it.
 - The extension point, if a later version wants derived values the
   database can filter on: that is a generated column, declared through
   the ORM and surfaced by the metadata seam as an ordinary field — not a

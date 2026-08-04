@@ -90,7 +90,7 @@ faked through a DTO class:
 ```ts
 createCrud(User, {
   computed: {
-    fullName: { resolve: (user) => `${user.firstName} ${user.lastName}` },
+    fullName: { resolve: (user) => [user.firstName, user.lastName].filter(Boolean).join(" ") },
   },
 });
 ```
@@ -98,21 +98,26 @@ createCrud(User, {
 `DefaultSerializer` **evaluates** a computed key by calling `resolve`,
 never by reading it off the row — which is what makes it behave the same
 over a TypeORM class instance and a Prisma/Mongoose plain object, and why
-no ORM adapter is involved at all. `resolve` also receives the request's
+no ORM adapter is involved at all. It evaluates it even when the row
+_does_ carry that key (a class getter, or a column outside the metadata
+seam): resolving beats reading, or the feature would collapse back into
+the accident it replaced. `resolve` also receives the request's
 `KavoContext`, so a field may vary by `principal`; it is synchronous by
-design, because it runs once per served item.
+design, because it runs once per served item — and must be **total**, not
+just pure, because one throwing row fails the entire list response
+([ADR-0019](/internals/adr/0019-computed-fields-are-serializer-evaluated)).
 
 The rules, all governed by
 [ADR-0019](/internals/adr/0019-computed-fields-are-serializer-evaluated):
 
-| Aspect                  | Behavior                                                                                  |
-| ----------------------- | ----------------------------------------------------------------------------------------- |
-| Default projection      | Included in `item`/`list` automatically — no DTO registration needed                      |
-| Explicit DTO            | Narrows it like any other field (omit it to hide it; name it to keep it, still evaluated) |
-| `selectable`            | Joined by default, so `fields=fullName` works; `selectable: false` opts out               |
-| `filterable`/`sortable` | **Never** — naming one is a bootstrap `ConfigurationException`, and a type error besides  |
-| Write payloads          | Always stripped, even when a registered `create`/`update` DTO declares the key            |
-| Precedence chain        | Outside it: structural entity config like `dto`, resolved once at `createCrud`            |
+| Aspect                  | Behavior                                                                                                                         |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Default projection      | Included in `item`/`list` automatically — no DTO registration needed                                                             |
+| Explicit DTO            | Narrows it like any other field (omit it to hide it; name it to keep it, still evaluated)                                        |
+| `selectable`            | Joined by default, so `fields=fullName` works; `selectable: false` opts out                                                      |
+| `filterable`/`sortable` | **Never** — naming one is a bootstrap `ConfigurationException`, and a type error besides                                         |
+| Write payloads          | Never writable — a `create`/`update`/`patch` DTO naming one is a bootstrap error, and the deserializer strips the key regardless |
+| Precedence chain        | Outside it: structural entity config like `dto`, resolved once at `createCrud`                                                   |
 
 The serialization order of §5 is unchanged: a computed field is subject to
 "selection narrows, never widens" exactly like a column.
@@ -123,5 +128,7 @@ from the target's own resolved config through the `EntityCatalog` (§6), so
 this composes with no extra machinery.
 
 Static typing of the response is unaffected: the entity-derived `ItemDto`
-does not grow the key. Registering an `item`/`list` DTO that names it is
-how a caller gets it statically typed, as for any other narrowing.
+does not grow the key, and neither does the generated OpenAPI response
+schema, which falls back to the entity class when no `item`/`list` slot is
+registered. Registering an `item`/`list` DTO that names it is how a caller
+gets it statically typed — and documented — as for any other narrowing.

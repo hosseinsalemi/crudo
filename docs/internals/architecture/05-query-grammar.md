@@ -189,10 +189,11 @@ LOWER(:v)`), identical on every driver. Both operators apply to string
   ([ADR-0019](/internals/adr/0019-computed-fields-are-serializer-evaluated)).
 - **Excluding instead of enumerating:** each allowlist key also accepts
   `{ exclude: [...] }` instead of an explicit array — resolved at
-  bootstrap to every own column except the ones named, so hiding one
-  column (e.g. a soft-delete marker) doesn't require re-listing every
-  other one. Resolution still starts from the same own-columns default,
-  so the result stays fail-closed like the plain array form.
+  bootstrap to every own column (plus, for `selectable`, every selectable
+  computed field) except the ones named, so hiding one column (e.g. a
+  soft-delete marker) doesn't require re-listing every other one.
+  Resolution starts from exactly the base set that key's plain default
+  uses, so the result stays fail-closed like the plain array form.
 - **Limits** (configurable per scope, doc 8): `query.maxFilterDepth`
   (default 3) on the built AST, `query.maxInValues` (default 100) on
   `in`/`notIn` arrays, `pagination.maxLimit` (default 100) on page size.

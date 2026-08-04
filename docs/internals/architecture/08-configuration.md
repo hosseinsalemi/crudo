@@ -96,10 +96,17 @@ bootstrap rather than as a surprising response later
 - a descriptor with no `resolve` function;
 - an `async` `resolve`, whose promise the serializer would emit unawaited;
 - the name `__proto__`, which is not an ordinary object key and would
-  disappear from the resolved map without a word;
+  disappear from the resolved map without a word — caught in both of its
+  spellings, by name for `{ ["__proto__"]: … }` and by inspecting the
+  declared record's prototype for the object-literal `{ __proto__: … }`,
+  which invokes the prototype setter and never reaches `Object.keys`;
 - a computed name in a configured `allowlists.filterable`/`sortable` —
   there is no column to translate to `WHERE`/`ORDER BY`, and in-memory
-  post-fetch filtering is rejected rather than deferred.
+  post-fetch filtering is rejected rather than deferred;
+- a computed name declared by a registered `create`/`update`/`patch` DTO
+  class — the value could only ever be discarded, and the DTO's runtime
+  shape is what `@kavo/nest` builds `@ApiBody` from, so OpenAPI would
+  advertise a property the engine unconditionally drops.
 
 ### `query.defaultSort`
 

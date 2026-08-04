@@ -16,7 +16,7 @@ import type { KavoContext } from "../context/kavo-context.js";
  * ```ts
  * createCrud(User, {
  *   computed: {
- *     fullName: { resolve: (user) => `${user.firstName} ${user.lastName}` },
+ *     fullName: { resolve: (user) => [user.firstName, user.lastName].filter(Boolean).join(" ") },
  *   },
  * });
  * ```
@@ -31,6 +31,19 @@ export interface ComputedFieldDescriptor<Entity = unknown> {
    * has to vary by caller, `context.principal`): a resolver that hits the
    * database or the network runs once per row and reintroduces exactly the
    * N+1 the include resolver exists to avoid.
+   *
+   * It must also be **total** over anything the columns can hold, which is
+   * the stronger requirement. `serializeList` maps it over every row and
+   * nothing catches it, so one row the resolver cannot handle fails the
+   * whole collection response for every caller —
+   * `user.firstName?.trim() ?? null`, never `user.firstName.trim()` on a
+   * nullable column.
+   *
+   * It receives the **fully hydrated row**, not the projected object
+   * (selection is "kept internally, stripped late"), so a computed field
+   * can surface a column a narrowed `item` DTO hides. That is deliberate —
+   * `resolve` is server-authored code — but it makes the resolver part of
+   * the exposure decision.
    *
    * **On an included relation target, `context` is the *root* request's.**
    * One response is one request, and `KavoContext` describes that request:
