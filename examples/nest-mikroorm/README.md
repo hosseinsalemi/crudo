@@ -56,12 +56,16 @@ query language and adds the join itself. (`@kavo/mongoose` refuses the same
 query outright.) It is still an allowlist decision, independent of whether the
 relation may be included.
 
-**Relations are declared by name, not by class.** `@ManyToOne("Owner")` rather
-than `@ManyToOne(() => Owner)`, with a type-only import alongside — the same
+**Relations are declared by name, not by class.** `@ManyToOne((): any => "Owner")`
+rather than `@ManyToOne(() => Owner)`, with a type-only import alongside — the same
 reason `nest-typeorm`'s entities use TypeORM's string targets. A value import
 both ways would make `Owner`↔`Pet` a runtime import cycle, which
 `.dependency-cruiser.cjs`'s `no-circular` rule forbids. The adapter resolves the
-target class off MikroORM's `targetMeta` either way.
+target class off MikroORM's `targetMeta` either way. The `(): any =>` return
+type is required as of MikroORM v7: its decorator types no longer accept a
+bare string, only a thunk resolving to an entity class or `EntitySchema` — a
+string target still works at runtime, but only passes type-checking with
+`any` as the thunk's declared return type.
 
 **There is no second entity registry.** `createInfrastructure` takes the
 `MikroORM` instance itself, and the instance already carries its entity

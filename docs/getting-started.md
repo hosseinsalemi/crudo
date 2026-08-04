@@ -64,7 +64,7 @@ Kavo never bundles your framework or your ORM. Each package declares what it exp
 - **`@kavo/typeorm`** — `typeorm` (`^0.3.20 || ^1.0.0`).
 - **`@kavo/prisma`** — `@prisma/client` (`^5.0.0 || ^6.0.0`).
 - **`@kavo/mongoose`** — `mongoose` (`^7.0.0 || ^8.0.0`).
-- **`@kavo/mikroorm`** — `@mikro-orm/core` (`^6.0.0`), plus the MikroORM driver package your database needs.
+- **`@kavo/mikroorm`** — `@mikro-orm/core` (`^7.0.0`), plus the MikroORM driver package your database needs.
 - **`@kavo/graphql`** — `graphql` (`^17.0.0`).
 - **`@kavo/mcp`** — `@modelcontextprotocol/sdk` (`^1.0.0`).
 
