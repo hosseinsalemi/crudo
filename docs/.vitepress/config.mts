@@ -191,6 +191,10 @@ const config = defineConfig({
                 text: "0018 — Mongoose models are entity identities",
                 link: "/internals/adr/0018-mongoose-models-are-entity-identities",
               },
+              {
+                text: "0019 — Cursor pagination is an opaque keyset union",
+                link: "/internals/adr/0019-cursor-pagination-is-an-opaque-keyset-union",
+              },
             ],
           },
         ],
