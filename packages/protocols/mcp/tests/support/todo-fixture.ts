@@ -1,5 +1,5 @@
 import type { EntityId, EntityMetadata, NormalizedQueryContext, RepositoryAdapter } from "@kavo/core";
-import { NotFoundException } from "@kavo/core";
+import { NotFoundException, isCursorPagination } from "@kavo/core";
 
 /** Test entity for the MCP binding — no ORM, no Nest anywhere near this package. */
 export class Todo {
@@ -36,7 +36,9 @@ export class InMemoryTodoAdapter implements RepositoryAdapter<Todo> {
 
   async findMany(query: NormalizedQueryContext<Todo>): Promise<readonly Todo[]> {
     this.lastQuery = query;
-    const { offset, limit } = query.pagination;
+    const { limit } = query.pagination;
+    // Offset-only fixture: narrow rather than assume (ADR-0019).
+    const offset = isCursorPagination(query.pagination) ? 0 : query.pagination.offset;
     return this.rows.slice(offset, offset + limit);
   }
 
@@ -115,7 +117,9 @@ export class InMemoryNoteAdapter implements RepositoryAdapter<Note> {
   }
 
   async findMany(query: NormalizedQueryContext<Note>): Promise<readonly Note[]> {
-    const { offset, limit } = query.pagination;
+    const { limit } = query.pagination;
+    // Offset-only fixture: narrow rather than assume (ADR-0019).
+    const offset = isCursorPagination(query.pagination) ? 0 : query.pagination.offset;
     return this.rows.filter((row) => row.deletedAt === null).slice(offset, offset + limit);
   }
 

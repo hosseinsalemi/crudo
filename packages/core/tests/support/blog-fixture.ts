@@ -6,7 +6,7 @@ import type {
   RelationDescriptor,
   RepositoryAdapter,
 } from "@kavo/core";
-import { NotFoundException } from "@kavo/core";
+import { NotFoundException, isCursorPagination } from "@kavo/core";
 
 /**
  * A small relation graph for include tests:
@@ -102,7 +102,9 @@ export class SeededAdapter<Entity extends object> implements RepositoryAdapter<E
 
   async findMany(query: NormalizedQueryContext<Entity>): Promise<readonly Entity[]> {
     this.lastQuery = query;
-    return this.rows.slice(query.pagination.offset, query.pagination.offset + query.pagination.limit);
+    // Offset-only fixture: narrow rather than assume (ADR-0019).
+    const offset = isCursorPagination(query.pagination) ? 0 : query.pagination.offset;
+    return this.rows.slice(offset, offset + query.pagination.limit);
   }
 
   async count(query: NormalizedQueryContext<Entity>): Promise<number> {
