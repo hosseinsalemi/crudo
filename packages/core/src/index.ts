@@ -42,6 +42,7 @@ export type { ProblemDetailsDto, QueryIssueDto } from "./errors/problem-details.
 // ── Configuration ─────────────────────────────────────────────────────
 export type {
   KavoSettings,
+  CachingSettings,
   ErrorSettings,
   PaginationSettings,
   QuerySettings,
@@ -71,6 +72,9 @@ export { DefaultIncludeResolver } from "./relations/default-include-resolver.js"
 export type { KavoContext, KavoContextState, StateKey } from "./context/kavo-context.js";
 export type { KavoRequest } from "./context/kavo-request.js";
 export type { KavoResponse } from "./context/kavo-response.js";
+
+// ── HTTP caching (ADR-0019) ───────────────────────────────────────────
+export { computeEtag, type RequestPreconditions } from "./caching/etag.js";
 
 // ── Serialization ─────────────────────────────────────────────────────
 export type { Deserializer, Serializer } from "./serialization/serializer.js";
@@ -124,6 +128,7 @@ export {
   OperationDisabledException,
   OperationNotRegisteredException,
   PersistenceException,
+  PreconditionFailedException,
   QueryValidationException,
   TransactionException,
   type KavoExceptionOptions,

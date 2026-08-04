@@ -136,6 +136,9 @@ export function createKavo(options: KavoOptions = {}): KavoInstance {
           new DefaultIncludeResolver(catalog) as IncludeResolver<Entity>,
         ),
         errorHandler: new DefaultErrorHandler(),
+        // The adapter is already both halves; the engine only ever reads
+        // through it, for the `If-Match` pre-read (ADR-0019).
+        reader: adapter as unknown as RepositoryAdapter<Entity>,
       });
 
       registered.set(resolved.entityName, describeResolvedConfig(resolved, Object.keys(STANDARD_OPERATIONS)));

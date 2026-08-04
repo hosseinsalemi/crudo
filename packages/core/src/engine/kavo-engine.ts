@@ -3,21 +3,27 @@ import type { KavoRequest } from "../context/kavo-request.js";
 import type { KavoResponse } from "../context/kavo-response.js";
 import type { DtoClass, DtoSlot } from "../dto/dto.js";
 import type { Deserializer, Serializer } from "../serialization/serializer.js";
+import type { EntityId } from "../types/entity-id.js";
 import type { EntityMetadata } from "../metadata/entity-metadata.js";
+import type { EntityReader } from "../persistence/entity-reader.js";
 import type { ErrorHandler } from "../errors/kavo-exception-shape.js";
 import type { NormalizedQueryContext } from "../query/query-context.js";
 import type { QueryContext } from "../query/query-context.js";
 import type { OperationDescriptor, OperationRegistry } from "../operations/operation-registry.js";
 import type { StandardOperationId } from "../operations/operation.js";
+import type { RequestPreconditions } from "../caching/etag.js";
 import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
 import type { KavoSettings } from "../config/settings.js";
 import {
+  NotFoundException,
   OperationDisabledException,
   OperationNotRegisteredException,
+  PreconditionFailedException,
   QueryValidationException,
 } from "../errors/exceptions.js";
 import { nameList } from "../errors/message-hints.js";
 import { QueryNormalizer } from "../query/query-normalizer.js";
+import { computeEtag, strongMatch, weakMatch } from "../caching/etag.js";
 import { createKavoContext, randomUuid } from "../context/default-kavo-context.js";
 import { mergeSettings } from "../config/merge-settings.js";
 import { validateSettings } from "../config/validate-settings.js";
@@ -43,7 +49,33 @@ export interface KavoEngineDependencies<Entity extends object> {
   readonly deserializer: Deserializer<Entity>;
   readonly normalizer: QueryNormalizer<Entity>;
   readonly errorHandler: ErrorHandler;
+  /**
+   * The read half of the entity's adapter, for the one thing a handler
+   * cannot do: evaluate an `If-Match` precondition, which needs both a
+   * read of the current row *and* the serializer that turns it into the
+   * representation the ETag was computed from (ADR-0019). Handlers close
+   * over the adapter privately and have no serializer, so the pre-read
+   * lives here rather than inside `updateOne`/`patchOne`/`deleteOne`.
+   */
+  readonly reader: EntityReader<Entity>;
 }
+
+/**
+ * Standard writes whose `If-Match` precondition is evaluated against the
+ * target's canonical read representation.
+ *
+ * `restoreOne`/`purgeOne` are absent deliberately: both act on a
+ * *soft-deleted* row (ADR-0013), which the canonical read excludes — a
+ * pre-read would raise `NotFoundException` for a row the operation itself
+ * would have found. Nothing else in the schema tells the engine what a
+ * custom operation targets, which is the same reason the table is keyed by
+ * `StandardOperationId`.
+ */
+const PRECONDITION_TARGETS: ReadonlySet<StandardOperationId> = new Set<StandardOperationId>([
+  "updateOne",
+  "patchOne",
+  "deleteOne",
+]);
 
 /**
  * Which DTO slot feeds each standard write operation's input. `Partial` is
@@ -61,8 +93,9 @@ const INPUT_SLOTS: Readonly<Partial<Record<StandardOperationId, DtoSlot>>> = {
  * The request pipeline (Template Method over one lifecycle):
  *
  * operation resolution → config resolution → query resolution (reads) →
- * context assembly → DTO resolution → deserialization → handler
- * execution → response mapping → serialization.
+ * context assembly → precondition evaluation (`If-Match` writes) → DTO
+ * resolution → deserialization → handler execution → response mapping →
+ * serialization → ETag / `If-None-Match`.
  *
  * Query resolution runs ahead of the spec's stage order (which lists it
  * after deserialization) because the context carries the normalized query
@@ -144,11 +177,80 @@ export class KavoEngine<Entity extends object> {
       correlationId,
     });
 
+    const preconditions = request.preconditions ?? request.options?.preconditions ?? null;
+    // Before the handler, so a failed precondition never reaches the
+    // adapter — the check is check-then-write, not compare-and-swap
+    // (ADR-0019), and that is exactly why it must be as late as possible
+    // and still ahead of the write.
+    await this.checkIfMatch(request, descriptor, configView, preconditions, correlationId);
+
     const input = this.resolveInput(request, descriptor, context);
 
     const result = await descriptor.handler.execute(input, context);
 
-    return this.mapResponse(descriptor, result, context);
+    return this.mapResponse(descriptor, result, context, preconditions);
+  }
+
+  /**
+   * `If-Match`: reject the write when the target's current ETag is not one
+   * the client named. A target that does not exist raises
+   * `NotFoundException` (404), never a 412 — a precondition is a statement
+   * about a representation, and there is none.
+   */
+  private async checkIfMatch(
+    request: KavoRequest<Entity>,
+    descriptor: OperationDescriptor<Entity>,
+    config: ResolvedEntityConfig<Entity>,
+    preconditions: RequestPreconditions | null,
+    correlationId: string,
+  ): Promise<void> {
+    const ifMatch = preconditions?.ifMatch;
+    if (ifMatch === undefined || ifMatch.length === 0) return;
+    if (!config.settings.caching.etag) return;
+    if (!PRECONDITION_TARGETS.has(descriptor.id as StandardOperationId)) return;
+
+    const id = this.coerceId(request.id) as EntityId;
+    const etag = await this.canonicalEtag(id, request, config, correlationId);
+    if (strongMatch(ifMatch, etag)) return;
+    throw new PreconditionFailedException({
+      messageParams: { entity: config.entityName, id: String(id), etag },
+      context: { entityName: config.entityName, operation: descriptor.id, correlationId },
+    });
+  }
+
+  /**
+   * The ETag of the entity's **canonical read representation** — what
+   * `findOne` on that id with no `select`/`include`/`sort` params would
+   * return. That is the representation a client's `If-Match` token came
+   * from, so it is the one the token is compared against; an ETag taken
+   * from a field-narrowed read identifies a different representation and
+   * will not match (ADR-0019).
+   */
+  private async canonicalEtag(
+    id: EntityId,
+    request: KavoRequest<Entity>,
+    config: ResolvedEntityConfig<Entity>,
+    correlationId: string,
+  ): Promise<string> {
+    const { reader, serializer, normalizer } = this.deps;
+    const query = normalizer.normalizeInput(undefined, config);
+    const context = createKavoContext<Entity>({
+      operation: "findOne",
+      config,
+      principal: request.options?.principal,
+      transaction: request.options?.transaction ?? null,
+      query,
+      correlationId,
+    });
+    const entity = await reader.findOneById(id, query, context);
+    if (entity === null) {
+      throw new NotFoundException({
+        messageParams: { entity: config.entityName, id: String(id) },
+        context: { entityName: config.entityName, operation: request.operation, correlationId },
+      });
+    }
+    const itemDto = config.dto.resolve("item", "findOne") as DtoClass<object> | null;
+    return computeEtag(serializer.serializeItem(entity, itemDto, context));
   }
 
   private configViewFor(request: KavoRequest<Entity>): ResolvedEntityConfig<Entity> {
@@ -246,11 +348,12 @@ export class KavoEngine<Entity extends object> {
     return value;
   }
 
-  private mapResponse(
+  private async mapResponse(
     descriptor: OperationDescriptor<Entity>,
     result: unknown,
     context: KavoContext<Entity>,
-  ): KavoResponse {
+    preconditions: RequestPreconditions | null,
+  ): Promise<KavoResponse> {
     const { serializer, config } = this.deps;
 
     if (descriptor.id === "findMany") {
@@ -267,19 +370,34 @@ export class KavoEngine<Entity extends object> {
           total,
           meta: {},
         },
+        // Collection ETags are out of scope (issue #120): a list's identity
+        // spans pagination, sort and filter, which is a different feature
+        // from hashing one representation.
+        etag: null,
+        notModified: false,
       };
     }
 
     if (result === null || result === undefined) {
       // Void results: deleteOne and purgeOne.
-      return { operation: descriptor.id, item: null, list: null };
+      return { operation: descriptor.id, item: null, list: null, etag: null, notModified: false };
     }
 
     const itemDto = (descriptor.output as DtoClass<object> | null) ?? config.dto.resolve("item", descriptor.id);
+    const item = serializer.serializeItem(result as Entity, itemDto, context);
+    // `context.config` is the per-call view, so `caching.etag` honors an
+    // override at any scope down to this one request.
+    const etag = context.config.settings.caching.etag ? await computeEtag(item) : null;
     return {
       operation: descriptor.id,
-      item: serializer.serializeItem(result as Entity, itemDto, context),
+      item,
       list: null,
+      etag,
+      // `If-None-Match` is a cache-revalidation question, so it is only
+      // answered for reads. On a write RFC 9110 gives it "only if absent"
+      // semantics, which is a create-conditionally feature this issue
+      // deliberately leaves out rather than half-implements.
+      notModified: etag !== null && descriptor.kind === "read" && weakMatch(preconditions?.ifNoneMatch ?? [], etag),
     };
   }
 }
