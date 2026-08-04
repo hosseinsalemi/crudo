@@ -1,6 +1,6 @@
 import { Controller, Get, Inject, Param, Post } from "@nestjs/common";
 import { Kavo, Override, getKavoServiceToken } from "@kavo/nest";
-import type { DefaultKavoService, EntityId, WireQuery } from "@kavo/core";
+import type { DefaultKavoService, EntityId, RequestPreconditions, WireQuery } from "@kavo/core";
 import type { DataSource } from "typeorm";
 import { Address } from "./address.entity.js";
 import { CreateAddressDto, UpdateAddressDto, AddressItemDto, AddressListDto } from "./address.dtos.js";
@@ -49,36 +49,47 @@ export class AddressController {
     return this.base.createOne({ ...dto, postalCode } as never);
   }
 
-  /** PUT sends the whole shape, so `postalCode` is always validated. */
+  /**
+   * PUT sends the whole shape, so `postalCode` is always validated.
+   *
+   * The trailing `preconditions` parameter is the `If-Match` /
+   * `If-None-Match` tokens `@Kavo` wires into every routed method,
+   * override included (ADR-0020 §7). Forwarding it is not optional
+   * bookkeeping: the precondition is evaluated *inside* the engine, so a
+   * method that drops it accepts an `If-Match` header and writes anyway.
+   */
   @Override()
-  async updateOne(id: EntityId, dto: Partial<Address>): Promise<unknown> {
+  async updateOne(id: EntityId, dto: Partial<Address>, preconditions: RequestPreconditions | null): Promise<unknown> {
     const patch = { ...dto };
     if (patch.postalCode !== undefined) {
       patch.postalCode = normalizePostalCode(patch.postalCode);
       assertValidPostalCode(patch.postalCode);
     }
-    return this.base.updateOne(id as never, patch as never);
+    return this.base.updateOne(id as never, patch as never, { preconditions: preconditions ?? undefined });
   }
 
   /** Same validation as `updateOne`, but only when the field is actually present. */
   @Override()
-  async patchOne(id: EntityId, dto: Partial<Address>): Promise<unknown> {
+  async patchOne(id: EntityId, dto: Partial<Address>, preconditions: RequestPreconditions | null): Promise<unknown> {
     const patch = { ...dto };
     if (patch.postalCode !== undefined) {
       patch.postalCode = normalizePostalCode(patch.postalCode);
       assertValidPostalCode(patch.postalCode);
     }
-    return this.base.patchOne(id as never, patch as never);
+    return this.base.patchOne(id as never, patch as never, { preconditions: preconditions ?? undefined });
   }
 
   /**
    * `Owner` owns the join column (`owner.entity.ts`), so the owner
    * referencing this row is detached before the address is removed.
+   * `preconditions` is forwarded so a stale `If-Match` still refuses the
+   * delete — see `updateOne` above for why an override has to do that
+   * itself.
    */
   @Override()
-  async deleteOne(id: EntityId): Promise<void> {
+  async deleteOne(id: EntityId, preconditions: RequestPreconditions | null): Promise<void> {
     await clearOwnerAddress(this.dataSource, Number(id));
-    await this.base.deleteOne(id as never);
+    await this.base.deleteOne(id as never, { preconditions: preconditions ?? undefined });
   }
 
   /**

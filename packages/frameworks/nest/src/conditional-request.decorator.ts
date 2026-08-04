@@ -22,11 +22,21 @@ interface ConditionalRequestShape {
  */
 const ENTITY_TAG = /(?:W\/)?"[^"]*"|\*|[^\s,]+/g;
 
-/** `'"a", W/"b"'` → `['"a"', 'W/"b"']`; absent stays absent. */
+/**
+ * `'"a", W/"b"'` → `['"a"', 'W/"b"']`; absent stays absent.
+ *
+ * A header that is *present* but yields no tags — `If-Match:` with an
+ * empty value, or `If-Match: ,,,` — returns an empty array, **not**
+ * `undefined`. The distinction is load-bearing: `undefined` means "the
+ * client asked for no guard", while `[]` means "the client asked for a
+ * guard and named nothing that can match", which RFC 9110 §13.1.1 makes a
+ * condition that evaluates false. Collapsing the two would turn a
+ * guarded write into an unguarded 2xx whenever a buggy client or an
+ * intermediary normalized the value away.
+ */
 export function parseEntityTags(raw: string | string[] | undefined): readonly string[] | undefined {
   if (raw === undefined) return undefined;
-  const matched = (Array.isArray(raw) ? raw.join(",") : raw).match(ENTITY_TAG);
-  return matched === null ? undefined : matched;
+  return (Array.isArray(raw) ? raw.join(",") : raw).match(ENTITY_TAG) ?? [];
 }
 
 /** @internal shared by the decorator and its tests. */
@@ -43,7 +53,7 @@ export function readPreconditions(request: ConditionalRequestShape): RequestPrec
 
 /**
  * `If-Match` / `If-None-Match` as a `RequestPreconditions`, for the
- * generated routes to hand the engine (ADR-0019). Applied programmatically
+ * generated routes to hand the engine (ADR-0020). Applied programmatically
  * by `@Kavo` as the last parameter of every generated method, the same way
  * `@Param`/`@Query`/`@Body` are — an `@Override`'d method may declare it
  * too, and gets the identical value.

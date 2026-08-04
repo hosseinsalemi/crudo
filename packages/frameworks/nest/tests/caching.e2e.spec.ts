@@ -1,16 +1,17 @@
 import "reflect-metadata";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
-import { Controller, type INestApplication } from "@nestjs/common";
+import { Controller, Inject, type INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
+import type { DefaultKavoService, RequestPreconditions } from "@kavo/core";
 import type { KavoModuleOptions } from "@kavo/nest";
-import { Kavo, KavoModule, parseEntityTags } from "@kavo/nest";
+import { Kavo, KavoModule, Override, getKavoServiceToken, parseEntityTags } from "@kavo/nest";
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
 import { boundServer, listen, type SupertestTarget } from "./support/listen.js";
 
 /**
  * ETag caching and conditional requests over real HTTP (issue #120,
- * ADR-0019). The engine-level semantics are pinned in
+ * ADR-0020). The engine-level semantics are pinned in
  * `packages/core/tests/caching.spec.ts`; what this file proves is the
  * wiring only `@kavo/nest` can: generated routes read `If-Match` /
  * `If-None-Match` off the request, set the `ETag` response header, and
@@ -65,7 +66,7 @@ async function seed(title = "write docs"): Promise<string> {
   return created.headers["etag"] as string;
 }
 
-@Kavo(Todo, { operations: { restoreOne: true } })
+@Kavo(Todo, { operations: { restoreOne: true, purgeOne: true } })
 @Controller("todos")
 class CachedTodoController {}
 
@@ -206,7 +207,54 @@ describe("If-Match → 412", () => {
 
     await request(server()).put("/todos/1").set("If-Match", etag).send({ title: "x" }).expect(412);
     await request(server()).delete("/todos/1").set("If-Match", etag).expect(412);
+
+    // `Todo` is soft-deletable, so a row count proves nothing here — a
+    // successful DELETE and a successful PUT each leave exactly one row
+    // too. Read the row back instead, and count only the live ones.
+    const current = await request(server()).get("/todos/1").expect(200);
+    expect(current.body).toMatchObject({ title: "write docs", priority: 5 });
+    expect(adapter.rows.filter((row) => row.deletedAt === null)).toHaveLength(1);
+  });
+
+  it("blocks a stale restore and a stale purge, which act on the deleted row", async () => {
+    await seed();
+    await request(server()).delete("/todos/1").expect(204);
+
+    await request(server()).patch("/todos/1/restore").set("If-Match", '"stale"').expect(412);
+    await request(server()).delete("/todos/1/purge").set("If-Match", '"stale"').expect(412);
     expect(adapter.rows).toHaveLength(1);
+    expect(adapter.rows[0]?.deletedAt).not.toBeNull();
+  });
+
+  it("allows a restore whose tag came from a withDeleted read", async () => {
+    await seed();
+    await request(server()).delete("/todos/1").expect(204);
+    const trashed = await request(server()).get("/todos/1?withDeleted=true").expect(200);
+
+    const restored = await request(server())
+      .patch("/todos/1/restore")
+      .set("If-Match", trashed.headers["etag"] as string)
+      .expect(200);
+    expect(restored.body).toMatchObject({ id: 1, deletedAt: null });
+  });
+
+  it("keeps DELETE's own 409 on an already-deleted row, header or no header", async () => {
+    // A live-rows-only pre-read turned this into a 404 as soon as an
+    // If-Match was present — the same request answering with a different
+    // error because a cache header rode along.
+    await seed();
+    await request(server()).delete("/todos/1").expect(204);
+    const current = await request(server()).get("/todos/1?withDeleted=true").expect(200);
+
+    const bare = await request(server()).delete("/todos/1");
+    expect(bare.status).toBe(409);
+    expect(bare.body).toMatchObject({ code: "KAVO_ALREADY_DELETED" });
+
+    const conditional = await request(server())
+      .delete("/todos/1")
+      .set("If-Match", current.headers["etag"] as string);
+    expect(conditional.status).toBe(409);
+    expect(conditional.body).toMatchObject({ code: "KAVO_ALREADY_DELETED" });
   });
 
   it("allows a fresh DELETE", async () => {
@@ -225,6 +273,100 @@ describe("If-Match → 412", () => {
   it("ignores If-Match on a request with no such header", async () => {
     await seed();
     await request(server()).patch("/todos/1").send({ priority: 1 }).expect(200);
+    expect(adapter.rows[0]).toMatchObject({ priority: 1 });
+  });
+
+  it("refuses a present but empty If-Match rather than writing unguarded", async () => {
+    // A header an intermediary normalized away, or a client that built it
+    // from an empty variable. Zero tags match nothing, so the write must
+    // not go through with a 2xx as if no guard had been asked for.
+    await seed();
+
+    for (const value of ["", " ", ",,,"]) {
+      const rejected = await request(server()).patch("/todos/1").set("If-Match", value).send({ priority: 9 });
+      expect(rejected.status).toBe(412);
+      expect(rejected.body).toMatchObject({ code: "KAVO_PRECONDITION_FAILED" });
+    }
+    expect(adapter.rows[0]).toMatchObject({ priority: 0 });
+  });
+
+  it("refuses an If-Match on POST, which targets no existing row", async () => {
+    const rejected = await request(server()).post("/todos").set("If-Match", '"anything"').send({ title: "a" });
+    expect(rejected.status).toBe(412);
+    expect(rejected.body).toMatchObject({ code: "KAVO_PRECONDITION_UNSUPPORTED" });
+    expect(adapter.rows).toHaveLength(0);
+  });
+});
+
+describe("If-Match through a replaced controller method", () => {
+  /**
+   * The two ways an app can own `updateOne` (ADR-0020 §7). Kavo enforces
+   * `If-Match` inside the engine, so a method that drops its
+   * `preconditions` parameter drops the guard with it — that is a
+   * documented consequence of replacing the function, and these two tests
+   * are what make it a decision rather than an accident.
+   */
+  @Kavo(Todo)
+  @Controller("todos")
+  class BypassingTodoController {
+    constructor(@Inject(getKavoServiceToken(Todo)) private readonly base: DefaultKavoService<Todo>) {}
+
+    @Override()
+    async updateOne(id: string, body: Partial<Todo>): Promise<unknown> {
+      return this.base.updateOne(id as never, body as never);
+    }
+  }
+
+  @Kavo(Todo)
+  @Controller("todos")
+  class ForwardingTodoController {
+    constructor(@Inject(getKavoServiceToken(Todo)) private readonly base: DefaultKavoService<Todo>) {}
+
+    @Override()
+    async updateOne(id: string, body: Partial<Todo>, preconditions: RequestPreconditions | null): Promise<unknown> {
+      return this.base.engine.execute({
+        operation: "updateOne",
+        id,
+        body: body as never,
+        query: null,
+        options: null,
+        preconditions,
+      });
+    }
+  }
+
+  it("drops the guard when the override drops its preconditions parameter", async () => {
+    await bootstrap(BypassingTodoController);
+    await seed();
+    await request(server()).patch("/todos/1").send({ priority: 5 }).expect(200);
+
+    // A stale tag, and the write lands anyway: the engine never saw it.
+    const applied = await request(server()).put("/todos/1").set("If-Match", '"stale"').send({ title: "overwritten" });
+    expect(applied.status).toBe(200);
+    expect(adapter.rows[0]).toMatchObject({ title: "overwritten" });
+    // And no ETag either: this override returns the typed service's
+    // unwrapped item, which is where the envelope's tag was discarded.
+    expect(applied.headers["etag"]).toBeUndefined();
+  });
+
+  it("applies the guard, and the ETag, when the override forwards them", async () => {
+    await bootstrap(ForwardingTodoController);
+    await seed();
+    await request(server()).patch("/todos/1").send({ priority: 5 }).expect(200);
+
+    const rejected = await request(server()).put("/todos/1").set("If-Match", '"stale"').send({ title: "overwritten" });
+    expect(rejected.status).toBe(412);
+    expect(rejected.body).toMatchObject({ code: "KAVO_PRECONDITION_FAILED" });
+    expect(adapter.rows[0]).toMatchObject({ title: "write docs" });
+
+    const current = await request(server()).get("/todos/1").expect(200);
+    const applied = await request(server())
+      .put("/todos/1")
+      .set("If-Match", current.headers["etag"] as string)
+      .send({ title: "renamed" })
+      .expect(200);
+    expect(applied.headers["etag"]).toMatch(/^"[0-9a-f]{64}"$/);
+    expect(adapter.rows[0]).toMatchObject({ title: "renamed" });
   });
 });
 
@@ -237,7 +379,7 @@ describe("caching.etag: false", () => {
     expect((await request(server()).get("/todos/1").expect(200)).headers["etag"]).toBeUndefined();
   });
 
-  it("ignores both conditional headers when disabled globally", async () => {
+  it("ignores If-None-Match and refuses If-Match when disabled globally", async () => {
     // The tag Kavo *would* have issued for this exact row, captured from
     // an otherwise identical app — so the 200 below is the check being
     // skipped, not a tag that happened not to match.
@@ -249,8 +391,16 @@ describe("caching.etag: false", () => {
     await seed("a");
 
     await request(server()).get("/todos/1").set("If-None-Match", wouldBe).expect(200);
-    await request(server()).patch("/todos/1").set("If-Match", '"definitely-stale"').send({ priority: 4 }).expect(200);
-    expect(adapter.rows[0]).toMatchObject({ priority: 4 });
+
+    // `If-Match` is the asymmetric half: ignoring it would answer 2xx for
+    // a write nothing guarded, so it is refused instead.
+    const refused = await request(server())
+      .patch("/todos/1")
+      .set("If-Match", '"definitely-stale"')
+      .send({ priority: 4 });
+    expect(refused.status).toBe(412);
+    expect(refused.body).toMatchObject({ code: "KAVO_PRECONDITION_UNSUPPORTED" });
+    expect(adapter.rows[0]).toMatchObject({ priority: 0 });
   });
 
   it("can be switched off for one entity only", async () => {
@@ -292,8 +442,13 @@ describe("parseEntityTags", () => {
     expect(parseEntityTags("abc")).toEqual(["abc"]);
   });
 
-  it("stays absent when the header is absent, and for an empty value", () => {
+  it("distinguishes an absent header from a present but empty one", () => {
+    // `undefined` is "no guard asked for"; `[]` is "a guard asked for that
+    // nothing can satisfy". Collapsing them turns a normalized-away header
+    // into an unguarded write.
     expect(parseEntityTags(undefined)).toBeUndefined();
-    expect(parseEntityTags("")).toBeUndefined();
+    expect(parseEntityTags("")).toEqual([]);
+    expect(parseEntityTags("   ")).toEqual([]);
+    expect(parseEntityTags(",,,")).toEqual([]);
   });
 });

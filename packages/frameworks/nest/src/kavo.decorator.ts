@@ -134,6 +134,18 @@ interface ResolvedRoute {
  * function backing it changes — resolved first, ahead of manual-method-wins,
  * so a decorated method never falls through to plain name-matching.
  *
+ * **A replaced method owns its own conditional-request handling.** Kavo
+ * enforces `If-Match` inside the engine (ADR-0020), so a method that does
+ * not reach the engine cannot have it enforced for it: a hand-written or
+ * `@Override`'d `updateOne` that ignores its `preconditions` parameter
+ * accepts an `If-Match` header and writes anyway. That is the price of
+ * replacing the function, and it is not silent by accident — the
+ * `ConditionalRequest` parameter is applied to overrides too, so the
+ * tokens are handed to the method. Forward them, either as
+ * `service.<op>(…, { preconditions })` on the typed surface or by
+ * returning `service.engine.execute({ …, preconditions })`, which
+ * additionally puts the `ETag` back on the response.
+ *
  * Route generation happens at decoration time (class definition), which is
  * what lets Nest's router see the methods during its normal controller
  * scan — Nest maps routes before any module lifecycle hook runs, so this
@@ -295,14 +307,6 @@ function defineRoute(
     configurable: true,
   });
   applyRouteDecorators(prototype, methodName, descriptor, route);
-  // Generated handlers — and only those — return the engine's
-  // `KavoResponse`, so the interceptor that unwraps it and applies the
-  // ETag/304 (ADR-0019) is scoped to them. A hand-written or
-  // `@Override`'d method returns its own value and keeps it. An
-  // *instance* rather than a class, so it needs no DI registration in
-  // whatever module the controller ends up in.
-  const propertyDescriptor = Object.getOwnPropertyDescriptor(prototype, methodName) as PropertyDescriptor;
-  UseInterceptors(new KavoResponseInterceptor())(prototype, methodName, propertyDescriptor);
 }
 
 /**
@@ -322,6 +326,16 @@ function applyRouteDecorators(
   applyParamDecorators(prototype, methodName, descriptor, route);
   HttpCode(route.status)(prototype, methodName, propertyDescriptor);
   METHOD_DECORATORS[route.method](route.path)(prototype, methodName, propertyDescriptor);
+  // The envelope unwrap / `ETag` / `304` interceptor (ADR-0020), applied
+  // to **both** paths. On a generated handler it is the only thing that
+  // turns the engine's `KavoResponse` into an HTTP response. On an
+  // `@Override`'d one it is a no-op unless that method returns an engine
+  // envelope of its own — `isKavoResponse` guards it — which is exactly
+  // how an override opts back in to the header: return
+  // `service.engine.execute(...)` rather than the typed service's
+  // unwrapped item. An *instance* rather than a class, so it needs no DI
+  // registration in whatever module the controller ends up in.
+  UseInterceptors(new KavoResponseInterceptor())(prototype, methodName, propertyDescriptor);
 }
 
 /**
@@ -377,7 +391,7 @@ type BoundController = Record<string, unknown> & {
  * `DefaultKavoService` methods — which is the same pipeline, since those
  * methods are `execute` plus an unwrap — because the ETag and the
  * not-modified flag live on the envelope those methods discard
- * (ADR-0019). One arm instead of nine also means the parameter layout is
+ * (ADR-0020). One arm instead of nine also means the parameter layout is
  * read from exactly one place, the one that wrote it.
  */
 function makeHandler(

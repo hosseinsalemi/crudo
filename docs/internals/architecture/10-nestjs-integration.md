@@ -227,7 +227,7 @@ envelope. It goes through the engine rather than the typed
 discard the `etag`/`notModified` the next section needs; it is the same
 pipeline either way, since those methods are `execute` plus that unwrap.
 
-### 2a. Conditional requests (ADR-0019)
+### 2a. Conditional requests (ADR-0020)
 
 Two pieces, both applied programmatically at decoration time:
 
@@ -236,12 +236,27 @@ Two pieces, both applied programmatically at decoration time:
   `RequestPreconditions`, applied as the last parameter of every
   generated method (and available to an `@Override`'d one that declares
   it, since both paths carry identical route metadata).
-- `KavoResponseInterceptor` — applied **method-scoped, to generated
-  handlers only**, as an instance so it needs no DI registration. It
-  sets the `ETag` header from the envelope, turns `notModified` into a
-  bodyless `304`, and unwraps to `item`/`list` — being the innermost
-  interceptor, nothing downstream ever sees the envelope. A hand-written
-  or `@Override`'d method returns its own value and is left alone.
+- `KavoResponseInterceptor` — applied **method-scoped, to every routed
+  method** (generated and `@Override`'d alike), as an instance so it
+  needs no DI registration. It sets the `ETag` header from the
+  envelope, turns `notModified` into a bodyless `304`, and unwraps to
+  `item`/`list` — being the innermost interceptor, nothing downstream
+  ever sees the envelope. It acts only on an engine envelope, so an
+  override returning its own value is untouched; an override returning
+  `service.engine.execute(...)` gets the identical treatment rather
+  than silently losing the header.
+
+`If-Match` enforcement is the engine's, not the binding's, so a method
+that replaces a generated one bypasses it — `@Override`'d or plain
+manual-method-wins. The tokens are still handed to the method (the
+`ConditionalRequest` parameter is applied to both paths); forwarding
+them as `{ preconditions }` or through `engine.execute` is what
+re-applies the guard. ADR-0020 §7 states the same rule; the e2e in
+`tests/caching.e2e.spec.ts` pins both arms.
+
+`parseEntityTags` distinguishes an absent header from a present but
+empty one: `If-Match:` yields `[]`, not `undefined`, so it evaluates
+false and 412s rather than sliding through as an unguarded write.
 
 Setting the status from an interceptor works because Nest applies the
 route's static `@HttpCode` _before_ interceptors run and does not
@@ -250,6 +265,12 @@ duck-typed, so Express and Fastify are served by one interceptor — the
 same trick as `ProblemResponse` in the exception filter. Kavo's tag is
 set before Express would add its own weak one, and Express only fills in
 a tag that is not already there, so ours wins.
+
+Being innermost also means the tag is set before any outer interceptor
+can rewrite the body. An app interceptor that redacts fields per role
+therefore emits a hash of the _unredacted_ representation; redaction
+belongs in the operation's `item` DTO, which the engine serializes
+through before hashing.
 
 ## 3. Exception mapping
 
@@ -263,8 +284,13 @@ between Kavo's hierarchy and HTTP: catalog status +
 Optional and zero-cost when absent (`createRequire` probe, cached).
 When `@nestjs/swagger` is installed, generated routes get: operation ids
 (`User_findMany`), the `:id` param, the query params documented on list
-routes (doc 5), registered DTO classes as body schemas (`ApiBody`), and
-problem-details response schemas for 400/404. Allowlist-derived
+routes (doc 5), registered DTO classes as body schemas (`ApiBody`),
+problem-details response schemas for 400/404, and the conditional-request
+surface (ADR-0020) — the `ETag` response header, `If-None-Match` + `304`
+on single-item reads, `If-Match` + `412` on single-row writes, gated on
+as much of `caching.etag` as decoration time can see (entity and
+operation scope; the global scope arrives later, with
+`KavoModule.forRoot`). Allowlist-derived
 per-field query documentation needs ORM metadata, which doesn't exist at
 decoration time — revisited in a future DX pass.
 
