@@ -240,6 +240,12 @@ ESM package should expect the same.
   resolver.
 - A typed `<Entity>FilterInput` per entity, instead of the raw-AST `JSON`
   scalar (§2).
+- The list envelope's `meta` bag (doc 07 §3.1). The generated `<Entity>List`
+  type declares `items`/`total`/`limit`/`offset` only, so what a `findMany`
+  handler contributes to `meta` reaches REST and MCP but is invisible to a
+  GraphQL client. Exposing it needs a decision the other fields did not: a
+  `JSON` scalar (the open bag as-is, opaque to the schema) or a per-entity
+  metadata type (typed, but a second thing to declare per entity).
 - Bulk operations and subscriptions.
 
 Each of these is real, valuable follow-up work, not an oversight — the

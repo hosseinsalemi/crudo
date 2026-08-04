@@ -195,3 +195,64 @@ Per-operation overrides, keyed by standard operation id. Each entry is either a 
 | `successStatus` | `number`                                                  | `201` create, `204` delete, `200` otherwise | Overrides the response status code on success.                                                                             |
 
 See [NestJS integration](/internals/architecture/10-nestjs-integration) for how route generation reads this, and [Registry-driven operations](/internals/adr/0006-registry-driven-operations) for why routes always come from the same registry the engine uses.
+
+### Custom list metadata
+
+The list envelope's `meta` bag (`ListResultDto.meta`) is `{}` until a `findMany` handler fills it. It is the place for anything about the list that isn't a row — facet counts, a freshness stamp, a cursor — and it does not need a DTO or a config key: whatever the handler returns as `meta` is what the client receives.
+
+> `ListResultDto.meta` on the **response** and `operations.<id>.meta` above are unrelated. The first is an open bag on the list envelope; the second is `OperationMetadata` — route options the framework layer reads, which never reach a response body.
+
+`withListMeta` wraps an existing handler so a contributor function's keys land on the bag, which saves rewriting the built-in `findMany` just to add one number:
+
+```ts
+// data-source.ts — the same infrastructure app.module.ts hands KavoModule
+export const infrastructure = createInfrastructure(dataSource);
+```
+
+```ts
+// book.controller.ts
+import { builtInHandlers, withListMeta } from "@kavo/core";
+import { infrastructure } from "./data-source.js";
+
+const findMany = builtInHandlers(infrastructure.adapterFor(Book))("findMany");
+
+@Kavo(Book, {
+  operations: {
+    findMany: {
+      handler: withListMeta(findMany, (result) => ({
+        inStock: result.entities.filter((book) => book.stock > 0).length,
+        countedAt: new Date().toISOString(),
+      })),
+    },
+  },
+})
+@Controller("books")
+export class BookController {}
+```
+
+```json
+{ "items": [...], "limit": 20, "offset": 0, "total": 2, "meta": { "inStock": 1, "countedAt": "2026-01-01T00:00:00.000Z" } }
+```
+
+The adapter has to exist when the class is **declared**, because `@Kavo`'s config object is evaluated at decoration time ([ADR-0012](/internals/adr/0012-decoration-time-route-generation)) — the module-scope `DataSource` the [wiring guide](/integrations/nest/typeorm#zero-config-wiring) already builds is exactly that. If yours is created by a DI factory (`KavoModule.forRootAsync`) instead, it isn't available yet: contribute from a handler that doesn't need the adapter, or configure the entity through `createCrud` where the infrastructure is already resolved.
+
+| Point                | Behavior                                                                                                                                                                               |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Contributor input    | The wrapped handler's whole result (`entities`, `total`, and any `meta` it already set) plus the request `KavoContext`. It may be `async`.                                             |
+| Merge precedence     | The contributor's keys win. The inner handler's `meta` is the base and the contributor merges over it, so the outermost wrap owns any key it names; keys it doesn't name pass through. |
+| Overriding that      | The inner bag is in hand — return `{ ...mine, ...result.meta }` to let the inner handler win instead.                                                                                  |
+| Serialization        | None. `meta` is your data, not entity data: no DTO projection, no `fields=` selection, no renaming. It must be JSON-serializable.                                                      |
+| Wrong-shaped handler | Wrapping a handler that doesn't return `{ entities, total }` raises `ConfigurationException` (`KAVO_CONFIG_INVALID`) naming the operation, rather than serving a malformed envelope.   |
+
+The wrapper is a convenience, not a requirement — the engine reads `meta` off whatever the `findMany` handler returns, so a hand-written one works the same way:
+
+```ts
+const handler = {
+  async execute(_input: null, context: KavoContext<Book>) {
+    const inner = await findMany.execute(null, context);
+    return { ...inner, meta: { inStock: 1 } };
+  },
+};
+```
+
+**Transport support.** `meta` rides the same envelope everywhere, so it reaches REST responses and [MCP](/internals/architecture/16-mcp-binding) tool results unchanged. It is **not** exposed by the [GraphQL binding](/internals/architecture/13-graphql-binding) — that binding's generated list type declares `items`/`total`/`limit`/`offset` only, so a GraphQL client cannot select `meta` today.

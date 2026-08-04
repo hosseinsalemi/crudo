@@ -112,11 +112,14 @@ A list response (`GET /books`) always has the same shape:
   "items": [{ "id": 1, "title": "Dune" }],
   "limit": 20,
   "offset": 0,
-  "total": 1
+  "total": 1,
+  "meta": {}
 }
 ```
 
 `total` is omitted (and its `COUNT` query skipped) if `pagination.count` is turned off.
+
+`meta` is an open bag for anything the API wants to say about the list that isn't a row: a facet count, a "results are approximate" flag, a cursor. It is `{}` unless the entity's `findMany` handler puts something there — see [custom list metadata](/integrations/nest/configuration#custom-list-metadata) for how. Kavo never writes to it itself, and nothing in it is projected, filtered, or renamed on the way out: what the handler returns is what the client receives.
 
 ## Errors
 

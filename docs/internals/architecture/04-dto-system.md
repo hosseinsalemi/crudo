@@ -16,7 +16,10 @@ docs** — there is no validation subsystem attached to them.
 | `item`   | Any single-resource response          | Entity, subject to field selection                               |
 | `list`   | Element type in `ListResultDto.items` | Same as `item`'s resolved type                                   |
 
-Restore reuses `item`/`list`; no additional slots exist.
+Restore reuses `item`/`list`; no additional slots exist. The list
+envelope's `meta` bag is deliberately **not** a slot: it carries the
+caller's own data rather than entity data, so it has no DTO and never
+passes through the serializer (doc 07 §3.1).
 
 ## 2. Resolution algorithm
 
