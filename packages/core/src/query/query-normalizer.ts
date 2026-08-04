@@ -78,6 +78,13 @@ export class QueryNormalizer<Entity = unknown> {
 
     let pagination: Pagination<Entity> = { limit: 0, offset: 0 };
     try {
+      // `PaginationStrategy.normalize` returns the non-generic `Pagination`,
+      // so the entity parameter has to be reintroduced here. The cast is
+      // sound because the only entity-typed member is `keyset`, and a
+      // strategy always leaves it `null` — it sees neither the effective
+      // sort nor the metadata needed to build one (ADR-0021 §4). Making
+      // `PaginationStrategy` generic would push that parameter onto every
+      // third-party strategy for no gain.
       pagination = this.strategyFor(config).normalize(rawParams, {
         defaultLimit: config.settings.pagination.defaultLimit,
         maxLimit: config.settings.pagination.maxLimit,
@@ -88,9 +95,14 @@ export class QueryNormalizer<Entity = unknown> {
     // Keyset resolution runs *after* sort, not inside the strategy: a
     // strategy is handed raw params and limits alone, and widening its
     // signature to take sort and metadata would break every custom one
-    // (ADR-0019).
+    // (ADR-0021).
     if (isCursorPagination(pagination)) {
       pagination = this.resolveKeyset(pagination, sort, config, issues);
+    } else if (hasCursorParam(rawParams["cursor"])) {
+      // The wire and programmatic paths reject this identically. Dropping a
+      // `?cursor=` on the floor would hand back page 1 forever while the
+      // client believed it was paging.
+      issues.push(cursorUnsupportedIssue(config));
     }
 
     if (issues.length > 0) {
@@ -163,20 +175,14 @@ export class QueryNormalizer<Entity = unknown> {
     // typed, so there is nothing to parse — but it must reach the *same*
     // normalized form, or calling the service directly would silently fall
     // back to offset paging on a cursor-configured entity.
-    const cursorPaged = config.settings.pagination.strategy === "cursor";
-    // Absent *or empty* means "first page", the same rule
-    // `CursorPaginationStrategy` applies to the wire param — a caller
-    // holding `nextCursor` in a string that starts out `""` must not get a
-    // 400 where the equivalent `?cursor=` gets page one.
-    const token = input.cursor === undefined || input.cursor === "" ? null : input.cursor;
+    const cursorPaged = this.pagesByKeyset(config);
+    // Absent *or empty* means "first page" — `hasCursorParam` is the same
+    // predicate the wire path applies, so a caller holding `nextCursor` in
+    // a string that starts out `""` does not get a 400 where the
+    // equivalent `?cursor=` gets page one.
+    const token = hasCursorParam(input.cursor) ? (input.cursor as string) : null;
     if (token !== null && !cursorPaged) {
-      issues.push({
-        field: "cursor",
-        code: "KAVO_QUERY_UNSUPPORTED_PARAM",
-        detail:
-          `Query parameter 'cursor' is not supported: ${config.entityName} paginates with ` +
-          `strategy '${config.settings.pagination.strategy}'. Set 'pagination.strategy' to 'cursor' to page by keyset.`,
-      });
+      issues.push(cursorUnsupportedIssue(config));
     }
     const pagination: Pagination<Entity> = cursorPaged
       ? this.resolveKeyset({ limit, cursor: token, keyset: null }, sort, config, issues)
@@ -211,13 +217,33 @@ export class QueryNormalizer<Entity = unknown> {
    * has no value to read off the returned row, and a `json` column has no
    * portable ordering.
    *
+   * Two allowlists beyond `sortable` gate the same set, because a cursor
+   * sort key is not only sorted by (ADR-0021):
+   *
+   * - **`filterable`**, because `keysetExpression` mints `EQ`/`GT`/`LT`
+   *   nodes over these fields and `readFilter` AND-s them into the adapter's
+   *   filter *after* `DefaultFilterParser` and `validateExpression` have
+   *   run. Without this check, `?sort=email,id&cursor=…` is a comparison
+   *   oracle over a field the config declared non-filterable, reachable by
+   *   binary search even though `?filter[email][gt]=…` is a 400.
+   * - **`selectable`**, because `cursorValuesOf` reads the raw entity and
+   *   `meta` never passes through the serializer, so the value lands in
+   *   `meta.nextCursor` regardless of the item DTO. Excluding
+   *   `passwordHash` from `selectable` while leaving `sortable` at its
+   *   default would otherwise base64-encode the hash into every page token.
+   *
+   * The field is **rejected**, never silently dropped from the sort:
+   * omitting a key would break the total order the keyset depends on.
+   *
    * A *nullable* sort field is deliberately **not** rejected here. Whether
    * an ORM calls a column nullable is not a reliable signal (Mongoose
    * reports every non-`required` path that way), so rejecting on it would
-   * make cursor paging unusable rather than safe. The narrower, accurate
-   * rule lives in `decodeCursor` instead: a cursor may not carry `null` for
-   * any key, so paging works until it actually reaches a row with a null
-   * sort key, and then says so (ADR-0019).
+   * make cursor paging unusable rather than safe. `decodeCursor` refuses a
+   * `null` cursor value instead — which, as ADR-0021 §4 now records
+   * plainly, is a *partial* guard: it catches NULLS-FIRST orderings and
+   * does nothing for NULLS-LAST ones, where null-keyed rows are omitted
+   * from every page without an error. Cursor paging is documented as
+   * unsupported over a nullable sort key.
    */
   private resolveKeyset(
     pagination: CursorPagination<Entity>,
@@ -231,8 +257,16 @@ export class QueryNormalizer<Entity = unknown> {
       const field = this.fields.get(entry.field as string);
       if (field === undefined) {
         issues.push(cursorSortIssue(entry.field as string, "is not a scalar column of this entity"));
-      } else if (field.kind === "json") {
+        continue;
+      }
+      if (field.kind === "json") {
         issues.push(cursorSortIssue(field.name, "is a 'json' column, which has no portable ordering"));
+        continue;
+      }
+      // The same gate the filter parser and the fieldset parser use, so the
+      // cursor path cannot be the one way around an allowlist.
+      if (requireAllowlisted(field.name, config, "filtering", issues)) {
+        requireAllowlisted(field.name, config, "selection", issues);
       }
     }
     if (sort.length === 0 || sort[sort.length - 1]!.field !== idField) {
@@ -284,6 +318,30 @@ export class QueryNormalizer<Entity = unknown> {
     }
   }
 
+  /**
+   * Whether this entity's configured strategy pages by keyset — probed
+   * *structurally*, by asking the strategy what it produces for empty
+   * params, rather than by comparing `pagination.strategy` to the string
+   * `"cursor"`. A third-party strategy registered as `"keyset"` that
+   * returns a `CursorPagination` is narrowed correctly by
+   * `isCursorPagination` on the wire path; comparing the name here would
+   * silently downgrade the programmatic path to offset paging and reject
+   * its `cursor` input as unsupported.
+   *
+   * A strategy that cannot normalize an empty request at all is not a
+   * keyset strategy for this purpose — its own issues surface on the wire
+   * path, where the params it needs actually exist.
+   */
+  private pagesByKeyset(config: ResolvedEntityConfig<Entity>): boolean {
+    const { defaultLimit, maxLimit } = config.settings.pagination;
+    try {
+      return isCursorPagination(this.strategyFor(config).normalize({}, { defaultLimit, maxLimit }));
+    } catch (error) {
+      if (error instanceof QueryValidationException) return false;
+      throw error;
+    }
+  }
+
   private strategyFor(config: ResolvedEntityConfig<Entity>): PaginationStrategy {
     const name = config.settings.pagination.strategy;
     const strategy = this.strategies.get(name);
@@ -296,6 +354,22 @@ export class QueryNormalizer<Entity = unknown> {
     }
     return strategy;
   }
+}
+
+/** Whether a raw `cursor` wire param was actually supplied (empty means "first page"). */
+function hasCursorParam(raw: unknown): boolean {
+  return raw !== undefined && raw !== null && raw !== "";
+}
+
+/** One wording for "this entity does not page by keyset", on both entry points. */
+function cursorUnsupportedIssue<Entity>(config: ResolvedEntityConfig<Entity>): QueryIssueDto {
+  return {
+    field: "cursor",
+    code: "KAVO_QUERY_UNSUPPORTED_PARAM",
+    detail:
+      `Query parameter 'cursor' is not supported: ${config.entityName} paginates with ` +
+      `strategy '${config.settings.pagination.strategy}'. Set 'pagination.strategy' to 'cursor' to page by keyset.`,
+  };
 }
 
 /** Why one effective-sort entry disqualifies the whole request from keyset paging. */
