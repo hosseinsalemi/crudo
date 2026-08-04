@@ -1,5 +1,6 @@
 import type { KavoContext } from "../context/kavo-context.js";
 import type { EntityId } from "../types/entity-id.js";
+import type { ListMetaDto } from "../dto/list-result.js";
 import type { OperationHandler } from "../operations/operation-handler.js";
 import type { RepositoryAdapter } from "../persistence/repository-adapter.js";
 import type { StandardOperationId } from "../operations/operation.js";
@@ -11,6 +12,18 @@ export interface FindManyResult<Entity> {
   readonly entities: readonly Entity[];
   /** `null` when counting is disabled (`pagination.count: false`). */
   readonly total: number | null;
+  /**
+   * Extra keys for the list envelope's open metadata bag
+   * (`ListResultDto.meta`) — **not** `OperationConfig.meta`
+   * (`OperationMetadata`, ADR-0007), which is route/framework metadata on
+   * a registry entry.
+   *
+   * The built-in handler never sets it; an overriding or wrapping handler
+   * (see `withListMeta`) does, and the engine merges what it finds here
+   * into the envelope instead of discarding it. Optional, so every
+   * existing handler stays valid and the field stays additive.
+   */
+  readonly meta?: ListMetaDto;
 }
 
 /** Input shape for the id-plus-body operations (update/patch). */

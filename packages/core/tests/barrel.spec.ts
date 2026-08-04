@@ -102,6 +102,7 @@ const PUBLIC_SURFACE: readonly string[] = [
   "IncludeTree",
   "IsAny",
   "IsUnknown",
+  "ListMetaContributor",
   "ListMetaDto",
   "ListResultDto",
   "LogicalOperator",
@@ -182,6 +183,7 @@ const PUBLIC_SURFACE: readonly string[] = [
   "resolveSoftDelete",
   "toProblemDetails",
   "validateSettings",
+  "withListMeta",
 ];
 
 /** Export names in the barrel source, both `export type` and value forms. */

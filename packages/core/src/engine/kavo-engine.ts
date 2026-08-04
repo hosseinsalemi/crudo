@@ -2,6 +2,7 @@ import type { KavoContext } from "../context/kavo-context.js";
 import type { KavoRequest } from "../context/kavo-request.js";
 import type { KavoResponse } from "../context/kavo-response.js";
 import type { DtoClass, DtoSlot } from "../dto/dto.js";
+import type { ListMetaDto } from "../dto/list-result.js";
 import type { Deserializer, Serializer } from "../serialization/serializer.js";
 import type { EntityMetadata } from "../metadata/entity-metadata.js";
 import type { ErrorHandler } from "../errors/kavo-exception-shape.js";
@@ -254,7 +255,7 @@ export class KavoEngine<Entity extends object> {
     const { serializer, config } = this.deps;
 
     if (descriptor.id === "findMany") {
-      const { entities, total } = result as FindManyResult<Entity>;
+      const { entities, total, meta } = result as FindManyResult<Entity>;
       const listDto = (descriptor.output as DtoClass<object> | null) ?? config.dto.resolve("list", descriptor.id);
       const pagination = context.query?.pagination ?? { limit: 0, offset: 0 };
       return {
@@ -265,7 +266,7 @@ export class KavoEngine<Entity extends object> {
           limit: pagination.limit,
           offset: pagination.offset,
           total,
-          meta: {},
+          meta: this.listMeta(meta),
         },
       };
     }
@@ -281,6 +282,27 @@ export class KavoEngine<Entity extends object> {
       item: serializer.serializeItem(result as Entity, itemDto, context),
       list: null,
     };
+  }
+
+  /**
+   * Assemble the list envelope's `meta` (`ListResultDto.meta` — the
+   * response bag, never `OperationConfig.meta`/`OperationMetadata`,
+   * ADR-0007).
+   *
+   * A named step rather than an inline `?? {}` because this is the single
+   * merge point for everything that can contribute to it, and the handler
+   * is only the first contributor: a pagination strategy computing
+   * `meta.nextCursor` (#118) belongs to the engine, not to whatever
+   * handler happens to be configured, and folds in here. `meta` is a
+   * required envelope field, so a handler that contributes nothing still
+   * yields an empty bag — never `undefined`.
+   *
+   * `meta` never passes through the serializer: it is the caller's own
+   * JSON-serializable data, not entity data, so no DTO projection or
+   * field selection applies to it and it reaches the wire verbatim.
+   */
+  private listMeta(handlerMeta: ListMetaDto | undefined): ListMetaDto {
+    return handlerMeta ?? {};
   }
 }
 
