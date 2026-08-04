@@ -241,7 +241,8 @@ GET /books
   ],
   "limit": 2,
   "offset": 0,
-  "total": 128
+  "total": 128,
+  "meta": {}
 }
 ```
 
@@ -274,7 +275,8 @@ GET /books
   ],
   "limit": 20,
   "offset": 0,
-  "total": 128
+  "total": 128,
+  "meta": {}
 }
 ```
 
@@ -289,7 +291,8 @@ GET /books
   ],
   "limit": 25,
   "offset": 50,
-  "total": 128
+  "total": 128,
+  "meta": {}
 }
 ```
 
@@ -308,7 +311,8 @@ GET /books
   ],
   "limit": 20,
   "offset": 0,
-  "total": 1
+  "total": 1,
+  "meta": {}
 }
 ```
 
