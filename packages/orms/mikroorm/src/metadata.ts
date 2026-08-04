@@ -8,12 +8,19 @@ import type { EntityProperty, MikroORM } from "@mikro-orm/core";
  *
  * `runtimeType` is preferred over `type`: MikroORM normalizes the former to
  * the JavaScript type the property actually holds (`"string"`, `"Date"`),
- * which is what core must coerce toward — a `bigint` or `decimal` column
- * surfaces as `"string"` there, and `string` is genuinely the right target
- * for it. The declared `type` is still consulted as a fallback, because
- * `runtimeType` is `"any"` for the custom types that carry no JavaScript
- * equivalent (`JsonType`). An unrecognized type degrades to `string` —
- * comparison still works, coercion just doesn't narrow.
+ * which is what core must coerce toward — a `decimal` column surfaces as
+ * `"string"` there, and `string` is genuinely the right target for it. The
+ * declared `type` is still consulted as a fallback, because `runtimeType` is
+ * `"any"` for the custom types that carry no JavaScript equivalent
+ * (`JsonType`). An unrecognized type degrades to `string` — comparison still
+ * works, coercion just doesn't narrow.
+ *
+ * A `bigint` column is a caveat, not a case this function special-cases: as
+ * of MikroORM v7, `BigIntType`'s default mode hands JavaScript a native
+ * `bigint`, and `runtimeType` reports that as `"bigint"`, matched below
+ * alongside `"number"`. An app that needs the old, precision-safe string
+ * representation back must construct the type explicitly —
+ * `new BigIntType("string")` — see doc 17 §1.
  */
 function fieldKindOf(property: EntityProperty): FieldKind {
   if (property.enum === true) return "enum";
@@ -65,12 +72,14 @@ const TO_MANY = new Set(["1:m", "m:n"]);
  * The lazy target-class thunk for one relation.
  *
  * A relation target can be declared two ways, and they do *not* arrive the
- * same: `@ManyToOne(() => Owner)` leaves `property.entity` a thunk, while
- * `@ManyToOne("Owner")` — the spelling that keeps a bidirectional relation's
- * import cycle off the runtime graph, and therefore the one a
- * `dependency-cruiser`-checked codebase reaches for — leaves it a plain
- * **string**. Calling it would throw for half the codebases that use this
- * adapter.
+ * same: `@ManyToOne(() => Owner)` leaves `property.entity` a thunk resolving
+ * to the class, while `@ManyToOne((): any => "Owner")` — the spelling that
+ * keeps a bidirectional relation's import cycle off the runtime graph, and
+ * therefore the one a `dependency-cruiser`-checked codebase reaches for —
+ * leaves it a thunk resolving to a plain **string** (MikroORM v7's decorator
+ * types no longer accept a bare string; `any` is what makes the thunk
+ * type-check). Calling it would return a string, not a class, for half the
+ * codebases that use this adapter.
  *
  * `targetMeta` is what both spellings have in common: MikroORM resolves it
  * during metadata discovery either way. The metadata-storage lookup behind
@@ -81,7 +90,8 @@ const TO_MANY = new Set(["1:m", "m:n"]);
  */
 function targetOf(orm: MikroORM, property: EntityProperty, owner: string): () => ClassRef {
   return () => {
-    const resolved = property.targetMeta?.class ?? orm.getMetadata().find(String(property.type))?.class;
+    const resolved =
+      property.targetMeta?.class ?? orm.getMetadata().getByClassName(String(property.type), false)?.class;
     if (resolved !== undefined) return resolved as ClassRef;
     if (typeof property.entity === "function") {
       return (property.entity as () => ClassRef)();
@@ -110,7 +120,7 @@ export function buildEntityMetadata<Entity extends object>(
   orm: MikroORM,
   entity: ClassRef<Entity>,
 ): EntityMetadata<Entity> {
-  const metadata = orm.getMetadata().find(entity.name);
+  const metadata = orm.getMetadata().getByClassName<Entity, false>(entity.name, false);
   if (metadata === undefined) {
     throw new ConfigurationException(
       entity.name,

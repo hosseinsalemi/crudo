@@ -13,9 +13,10 @@
     "@kavo/core": "workspace:*",
     "@kavo/mikroorm": "workspace:*",
     "@kavo/nest": "workspace:*",
-    "@mikro-orm/better-sqlite": "^6.6.14",
-    "@mikro-orm/core": "^6.6.14",
-    "@mikro-orm/postgresql": "^6.6.14",
+    "@mikro-orm/core": "^7.1.9",
+    "@mikro-orm/decorators": "^7.1.9",
+    "@mikro-orm/postgresql": "^7.1.9",
+    "@mikro-orm/sqlite": "^7.1.9",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
@@ -24,6 +25,8 @@
     "rxjs": "^7.8.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.4",
+    "@electric-sql/pglite-socket": "^0.2.7",
     "@nestjs/testing": "^11.0.0",
     "@testcontainers/postgresql": "^12.0.4",
     "@types/supertest": "^7.2.1",

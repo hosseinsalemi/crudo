@@ -56,12 +56,16 @@ query language and adds the join itself. (`@kavo/mongoose` refuses the same
 query outright.) It is still an allowlist decision, independent of whether the
 relation may be included.
 
-**Relations are declared by name, not by class.** `@ManyToOne("Owner")` rather
-than `@ManyToOne(() => Owner)`, with a type-only import alongside — the same
+**Relations are declared by name, not by class.** `@ManyToOne((): any => "Owner")`
+rather than `@ManyToOne(() => Owner)`, with a type-only import alongside — the same
 reason `nest-typeorm`'s entities use TypeORM's string targets. A value import
 both ways would make `Owner`↔`Pet` a runtime import cycle, which
 `.dependency-cruiser.cjs`'s `no-circular` rule forbids. The adapter resolves the
-target class off MikroORM's `targetMeta` either way.
+target class off MikroORM's `targetMeta` either way. The `(): any =>` return
+type is required as of MikroORM v7: its decorator types no longer accept a
+bare string, only a thunk resolving to an entity class or `EntitySchema` — a
+string target still works at runtime, but only passes type-checking with
+`any` as the thunk's declared return type.
 
 **There is no second entity registry.** `createInfrastructure` takes the
 `MikroORM` instance itself, and the instance already carries its entity
@@ -79,26 +83,32 @@ exercising anything MikroORM-specific.
 
 ## The e2e suites
 
-Both suites run the same assertions — `tests/crud-e2e.suite.ts` holds them, and
-each spec differs only in which database it points the app at. One behavioral
-spec, two drivers, no forked assertions (the same split `nest-typeorm` uses).
+All three suites run the same assertions — `tests/crud-e2e.suite.ts` holds
+them, and each spec differs only in which database it points the app at. One
+behavioral spec, three drivers, no forked assertions (the same split
+`nest-typeorm` uses).
 
-| Spec                             | Database                                         |
-| -------------------------------- | ------------------------------------------------ |
-| `tests/app.e2e.spec.ts`          | in-memory SQLite — no Docker, nothing to install |
-| `tests/app-postgres.e2e.spec.ts` | Testcontainers `postgres:18-alpine`              |
+| Spec                                    | Database                                              |
+| --------------------------------------- | ----------------------------------------------------- |
+| `tests/app.e2e.spec.ts`                 | in-memory SQLite — no Docker, nothing to install      |
+| `tests/app-postgres.e2e.spec.ts`        | Testcontainers `postgres:18-alpine`                   |
+| `tests/app-postgres-pglite.e2e.spec.ts` | PGlite, fronted by `pglite-socket` — no Docker either |
 
-The Postgres suite is not merely a second connection string: it is the only
-place `caseInsensitiveFilters: true` is exercised. `ILIKE` maps to MikroORM's
-`$ilike`, which **only PostgreSQL supports** — every other driver receives the
-token verbatim and fails with a syntax error — so the flag is declared rather
-than detected, and defaults to `false`.
+Both Postgres suites exercise `caseInsensitiveFilters: true` — the only place
+it's turned on. `ILIKE` maps to MikroORM's `$ilike`, which **only PostgreSQL
+supports** — every other driver receives the token verbatim and fails with a
+syntax error — so the flag is declared rather than detected, and defaults to
+`false`. The PGlite suite exists to get that same real-Postgres
+`ILIKE`/SQLSTATE-23505 behavior without a Docker daemon; the Testcontainers
+suite remains as the check against an actual `postgres:18-alpine` server.
 
-The suite's ILIKE assertion passes both ways: a real `ILIKE` on Postgres, and a
-degraded `$like` on SQLite, whose own `LIKE` is already ASCII case-insensitive.
-That both hold is exactly the argument for the `false` default.
+The suite's ILIKE assertion passes across all three: a real `ILIKE` on both
+Postgres flavours, and a degraded `$like` on SQLite, whose own `LIKE` is
+already ASCII case-insensitive. That all three hold is exactly the argument
+for the `false` default.
 
 ```bash
-pnpm vitest run examples/nest-mikroorm/tests/app.e2e.spec.ts           # no Docker
-pnpm vitest run examples/nest-mikroorm/tests/app-postgres.e2e.spec.ts  # needs Docker
+pnpm vitest run examples/nest-mikroorm/tests/app.e2e.spec.ts                  # no Docker
+pnpm vitest run examples/nest-mikroorm/tests/app-postgres.e2e.spec.ts         # needs Docker
+pnpm vitest run examples/nest-mikroorm/tests/app-postgres-pglite.e2e.spec.ts  # no Docker
 ```

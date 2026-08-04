@@ -45,11 +45,19 @@ Five details are less obvious than the table suggests:
 
 **Field kind comes from `runtimeType`, not the column type.** MikroORM
 normalizes `runtimeType` to the JavaScript type a property actually holds,
-which is what core must coerce toward. A `bigint` or `decimal` column
-surfaces as `string` there and is reported as `string` — reading `number`
-off the column type instead would corrupt values past 2⁵³. The declared
-`type` is consulted only as a fallback, for the custom types whose
-`runtimeType` is `"any"` and therefore narrows nothing (`JsonType`).
+which is what core must coerce toward. A `decimal` column surfaces as
+`string` there and is reported as `string` — reading `number` off the column
+type instead would corrupt values past 2⁵³. The declared `type` is consulted
+only as a fallback, for the custom types whose `runtimeType` is `"any"` and
+therefore narrows nothing (`JsonType`).
+
+**`BigIntType`'s default mode changed in MikroORM v7.** Declaring a column
+with the `"bigint"` shorthand now hands JavaScript a native `bigint` by
+default (previously it was a precision-safe string). A native `bigint` is
+still reported as `FieldKind` `"number"` here, and — worse — is not
+JSON-serializable at all. An app with a `bigint` column must construct the
+type explicitly with string mode to keep the old, safe behavior:
+`@Property({ type: new BigIntType("string") })`.
 
 **Generated is a union of four independent flags.** MikroORM has no single
 "the caller cannot write this" marker, so `generated` is true for an
@@ -60,15 +68,18 @@ auto-increment or database-generated column, a property with an
 
 **A relation target is resolved from `targetMeta`, never by calling the
 declaration.** MikroORM accepts two spellings, and they do not arrive the
-same: `@ManyToOne(() => Owner)` leaves `property.entity` a thunk, while
-`@ManyToOne("Owner")` leaves it a plain **string**. The string spelling is
-not exotic — it is what keeps a bidirectional relation's import cycle off
-the runtime graph, so it is exactly what a codebase with a `no-circular`
+same: `@ManyToOne(() => Owner)` leaves `property.entity` a thunk resolving to
+the class, while `@ManyToOne((): any => "Owner")` leaves it a thunk resolving
+to a plain **string**. As of MikroORM v7 the by-name form's thunk return type
+no longer includes `string` (`EntityName<T>` is class/`EntitySchema` only),
+so `any` is what makes it type-check — the string still works at runtime. The by-name spelling is not
+exotic — it is what keeps a bidirectional relation's import cycle off the
+runtime graph, so it is exactly what a codebase with a `no-circular`
 dependency rule (this one included, see doc 02 §3) reaches for. Calling
-`property.entity()` would therefore throw for half the codebases using this
-adapter. `targetMeta` is what both spellings have in common; a
-metadata-storage lookup by entity name backs it up, and the declared thunk
-is the last resort. Resolution is deferred until the thunk core holds is
+`property.entity()` and getting back a string would therefore break for half
+the codebases using this adapter. `targetMeta` is what both spellings have
+in common; a metadata-storage lookup by entity name backs it up, and the
+declared thunk is the last resort. Resolution is deferred until the thunk core holds is
 actually called, because a bidirectional relation's target may not be
 registered yet when this entity's metadata is derived.
 

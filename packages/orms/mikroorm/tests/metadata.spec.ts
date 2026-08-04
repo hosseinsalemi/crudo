@@ -1,17 +1,16 @@
 import "reflect-metadata";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { BigIntType, Collection, MikroORM } from "@mikro-orm/core";
 import {
-  Collection,
   Embeddable,
   Embedded,
   Entity,
   Enum,
   ManyToOne,
-  MikroORM,
   OneToMany,
   PrimaryKey,
   Property,
-} from "@mikro-orm/core";
+} from "@mikro-orm/decorators/legacy";
 import { ConfigurationException, type FieldMetadata } from "@kavo/core";
 import { buildEntityMetadata } from "@kavo/mikroorm";
 import { newTestOrm } from "./support/database.js";
@@ -44,8 +43,13 @@ class Widget {
   @Enum({ items: () => Status })
   status: Status = Status.Active;
 
-  /** A column whose JavaScript representation is not its column type. */
-  @Property({ columnType: "bigint", type: "bigint" })
+  /**
+   * A column whose JavaScript representation is not its column type.
+   * `BigIntType`'s default mode is native `bigint` (v7); `'string'` mode is
+   * what keeps the runtime value precision-safe through Kavo's coercion and
+   * JSON serialization, which cannot represent a native `bigint` at all.
+   */
+  @Property({ columnType: "bigint", type: new BigIntType("string") })
   serial!: string;
 
   @Property({ type: "Date", onCreate: () => new Date() })
@@ -94,8 +98,8 @@ describe("buildEntityMetadata — field kinds", () => {
   });
 
   it("follows the runtime representation, not the column type, for bigint", () => {
-    // MikroORM hands a `bigint` column to JavaScript as a string to keep
-    // precision, so `string` is what core must coerce toward — reading
+    // `Widget.serial` explicitly requests `BigIntType`'s `'string'` mode to
+    // keep precision, so `string` is what core must coerce toward — reading
     // `number` off the column type would corrupt values past 2^53.
     expect(byName["serial"]).toMatchObject({ kind: "string" });
   });
@@ -186,18 +190,19 @@ describe("buildEntityMetadata — embeddables", () => {
 
 describe("buildEntityMetadata — relation targets", () => {
   it("resolves a target declared by name, not just by class thunk", async () => {
-    // `@ManyToOne(() => Owner)` leaves `property.entity` a thunk, but
-    // `@ManyToOne("Owner")` — the spelling that keeps a bidirectional
-    // relation's import cycle off the runtime graph, which
-    // `.dependency-cruiser.cjs` forbids — leaves it a plain *string*.
-    // Calling it would throw, and core matches relation targets by class
-    // identity, so a string would break include projection outright.
+    // `@ManyToOne(() => Owner)` leaves `property.entity` a thunk resolving to
+    // the class, but `@ManyToOne(() => "Owner")` — the spelling that keeps a
+    // bidirectional relation's import cycle off the runtime graph, which
+    // `.dependency-cruiser.cjs` forbids — leaves it a thunk resolving to a
+    // plain *string*. Calling it would throw, and core matches relation
+    // targets by class identity, so a string would break include projection
+    // outright.
     @Entity()
     class Kennel {
       @PrimaryKey({ type: "number" })
       id!: number;
 
-      @OneToMany("Hound", "kennel")
+      @OneToMany((): any => "Hound", "kennel")
       hounds = new Collection<object>(this);
     }
 
@@ -206,7 +211,7 @@ describe("buildEntityMetadata — relation targets", () => {
       @PrimaryKey({ type: "number" })
       id!: number;
 
-      @ManyToOne("Kennel", { nullable: true })
+      @ManyToOne((): any => "Kennel", { nullable: true })
       kennel: object | null = null;
     }
 

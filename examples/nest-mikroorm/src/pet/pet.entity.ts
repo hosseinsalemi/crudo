@@ -1,4 +1,5 @@
-import { Collection, Entity, Enum, ManyToMany, ManyToOne, PrimaryKey, Property } from "@mikro-orm/core";
+import { Collection } from "@mikro-orm/core";
+import { Entity, Enum, ManyToMany, ManyToOne, PrimaryKey, Property } from "@mikro-orm/decorators/legacy";
 // Type-only imports + string relation targets keep the Owner↔Pet cycle off
 // the runtime import graph, which `.dependency-cruiser.cjs`'s `no-circular`
 // rule forbids (type-only edges are exempt). MikroORM resolves "Owner" and
@@ -42,13 +43,13 @@ export abstract class Pet {
   @Enum({ items: () => PetSizeEnum })
   size: PetSizeEnum = PetSizeEnum.Medium;
 
-  @ManyToOne("Owner", { nullable: true })
+  @ManyToOne((): any => "Owner", { nullable: true })
   owner: Owner | null = null;
 
   // Owning side of the many-to-many edge: `include=tags` loads through the
   // pivot table MikroORM creates. Unidirectional — `Tag` has no inverse
   // `pets` field, since nothing browses pets from a tag.
-  @ManyToMany("Tag", undefined, { owner: true })
+  @ManyToMany((): any => "Tag", undefined, { owner: true })
   tags = new Collection<Tag>(this);
 
   @Property({ type: "Date", onCreate: () => new Date() })
