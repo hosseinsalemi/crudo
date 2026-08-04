@@ -1046,6 +1046,38 @@ describe("@Kavo computed fields over the wire (ADR-0019)", () => {
     await request(server()).post("/todos").send({ title: "Ship It", slug: "hijacked" }).expect(201);
     expect(adapter.rows[1]).not.toHaveProperty("slug");
   });
+
+  it("omits the key over the wire when the resolver returns undefined", async () => {
+    @Kavo(Todo, { computed: { note: { resolve: () => undefined } } })
+    @Controller("todos")
+    class UndefinedComputedController {}
+
+    await app.close();
+    await bootstrap(UndefinedComputedController);
+    await request(server()).post("/todos").send({ title: "x" }).expect(201);
+    expect((await request(server()).get("/todos/1").expect(200)).body).not.toHaveProperty("note");
+  });
+
+  it("turns a throwing resolver into problem details without leaking the message", async () => {
+    @Kavo(Todo, {
+      computed: {
+        note: {
+          resolve: () => {
+            throw new Error("secret internal detail");
+          },
+        },
+      },
+    })
+    @Controller("todos")
+    class ThrowingComputedController {}
+
+    await app.close();
+    await bootstrap(ThrowingComputedController);
+    // The write serializes its result too, so this is where it surfaces.
+    const response = await request(server()).post("/todos").send({ title: "x" }).expect(500);
+    expect(response.body).toMatchObject({ code: "KAVO_PERSISTENCE_FAILED", status: 500 });
+    expect(JSON.stringify(response.body)).not.toContain("secret internal detail");
+  });
 });
 
 describe("@Kavo Swagger request-body schemas", () => {

@@ -53,7 +53,11 @@ computed field's source columns are always present, even under
 
 `resolve` is **synchronous** and runs once per served item. An
 async or database-hitting resolver is not offered: it would reintroduce
-per-row N+1 at exactly the stage the include resolver exists to batch.
+per-row N+1 at exactly the stage the include resolver exists to batch. An
+`async resolve` is a bootstrap error rather than a slow success, because
+the serializer emits the return value unawaited and the response would
+silently carry `{}`. Returning `undefined` omits the key and `null` emits
+it, the same distinction the column branch draws.
 
 **2. Present by default, narrowed like any other field.** A declared
 computed field joins the entity-derived `item`/`list` projection with no
@@ -80,10 +84,12 @@ documentation would otherwise pass the key through to the adapter as if it
 were a column. The strip is explicit and applies whichever projection is
 in force.
 
-Two further declarations are bootstrap errors, for the same
+Further declarations are bootstrap errors for the same
 fail-fast-with-the-key-path reason: a computed name colliding with a real
 column or relation (the shadowed value would silently vanish from every
-response), and a descriptor with no `resolve` function.
+response), a descriptor with no `resolve` function, and the name
+`__proto__`, which is not an ordinary object key and would disappear from
+the resolved map without a word.
 
 `computed` carries functions, so — like `dto` and `relations` — it is
 **entity-scope structural config, outside the settings precedence chain**:
@@ -104,6 +110,22 @@ so rule 3 is a compile error before it is a bootstrap error.
   target's own `ResolvedEntityConfig` through the `EntityCatalog`, and
   that config now carries `computed`. A relation still cannot widen what
   its target exposes.
+- What that composition does **not** give it is a context of its own. One
+  response is one request, and `KavoContext` describes that request, so a
+  target's resolver is handed the _root_ operation's context:
+  `GET /posts/1?include=author` gives an `Author` computed field a context
+  whose `entityName`, `operation`, `config` and `query` are Post's. Only
+  the request-scoped members — `principal`, `correlationId`,
+  `transaction`, `state` — are meaningful from a relation target. A
+  per-target context was rejected as a worse lie: it would have to invent
+  an `operation` that no caller issued and a `query` that was never
+  normalized against that entity.
+- `selectable: false` narrows the allowlist, not the projection. The field
+  stays in the default response and its name becomes a 400 in `fields=`;
+  a request that sends any fieldset still drops it, with no way to ask for
+  it back. That follows from rule 2 rather than contradicting it —
+  selection narrows uniformly — but it is the one place the flag's name
+  reads as a stronger promise than it makes.
 - `ResolvedEntityConfig` gains a required `computed` member. It is
   produced by Kavo and read by the serializer/deserializer; anything
   constructing one by hand has to supply it.

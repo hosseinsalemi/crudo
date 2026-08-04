@@ -24,17 +24,34 @@ import type { KavoContext } from "../context/kavo-context.js";
 export interface ComputedFieldDescriptor<Entity = unknown> {
   /**
    * Derive the field's value for one entity. Called once per served item,
-   * **synchronously** — the return value is emitted as-is, never awaited.
-   * Keep it a pure function of `entity` (plus, where a field has to vary by
-   * caller, `context.principal`): a resolver that hits the database or the
-   * network runs once per row and reintroduces exactly the N+1 the include
-   * resolver exists to avoid.
+   * **synchronously** — the return value is emitted as-is, never awaited
+   * (declaring `resolve` `async` is a bootstrap error). Returning
+   * `undefined` omits the key; `null` emits it, the same distinction a
+   * column draws. Keep it a pure function of `entity` (plus, where a field
+   * has to vary by caller, `context.principal`): a resolver that hits the
+   * database or the network runs once per row and reintroduces exactly the
+   * N+1 the include resolver exists to avoid.
+   *
+   * **On an included relation target, `context` is the *root* request's.**
+   * One response is one request, and `KavoContext` describes that request:
+   * serving `GET /posts/1?include=author` hands an `Author` computed field
+   * a context whose `entityName`, `operation`, `config` and `query` are
+   * Post's. Only the request-scoped members — `principal`, `correlationId`,
+   * `transaction`, `state` — mean what they say from a relation target
+   * (ADR-0019).
    */
   resolve(entity: Entity, context: KavoContext<Entity>): unknown;
   /**
    * Whether the field joins the `selectable` allowlist, so `fields=` can
-   * name it. Defaults to `true`; set `false` for a field that should always
-   * be present and never individually selectable.
+   * name it. Defaults to `true`; `false` keeps the field in the default
+   * projection while making its name a 400 in `fields=`.
+   *
+   * Note what that does *not* buy: a request that sends any `fields=` at
+   * all still drops the field, because selection narrows the projection
+   * uniformly and there is no way to ask for it back. `false` means "not
+   * individually selectable", not "always present". An explicit
+   * `allowlists.selectable` list naming the field overrides this — an
+   * explicit list is always the deliberate answer.
    */
   readonly selectable?: boolean;
 }

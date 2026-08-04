@@ -180,12 +180,20 @@ Response fields with no backing column, derived from an entity that has already 
 
 | Field        | Type                                        | What it does                                                                                         |
 | ------------ | ------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `resolve`    | `(entity, context: KavoContext) => unknown` | Derives the value. Called once per served item, **synchronously** — see the N+1 caveat below.        |
-| `selectable` | `boolean` (default `true`)                  | Whether `fields=` may name the field. `false` keeps it always-present and never individually chosen. |
+| `resolve`    | `(entity, context: KavoContext) => unknown` | Derives the value. Called once per served item, **synchronously** — see the caveats below.           |
+| `selectable` | `boolean` (default `true`)                  | Whether `fields=` may name the field. `false` makes naming it a 400 — read the note below carefully. |
 
 A declared computed field is in the default `item`/`list` projection with no DTO registration, and in the `selectable` allowlist by default. It is **never** filterable, sortable, or writable — naming one in `allowlists.filterable`/`sortable` is both a type error and a bootstrap `ConfigurationException`, and a value for one in a request body is stripped even if a registered `create`/`update` DTO declares the key.
 
-Keep `resolve` a pure function of the entity (plus `context.principal` where a field has to vary by caller). It runs per row, so a resolver that queries the database or calls out over the network reintroduces exactly the N+1 that batched includes exist to avoid.
+`resolve` returning `undefined` omits the key; `null` emits it — the same distinction a column draws.
+
+**What `selectable: false` does and does not mean.** It removes the name from the allowlist, so `?fields=auditNote` is a 400. It does **not** pin the field into every response: selection narrows the projection uniformly, so any request that sends `fields=` at all still drops it, and the client has no way to ask for it back. Read it as "not individually selectable", not "always present". An explicit `allowlists.selectable` list naming the field overrides the flag — an explicit list is always the deliberate answer.
+
+Keep `resolve` a pure function of the entity (plus `context.principal` where a field has to vary by caller). It runs per row, so a resolver that queries the database or calls out over the network reintroduces exactly the N+1 that batched includes exist to avoid. Declaring it `async` is a bootstrap error rather than a slow success: the serializer never awaits, so the promise would be emitted as-is and serialize to `{}`.
+
+On an **included relation target**, `resolve` receives the _root_ request's `KavoContext` — serving `GET /posts/1?include=author` hands an `Author` computed field a context whose `entityName`, `operation`, `config` and `query` describe Post. Only `principal`, `correlationId`, `transaction` and `state` mean what they say from a relation target.
+
+Pass the config inline to `@Kavo(...)` (or use `satisfies`) rather than annotating it `EntityConfig<Book>`: the computed-key type parameter is inferred at the call site, and an explicit `EntityConfig<Book>` annotation fixes it to `never` — which erases `computed`'s value types and leaves `resolve`'s parameter implicitly `any`.
 
 See [ADR-0019](/internals/adr/0019-computed-fields-are-serializer-evaluated) for the reasoning and [DTO system §7](/internals/architecture/04-dto-system) for how it interacts with DTO narrowing and field selection.
 

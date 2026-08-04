@@ -37,9 +37,31 @@ void kavo.createCrud(Author, {
 // A descriptor can be declared standalone and still infer the key.
 const initials: ComputedFieldDescriptor<Author> = {
   resolve: (author) => author.name.slice(0, 2),
-  selectable: false,
 };
 void kavo.createCrud(Author, { computed: { initials }, allowlists: { selectable: ["id", "initials"] } });
+
+void kavo.createCrud(Author, {
+  computed: {
+    // @ts-expect-error — `resolve` is typed to the entity, so a misspelled
+    // property is caught here rather than as `undefined` in a response.
+    initials: { resolve: (author) => author.nmae },
+  },
+});
+
+void kavo.createCrud(Author, {
+  computed: { initials: { resolve: (author) => author.name } },
+  // @ts-expect-error — the `{ exclude }` form is barred from filterable too:
+  // excluding a name that could never be in the list is a confusion, not a
+  // no-op worth silently accepting.
+  allowlists: { filterable: { exclude: ["initials"] } },
+});
+
+// `{ exclude }` on `selectable` accepts a computed name, because that list
+// really does contain one to remove.
+void kavo.createCrud(Author, {
+  computed: { initials: { resolve: (author) => author.name } },
+  allowlists: { selectable: { exclude: ["initials"] } },
+});
 
 void kavo.createCrud(Author, {
   computed: { initials: { resolve: (author) => author.name } },

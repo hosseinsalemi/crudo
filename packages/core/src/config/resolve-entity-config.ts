@@ -119,10 +119,14 @@ const NO_COMPUTED_FIELDS: Readonly<Record<string, never>> = Object.freeze({});
  * precedence chain — an entity's declaration is the whole story, resolved
  * once here.
  *
- * Both ways a declaration can be structurally wrong fail at bootstrap
+ * The ways a declaration can be structurally wrong all fail at bootstrap
  * rather than as a surprising response later: a name that shadows a real
  * column or relation (the shadowed value would silently disappear from
- * every response), and a descriptor with no `resolve` function.
+ * every response), a descriptor with no `resolve` function, and the one
+ * name that is not a key at all — `__proto__`, which would set this
+ * accumulator's prototype instead of adding an entry and so vanish
+ * without a word (the same class of hazard as the bracket-segment fix in
+ * the filter parser).
  */
 function resolveComputedFields<Entity extends object>(
   metadata: EntityMetadata<Entity>,
@@ -140,6 +144,14 @@ function resolveComputedFields<Entity extends object>(
   const resolved: Record<string, ComputedFieldDescriptor<Entity>> = {};
   for (const name of Object.keys(declared)) {
     const descriptor = declared[name];
+    if (name === "__proto__") {
+      throw new ConfigurationException(
+        entityName,
+        `computed.${name}`,
+        `'__proto__' cannot name a computed field — it is not an ordinary object key, ` +
+          `so the declaration would silently disappear instead of producing a response field`,
+      );
+    }
     if (typeof descriptor?.resolve !== "function") {
       throw new ConfigurationException(
         entityName,
@@ -155,6 +167,21 @@ function resolveComputedFields<Entity extends object>(
         `computed.${name}`,
         `computed field '${name}' collides with an existing ${kind} on '${entityName}' — ` +
           `a computed field must have a name of its own, or the ${kind} would never reach a response`,
+      );
+    }
+    // The serializer emits `resolve`'s return value as-is and never awaits
+    // it (ADR-0019), so an `async` resolver would put a pending promise in
+    // the response — `{}` once serialized to JSON. Catching the shape
+    // people actually write turns a silently wrong body into a bootstrap
+    // failure; a plain function that happens to return a promise still
+    // gets through, which is the limit of what is detectable here.
+    if (descriptor.resolve.constructor?.name === "AsyncFunction") {
+      throw new ConfigurationException(
+        entityName,
+        `computed.${name}`,
+        `computed field '${name}' has an async 'resolve' — computed fields are resolved ` +
+          `synchronously per served item and the promise would be emitted unawaited; ` +
+          `fetch what it needs before serialization (a custom handler, or an eager relation)`,
       );
     }
     resolved[name] = descriptor;

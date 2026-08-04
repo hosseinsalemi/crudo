@@ -110,7 +110,12 @@ export class DefaultSerializer<Entity = unknown> implements Serializer<Entity> {
       // row itself, and an inherited `constructor`/`toString` must not be
       // mistaken for a declared computed field.
       if (Object.prototype.hasOwnProperty.call(projection.computed, key)) {
-        result[key] = projection.computed[key]?.resolve(entity as never, context as never);
+        const value = projection.computed[key]?.resolve(entity as never, context as never);
+        // `undefined` is absence, `null` is data — the same distinction the
+        // column branch draws below, so a resolver that opts out of
+        // emitting a value reads the same programmatically as it does once
+        // `JSON.stringify` has dropped the key.
+        if (value !== undefined) result[key] = value;
         continue;
       }
       if (key in source) result[key] = source[key];
