@@ -160,7 +160,13 @@ export class DefaultDeserializer<Entity = unknown> implements Deserializer<Entit
     const source = raw as Record<string, unknown>;
     const result: Record<string, unknown> = {};
     for (const key of allowed) {
-      if (!(key in source)) continue;
+      // Own properties only. `raw` is a wire body, so an inherited key is
+      // never something the client sent — but it *is* something a polluted
+      // `Object.prototype` would supply, silently adding a writable field to
+      // every request that omits it. Defence in depth: the filter parser no
+      // longer offers a way to pollute (see `emptyNode` there), and this
+      // keeps a pollution introduced anywhere else out of writes.
+      if (!Object.prototype.hasOwnProperty.call(source, key)) continue;
       const idField = this.relationIdFields.get(key)?.();
       result[key] = idField === undefined ? source[key] : associate(source[key], idField);
     }

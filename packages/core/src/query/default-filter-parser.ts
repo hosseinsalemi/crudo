@@ -112,7 +112,10 @@ export class DefaultFilterParser<Entity = unknown> implements FilterParser<Entit
 
   /** Fold every `filter[...]` param into one nested node tree. */
   private collectBracketTree(rawParams: Readonly<Record<string, unknown>>): Record<string, unknown> | null {
-    const tree: Record<string, unknown> = {};
+    // Null-prototype: segments are attacker-controlled, and on a plain `{}`
+    // the segment `__proto__` resolves to `Object.prototype` — `assignPath`
+    // would then walk into it and write there. See {@link emptyNode}.
+    const tree = emptyNode();
     let found = false;
     for (const [key, value] of Object.entries(rawParams)) {
       const segments = parseBracketKey(key, "filter");
@@ -381,6 +384,27 @@ function expressionDepth(expression: FilterExpression<unknown>): number {
 }
 
 /**
+ * A tree node with **no prototype**, which is what makes the bracket grammar
+ * safe to build from untrusted keys.
+ *
+ * On an ordinary `{}`, reading the key `__proto__` yields `Object.prototype`
+ * rather than `undefined`, so `filter[__proto__][withDeleted]=true` would
+ * have `assignPath` walk into the prototype and assign there — polluting
+ * every object in the process. The pollution then rides the prototype chain
+ * into `rawParams["withDeleted"]`, `rawParams["limit"]` and the `key in
+ * source` check in the deserializer, so one anonymous request could hand
+ * every later request a filter, a soft-delete flag, or an extra body field.
+ *
+ * With no prototype there is nothing to walk into: `__proto__` becomes an
+ * ordinary own key and fails the filterable allowlist like any other unknown
+ * field — a 400, not a silent drop and not a write. `Object.entries`,
+ * `typeof`, and the rest of this file behave identically on these objects.
+ */
+function emptyNode(): Record<string, unknown> {
+  return Object.create(null) as Record<string, unknown>;
+}
+
+/**
  * Set `value` at `segments` in a nested record. A trailing empty segment
  * (the repeated-key form `filter[status][in][]=a&filter[status][in][]=b`)
  * appends into an array at the parent key instead.
@@ -397,7 +421,7 @@ function assignPath(tree: Record<string, unknown>, segments: readonly string[], 
     if (typeof existing === "object" && existing !== null && !Array.isArray(existing)) {
       node = existing as Record<string, unknown>;
     } else {
-      const next: Record<string, unknown> = {};
+      const next = emptyNode();
       node[segment] = next;
       node = next;
     }

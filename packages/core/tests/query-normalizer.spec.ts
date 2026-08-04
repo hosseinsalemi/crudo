@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { QueryNormalizer, resolveEntityConfig } from "@kavo/core";
+import type { ClassRef, EntityMetadata } from "@kavo/core";
+import { DefaultEntityCatalog, DefaultIncludeResolver, QueryNormalizer, resolveEntityConfig } from "@kavo/core";
 import { userMetadata } from "./support/user-fixture.js";
 import { accountMetadata } from "./support/account-fixture.js";
+import type { Post } from "./support/blog-fixture.js";
+import { Author, Comment, authorMetadata, commentMetadata, postMetadata } from "./support/blog-fixture.js";
 import { issuesOf } from "./support/query-issues.js";
 
 const config = resolveEntityConfig(userMetadata, undefined, undefined);
@@ -9,6 +12,24 @@ const normalizer = new QueryNormalizer(userMetadata);
 
 const softDeletableConfig = resolveEntityConfig(accountMetadata, undefined, undefined);
 const softDeletableNormalizer = new QueryNormalizer(accountMetadata);
+
+/**
+ * `Post` is the one fixture that is both soft-deletable (`deletedAt`) and
+ * relation-bearing, so it is the only place the whole grammar — filter,
+ * sort, pagination, root and relation fieldsets, includes, and the
+ * soft-delete flags — can meet in a single normalized request.
+ */
+const postCatalog = new DefaultEntityCatalog((entity: ClassRef) => {
+  if (entity === Comment) return commentMetadata as unknown as EntityMetadata<object>;
+  if (entity === Author) return authorMetadata as unknown as EntityMetadata<object>;
+  return undefined;
+});
+const postConfig = resolveEntityConfig(
+  postMetadata,
+  { relations: { edges: { comments: { includable: true } } } },
+  undefined,
+);
+const postNormalizer = new QueryNormalizer<Post>(postMetadata, [], new DefaultIncludeResolver<Post>(postCatalog));
 
 describe("QueryNormalizer — wire params", () => {
   it("normalizes the full reference query", () => {
@@ -182,6 +203,110 @@ describe("QueryNormalizer — onlyDeleted", () => {
   it("rejects a non-boolean onlyDeleted value", () => {
     const issues = issuesOf(() => softDeletableNormalizer.normalizeWire({ onlyDeleted: "yes" }, softDeletableConfig));
     expect(issues[0]).toMatchObject({ field: "onlyDeleted", code: "KAVO_QUERY_INVALID_VALUE" });
+  });
+});
+
+/**
+ * Every feature below is individually covered above; what these pin down is
+ * that they compose. Each section of the pipeline writes into one shared
+ * issue list and one shared result, so a regression that lets one section
+ * clobber another's output — or short-circuit the sections after it — is
+ * invisible to any single-feature test.
+ */
+describe("QueryNormalizer — the whole grammar in one request", () => {
+  const wire = {
+    "filter[title][like]": "%draft%",
+    "filter[authorId][eq]": "7",
+    sort: "-id,title",
+    limit: "5",
+    offset: "10",
+    fields: "id,title",
+    "fields[comments]": "id,body",
+    include: "comments",
+    onlyDeleted: "true",
+  };
+
+  it("normalizes filter, sort, pagination, fields, include and onlyDeleted together", () => {
+    const query = postNormalizer.normalizeWire(wire, postConfig);
+
+    expect(query.filter.root).toMatchObject({
+      kind: "group",
+      operator: "AND",
+      children: [
+        { field: "title", operator: "LIKE", value: "%draft%" },
+        { field: "authorId", operator: "EQ", value: 7 },
+      ],
+    });
+    expect(query.sort).toEqual([
+      { field: "id", direction: "desc" },
+      { field: "title", direction: "asc" },
+    ]);
+    expect(query.pagination).toEqual({ limit: 5, offset: 10 });
+    expect(query.fields).toEqual({ root: ["id", "title"], relations: { comments: ["id", "body"] } });
+    expect(query.onlyDeleted).toBe(true);
+    expect(query.withDeleted).toBe(false);
+    expect(query.count).toBe(true);
+  });
+
+  it("resolves the include tree in the same pass, fieldset attached", () => {
+    const query = postNormalizer.normalizeWire(wire, postConfig);
+    expect(Object.keys(query.include)).toEqual(["comments"]);
+    expect(query.include["comments"]).toMatchObject({
+      path: "comments",
+      fields: ["id", "body"],
+      strategy: "batch",
+    });
+  });
+
+  it("still collects issues from every section when they are combined", () => {
+    // Distinct bad names per section on purpose: with one shared name the
+    // three `KAVO_QUERY_INVALID_FIELD` issues are indistinguishable, so a
+    // regression where one section double-reported while another stopped
+    // reporting would produce the same multiset and pass.
+    const issues = issuesOf(() =>
+      postNormalizer.normalizeWire(
+        { ...wire, "filter[secretA][eq]": "x", sort: "-secretB", fields: "secretC", limit: "abc" },
+        postConfig,
+      ),
+    );
+    expect(issues).toEqual([
+      expect.objectContaining({ field: "secretA", code: "KAVO_QUERY_INVALID_FIELD" }),
+      expect.objectContaining({ field: "secretB", code: "KAVO_QUERY_INVALID_FIELD" }),
+      expect.objectContaining({ field: "secretC", code: "KAVO_QUERY_INVALID_FIELD" }),
+      expect.objectContaining({ field: "limit", code: "KAVO_QUERY_INVALID_VALUE" }),
+    ]);
+  });
+});
+
+/**
+ * A trash view is still a read: narrowing the root to soft-deleted rows must
+ * not change what `include=` resolves to. The flags and the include resolver
+ * are separate branches of `normalizeWire`, and the include branch runs
+ * before pagination — so a flag that short-circuited would silently strip
+ * relations from exactly the view that needs them most.
+ */
+describe("QueryNormalizer — include under the soft-delete flags", () => {
+  it("resolves the same include tree for a live, withDeleted, and onlyDeleted read", () => {
+    const live = postNormalizer.normalizeWire({ include: "comments" }, postConfig);
+    const withDeleted = postNormalizer.normalizeWire({ include: "comments", withDeleted: "true" }, postConfig);
+    const onlyDeleted = postNormalizer.normalizeWire({ include: "comments", onlyDeleted: "true" }, postConfig);
+
+    expect(Object.keys(live.include)).toEqual(["comments"]);
+    expect(withDeleted.include).toEqual(live.include);
+    expect(onlyDeleted.include).toEqual(live.include);
+    expect([live.withDeleted, live.onlyDeleted]).toEqual([false, false]);
+    expect([withDeleted.withDeleted, withDeleted.onlyDeleted]).toEqual([true, false]);
+    expect([onlyDeleted.withDeleted, onlyDeleted.onlyDeleted]).toEqual([false, true]);
+  });
+
+  it("reports the include failure and the flag conflict in one exception", () => {
+    const issues = issuesOf(() =>
+      postNormalizer.normalizeWire({ include: "ghosts", withDeleted: "true", onlyDeleted: "true" }, postConfig),
+    );
+    expect(issues).toContainEqual(expect.objectContaining({ field: "ghosts", code: "KAVO_QUERY_INVALID_FIELD" }));
+    expect(issues).toContainEqual(
+      expect.objectContaining({ field: "onlyDeleted", code: "KAVO_QUERY_CONFLICTING_PARAMS" }),
+    );
   });
 });
 

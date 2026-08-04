@@ -169,6 +169,80 @@ describe("@Kavo route generation", () => {
   });
 });
 
+/**
+ * Regression, over real HTTP because that is where the damage was: a single
+ * anonymous GET whose query string carried a `__proto__` bracket segment used
+ * to write into `Object.prototype`, and the write then leaked into every
+ * later request in the process through the plain-object reads in the
+ * normalizer and the deserializer. Unit coverage lives in
+ * `packages/core/tests/filter-parser.spec.ts`; what this file adds is the
+ * amplification path — victim requests that never touch the attacking one.
+ */
+describe("@Kavo prototype pollution over the wire", () => {
+  @Kavo(Todo, { softDelete: { strategy: "soft" } })
+  @Controller("todos")
+  class PollutionController {}
+
+  const POLLUTED = ["withDeleted", "onlyDeleted", "limit", "done", "priority", "include"];
+
+  beforeEach(async () => {
+    await bootstrap(PollutionController);
+  });
+
+  afterEach(() => {
+    for (const key of POLLUTED) delete (Object.prototype as Record<string, unknown>)[key];
+  });
+
+  async function attack(segment: string, value: string): Promise<void> {
+    // The attacking request itself is allowed to 400 — what matters is that
+    // it leaves nothing behind.
+    await request(server()).get(`/todos?filter[__proto__][${segment}]=${value}`);
+    expect(Object.prototype.hasOwnProperty.call(Object.prototype, segment)).toBe(false);
+  }
+
+  it("cannot hand a later reader the soft-deleted rows", async () => {
+    await request(server()).post("/todos").send({ title: "live" }).expect(201);
+    await request(server()).post("/todos").send({ title: "deleted" }).expect(201);
+    await request(server()).delete("/todos/2").expect(204);
+
+    await attack("withDeleted", "true");
+
+    const victim = await request(server()).get("/todos").expect(200);
+    expect(victim.body.total).toBe(1);
+    expect(victim.body.items).toEqual([expect.objectContaining({ title: "live" })]);
+  });
+
+  it("cannot smuggle a field into a later writer's body", async () => {
+    // The nastiest amplification: `done` is on the create DTO, so a polluted
+    // prototype used to satisfy the deserializer's `key in source` check and
+    // append itself to bodies that never mentioned it.
+    await attack("done", "true");
+
+    const created = await request(server()).post("/todos").send({ title: "innocent" }).expect(201);
+    expect(created.body).toMatchObject({ title: "innocent", done: false });
+  });
+
+  it("cannot cap or break a later reader's pagination", async () => {
+    for (let i = 1; i <= 3; i++) {
+      await request(server())
+        .post("/todos")
+        .send({ title: `t${i}` })
+        .expect(201);
+    }
+    await attack("limit", "1");
+
+    const victim = await request(server()).get("/todos").expect(200);
+    expect(victim.body.items).toHaveLength(3);
+  });
+
+  it("cannot poison a later reader into a permanent 400", async () => {
+    // `include` on an entity with nothing includable is a 400. Inherited off
+    // the prototype it would make every read fail for every client, forever.
+    await attack("include", "list");
+    await request(server()).get("/todos").expect(200);
+  });
+});
+
 describe("@Kavo page pagination over the wire", () => {
   @Kavo(Todo, { pagination: { strategy: "page", defaultLimit: 2, maxLimit: 3 } })
   @Controller("todos")
@@ -743,6 +817,59 @@ describe("@Kavo soft-delete routes", () => {
     expect(response.body.items).toHaveLength(1);
   });
 
+  it("narrows the list to the trash for onlyDeleted=true", async () => {
+    // The flag is unit-tested in core; what this pins down is that it
+    // survives the wire — the binding hands the engine flat query params,
+    // and a flag that never reached the normalizer would read as a
+    // plain live listing instead of a 400.
+    await request(server()).post("/todos").send({ title: "still here" }).expect(201);
+    await request(server()).delete("/todos/1").expect(204);
+
+    const trash = await request(server()).get("/todos?onlyDeleted=true").expect(200);
+    expect(trash.body).toMatchObject({ total: 1 });
+    expect(trash.body.items).toEqual([expect.objectContaining({ id: 1, title: "x" })]);
+    expect(adapter.lastQuery).toMatchObject({ onlyDeleted: true, withDeleted: false });
+
+    // …and the default view is still its complement.
+    const live = await request(server()).get("/todos").expect(200);
+    expect(live.body.items).toEqual([expect.objectContaining({ id: 2, title: "still here" })]);
+  });
+
+  it("applies onlyDeleted to a single-row read too", async () => {
+    // The list and the by-id path resolve visibility separately, in every
+    // real adapter as well as this fake, so the trash view has to be
+    // asserted on both — a by-id read that ignored the flag would 404 the
+    // row the list just handed the client.
+    await request(server()).delete("/todos/1").expect(204);
+    await request(server()).get("/todos/1").expect(404);
+    const trashed = await request(server()).get("/todos/1?onlyDeleted=true").expect(200);
+    expect(trashed.body).toMatchObject({ id: 1, title: "x" });
+  });
+
+  it("maps withDeleted+onlyDeleted together to a 400 problem-details document", async () => {
+    const response = await request(server())
+      .get("/todos?withDeleted=true&onlyDeleted=true")
+      .expect(400)
+      .expect("Content-Type", /application\/problem\+json/);
+    expect(response.body).toMatchObject({ status: 400, code: "KAVO_QUERY_INVALID" });
+    expect(response.body.errors).toContainEqual(
+      expect.objectContaining({ field: "onlyDeleted", code: "KAVO_QUERY_CONFLICTING_PARAMS" }),
+    );
+  });
+
+  it("rejects onlyDeleted on an entity that is not soft-deletable", async () => {
+    @Kavo(Todo, { softDelete: { strategy: "hard" } })
+    @Controller("todos")
+    class HardDeleteController {}
+
+    await app.close();
+    await bootstrap(HardDeleteController);
+    const response = await request(server()).get("/todos?onlyDeleted=true").expect(400);
+    expect(response.body.errors).toContainEqual(
+      expect.objectContaining({ field: "onlyDeleted", code: "KAVO_QUERY_UNSUPPORTED_PARAM" }),
+    );
+  });
+
   it("restores through PATCH /:id/restore, returning the item", async () => {
     await request(server()).delete("/todos/1").expect(204);
     const restored = await request(server()).patch("/todos/1/restore").expect(200);
@@ -817,6 +944,50 @@ describe("@Kavo relation includes", () => {
       code: "KAVO_QUERY_INVALID",
       errors: [{ field: "list", code: "KAVO_QUERY_INVALID_FIELD" }],
     });
+  });
+
+  it("carries filter, sort, include and pagination through one request", async () => {
+    // Each of these is covered on its own above; what a single request adds
+    // is that they survive *together* — one query string, one flatten, one
+    // normalization pass. A regression where one section's parse consumed or
+    // clobbered another's params is invisible to any single-feature test.
+    for (let i = 1; i <= 3; i++) {
+      await request(server())
+        .post("/todos")
+        .send({ title: `t${i}`, priority: i, list: 7 })
+        .expect(201);
+    }
+
+    const response = await request(server())
+      .get("/todos?filter[done][eq]=false&filter[priority][gte]=1&sort=-priority,title&include=list&limit=2&offset=1")
+      .expect(200);
+
+    expect(adapter.lastQuery?.filter.root).toMatchObject({
+      kind: "group",
+      operator: "AND",
+      children: [
+        { field: "done", operator: "EQ", value: false },
+        { field: "priority", operator: "GTE", value: 1 },
+      ],
+    });
+    expect(adapter.lastQuery?.sort).toEqual([
+      { field: "priority", direction: "desc" },
+      { field: "title", direction: "asc" },
+    ]);
+    expect(adapter.lastQuery?.pagination).toEqual({ limit: 2, offset: 1 });
+    expect(Object.keys(adapter.lastQuery?.include ?? {})).toEqual(["list"]);
+
+    // The envelope mirrors the request, and the included relation is still
+    // embedded on every item of the page. `total: 3` is not evidence the
+    // filter ran — this fake's `count()` ignores the filter, and all three
+    // rows match it anyway. The load-bearing assertions are the
+    // `adapter.lastQuery` ones above; filter *evaluation* belongs to the
+    // real adapters.
+    expect(response.body).toMatchObject({ limit: 2, offset: 1, total: 3 });
+    expect(response.body.items).toHaveLength(2);
+    for (const item of response.body.items) {
+      expect(item).toMatchObject({ list: { id: 7 } });
+    }
   });
 
   it("documents include and fields[relation] in the OpenAPI schema", async () => {

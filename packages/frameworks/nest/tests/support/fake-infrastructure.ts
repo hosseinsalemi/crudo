@@ -116,7 +116,7 @@ export class InMemoryTodoAdapter implements RepositoryAdapter<Todo> {
   ): Promise<Todo | null> {
     const row = this.rows.find((candidate) => candidate.id === Number(id)) ?? null;
     if (row === null) return null;
-    return this.visible(row, context, query?.withDeleted ?? false) ? row : null;
+    return this.visible(row, context, query?.withDeleted ?? false, query?.onlyDeleted ?? false) ? row : null;
   }
 
   async findOne(query: NormalizedQueryContext<Todo>, context: KavoContext<Todo>): Promise<Todo | null> {
@@ -194,11 +194,17 @@ export class InMemoryTodoAdapter implements RepositoryAdapter<Todo> {
   }
 
   private live(query: NormalizedQueryContext<Todo>, context: KavoContext<Todo>): readonly Todo[] {
-    return this.rows.filter((row) => this.visible(row, context, query.withDeleted));
+    return this.rows.filter((row) => this.visible(row, context, query.withDeleted, query.onlyDeleted));
   }
 
-  private visible(row: Todo, context: KavoContext<Todo>, withDeleted: boolean): boolean {
+  /**
+   * The three soft-delete views a read can ask for: live rows (the
+   * default), everything (`withDeleted`), and the trash (`onlyDeleted`).
+   * Driven by the resolved strategy rather than this fake's own opinion.
+   */
+  private visible(row: Todo, context: KavoContext<Todo>, withDeleted: boolean, onlyDeleted: boolean): boolean {
     if (context.config.softDelete.strategy !== "soft") return true;
+    if (onlyDeleted) return row.deletedAt !== null;
     return withDeleted || row.deletedAt === null;
   }
 
