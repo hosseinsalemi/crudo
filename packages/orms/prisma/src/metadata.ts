@@ -115,6 +115,45 @@ export function buildEntityMetadata<Entity extends object>(
   };
 }
 
+/**
+ * One relation edge, as the filter translator needs to see it: which
+ * Prisma model it lands on, and whether it is a list.
+ */
+export interface PrismaRelationEdge {
+  readonly cardinality: "one" | "many";
+  /** Target model name — the key to look up for the next path segment. */
+  readonly target: string;
+}
+
+/**
+ * Model name → relation property name → edge, for the whole datamodel.
+ *
+ * `EntityMetadata.relations` describes one entity, which is enough for
+ * include resolution but not for a filter path: `author.posts.title` walks
+ * two models, and only the second hop knows whether `posts` is a list. The
+ * graph is derived once at bootstrap (`createInfrastructure`) and handed to
+ * the translator as plain data, which is what keeps `translateFilter` a
+ * pure function rather than something that reaches for a client.
+ */
+export type PrismaRelationGraph = ReadonlyMap<string, ReadonlyMap<string, PrismaRelationEdge>>;
+
+/** Derive {@link PrismaRelationGraph} from Prisma's DMMF. */
+export function buildRelationGraph(datamodel: PrismaDatamodel): PrismaRelationGraph {
+  return new Map(
+    datamodel.models.map((model) => [
+      model.name,
+      new Map(
+        model.fields
+          .filter((field) => field.kind === "object")
+          .map((field): [string, PrismaRelationEdge] => [
+            field.name,
+            { cardinality: field.isList ? "many" : "one", target: field.type },
+          ]),
+      ),
+    ]),
+  );
+}
+
 function relationDescriptor(
   field: PrismaField,
   ownerModelName: string,
