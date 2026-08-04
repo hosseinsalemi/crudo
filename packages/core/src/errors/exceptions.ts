@@ -117,12 +117,36 @@ export class NotDeletedException extends KavoException {
  * current ETag → 412. Distinct from {@link ConflictException} (409): a
  * conflict is the database refusing the write, this is Kavo refusing to
  * attempt it because the client is acting on a version it never saw
- * (ADR-0019). A *missing* target is still a {@link NotFoundException} —
- * the precondition is only evaluated once the row is known to exist.
+ * (ADR-0020). A target with no current representation is never this: the
+ * check falls through to the handler, which raises whatever that operation
+ * raises for it ({@link NotFoundException} for a row that is gone,
+ * {@link AlreadyDeletedException} for a `deleteOne` on a soft-deleted one)
+ * — so an error's identity never depends on whether a cache header was
+ * sent.
  */
 export class PreconditionFailedException extends KavoException {
   constructor(options: KavoExceptionOptions = {}) {
     super("KAVO_PRECONDITION_FAILED", options);
+  }
+}
+
+/**
+ * An `If-Match` the engine cannot evaluate at all → 412. Three ways to get
+ * here, all of them configuration or operation shape rather than a race:
+ * the operation does not target one identified row (`createOne`, any
+ * custom operation), `caching.etag` is off for the operation in force, or
+ * `findOne` is not an enabled operation so there is no canonical
+ * representation to compare against (ADR-0020 §4).
+ *
+ * Distinct from {@link PreconditionFailedException} because the fix is
+ * different — that one says "re-read and retry", this one says "this guard
+ * cannot be honored here at all", and retrying it will never succeed. Both
+ * are 412: the request did not happen, which is what an `If-Match` client
+ * must be able to rely on.
+ */
+export class PreconditionUnsupportedException extends KavoException {
+  constructor(options: KavoExceptionOptions = {}) {
+    super("KAVO_PRECONDITION_UNSUPPORTED", options);
   }
 }
 

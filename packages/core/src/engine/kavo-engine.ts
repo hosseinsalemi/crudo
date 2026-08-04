@@ -15,15 +15,15 @@ import type { RequestPreconditions } from "../caching/etag.js";
 import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
 import type { KavoSettings } from "../config/settings.js";
 import {
-  NotFoundException,
   OperationDisabledException,
   OperationNotRegisteredException,
   PreconditionFailedException,
+  PreconditionUnsupportedException,
   QueryValidationException,
 } from "../errors/exceptions.js";
 import { nameList } from "../errors/message-hints.js";
 import { QueryNormalizer } from "../query/query-normalizer.js";
-import { computeEtag, strongMatch, weakMatch } from "../caching/etag.js";
+import { WILDCARD, computeEtag, strongMatch, weakMatch } from "../caching/etag.js";
 import { createKavoContext, randomUuid } from "../context/default-kavo-context.js";
 import { mergeSettings } from "../config/merge-settings.js";
 import { validateSettings } from "../config/validate-settings.js";
@@ -53,7 +53,7 @@ export interface KavoEngineDependencies<Entity extends object> {
    * The read half of the entity's adapter, for the one thing a handler
    * cannot do: evaluate an `If-Match` precondition, which needs both a
    * read of the current row *and* the serializer that turns it into the
-   * representation the ETag was computed from (ADR-0019). Handlers close
+   * representation the ETag was computed from (ADR-0020). Handlers close
    * over the adapter privately and have no serializer, so the pre-read
    * lives here rather than inside `updateOne`/`patchOne`/`deleteOne`.
    */
@@ -61,21 +61,41 @@ export interface KavoEngineDependencies<Entity extends object> {
 }
 
 /**
- * Standard writes whose `If-Match` precondition is evaluated against the
- * target's canonical read representation.
+ * The standard writes that target one identified row, which is exactly the
+ * set whose `If-Match` the engine can evaluate: it re-reads that row and
+ * hashes its canonical representation (ADR-0020 §4).
  *
- * `restoreOne`/`purgeOne` are absent deliberately: both act on a
- * *soft-deleted* row (ADR-0013), which the canonical read excludes — a
- * pre-read would raise `NotFoundException` for a row the operation itself
- * would have found. Nothing else in the schema tells the engine what a
- * custom operation targets, which is the same reason the table is keyed by
- * `StandardOperationId`.
+ * `restoreOne`/`purgeOne` are in the set even though they act on a
+ * *soft-deleted* row (ADR-0013): the pre-read asks for `withDeleted`, and
+ * that flag changes only the filter, never the projection — so the tag it
+ * produces is byte-identical to the one `GET /books/1?withDeleted=true`
+ * served the client. Leaving them out is what let `DELETE /books/1/purge`
+ * accept an `If-Match` and hard-delete anyway.
+ *
+ * Anything *not* in this set — `createOne`, and every custom operation,
+ * whose target nothing in the schema describes — cannot be evaluated, and
+ * is refused rather than performed unguarded
+ * ({@link PreconditionUnsupportedException}). That is the same reason the
+ * table is keyed by `StandardOperationId`.
  */
 const PRECONDITION_TARGETS: ReadonlySet<StandardOperationId> = new Set<StandardOperationId>([
   "updateOne",
   "patchOne",
   "deleteOne",
+  "restoreOne",
+  "purgeOne",
 ]);
+
+/**
+ * Why an `If-Match` could not be evaluated — a closed set, rendered into
+ * `KAVO_PRECONDITION_UNSUPPORTED`'s `{reason}` and written here rather
+ * than anywhere a caller can reach.
+ */
+const UNEVALUABLE = {
+  notTargeted: "the operation does not target one identified row, so there is no representation to compare against",
+  cachingOff: "caching.etag is disabled for it, so no ETag is computed for this entity's representations",
+  noCanonicalRead: "findOne is not an enabled operation, so this entity exposes no canonical representation to read",
+} as const;
 
 /**
  * Which DTO slot feeds each standard write operation's input. `Partial` is
@@ -180,7 +200,7 @@ export class KavoEngine<Entity extends object> {
     const preconditions = request.preconditions ?? request.options?.preconditions ?? null;
     // Before the handler, so a failed precondition never reaches the
     // adapter — the check is check-then-write, not compare-and-swap
-    // (ADR-0019), and that is exactly why it must be as late as possible
+    // (ADR-0020), and that is exactly why it must be as late as possible
     // and still ahead of the write.
     await this.checkIfMatch(request, descriptor, configView, preconditions, correlationId);
 
@@ -193,9 +213,24 @@ export class KavoEngine<Entity extends object> {
 
   /**
    * `If-Match`: reject the write when the target's current ETag is not one
-   * the client named. A target that does not exist raises
-   * `NotFoundException` (404), never a 412 — a precondition is a statement
-   * about a representation, and there is none.
+   * the client named.
+   *
+   * Three outcomes, and the third is the one worth naming. **Evaluated**
+   * for the standard single-row writes: the row is re-read and its
+   * canonical tag compared. **Ignored** for reads — `If-Match` is a
+   * lost-update guard, a safe method cannot lose an update, and
+   * `If-None-Match` is the read-side conditional (ADR-0020 §4).
+   * **Refused** for everything else: an unevaluable precondition on a
+   * request that changes state is answered with
+   * `PreconditionUnsupportedException` rather than a silent `return`,
+   * because a client that asked for a guard and did not get one must find
+   * out from the response rather than from a lost update.
+   *
+   * A target with no current representation at all is *not* decided here:
+   * the check falls through and the handler raises its own error, so
+   * `DELETE` on a soft-deleted row is the same 409 with or without an
+   * `If-Match` header. The identity of an error must not depend on whether
+   * a cache header was sent.
    */
   private async checkIfMatch(
     request: KavoRequest<Entity>,
@@ -205,12 +240,37 @@ export class KavoEngine<Entity extends object> {
     correlationId: string,
   ): Promise<void> {
     const ifMatch = preconditions?.ifMatch;
-    if (ifMatch === undefined || ifMatch.length === 0) return;
-    if (!config.settings.caching.etag) return;
-    if (!PRECONDITION_TARGETS.has(descriptor.id as StandardOperationId)) return;
+    if (ifMatch === undefined) return;
+    if (descriptor.kind === "read") return;
+
+    const refuse = (reason: string): never => {
+      throw new PreconditionUnsupportedException({
+        messageParams: { entity: config.entityName, operation: descriptor.id, reason },
+        context: { entityName: config.entityName, operation: descriptor.id, correlationId },
+      });
+    };
+    if (!PRECONDITION_TARGETS.has(descriptor.id as StandardOperationId)) refuse(UNEVALUABLE.notTargeted);
+    if (!config.settings.caching.etag) refuse(UNEVALUABLE.cachingOff);
+    // The 412 below names the current tag, which is only safe to disclose
+    // when the client could have read it for itself. No enabled `findOne`
+    // means no canonical representation to read — and an unconditional
+    // hash in an error message would be an offline oracle over a
+    // low-entropy row.
+    if (this.deps.registry.get("findOne")?.enabled !== true) refuse(UNEVALUABLE.noCanonicalRead);
+
+    // `*` is "only if it exists", which the pre-read cannot make more or
+    // less true — `strongMatch` returns on the wildcard without looking at
+    // the tag. Short-circuiting here spares a read, a serialization and a
+    // SHA-256 whose answer was a constant, and a target that turns out not
+    // to exist still raises from the handler.
+    if (ifMatch.includes(WILDCARD)) return;
 
     const id = this.coerceId(request.id) as EntityId;
     const etag = await this.canonicalEtag(id, request, config, correlationId);
+    // No current representation: the row is gone, or an adapter would
+    // refuse this write for a reason of its own. Either way the handler
+    // owns the answer.
+    if (etag === null) return;
     if (strongMatch(ifMatch, etag)) return;
     throw new PreconditionFailedException({
       messageParams: { entity: config.entityName, id: String(id), etag },
@@ -219,21 +279,34 @@ export class KavoEngine<Entity extends object> {
   }
 
   /**
-   * The ETag of the entity's **canonical read representation** — what
-   * `findOne` on that id with no `select`/`include`/`sort` params would
+   * The ETag of the target row's **canonical read representation** — what
+   * `findOne` on that id with no `fields`/`include`/`sort` params would
    * return. That is the representation a client's `If-Match` token came
    * from, so it is the one the token is compared against; an ETag taken
    * from a field-narrowed read identifies a different representation and
-   * will not match (ADR-0019).
+   * will not match (ADR-0020).
+   *
+   * The pre-read asks for `withDeleted`, which is what makes the check
+   * work for `restoreOne`/`purgeOne`: it widens the *filter* and never
+   * touches the projection, so a live row hashes exactly as
+   * `GET /books/1` would and a soft-deleted one exactly as
+   * `GET /books/1?withDeleted=true` would. `null` means the row is not
+   * there under any view — the caller lets the handler decide what that
+   * is, rather than turning every such case into a 404.
    */
   private async canonicalEtag(
     id: EntityId,
     request: KavoRequest<Entity>,
     config: ResolvedEntityConfig<Entity>,
     correlationId: string,
-  ): Promise<string> {
+  ): Promise<string | null> {
     const { reader, serializer, normalizer } = this.deps;
-    const query = normalizer.normalizeInput(undefined, config);
+    // `withDeleted` is only a legal query param on a soft-deletable entity
+    // — the normalizer rejects it outright otherwise (a client that thinks
+    // it is seeing deleted rows should be told it is not), and on a
+    // hard-delete entity there is nothing for it to widen anyway.
+    const softDeletable = config.softDelete.strategy === "soft";
+    const query = normalizer.normalizeInput(softDeletable ? { withDeleted: true } : undefined, config);
     const context = createKavoContext<Entity>({
       operation: "findOne",
       config,
@@ -243,12 +316,7 @@ export class KavoEngine<Entity extends object> {
       correlationId,
     });
     const entity = await reader.findOneById(id, query, context);
-    if (entity === null) {
-      throw new NotFoundException({
-        messageParams: { entity: config.entityName, id: String(id) },
-        context: { entityName: config.entityName, operation: request.operation, correlationId },
-      });
-    }
+    if (entity === null) return null;
     const itemDto = config.dto.resolve("item", "findOne") as DtoClass<object> | null;
     return computeEtag(serializer.serializeItem(entity, itemDto, context));
   }

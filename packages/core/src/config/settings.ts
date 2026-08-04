@@ -72,9 +72,14 @@ export interface RelationSettings {
  * HTTP response caching. One key covers both halves of the feature,
  * because they are two ends of the same value: the `ETag` computed for a
  * single-item response, and the `If-None-Match`/`If-Match` preconditions
- * evaluated against it (ADR-0019). `etag: false` at any scope turns both
- * off — no tag is computed, and a conditional header is ignored rather
- * than half-honored.
+ * evaluated against it (ADR-0020). `etag: false` at any scope turns both
+ * off: no tag is computed, `If-None-Match` is ignored, and an `If-Match`
+ * — the one header whose whole purpose is to prevent a write — is
+ * **refused** with 412 `KAVO_PRECONDITION_UNSUPPORTED` rather than
+ * ignored. Ignoring it would answer 2xx for a guard that was never
+ * applied, which the per-operation scope makes easy to arrive at by
+ * accident: `findOne` serving tags while `updateOne` has caching off is a
+ * client holding a tag nothing will ever check.
  */
 export interface CachingSettings {
   readonly etag: boolean;

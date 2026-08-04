@@ -87,7 +87,13 @@ This is the shape of `defaults` above, and also of every entity-scope, operation
 | ------ | --------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `etag` | `boolean` | `true`  | Whether single-item responses carry an `ETag`, and whether `If-None-Match` (→ `304`) and `If-Match` (→ `412`) are honored. One key, both halves. |
 
-`false` at any scope turns both halves off together — no tag is computed, and a conditional header on a request is ignored rather than half-honored. See [ETags and conditional requests](/using-the-api#etags-and-conditional-requests) for the wire behavior, including the explicit limits: the `If-Match` check is check-then-write rather than an atomic compare-and-swap, and a token has to come from an unnarrowed read.
+`false` at any scope turns both halves off together — no tag is computed and `If-None-Match` is ignored. `If-Match` is the exception: it is **refused** with `412 KAVO_PRECONDITION_UNSUPPORTED`, not ignored. Answering `2xx` would tell a client its write was guarded when nothing checked it, and the per-operation scope makes that easy to arrive at by accident (`operations: { findOne: { caching: { etag: true } }, updateOne: { caching: { etag: false } } }` would serve tags on `GET` and drop the header on `PUT`).
+
+See [ETags and conditional requests](/using-the-api#etags-and-conditional-requests) for the wire behavior, including the explicit limits: the `If-Match` check is check-then-write rather than an atomic compare-and-swap, and a token has to come from an unnarrowed read.
+
+**Redaction belongs in the DTO, not in an interceptor.** Kavo's `KavoResponseInterceptor` is method-scoped and therefore innermost: it sets the `ETag` before any controller- or app-level interceptor runs. An outer interceptor that strips fields per role would ship a hash of the _unredacted_ representation next to a redacted body — and a client's `If-Match` built from it would never match. Shape the response with a per-operation `item` DTO, which the engine serializes through before hashing.
+
+**An `@Override`'d method enforces `If-Match` only if it forwards it.** The check lives in the engine, so a method you wrote in place of a generated one bypasses it. `@Kavo` still hands the tokens to the method as its last parameter; pass them on with `{ preconditions }` on the typed service, or return `service.engine.execute({ …, preconditions })` to also get the `ETag` header back.
 
 ### `softDelete`
 

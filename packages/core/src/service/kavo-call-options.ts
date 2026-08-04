@@ -20,6 +20,14 @@ export interface KavoCallOptions {
    * surface (`service.updateOne(id, data, { preconditions })`) reaches
    * `KavoRequest.preconditions` without every method growing a parameter
    * for it. `KavoRequest.preconditions`, when set, wins.
+   *
+   * Only the `ifMatch` half does anything here. It is evaluated inside the
+   * engine, so a failed precondition surfaces as a thrown
+   * `PreconditionFailedException` either way. `ifNoneMatch` is answered by
+   * setting `KavoResponse.notModified`, and these methods return
+   * `response.item` — so through this surface it is a **no-op**. Reach for
+   * `service.engine.execute(...)` when the not-modified answer is the one
+   * you need; that is what `@kavo/nest`'s generated routes do.
    */
   readonly preconditions?: RequestPreconditions;
 }

@@ -73,8 +73,14 @@ export type { KavoContext, KavoContextState, StateKey } from "./context/kavo-con
 export type { KavoRequest } from "./context/kavo-request.js";
 export type { KavoResponse } from "./context/kavo-response.js";
 
-// ── HTTP caching (ADR-0019) ───────────────────────────────────────────
-export { computeEtag, type RequestPreconditions } from "./caching/etag.js";
+// ── HTTP caching (ADR-0020) ───────────────────────────────────────────
+// The *type* only. `computeEtag` stays internal on purpose: exporting it
+// would make "SHA-256 of the canonicalized representation" a public
+// promise, and ADR-0020's own consequences say a version-column scheme may
+// supersede it. Nothing in the workspace needs it — `@kavo/nest` consumes
+// the tag off `KavoResponse` — so the barrel keeps to what has a consumer
+// (ADR-0010).
+export type { RequestPreconditions } from "./caching/etag.js";
 
 // ── Serialization ─────────────────────────────────────────────────────
 export type { Deserializer, Serializer } from "./serialization/serializer.js";
@@ -129,6 +135,7 @@ export {
   OperationNotRegisteredException,
   PersistenceException,
   PreconditionFailedException,
+  PreconditionUnsupportedException,
   QueryValidationException,
   TransactionException,
   type KavoExceptionOptions,
