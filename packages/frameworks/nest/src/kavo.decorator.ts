@@ -1,4 +1,4 @@
-import { Body, Delete, Get, HttpCode, Param, Patch, Post, Put, Query } from "@nestjs/common";
+import { Body, Delete, Get, HttpCode, Param, Patch, Post, Put, Query, UseInterceptors } from "@nestjs/common";
 import type {
   ClassRef,
   DefaultKavoService,
@@ -7,11 +7,14 @@ import type {
   OperationDescriptor,
   OperationId,
   QueryContext,
+  RequestPreconditions,
   StandardOperationId,
 } from "@kavo/core";
 import { ConfigurationException, createOperationRegistry } from "@kavo/core";
 import type { KavoHttpMethod, KavoRouteOptions } from "./operation-metadata.js";
 import type { OverrideMetadata } from "./override.decorator.js";
+import { ConditionalRequest } from "./conditional-request.decorator.js";
+import { KavoResponseInterceptor } from "./kavo-response.interceptor.js";
 import { KAVO_CONTROLLER_METADATA, KAVO_OVERRIDE_METADATA, KAVO_SERVICE_PROPERTY } from "./tokens.js";
 import { WireQueryPipe } from "./wire-query.pipe.js";
 import { applySwaggerMetadata } from "./swagger.js";
@@ -292,6 +295,14 @@ function defineRoute(
     configurable: true,
   });
   applyRouteDecorators(prototype, methodName, descriptor, route);
+  // Generated handlers — and only those — return the engine's
+  // `KavoResponse`, so the interceptor that unwraps it and applies the
+  // ETag/304 (ADR-0019) is scoped to them. A hand-written or
+  // `@Override`'d method returns its own value and keeps it. An
+  // *instance* rather than a class, so it needs no DI registration in
+  // whatever module the controller ends up in.
+  const propertyDescriptor = Object.getOwnPropertyDescriptor(prototype, methodName) as PropertyDescriptor;
+  UseInterceptors(new KavoResponseInterceptor())(prototype, methodName, propertyDescriptor);
 }
 
 /**
@@ -315,9 +326,15 @@ function applyRouteDecorators(
 
 /**
  * Parameter layout per generated method (fixed positions):
- * reads → (id?, query); writes → (id?, body). Nest's param decorators are
- * plain functions; applying them programmatically writes the same route
- * metadata the `@Param`/`@Query`/`@Body` syntax would.
+ * reads → (id?, query, preconditions); writes → (id?, body?, preconditions).
+ * Nest's param decorators are plain functions; applying them
+ * programmatically writes the same route metadata the
+ * `@Param`/`@Query`/`@Body` syntax would.
+ *
+ * The trailing preconditions parameter is unconditional so the two paths
+ * (generated and `@Override`'d) keep identical route metadata: an
+ * override that doesn't want `If-Match`/`If-None-Match` simply declares
+ * fewer parameters, which is already how it opts out of the others.
  */
 function applyParamDecorators(
   prototype: Record<string, unknown>,
@@ -331,9 +348,15 @@ function applyParamDecorators(
   }
   if (descriptor.kind === "read") {
     Query(new WireQueryPipe())(prototype, methodName, index++);
-  } else if (usesBody(route.method) && !BODYLESS_WRITES.has(descriptor.id as StandardOperationId)) {
+  } else if (takesBody(descriptor, route)) {
     Body()(prototype, methodName, index++);
   }
+  ConditionalRequest()(prototype, methodName, index++);
+}
+
+/** Writes that carry a request body — the mirror of `BODYLESS_WRITES`. */
+function takesBody(descriptor: OperationDescriptor<object>, route: ResolvedRoute): boolean {
+  return usesBody(route.method) && !BODYLESS_WRITES.has(descriptor.id as StandardOperationId);
 }
 
 function usesBody(method: KavoHttpMethod): boolean {
@@ -344,59 +367,42 @@ type BoundController = Record<string, unknown> & {
   [KAVO_SERVICE_PROPERTY]: DefaultKavoService<object>;
 };
 
+/**
+ * One handler shape for every operation, standard or custom: build the
+ * transport-agnostic `KavoRequest` from the fixed parameter layout
+ * `applyParamDecorators` wrote, and return the engine's `KavoResponse`
+ * untouched for `KavoResponseInterceptor` to unwrap.
+ *
+ * It goes through `service.engine.execute` rather than the typed
+ * `DefaultKavoService` methods — which is the same pipeline, since those
+ * methods are `execute` plus an unwrap — because the ETag and the
+ * not-modified flag live on the envelope those methods discard
+ * (ADR-0019). One arm instead of nine also means the parameter layout is
+ * read from exactly one place, the one that wrote it.
+ */
 function makeHandler(
   descriptor: OperationDescriptor<object>,
   route: ResolvedRoute,
 ): (...args: unknown[]) => Promise<unknown> {
   const id = descriptor.id;
+  const isRead = descriptor.kind === "read";
+  // Mirrors `applyParamDecorators` exactly: a read takes a query and never
+  // a body, whatever verb it is routed under.
+  const hasBody = !isRead && takesBody(descriptor, route);
 
-  // Standard operations delegate to the typed service surface; custom
-  // operations go through the engine envelope — one pipeline either way.
-  switch (id) {
-    case "createOne":
-      return async function (this: BoundController, body: unknown) {
-        return this[KAVO_SERVICE_PROPERTY].createOne(body as never);
-      };
-    case "findMany":
-      return async function (this: BoundController, query: unknown) {
-        return this[KAVO_SERVICE_PROPERTY].findMany(query as never);
-      };
-    case "findOne":
-      return async function (this: BoundController, id: unknown, query: unknown) {
-        return this[KAVO_SERVICE_PROPERTY].findOne(id as never, query as never);
-      };
-    case "updateOne":
-      return async function (this: BoundController, id: unknown, body: unknown) {
-        return this[KAVO_SERVICE_PROPERTY].updateOne(id as never, body as never);
-      };
-    case "patchOne":
-      return async function (this: BoundController, id: unknown, body: unknown) {
-        return this[KAVO_SERVICE_PROPERTY].patchOne(id as never, body as never);
-      };
-    case "deleteOne":
-      return async function (this: BoundController, id: unknown) {
-        await this[KAVO_SERVICE_PROPERTY].deleteOne(id as never);
-      };
-    case "restoreOne":
-      return async function (this: BoundController, id: unknown) {
-        return this[KAVO_SERVICE_PROPERTY].restoreOne(id as never);
-      };
-    case "purgeOne":
-      return async function (this: BoundController, id: unknown) {
-        await this[KAVO_SERVICE_PROPERTY].purgeOne(id as never);
-      };
-    default:
-      return async function (this: BoundController, ...args: unknown[]) {
-        const requestId = route.hasIdParam ? (args[0] as string) : null;
-        const body = route.hasIdParam ? args[1] : args[0];
-        const response = await this[KAVO_SERVICE_PROPERTY].engine.execute({
-          operation: id,
-          id: requestId,
-          body: (body ?? null) as never,
-          query: null,
-          options: null,
-        });
-        return response.item;
-      };
-  }
+  return async function (this: BoundController, ...args: unknown[]) {
+    let index = 0;
+    const requestId = route.hasIdParam ? (args[index++] as string) : null;
+    const query = isRead ? args[index++] : null;
+    const body = hasBody ? args[index++] : null;
+    const preconditions = (args[index] ?? null) as RequestPreconditions | null;
+    return this[KAVO_SERVICE_PROPERTY].engine.execute({
+      operation: id,
+      id: requestId,
+      body: (body ?? null) as never,
+      query: (query ?? null) as never,
+      options: null,
+      preconditions,
+    });
+  };
 }
