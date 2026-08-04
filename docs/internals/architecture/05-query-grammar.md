@@ -181,6 +181,12 @@ LOWER(:v)`), identical on every driver. Both operators apply to string
   (`KAVO_QUERY_INVALID_FIELD`), never a silent drop. Programmatic
   callers (`findMany({ filter })`) pass through the **same** allowlist
   and limit checks — typed input skips coercion, not security.
+- **Computed fields are selectable only:** a declared computed field
+  (doc 04 §7) joins the _selectable_ default and never the filterable or
+  sortable one — it has no column to translate to `WHERE`/`ORDER BY`, so
+  naming it in either is a bootstrap `ConfigurationException` rather than
+  an in-memory fallback
+  ([ADR-0019](/internals/adr/0019-computed-fields-are-serializer-evaluated)).
 - **Excluding instead of enumerating:** each allowlist key also accepts
   `{ exclude: [...] }` instead of an explicit array — resolved at
   bootstrap to every own column except the ones named, so hiding one

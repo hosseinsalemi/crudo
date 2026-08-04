@@ -115,7 +115,7 @@ An entity's own `operations.<id>` (below) always wins over this global map.
 
 ## `@Kavo(Entity, config)` — entity-scope config
 
-Every field above (`pagination`, `query`, `errors`, `relations`, `softDelete`) can also be set here, one level above global. In addition, `@Kavo`'s config carries three fields that only make sense per entity:
+Every field above (`pagination`, `query`, `errors`, `relations`, `softDelete`) can also be set here, one level above global. In addition, `@Kavo`'s config carries four fields that only make sense per entity:
 
 ### `dto`
 
@@ -164,6 +164,30 @@ What a request may filter, sort, and select on — including relation paths. Any
 | `selectable` | same shape                                                    | Fields usable in `fields=`.     |
 
 `{ exclude: [...] }` means "every own column except these", resolved against entity metadata at bootstrap. Omit a key entirely and it derives from the `query` DTO or entity metadata instead.
+
+### `computed`
+
+Response fields with no backing column, derived from an entity that has already been fetched:
+
+```ts
+@Kavo(Book, {
+  computed: {
+    displayTitle: { resolve: (book) => `${book.title} (${book.year})` },
+    canEdit: { resolve: (book, context) => book.ownerId === (context.principal as User)?.id },
+  },
+})
+```
+
+| Field        | Type                                        | What it does                                                                                         |
+| ------------ | ------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `resolve`    | `(entity, context: KavoContext) => unknown` | Derives the value. Called once per served item, **synchronously** — see the N+1 caveat below.        |
+| `selectable` | `boolean` (default `true`)                  | Whether `fields=` may name the field. `false` keeps it always-present and never individually chosen. |
+
+A declared computed field is in the default `item`/`list` projection with no DTO registration, and in the `selectable` allowlist by default. It is **never** filterable, sortable, or writable — naming one in `allowlists.filterable`/`sortable` is both a type error and a bootstrap `ConfigurationException`, and a value for one in a request body is stripped even if a registered `create`/`update` DTO declares the key.
+
+Keep `resolve` a pure function of the entity (plus `context.principal` where a field has to vary by caller). It runs per row, so a resolver that queries the database or calls out over the network reintroduces exactly the N+1 that batched includes exist to avoid.
+
+See [ADR-0019](/internals/adr/0019-computed-fields-are-serializer-evaluated) for the reasoning and [DTO system §7](/internals/architecture/04-dto-system) for how it interacts with DTO narrowing and field selection.
 
 ### `operations`
 
