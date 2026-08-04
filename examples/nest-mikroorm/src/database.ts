@@ -1,5 +1,5 @@
 import { MikroORM } from "@mikro-orm/core";
-import { defineConfig as defineSqliteConfig } from "@mikro-orm/better-sqlite";
+import { defineConfig as defineSqliteConfig } from "@mikro-orm/sqlite";
 import { defineConfig as definePostgresConfig } from "@mikro-orm/postgresql";
 import { Address } from "./address/address.entity.js";
 import { Cat } from "./cat/cat.entity.js";
@@ -41,7 +41,7 @@ export interface PostgresOptions {
  */
 export async function createSqliteOrm(): Promise<MikroORM> {
   const orm = await MikroORM.init(defineSqliteConfig({ dbName: ":memory:", entities }));
-  await orm.schema.createSchema();
+  await orm.schema.create();
   return orm;
 }
 
@@ -52,6 +52,6 @@ export async function createSqliteOrm(): Promise<MikroORM> {
  */
 export async function createPostgresOrm(options: PostgresOptions): Promise<MikroORM> {
   const orm = await MikroORM.init(definePostgresConfig({ ...options, entities }));
-  await orm.schema.refreshDatabase();
+  await orm.schema.refresh();
   return orm;
 }

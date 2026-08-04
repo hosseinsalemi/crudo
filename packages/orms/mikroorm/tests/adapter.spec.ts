@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { Collection, Entity, ManyToMany, ManyToOne, MikroORM, OneToMany, PrimaryKey, Property } from "@mikro-orm/core";
+import { Collection, MikroORM } from "@mikro-orm/core";
+import { Entity, ManyToMany, ManyToOne, OneToMany, PrimaryKey, Property } from "@mikro-orm/decorators/legacy";
 import {
   ConfigurationException,
   ConflictException,

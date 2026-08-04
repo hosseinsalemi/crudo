@@ -81,7 +81,7 @@ export class MikroOrmRepositoryAdapter<Entity extends object> implements Reposit
     const relationIdFields = new Map<string, () => string>();
     for (const relation of metadata.relations) {
       relationIdFields.set(relation.name, () => {
-        const target = this.orm.getMetadata().find(relation.target().name);
+        const target = this.orm.getMetadata().getByClassName(relation.target().name, false);
         return target?.primaryKeys[0] ?? "id";
       });
     }

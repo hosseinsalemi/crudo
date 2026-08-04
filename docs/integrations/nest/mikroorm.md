@@ -24,7 +24,7 @@ bun add @kavo/core @kavo/nest @kavo/mikroorm
 
 :::
 
-`@kavo/mikroorm` expects `@mikro-orm/core` (`^6.0.0`) as a peer, plus whichever MikroORM driver package your database needs (`@mikro-orm/postgresql`, `@mikro-orm/mysql`, `@mikro-orm/better-sqlite`, …) — add them to the command above if your app doesn't already have them — and `@kavo/nest` expects the Nest runtime your app already has. See [Peer dependencies](/getting-started#peer-dependencies) for the full list with versions, and [Requirements](/getting-started#requirements) for the Node and TypeScript prerequisites.
+`@kavo/mikroorm` expects `@mikro-orm/core` (`^7.0.0`) as a peer, plus whichever MikroORM driver package your database needs (`@mikro-orm/postgresql`, `@mikro-orm/mysql`, `@mikro-orm/sqlite`, …) — add them to the command above if your app doesn't already have them — and `@kavo/nest` expects the Nest runtime your app already has. See [Peer dependencies](/getting-started#peer-dependencies) for the full list with versions, and [Requirements](/getting-started#requirements) for the Node and TypeScript prerequisites.
 
 ## Zero-config wiring
 

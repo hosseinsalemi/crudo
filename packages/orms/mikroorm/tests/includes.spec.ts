@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { Collection, Entity, ManyToOne, MikroORM, OneToMany, PrimaryKey, Property } from "@mikro-orm/core";
+import { Collection, MikroORM } from "@mikro-orm/core";
+import { Entity, ManyToOne, OneToMany, PrimaryKey, Property } from "@mikro-orm/decorators/legacy";
 import type { DefaultKavoService, KavoInstance } from "@kavo/core";
 import { createMikroOrmKavo } from "@kavo/mikroorm";
 import { clearDatabase, newTestOrm } from "./support/database.js";

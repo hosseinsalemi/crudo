@@ -1,5 +1,5 @@
 import { MikroORM, type EntityClass } from "@mikro-orm/core";
-import { defineConfig } from "@mikro-orm/better-sqlite";
+import { defineConfig } from "@mikro-orm/sqlite";
 
 /**
  * One in-memory SQLite database per spec file, with the schema created from
@@ -18,7 +18,7 @@ export async function newTestOrm(entities: readonly EntityClass<object>[]): Prom
       entities: entities as EntityClass<object>[],
     }),
   );
-  await orm.schema.createSchema();
+  await orm.schema.create();
   return orm;
 }
 
@@ -28,5 +28,5 @@ export async function newTestOrm(entities: readonly EntityClass<object>[]): Prom
  * own `EntityManager`s.
  */
 export async function clearDatabase(orm: MikroORM): Promise<void> {
-  await orm.schema.clearDatabase();
+  await orm.schema.clear();
 }
