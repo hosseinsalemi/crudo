@@ -69,6 +69,18 @@ export interface RelationSettings {
 }
 
 /**
+ * HTTP response caching. One key covers both halves of the feature,
+ * because they are two ends of the same value: the `ETag` computed for a
+ * single-item response, and the `If-None-Match`/`If-Match` preconditions
+ * evaluated against it (ADR-0019). `etag: false` at any scope turns both
+ * off — no tag is computed, and a conditional header is ignored rather
+ * than half-honored.
+ */
+export interface CachingSettings {
+  readonly etag: boolean;
+}
+
+/**
  * How the delete strategy is chosen. `auto` — the default —
  * resolves per entity: soft when it carries the delete-marker field, hard
  * otherwise, so entities that aren't soft-deletable cost nothing. `soft`
@@ -90,6 +102,7 @@ export interface KavoSettings {
   readonly query: QuerySettings;
   readonly errors: ErrorSettings;
   readonly relations: RelationSettings;
+  readonly caching: CachingSettings;
   readonly softDelete: SoftDeleteSettings | false;
   /**
    * Global operation enablement, keyed by standard operation id — booleans

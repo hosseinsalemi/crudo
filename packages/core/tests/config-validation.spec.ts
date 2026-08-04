@@ -132,6 +132,27 @@ describe("validateSettings — errors", () => {
   });
 });
 
+describe("validateSettings — caching", () => {
+  it("rejects a non-boolean caching.etag", () => {
+    for (const value of ["false", 0, null]) {
+      expectRejected({ caching: { etag: value } }, "caching.etag", value);
+    }
+  });
+
+  it("accepts both booleans", () => {
+    expect(() => accept({ caching: { etag: true } })).not.toThrow();
+    expect(() => accept({ caching: { etag: false } })).not.toThrow();
+  });
+
+  it("rejects `caching: false`, pointing at the key that does disable it", () => {
+    // `softDelete: false` is the schema's one wholesale disable, and the
+    // resemblance is exactly what makes this mistake worth naming.
+    const error = rejectionOf({ caching: false });
+    expect(error.messageParams).toMatchObject({ entity: "User", path: "caching" });
+    expect(String(error.messageParams["problem"])).toContain("caching.etag");
+  });
+});
+
 describe("validateSettings — relation limits", () => {
   it("rejects a maxIncludeDepth that is not a positive integer", () => {
     for (const value of NOT_POSITIVE_INTEGERS) {

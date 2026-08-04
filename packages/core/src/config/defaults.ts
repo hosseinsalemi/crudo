@@ -29,6 +29,12 @@ export const BUILT_IN_DEFAULTS: KavoSettings = Object.freeze({
     // nothing to reach.
     edges: Object.freeze({}),
   }),
+  // On by default: an `ETag` on every single-item response costs one hash
+  // of a representation that was going to be serialized anyway, and a
+  // client that sends no conditional header pays nothing beyond it.
+  caching: Object.freeze({
+    etag: true,
+  }),
   // `auto`: soft for entities carrying the marker field, hard for the rest
   // nothing to configure for entities that aren't
   // soft-deletable.
