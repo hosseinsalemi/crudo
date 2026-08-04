@@ -164,7 +164,11 @@ export class QueryNormalizer<Entity = unknown> {
     // normalized form, or calling the service directly would silently fall
     // back to offset paging on a cursor-configured entity.
     const cursorPaged = config.settings.pagination.strategy === "cursor";
-    const token = input.cursor ?? null;
+    // Absent *or empty* means "first page", the same rule
+    // `CursorPaginationStrategy` applies to the wire param — a caller
+    // holding `nextCursor` in a string that starts out `""` must not get a
+    // 400 where the equivalent `?cursor=` gets page one.
+    const token = input.cursor === undefined || input.cursor === "" ? null : input.cursor;
     if (token !== null && !cursorPaged) {
       issues.push({
         field: "cursor",
