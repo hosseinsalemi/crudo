@@ -14,11 +14,13 @@ KavoRequest
  → Query Resolution       reads only: WireQuery → normalizeWire, QueryContext → normalizeInput
  → Context Assembly       KavoContext: identity, config view, principal, transaction ⟨reserved⟩,
                           normalized query, correlationId, typed state bag
+ → Precondition Check     If-Match writes only: pre-read + hash → 412 / 404 (ADR-0019)
  → DTO Resolution         descriptor.input/output else the doc-4 slot default
  → Deserialization        writes only: body → allowed-key projection
  → Handler Execution      OperationHandler from the registry (built-in, overridden, or custom)
  → Response Mapping       item / ListResultDto envelope / void
  → Serialization          DTO mapping → field selection
+ → ETag                   single-item responses: hash the representation; If-None-Match → notModified
 KavoResponse
 ```
 
@@ -59,6 +61,26 @@ not a TODO.
 The engine also coerces URL path ids against the id column's kind, so
 `GET /users/abc` on a numeric key is a clean 400 rather than a driver
 error.
+
+## 3a. Conditional requests (ADR-0019)
+
+`caching.etag` (doc 08, default on) makes every single-item response
+carry a strong `ETag` — a SHA-256 of the **canonicalized serialized
+representation**, keys sorted so a DTO field reorder is not a spurious
+cache miss. Collection responses carry none. The tag and a
+`notModified` flag ride on `KavoResponse`, so any transport can act on
+them; `@kavo/nest` turns them into the `ETag` header and a `304`.
+
+`If-Match` is the one stage that needs a read the handlers cannot give
+it: `KavoEngineDependencies.reader` exists for it. The engine re-reads
+the target through that reader, hashes the entity's **canonical read
+representation** (what `findOne` with no query params would return),
+and raises `PreconditionFailedException` (412) when no supplied token
+matches — or `NotFoundException` (404) when the row is not there at all.
+It runs on `updateOne`/`patchOne`/`deleteOne` only;
+`restoreOne`/`purgeOne` target soft-deleted rows the canonical read
+excludes. This is application-level check-then-write, **not** an atomic
+compare-and-swap; the race window is real and stated in the ADR.
 
 ## 4. Patterns
 

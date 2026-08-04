@@ -118,6 +118,42 @@ A list response (`GET /books`) always has the same shape:
 
 `total` is omitted (and its `COUNT` query skipped) if `pagination.count` is turned off.
 
+## ETags and conditional requests
+
+Every single-item response — `POST /books`, `GET /books/1`, `PUT`, `PATCH`, and `PATCH /books/1/restore` — carries a strong `ETag`:
+
+```
+ETag: "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+```
+
+It is a hash of the exact representation being returned, so it changes whenever any field in the response does. List responses (`GET /books`) do not carry one.
+
+### `If-None-Match` — skip a body you already have
+
+```
+GET /books/1
+If-None-Match: "9f86d0…"
+```
+
+If your copy is still current you get `304 Not Modified` with an empty body and the same `ETag`. If it isn't, you get the ordinary `200` and a fresh tag. `*` matches any existing representation.
+
+### `If-Match` — don't overwrite a version you never saw
+
+```
+PATCH /books/1
+If-Match: "9f86d0…"
+```
+
+Supported on the update, patch and delete routes — `PUT /books/1`, `PATCH /books/1`, `DELETE /books/1`. The restore and purge routes (`PATCH /books/1/restore`, `DELETE /books/1/purge`) act on soft-deleted rows, which no ordinary read can hand you a tag for, so they ignore `If-Match` rather than reject every request that carries one. If the book's current tag is one you named, the write goes ahead and the response carries the new tag. If it isn't — somebody else changed the book since you read it — the write is refused with `412 Precondition Failed` and a `KAVO_PRECONDITION_FAILED` problem document naming the current tag, and **nothing is written**. If the book doesn't exist at all you get `404`, not `412`. `*` matches any existing representation, so `If-Match: *` means "only if it still exists".
+
+### Two things to know
+
+**The `If-Match` check is not atomic.** Kavo reads the row, compares the tag, and then writes. There is a real window between the check and the write in which another writer can slip in — so this narrows the last-write-wins race, it does not eliminate it. It is not a database-level compare-and-swap, and Kavo does not claim to be one. If you need that guarantee, enforce it in your own transaction.
+
+**An `If-Match` token has to come from an unnarrowed read.** An ETag identifies one _representation_, so `GET /books/1?fields=title` produces a different tag from `GET /books/1`. Preconditions are evaluated against the full default representation, so a tag taken from a `fields=`- or `include=`-narrowed read will 412. Use the tag from a plain `GET /books/1`, or from the write response that produced the version you're editing.
+
+Both halves are one setting, [`caching.etag`](/integrations/nest/configuration#caching) (on by default). Turning it off at any scope stops the tags being generated _and_ stops the conditional headers being honored.
+
 ## Errors
 
 Every error response is an [RFC 9457 problem-details](https://www.rfc-editor.org/rfc/rfc9457) document, `Content-Type: application/problem+json`:

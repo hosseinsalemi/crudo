@@ -45,6 +45,7 @@ policy). Source of truth: `ERROR_CATALOG` in
 | `KAVO_CONFLICT`                 | 409  | Unique/FK violation mapped by the adapter                                                        | —                                 |
 | `KAVO_ALREADY_DELETED`          | 409  | Soft-deleting an already-deleted row                                                             | —                                 |
 | `KAVO_NOT_DELETED`              | 409  | Restoring or purging a row that is not deleted                                                   | —                                 |
+| `KAVO_PRECONDITION_FAILED`      | 412  | `If-Match` names no tag matching the target's current ETag (ADR-0019)                            | —                                 |
 | `KAVO_OPERATION_DISABLED`       | 405  | Programmatic call to a disabled registry entry (no route exists over HTTP)                       | —                                 |
 | `KAVO_OPERATION_NOT_REGISTERED` | 405  | Programmatic call naming an operation the registry has no entry for at all                       | —                                 |
 | `KAVO_BULK_FAILED`              | 422  | Atomic bulk failure (reserved — bulk is not built)                                               | `items[]` per-index issues        |

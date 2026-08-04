@@ -135,7 +135,8 @@ overrides get through `context` inside a plain `OperationHandler`.
 
 Because Kavo owns the param wiring, the decorated method must accept
 parameters in the same fixed position a generated route would — reads:
-`(id?, query)`; writes: `(id?, body)` — and must not declare its own
+`(id?, query, preconditions)`; writes: `(id?, body?, preconditions)`;
+declare only as many as the method actually uses — and must not declare its own
 `@Param`/`@Query`/`@Body`: `@Kavo` checks for existing Nest route-argument
 metadata on the method and fails at decoration time (ADR-0012's only
 moment) rather than let the two decorations collide silently. The same
@@ -217,6 +218,38 @@ normally. The service arrives by property injection under a private key;
 `WireQueryPipe` (internal to `@kavo/nest`) wraps `req.query` in core's
 `WireQuery`, after `flattenQuery` normalizes qs-extended nested objects
 back to flat bracket keys, making the binding query-parser-agnostic.
+
+Every generated handler is one shape — build the `KavoRequest` from the
+fixed parameter layout (`id?`, `query` or `body`, then
+`preconditions`) and call `service.engine.execute`, returning the
+envelope. It goes through the engine rather than the typed
+`DefaultKavoService` methods because those unwrap to the item and
+discard the `etag`/`notModified` the next section needs; it is the same
+pipeline either way, since those methods are `execute` plus that unwrap.
+
+### 2a. Conditional requests (ADR-0019)
+
+Two pieces, both applied programmatically at decoration time:
+
+- `ConditionalRequest()` — a `createParamDecorator` that reads
+  `If-Match` / `If-None-Match` off the request into core's
+  `RequestPreconditions`, applied as the last parameter of every
+  generated method (and available to an `@Override`'d one that declares
+  it, since both paths carry identical route metadata).
+- `KavoResponseInterceptor` — applied **method-scoped, to generated
+  handlers only**, as an instance so it needs no DI registration. It
+  sets the `ETag` header from the envelope, turns `notModified` into a
+  bodyless `304`, and unwraps to `item`/`list` — being the innermost
+  interceptor, nothing downstream ever sees the envelope. A hand-written
+  or `@Override`'d method returns its own value and is left alone.
+
+Setting the status from an interceptor works because Nest applies the
+route's static `@HttpCode` _before_ interceptors run and does not
+re-apply it when replying. Both `header()` and `status()` are
+duck-typed, so Express and Fastify are served by one interceptor — the
+same trick as `ProblemResponse` in the exception filter. Kavo's tag is
+set before Express would add its own weak one, and Express only fills in
+a tag that is not already there, so ours wins.
 
 ## 3. Exception mapping
 

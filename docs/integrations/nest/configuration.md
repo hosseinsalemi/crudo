@@ -81,6 +81,14 @@ This is the shape of `defaults` above, and also of every entity-scope, operation
 | `maxDepth`       | `number`                          | (inherits `relations.maxIncludeDepth`) | Overrides the include-depth limit for the subtree below this relation only.                                                                                               |
 | `strategy`       | `"join"` \| `"batch"` \| `"auto"` | `"auto"`                               | How the relation loads: `join` (single query, correct for to-one), `batch` (per-level `WHERE parentId IN (...)`, correct for to-many), or `auto` (picks per cardinality). |
 
+### `caching`
+
+| Field  | Type      | Default | What it does                                                                                                                                     |
+| ------ | --------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `etag` | `boolean` | `true`  | Whether single-item responses carry an `ETag`, and whether `If-None-Match` (→ `304`) and `If-Match` (→ `412`) are honored. One key, both halves. |
+
+`false` at any scope turns both halves off together — no tag is computed, and a conditional header on a request is ignored rather than half-honored. See [ETags and conditional requests](/using-the-api#etags-and-conditional-requests) for the wire behavior, including the explicit limits: the `If-Match` check is check-then-write rather than an atomic compare-and-swap, and a token has to come from an unnarrowed read.
+
 ### `softDelete`
 
 | Field      | Type                             | Default       | What it does                                                                                                                                                                                                                               |
