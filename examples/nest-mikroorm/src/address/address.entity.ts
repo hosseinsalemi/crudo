@@ -1,4 +1,4 @@
-import { Entity, OneToOne, PrimaryKey, Property } from "@mikro-orm/core";
+import { Entity, OneToOne, PrimaryKey, Property } from "@mikro-orm/decorators/legacy";
 // Type-only import + string relation target, same reasoning as
 // `pet.entity.ts`: the Owner↔Address cycle stays off the runtime graph.
 import type { Owner } from "../owner/owner.entity.js";
@@ -23,6 +23,6 @@ export class Address {
   @Property({ type: "string" })
   postalCode!: string;
 
-  @OneToOne("Owner", undefined, { mappedBy: "address", nullable: true })
+  @OneToOne((): any => "Owner", undefined, { mappedBy: "address", nullable: true })
   owner: Owner | null = null;
 }

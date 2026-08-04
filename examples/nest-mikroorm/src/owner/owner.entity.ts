@@ -1,4 +1,5 @@
-import { Collection, Entity, OneToMany, OneToOne, PrimaryKey, Property } from "@mikro-orm/core";
+import { Collection } from "@mikro-orm/core";
+import { Entity, OneToMany, OneToOne, PrimaryKey, Property } from "@mikro-orm/decorators/legacy";
 // Type-only imports + string relation targets keep the Owner↔Pet and
 // Owner↔Address cycles off the runtime graph — see `pet.entity.ts`.
 import type { Address } from "../address/address.entity.js";
@@ -33,13 +34,13 @@ export class Owner {
   @Property({ type: "Date", nullable: true })
   startedAt: Date | null = null;
 
-  @OneToMany("Pet", "owner")
+  @OneToMany((): any => "Pet", "owner")
   pets = new Collection<Pet>(this);
 
   // The owning side of the one-to-one: Owner carries the nullable join
   // column. `owner: true` is what makes this the owning side, the MikroORM
   // counterpart of TypeORM's explicit `@JoinColumn`.
-  @OneToOne("Address", undefined, { owner: true, nullable: true })
+  @OneToOne((): any => "Address", undefined, { owner: true, nullable: true })
   address: Address | null = null;
 
   @Property({ type: "Date", onCreate: () => new Date() })

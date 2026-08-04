@@ -52,7 +52,7 @@ export function registerCrudE2eSuite(getApp: () => INestApplication, getOrm: () 
       // bootstrapped once per spec file. `clearDatabase` also resets the
       // identity map, which matters because the suite drives the app over
       // HTTP while occasionally asserting through a forked EntityManager.
-      await getOrm().schema.clearDatabase();
+      await getOrm().schema.clear();
     });
 
     it("runs the full CRUD lifecycle over HTTP", async () => {
@@ -455,7 +455,9 @@ export function registerCrudE2eSuite(getApp: () => INestApplication, getOrm: () 
       await request(server()).get(`/owners/${id}`).expect(200);
 
       const em = getOrm().em.fork();
-      await em.nativeUpdate("Owner", { id }, { name: "Changed underneath" });
+      // MikroORM v7's `EntityName<T>` no longer includes a bare string; `as any`
+      // keeps this a name-only reference rather than importing the class.
+      await em.nativeUpdate("Owner" as any, { id }, { name: "Changed underneath" });
 
       const refetched = await request(server()).get(`/owners/${id}`).expect(200);
       expect(refetched.body.name).toBe("Changed underneath");
