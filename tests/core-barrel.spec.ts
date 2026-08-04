@@ -47,11 +47,16 @@ describe("the @kavo/core barrel is an explicit named list (ADR-0010)", () => {
   const source = readFileSync(BARREL_PATH, "utf8");
   const code = stripComments(source);
 
-  it("uses no `export *` — including the `export * as ns` form", () => {
-    // Matches `export *` and `export * as ns`, tolerating any whitespace
-    // between the keyword and the star, and ignoring `export {}` /
-    // `export type {}` which are the sanctioned spellings.
-    const starExports = code.match(/^[ \t]*export[ \t]+\*/gm) ?? [];
+  it("uses no `export *` — including the `as ns` and `type *` forms", () => {
+    // Matches `export *`, `export * as ns`, and `export type * from` —
+    // tolerating any whitespace between the keywords and the star, and
+    // ignoring `export {}` / `export type {}`, the sanctioned spellings.
+    //
+    // `export type *` is the one that matters most here despite looking like
+    // an edge case: this barrel is overwhelmingly `export type { ... }`, so
+    // it is the form someone consolidating type re-exports reaches for first,
+    // and it grows the public surface exactly the way ADR-0010 forecloses.
+    const starExports = code.match(/^[ \t]*export[ \t]+(?:type[ \t]+)?\*/gm) ?? [];
 
     expect(
       starExports,

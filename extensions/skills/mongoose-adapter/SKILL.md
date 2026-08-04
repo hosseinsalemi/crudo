@@ -110,7 +110,9 @@ POST /books  {"author":"<id>"}        # writable by id (ADR-0014)
 Mark it includable like any other relation:
 
 ```ts
-@Kavo(Book, { relations: { edges: { author: { includable: true } } } });
+@Kavo(Book, { relations: { edges: { author: { includable: true } } } })
+@Controller("books")
+export class BookController {}
 ```
 
 **Filtering across a relation is refused.** `filter[author.name]` returns a

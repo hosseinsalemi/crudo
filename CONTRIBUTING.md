@@ -248,10 +248,27 @@ that explains why.
   | Protocol bindings (`protocols/*`)   | the `@kavo/core` barrel + its own peer | a framework, an ORM, **another protocol**    | `protocol-bindings-only-import-core`                  |
   | Framework bindings (`frameworks/*`) | core **and the two protocol barrels**  | an ORM adapter, any barrel _subpath_         | `framework-bindings-import-core-and-protocol-barrels` |
 
-  Every row is machine-checked; none of it is review-only. The rules are
-  written against the directory layout and back-reference the package they
-  came from, so a new adapter or protocol binding is covered the day its
-  directory exists rather than when someone remembers to extend a list.
+  Every row's **"never imports"** column is machine-checked; none of it is
+  review-only. The forbidding rules are written against the directory layout
+  and back-reference the package they came from, so a new adapter or protocol
+  binding is constrained the day its directory exists rather than when someone
+  remembers to extend a list.
+
+  Two things that column does **not** say, both worth knowing before you trust
+  a green gate:
+
+  - **The "may import" column is looser than it reads.** The rules forbid
+    reaching another _workspace_ package; they say nothing about npm. The one
+    exception is `only-framework-bindings-import-a-host-framework`, which
+    stops an adapter or a protocol binding importing `@nestjs/*`. Pulling in
+    some _other_ package's peer — `typeorm` inside `@kavo/prisma`, say — is
+    still caught by review, not by the gate.
+  - **The frameworks row's allowlist is the one hand-maintained list left.**
+    `@kavo/(core|graphql|mcp)` is spelled out, so a new `protocols/*` package
+    that `@kavo/nest` is meant to glue has to be added there or the sanctioned
+    edge fails the gate. That is deliberate — a sideways edge should be an
+    explicit reviewed decision — but it does mean this rule, unlike the
+    others, needs an edit when a protocol package lands.
 
   So `@kavo/nest` really does import `@kavo/graphql` and `@kavo/mcp` directly —
   that is the sanctioned `frameworks/* → protocols/*` edge from

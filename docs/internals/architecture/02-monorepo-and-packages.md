@@ -111,7 +111,8 @@ Two independent enforcement layers:
    cross-package import a compile error.
 2. **dependency-cruiser** (`.dependency-cruiser.cjs`, run in `pnpm check`)
    forbids: core importing anything, adapter↔framework imports in either
-   direction, cross-package deep imports past a barrel, and runtime import
+   direction, cross-package deep imports past a barrel, an adapter or
+   protocol binding importing `@nestjs/*`, and runtime import
    cycles (type-only cycles are exempt — core's contracts are mutually
    referential by design and erase at compile time). One exception to
    "no cross-edge imports": a `frameworks/*` package may depend on a
@@ -119,8 +120,8 @@ Two independent enforcement layers:
    the reverse — ADR-0016.
 
    Three properties of that rule set are load-bearing and easy to lose:
-   - **Coverage is total, and stays total without edits.** Every edge in the
-     topology is checked, including the four that were review-only for most of
+   - **Every workspace edge is checked, and stays checked without edits.**
+     That includes the four that were review-only for most of
      this repo's life: an ORM adapter importing a protocol package, one ORM
      adapter importing another, one protocol importing another, and one edge's
      `src` deep-importing another edge's. `core-imports-nothing` covers
@@ -132,10 +133,21 @@ Two independent enforcement layers:
      constrained the day its directory exists. The previous spelling was
      one rule per package, which meant every new package had to hand-edit
      every other package's rule, and the prose describing the set drifted out
-     of sync with it twice. What a green `depcruise` still does not prove is
+     of sync with it twice.
+
+     Two limits are part of the design rather than oversights.
+     `framework-bindings-import-core-and-protocol-barrels` still names
+     `@kavo/(core|graphql|mcp)` explicitly, because it is an _allowlist_ of
+     sanctioned sideways edges — a new `protocols/*` package that `@kavo/nest`
+     glues must be added to it, and that edit is the architectural decision
+     being reviewed. And the rules match `@kavo/*` and `packages/*` only, so
+     npm edges are outside them: `only-framework-bindings-import-a-host-`
+     `framework` blocks `@nestjs/*` in an adapter or protocol binding, but a
+     wrong _peer_ (`typeorm` inside `@kavo/prisma`) is review's job. So is
      the part no import graph can see — an ORM or Nest type leaking into a
      core signature, and whether a newly named barrel export was meant to be
      public.
+
    - **Both spellings are matched.** A workspace package specifier does not
      resolve to a path for dependency-cruiser, so a path-only rule silently
      misses `from "@kavo/nest"` — the spelling anyone would actually write.

@@ -75,9 +75,21 @@ another package's barrel. Run `pnpm depcruise` — it is cheap and it is the
 answer on import edges. If you want the detail, read the rule comments in that
 file rather than re-deriving the rule set here.
 
-So do not spend the review re-checking import edges by eye. A green
-`depcruise` settles them. Spend it instead on the two things an import graph
-cannot show:
+So do not spend the review re-checking **workspace** import edges by eye — a
+green `depcruise` settles those. It does not settle npm edges: the rules gate
+on `@kavo/*` and `packages/*` paths, so a dependency pulled from node_modules
+is outside what they look at, with one exception
+(`only-framework-bindings-import-a-host-framework`, which blocks `@nestjs/*`
+in an adapter or protocol binding). Spend the review on that gap and on the
+two things an import graph cannot show:
+
+- **Wrong-peer imports** — each edge package adapts exactly one external
+  technology, so `typeorm` inside `@kavo/prisma`, `graphql` inside
+  `@kavo/mcp`, or any new hard `dependencies` entry where a peer was intended
+  is a finding the gate will not raise. Grep the changed files for bare
+  specifiers directly. `@kavo/mcp` is the sharpest case: it consumes
+  `@modelcontextprotocol/sdk` for **types only** (doc 16 §5), so a runtime
+  import of it there is a real regression.
 
 - **No leakage through types** — a TypeORM type (`QueryRunner`,
   `EntityMetadata`, `SelectQueryBuilder`), a Mongoose or MikroORM type, or a

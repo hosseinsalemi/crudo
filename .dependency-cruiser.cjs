@@ -95,7 +95,15 @@ module.exports = {
         "protocol-bindings-only-import-core is what stops it running the " +
         "other way. An ORM adapter is never importable (ADR-0002). The " +
         "allowlist is `$`-anchored on purpose, so the sideways edge stops at " +
-        "the barrel: `@kavo/graphql/src/...` is still a deep import.",
+        "the barrel: `@kavo/graphql/src/...` is still a deep import.\n\n" +
+        "**This is the one rule in this file that names packages, and so the " +
+        "one that needs editing when a package lands.** A new protocols/* " +
+        "package that @kavo/nest is meant to glue (ADR-0016 anticipates a " +
+        "future @kavo/grpc) must be added to the allowlist here, or the " +
+        "sanctioned edge fails the gate. That is deliberate: an allowlist of " +
+        "sideways edges should be explicit and reviewed, not inferred from " +
+        "the directory layout the way the forbidding rules are — adding one " +
+        "is an architectural decision, not a mechanical consequence.",
       from: { path: "^packages/frameworks/([^/]+)/src" },
       to: {
         path: "^(@kavo/|packages/)",
@@ -132,9 +140,39 @@ module.exports = {
         "@kavo/* package rather than only @kavo/core. This is the rule that " +
         "catches one edge deep-importing another — `@kavo/mcp/src/...` from " +
         "@kavo/graphql, say — which the two core-anchored rules never looked " +
-        "at. Named with no package list so it needs no edit when one lands.",
-      from: { path: "^(packages|examples)/" },
-      to: { path: "^@kavo/[^/]+/.+" },
+        "at. Written with no package list so it needs no edit when one lands.\n\n" +
+        "**Both spellings, and this is the rule where that bites hardest.** A " +
+        "deep specifier resolves to a real path whenever the importer has the " +
+        "target as a genuine dependency — which is exactly the case in " +
+        "`examples/*`, where `@kavo/typeorm/src/foo.js` lands in the graph as " +
+        "`packages/orms/typeorm/src/foo.ts` and never matches the `@kavo/…` " +
+        "half at all. Matching only the specifier form left every example-app " +
+        "deep import unchecked, since the per-tier rules above are " +
+        "`packages/**/src`-scoped and never look at `examples/`. `$1` is the " +
+        "importing package root, so same-package relative imports stay legal.",
+      from: {
+        path: "^(packages/(?:core|orms/[^/]+|frameworks/[^/]+|protocols/[^/]+)|examples/[^/]+)/",
+      },
+      to: {
+        path: "^(@kavo/[^/]+/.+|packages/(?:core|orms/[^/]+|frameworks/[^/]+|protocols/[^/]+)/src/.+)",
+        pathNot: "^$1/",
+      },
+    },
+    {
+      name: "only-framework-bindings-import-a-host-framework",
+      severity: "error",
+      comment:
+        "An ORM adapter and a protocol binding are both leaves that adapt " +
+        "exactly one external technology, and a host framework is never it. " +
+        "ADR-0002 puts it as 'an adapter must be usable from any future " +
+        "framework binding'; doc 16 says @kavo/mcp 'has no idea Nest, " +
+        "Express, or any other host exists'. The rules above cannot say this " +
+        "— they gate on `to.path: ^(@kavo/|packages/)`, so a bare " +
+        "`@nestjs/common` is outside what they look at, and a hard import of " +
+        "it would break every consumer wiring the package into a non-Nest " +
+        "host with `Cannot find module` at import time.",
+      from: { path: "^packages/(orms|protocols)/[^/]+/src" },
+      to: { path: "^@nestjs/" },
     },
     {
       name: "tests-no-other-package-internals",

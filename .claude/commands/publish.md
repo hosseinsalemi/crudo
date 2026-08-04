@@ -178,12 +178,13 @@ workflow.
    Release for the tag — none of this is meaningfully undoable once pushed.
 
    **Name every package explicitly in the prompt**, enumerated from the
-   `PACKAGE_DIRS` you read in step 3 rather than from memory or from a list
-   written here — currently `@kavo/core`, `@kavo/typeorm`, `@kavo/prisma`,
-   `@kavo/mongoose`, `@kavo/nest`, `@kavo/graphql`, and `@kavo/mcp`, all seven
-   at the same version per ADR-0004. A confirmation gate that names a subset
-   understates an irreversible public release, which is a release hazard
-   rather than a cosmetic slip. Wait for an explicit go-ahead before step 7.
+   `PACKAGE_DIRS` you read in step 3 — never from memory, and never from a
+   list written here. There is deliberately no list in this file to copy: one
+   would go stale the day a package lands, and a confirmation gate that names
+   a subset understates an irreversible public release, which is a release
+   hazard rather than a cosmetic slip. State the count you actually read, and
+   note they all go out at the same version per ADR-0004. Wait for an explicit
+   go-ahead before step 7.
 
 7. **Commit directly to `main`, then tag and push both.** Stage by directory
    rather than by enumerating packages — step 1 already refused to run on a

@@ -98,8 +98,10 @@ after it is extra instructions or corrections to fold in during implementation.
     reimplement its rules here; it owns them, and a second copy in this file
     is a copy that drifts out of sync with the first.
 
-    b. **Open the PR** — invoke the `pr` command and follow it, passing the
-    issue number so the body can close it.
+    b. **Open the PR** — invoke the `pr` command and follow it. It derives
+    `Closes #<n>` from the branch name, which step 4 already built as
+    `<type>/<issue-number>-<short-slug>`, so it needs no argument here;
+    pass one only to add notes or `--draft`.
 
     c. **Print the PR URL** and tell the user to run `/review` on it or
     `/merge` once CI and review are green.

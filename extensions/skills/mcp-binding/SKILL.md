@@ -47,10 +47,14 @@ declared soft delete still gets `restoreOne`/`purgeOne` tools, and calling
 one returns an `OperationDisabledException` as a normal error result —
 exactly what calling the equivalent disabled REST route would do.
 
-`createOne`/`updateOne`/`patchOne` take a deliberately unconstrained
-`inputSchema` (`{ type: "object" }`). JSON Schema permits additional
-properties by default, so whatever a caller sends lands on the DTO as-is and
-the engine's own DTO layer validates it — the same trust boundary REST has.
+The write tools' `inputSchema` is deliberately unconstrained about _fields_:
+JSON Schema permits additional properties by default, so whatever a caller
+sends lands on the DTO as-is and the engine's own DTO layer validates it —
+the same trust boundary REST has. `createOne` is a bare
+`{ type: "object" }`; `updateOne` and `patchOne` are
+`{ type: "object", properties: { id }, required: ["id"] }`, so **`id` is a
+declared, required property** on those two even though every other field is
+free-form.
 
 ### `findMany` args are the programmatic surface, not REST's
 
@@ -72,9 +76,15 @@ nesting the DTO under an `input` key — one flat object, unlike GraphQL's
 
 ## Results and errors
 
-A successful call returns the item — or the
-`{ items, total, limit, offset }` envelope for `findMany` — JSON-stringified
-as MCP `text` content.
+A successful call returns its result JSON-stringified as MCP `text` content.
+The result is not always the entity — do not assume an item shape:
+
+| Tool                                                          | Result                            |
+| ------------------------------------------------------------- | --------------------------------- |
+| `findOne`, `createOne`, `updateOne`, `patchOne`, `restoreOne` | the item                          |
+| `findMany`                                                    | `{ items, total, limit, offset }` |
+| `deleteOne`                                                   | `{ deleted: true }`               |
+| `purgeOne`                                                    | `{ purged: true }`                |
 
 A `KavoException` the engine raises becomes an **`isError: true`** tool
 result with `${code}: ${detail}` as the text, MCP's convention for an

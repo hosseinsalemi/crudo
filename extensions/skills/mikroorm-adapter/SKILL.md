@@ -117,7 +117,9 @@ included:
 @Kavo(Book, {
   allowlists: { filterable: ["title", "author.name"] },
   relations: { edges: { author: { includable: true } } },
-});
+})
+@Controller("books")
+export class BookController {}
 ```
 
 ## Two smaller traps

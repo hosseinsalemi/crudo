@@ -41,10 +41,19 @@ the way you would pass an entity class with TypeORM — does not work:
 @Kavo(Book)               // ✓ the marker class
 ```
 
-The class body is documentation, not configuration: field declarations there
-are never read. All real metadata comes from Prisma's DMMF. Name-matching is
-what binds the two, so a marker class named `Books` for a model named `Book`
-will not resolve. See ADR-0017 for the full rationale.
+**Declare the fields anyway** — they are what gives you type safety. At
+runtime `@kavo/prisma` reads only `.name` off the class and takes all real
+metadata from Prisma's DMMF, so an empty `class Book {}` still produces
+working routes. But the declared fields are what type `createCrud`'s generic
+parameters, so an empty marker class collapses `Entity` to `{}` and every
+typed surface built on it silently stops checking anything:
+`allowlists.filterable`/`sortable`/`selectable`, `query.defaultSort`, and the
+DTO slot generics all stop rejecting misspelled field names at compile time.
+
+Name-matching is what binds class to model, so a marker class named `Books`
+for a model named `Book` will not resolve — that one fails loudly, as a
+bootstrap `ConfigurationException` rather than a silent no-op. See ADR-0017
+for the full rationale.
 
 ## Wiring
 
