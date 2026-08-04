@@ -450,7 +450,21 @@ describe("allowlist rejection messages", () => {
     expect(detail).toContain("Field 'emial' cannot be used for filtering.");
     expect(detail).toContain("Did you mean 'email'?");
     expect(detail).toContain("Filterable fields on User:");
-    expect(detail).toContain("Add it to allowlists.filterable on the User config to permit it.");
+    expect(detail).toContain("add it to allowlists.filterable on the User config to permit it.");
+  });
+
+  it("stops appending the hint once a request is past a handful of problems", () => {
+    // `?fields=a1,…,a5000` is a legal query string, and the hint is not
+    // free: it walks the whole allowlist per rejected name and adds a few
+    // hundred bytes per issue. Uncapped, one request becomes a megabyte of
+    // prose and an O(names × allowlist) sweep. The leading sentence — the
+    // part that says what was refused — is never dropped.
+    const many = Array.from({ length: 200 }, (_unused, index) => `bad${index}`).join(",");
+    const issues = issuesOf(() => normalizer.normalizeWire({ fields: many }, config));
+    expect(issues).toHaveLength(200);
+    expect(issues.every((issue) => issue.detail.includes("cannot be used for selection"))).toBe(true);
+    expect(issues.filter((issue) => issue.detail.includes("allowlists.selectable"))).toHaveLength(5);
+    expect(issues[199]!.detail).toBe("Field 'bad199' cannot be used for selection.");
   });
 
   it("names allowlists.sortable for a sort field", () => {

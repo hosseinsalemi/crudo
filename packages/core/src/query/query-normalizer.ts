@@ -11,7 +11,7 @@ import type { IncludeResolver } from "../relations/include-resolver.js";
 import type { IncludeTree } from "../relations/include-tree.js";
 import type { AllowlistUsage } from "../errors/message-hints.js";
 import { ConfigurationException, QueryValidationException } from "../errors/exceptions.js";
-import { allowlistHint } from "../errors/message-hints.js";
+import { pushAllowlistIssue } from "../errors/message-hints.js";
 import { DefaultFilterParser } from "./default-filter-parser.js";
 import { builtInPaginationStrategies } from "./pagination-strategies.js";
 import { parseBracketKey } from "./bracket-notation.js";
@@ -484,11 +484,7 @@ function requireAllowlisted<Entity>(
 ): boolean {
   const allowed = config.allowlists[ALLOWLIST_FOR[usage]] as readonly string[];
   if (allowed.includes(field)) return true;
-  issues.push({
-    field,
-    code: "KAVO_QUERY_INVALID_FIELD",
-    detail: `Field '${field}' cannot be used for ${usage}.` + allowlistHint(field, usage, config.entityName, allowed),
-  });
+  pushAllowlistIssue(field, usage, config.entityName, allowed, issues);
   return false;
 }
 

@@ -5,7 +5,7 @@ import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
 import type { EntityMetadata, FieldMetadata } from "../metadata/entity-metadata.js";
 import type { QueryIssueDto } from "../errors/problem-details.js";
 import { QueryValidationException } from "../errors/exceptions.js";
-import { allowlistHint } from "../errors/message-hints.js";
+import { pushAllowlistIssue } from "../errors/message-hints.js";
 import { coerceScalar, isIssue } from "./value-coercion.js";
 import { parseBracketKey } from "./bracket-notation.js";
 
@@ -228,13 +228,10 @@ export class DefaultFilterParser<Entity = unknown> implements FilterParser<Entit
   ): void {
     const filterable = config.allowlists.filterable as readonly string[];
     if (!filterable.includes(field)) {
-      issues.push({
-        field,
-        code: "KAVO_QUERY_INVALID_FIELD",
-        detail:
-          `Field '${field}' cannot be used for filtering.` +
-          allowlistHint(field, "filtering", config.entityName, filterable),
-      });
+      // Same construction site as the programmatic path's
+      // `requireAllowlisted`, so the two entry points cannot word one
+      // rejection differently.
+      pushAllowlistIssue(field, "filtering", config.entityName, filterable, issues);
       return;
     }
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
