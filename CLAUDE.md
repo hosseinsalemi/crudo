@@ -91,7 +91,7 @@ Nothing is special-cased per verb. Operations come from an **operation registry*
 - **Manual-method-wins**: a hand-written controller method whose name matches an operation id suppresses that generated route.
 - The bound service arrives later via property injection (`forFeature` provider), not through the constructor.
 
-Every generated route — standard or custom — goes through `service.engine.execute(...)` and returns the `KavoResponse` envelope, which a method-scoped `KavoResponseInterceptor` unwraps after applying the `ETag`/`304` (ADR-0019); the typed `DefaultKavoService` surface is the same pipeline plus that unwrap, and stays the programmatic front door. HTTP query strings arrive as flat bracket keys wrapped in a `WireQuery` marker so the full parse-and-coerce pipeline runs; programmatic callers pass a typed `QueryContext` (normalized without coercion).
+Every generated route — standard or custom — goes through `service.engine.execute(...)` and returns the `KavoResponse` envelope, which a method-scoped `KavoResponseInterceptor` unwraps after applying the `ETag`/`304` (ADR-0020); the typed `DefaultKavoService` surface is the same pipeline plus that unwrap, and stays the programmatic front door. HTTP query strings arrive as flat bracket keys wrapped in a `WireQuery` marker so the full parse-and-coerce pipeline runs; programmatic callers pass a typed `QueryContext` (normalized without coercion).
 
 ### Wiring an app
 

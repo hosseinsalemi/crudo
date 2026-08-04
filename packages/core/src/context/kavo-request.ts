@@ -28,7 +28,7 @@ export interface KavoRequest<
   readonly options: KavoCallOptions | null;
   /**
    * Conditional-request tokens (`If-Match` / `If-None-Match`), transport-
-   * agnostic (ADR-0019). Optional so every existing caller keeps compiling;
+   * agnostic (ADR-0020). Optional so every existing caller keeps compiling;
    * absent and `null` mean the same thing — no precondition. When both this
    * and `options.preconditions` are set, this one wins, because it is the
    * request's own data rather than a per-call override of it.

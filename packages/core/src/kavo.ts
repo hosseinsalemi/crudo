@@ -137,7 +137,7 @@ export function createKavo(options: KavoOptions = {}): KavoInstance {
         ),
         errorHandler: new DefaultErrorHandler(),
         // The adapter is already both halves; the engine only ever reads
-        // through it, for the `If-Match` pre-read (ADR-0019).
+        // through it, for the `If-Match` pre-read (ADR-0020).
         reader: adapter as unknown as RepositoryAdapter<Entity>,
       });
 
