@@ -1,5 +1,6 @@
 import type {
   ClassRef,
+  Filter,
   KavoContext,
   EntityId,
   IncludeNode,
@@ -8,7 +9,14 @@ import type {
   RepositoryAdapter,
   ResolvedSoftDelete,
 } from "@kavo/core";
-import { AlreadyDeletedException, ConfigurationException, NotDeletedException, NotFoundException } from "@kavo/core";
+import {
+  AlreadyDeletedException,
+  ConfigurationException,
+  NotDeletedException,
+  NotFoundException,
+  isCursorPagination,
+  readFilter,
+} from "@kavo/core";
 import type { DataSource, DeepPartial, ObjectLiteral, Repository, SelectQueryBuilder } from "typeorm";
 import { FilterTranslator } from "./filter-translator.js";
 import { mapDriverError } from "./error-mapping.js";
@@ -95,9 +103,13 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
 
   async findMany(query: NormalizedQueryContext<Entity>, context: KavoContext<Entity>): Promise<readonly Entity[]> {
     try {
-      const entities = await this.buildQuery(query, context)
-        .skip(query.pagination.offset)
-        .take(query.pagination.limit)
+      // `readFilter` folds in the keyset predicate under cursor pagination
+      // (a no-op otherwise), and a cursor page has no `offset` to skip by —
+      // the keyset predicate *is* the skip.
+      const { pagination } = query;
+      const entities = await this.buildQuery(query, context, { filter: readFilter(query) })
+        .skip(isCursorPagination(pagination) ? 0 : pagination.offset)
+        .take(pagination.limit)
         .getMany();
       await this.loadBatches(entities, this.entity, query.include);
       return entities;
@@ -125,7 +137,7 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
   private buildQuery(
     query: NormalizedQueryContext<Entity>,
     context: KavoContext<Entity>,
-    options: { sorted?: boolean; includes?: boolean } = {},
+    options: { sorted?: boolean; includes?: boolean; filter?: Filter<Entity> } = {},
   ): SelectQueryBuilder<Entity> {
     const qb = this.repository.createQueryBuilder(this.alias);
     this.scopeToLive(qb, context, query.withDeleted, query.onlyDeleted);
@@ -136,7 +148,7 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
     if (options.includes !== false) {
       this.joinIncludes(qb, query.include, this.alias, translator);
     }
-    translator.apply(query.filter);
+    translator.apply(options.filter ?? query.filter);
     if (options.sorted !== false) {
       for (const sort of query.sort) {
         qb.addOrderBy(translator.columnRef(sort.field as string), sort.direction === "desc" ? "DESC" : "ASC");

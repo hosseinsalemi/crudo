@@ -6,8 +6,16 @@ import type {
   NormalizedQueryContext,
   RepositoryAdapter,
   ResolvedSoftDelete,
+  Filter,
 } from "@kavo/core";
-import { AlreadyDeletedException, ConfigurationException, NotDeletedException, NotFoundException } from "@kavo/core";
+import {
+  AlreadyDeletedException,
+  ConfigurationException,
+  NotDeletedException,
+  NotFoundException,
+  isCursorPagination,
+  readFilter,
+} from "@kavo/core";
 import { mapDriverError } from "./error-mapping.js";
 import { translateFilter, type FilterTranslatorOptions, type PrismaWhere } from "./filter-translator.js";
 import { delegateName, type PrismaClientLike, type PrismaModelDelegate } from "./prisma-client-like.js";
@@ -87,10 +95,16 @@ export class PrismaRepositoryAdapter<Entity extends object> implements Repositor
 
   async findMany(query: NormalizedQueryContext<Entity>, context: KavoContext<Entity>): Promise<readonly Entity[]> {
     try {
+      // `readFilter` folds in the keyset predicate under cursor pagination
+      // (a no-op otherwise), and a cursor page has no `offset` to skip by —
+      // the keyset predicate *is* the skip. Prisma's own `cursor`/`skip: 1`
+      // option is deliberately not used: it takes a unique *id* and cannot
+      // express a multi-column keyset with mixed directions.
+      const { pagination } = query;
       const rows = await this.delegate.findMany({
-        ...this.buildFindArgs(query, context),
-        skip: query.pagination.offset,
-        take: query.pagination.limit,
+        ...this.buildFindArgs(query, context, readFilter(query)),
+        skip: isCursorPagination(pagination) ? 0 : pagination.offset,
+        take: pagination.limit,
       });
       return rows as Entity[];
     } catch (error) {
@@ -114,9 +128,13 @@ export class PrismaRepositoryAdapter<Entity extends object> implements Repositor
     }
   }
 
-  private buildFindArgs(query: NormalizedQueryContext<Entity>, context: KavoContext<Entity>): Record<string, unknown> {
+  private buildFindArgs(
+    query: NormalizedQueryContext<Entity>,
+    context: KavoContext<Entity>,
+    filter: Filter<Entity> = query.filter,
+  ): Record<string, unknown> {
     const where = this.scopeToLive(
-      translateFilter(query.filter, this.filterOptions),
+      translateFilter(filter, this.filterOptions),
       context,
       query.withDeleted,
       query.onlyDeleted,
