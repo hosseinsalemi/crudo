@@ -81,6 +81,17 @@ export const ERROR_CATALOG = {
     title: "Not deleted",
     message: "{entity} with id '{id}' is not deleted.",
   },
+  KAVO_PRECONDITION_FAILED: {
+    status: 412,
+    title: "Precondition failed",
+    // The current tag is in the message on purpose: it is the value the
+    // client needs to retry, it is already public (it is the `ETag` of a
+    // representation the client is authorized to read), and without it the
+    // only way forward is a blind re-GET.
+    message:
+      "The If-Match precondition failed: {entity} with id '{id}' has changed since the ETag the request supplied. " +
+      "Its current ETag is {etag}.",
+  },
   KAVO_OPERATION_DISABLED: {
     status: 405,
     title: "Operation disabled",

@@ -112,6 +112,20 @@ export class NotDeletedException extends KavoException {
   }
 }
 
+/**
+ * An `If-Match` precondition whose tokens do not include the target's
+ * current ETag → 412. Distinct from {@link ConflictException} (409): a
+ * conflict is the database refusing the write, this is Kavo refusing to
+ * attempt it because the client is acting on a version it never saw
+ * (ADR-0019). A *missing* target is still a {@link NotFoundException} —
+ * the precondition is only evaluated once the row is known to exist.
+ */
+export class PreconditionFailedException extends KavoException {
+  constructor(options: KavoExceptionOptions = {}) {
+    super("KAVO_PRECONDITION_FAILED", options);
+  }
+}
+
 /** Calling an operation whose registry entry is disabled. */
 export class OperationDisabledException extends KavoException {
   constructor(options: KavoExceptionOptions = {}) {

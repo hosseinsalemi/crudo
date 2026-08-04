@@ -39,6 +39,7 @@ const CATALOG: Readonly<Record<CatalogedErrorCode, { status: number; title: stri
   KAVO_CONFLICT: { status: 409, title: "Conflict" },
   KAVO_ALREADY_DELETED: { status: 409, title: "Already deleted" },
   KAVO_NOT_DELETED: { status: 409, title: "Not deleted" },
+  KAVO_PRECONDITION_FAILED: { status: 412, title: "Precondition failed" },
   KAVO_OPERATION_DISABLED: { status: 405, title: "Operation disabled" },
   KAVO_OPERATION_NOT_REGISTERED: { status: 405, title: "Operation not registered" },
   KAVO_PERSISTENCE_FAILED: { status: 500, title: "Persistence failure" },
