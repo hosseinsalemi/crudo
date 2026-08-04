@@ -349,6 +349,100 @@ describe("association by id (ADR-0014)", () => {
   });
 });
 
+/**
+ * Issue #7: the two ways an include can be rejected used to render the
+ * identical sentence, so the message could not tell a typo from a
+ * permission that was never granted. Assertions stay on the actionable
+ * clause (`toContain`), never on the whole string — the prose is meant to
+ * keep improving.
+ */
+describe("include rejection messages", () => {
+  const detailOf = async (fn: () => Promise<unknown>): Promise<string> => {
+    try {
+      await fn();
+    } catch (error) {
+      const issues = (error as QueryValidationException).issues;
+      expect(issues).toHaveLength(1);
+      return issues[0]!.detail;
+    }
+    throw new Error("expected QueryValidationException");
+  };
+
+  it("tells a relation that does not exist from one that was never opted in", async () => {
+    const { authors } = blog();
+    const unknown = await detailOf(() =>
+      authors.findMany({ include: ["ghosts"] as unknown as readonly IncludePath<Author>[] }),
+    );
+    const closed = await detailOf(() => authors.findMany({ include: ["posts"] }));
+    expect(unknown).not.toBe(closed);
+    expect(unknown).toContain("does not exist on Author");
+    expect(closed).toContain("is not includable");
+  });
+
+  it("names the config key that opts a real relation in", async () => {
+    const { authors } = blog();
+    const detail = await detailOf(() => authors.findMany({ include: ["posts"] }));
+    expect(detail).toContain("relations.edges.posts.includable = true");
+    expect(detail).toContain("on the Author config");
+  });
+
+  it("lists the includable relations, and says 'none' when the default empty config is why", async () => {
+    const { authors } = blog();
+    const detail = await detailOf(() =>
+      authors.findMany({ include: ["ghosts"] as unknown as readonly IncludePath<Author>[] }),
+    );
+    expect(detail).toContain("Includable relations on Author: none.");
+  });
+
+  it("suggests the near miss, drawn only from relations already opted in", async () => {
+    const { authors } = blog({ author: { relations: { edges: { posts: { includable: true } } } } });
+    const detail = await detailOf(() =>
+      authors.findMany({ include: ["postz"] as unknown as readonly IncludePath<Author>[] }),
+    );
+    expect(detail).toContain("Did you mean 'posts'?");
+  });
+
+  it("never enumerates a relation the config has not opted in", async () => {
+    // The disclosure rule: a rejection may name only what the client is
+    // already permitted to ask for. `Post.author` exists in metadata but no
+    // edge names it, so it must not appear.
+    const { authors } = blog({
+      author: { relations: { edges: { posts: { includable: true } } } },
+    });
+    const detail = await detailOf(() =>
+      authors.findMany({ include: ["posts.authr"] as unknown as readonly IncludePath<Author>[] }),
+    );
+    expect(detail).toContain("Includable relations on Post: none.");
+    expect(detail).not.toContain("'author'");
+  });
+
+  it("blames the entity that owns the failing segment, not the root", async () => {
+    const { authors } = blog({
+      author: { relations: { edges: { posts: { includable: true } } } },
+    });
+    const detail = await detailOf(() =>
+      authors.findMany({ include: ["posts.comments"] as unknown as readonly IncludePath<Author>[] }),
+    );
+    expect(detail).toContain("on Post is not includable");
+    expect(detail).toContain("(in include path 'posts.comments')");
+    expect(detail).toContain("on the Post config");
+    expect(detail).not.toContain("Author");
+  });
+
+  it("names the target entity's allowlist when a relation fieldset is rejected", async () => {
+    const { authors } = blog({
+      author: { relations: { edges: { posts: { includable: true } } } },
+      post: { allowlists: { selectable: ["id", "title"] } },
+    });
+    const detail = await detailOf(() =>
+      authors.findMany({ include: ["posts"], fields: { relations: { posts: ["titel"] } } }),
+    );
+    expect(detail).toContain("Did you mean 'title'?");
+    expect(detail).toContain("Selectable fields on Post: id, title.");
+    expect(detail).toContain("allowlists.selectable on the Post config");
+  });
+});
+
 /** The include tree the adapter last received — what resolution produced. */
 function includeTree<Entity extends object>(adapter: SeededAdapter<Entity>): Record<string, IncludeNode> {
   return (adapter.lastQuery?.include ?? {}) as Record<string, IncludeNode>;

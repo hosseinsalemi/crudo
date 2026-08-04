@@ -5,6 +5,7 @@ import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
 import type { EntityMetadata, FieldMetadata } from "../metadata/entity-metadata.js";
 import type { QueryIssueDto } from "../errors/problem-details.js";
 import { QueryValidationException } from "../errors/exceptions.js";
+import { allowlistHint } from "../errors/message-hints.js";
 import { coerceScalar, isIssue } from "./value-coercion.js";
 import { parseBracketKey } from "./bracket-notation.js";
 
@@ -225,11 +226,14 @@ export class DefaultFilterParser<Entity = unknown> implements FilterParser<Entit
     issues: QueryIssueDto[],
     out: FilterExpression<Entity>[],
   ): void {
-    if (!(config.allowlists.filterable as readonly string[]).includes(field)) {
+    const filterable = config.allowlists.filterable as readonly string[];
+    if (!filterable.includes(field)) {
       issues.push({
         field,
         code: "KAVO_QUERY_INVALID_FIELD",
-        detail: `Field '${field}' cannot be used for filtering.`,
+        detail:
+          `Field '${field}' cannot be used for filtering.` +
+          allowlistHint(field, "filtering", config.entityName, filterable),
       });
       return;
     }

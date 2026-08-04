@@ -5,6 +5,7 @@ import type { QueryIssueDto } from "../errors/problem-details.js";
 import type { RelationDescriptor } from "./relation-descriptor.js";
 import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
 import { QueryValidationException } from "../errors/exceptions.js";
+import { allowlistHint, nameList, suggestName } from "../errors/message-hints.js";
 
 /** A pending node, before validation turns it into an `IncludeNode`. */
 interface DraftNode {
@@ -85,11 +86,30 @@ export class DefaultIncludeResolver<Entity extends object = object> implements I
     const tree: Record<string, IncludeNode> = {};
     for (const draft of drafts.values()) {
       const relation = owner.relations.get(draft.name);
-      if (relation === undefined || !relation.includable) {
+      // Two different mistakes, and the fix differs: a name that is not a
+      // relation at all is a typo, while a relation the config never named
+      // in `relations.edges` is a permission the developer has to grant.
+      // The registry keeps every metadata relation and flips `includable`
+      // only for configured edges, so the two are already distinguishable
+      // here (they were reported identically until issue #7).
+      if (relation === undefined) {
         issues.push({
           field: draft.path,
           code: "KAVO_QUERY_INVALID_FIELD",
-          detail: `Field '${draft.path}' cannot be used for inclusion.`,
+          detail:
+            `Relation '${draft.name}' does not exist on ${owner.entityName}` +
+            `${inPath(draft)}.${suggestion(draft.name, includableNames(owner))}` +
+            ` Includable relations on ${owner.entityName}: ${nameList(includableNames(owner))}.`,
+        });
+        continue;
+      }
+      if (!relation.includable) {
+        issues.push({
+          field: draft.path,
+          code: "KAVO_QUERY_INVALID_FIELD",
+          detail:
+            `Relation '${draft.name}' on ${owner.entityName} is not includable${inPath(draft)}.` +
+            ` Opt in with relations.edges.${draft.name}.includable = true on the ${owner.entityName} config.`,
         });
         continue;
       }
@@ -196,11 +216,42 @@ export class DefaultIncludeResolver<Entity extends object = object> implements I
       issues.push({
         field: `${draft.path}.${field}`,
         code: "KAVO_QUERY_INVALID_FIELD",
-        detail: `Field '${field}' cannot be used for selection on '${draft.path}'.`,
+        detail:
+          `Field '${field}' cannot be used for selection on '${draft.path}'.` +
+          // The allowlist that rejected it is the *target* entity's, so the
+          // config key the developer has to edit is the target's too.
+          allowlistHint(field, "selection", target.entityName, allowed),
       });
     }
     return fields;
   }
+}
+
+/**
+ * The relations a client is permitted to include on this entity — the only
+ * names a rejection may enumerate. `all()` also holds relations the config
+ * never opted in, and naming those would turn an error message into a
+ * schema dump (the disclosure rule in `errors/message-hints.ts`).
+ */
+function includableNames(owner: ResolvedEntityConfig<object>): readonly string[] {
+  return owner.relations
+    .all()
+    .filter((relation) => relation.includable)
+    .map((relation) => relation.name);
+}
+
+/**
+ * ` (in include path 'posts.comments')` — omitted at the top level, where
+ * the path and the relation name are the same string and repeating it adds
+ * nothing.
+ */
+function inPath(draft: DraftNode): string {
+  return draft.path === draft.name ? "" : ` (in include path '${draft.path}')`;
+}
+
+function suggestion(name: string, candidates: readonly string[]): string {
+  const match = suggestName(name, candidates);
+  return match === undefined ? "" : ` Did you mean '${match}'?`;
 }
 
 /** Merge one dot-path into the draft tree, sharing prefixes. */

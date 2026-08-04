@@ -437,3 +437,64 @@ describe("QueryNormalizer — the three fields spellings", () => {
     });
   });
 });
+
+/**
+ * Issue #7: an allowlist rejection named what was refused and stopped
+ * there, leaving the developer to guess which config key would permit it.
+ * The leading sentence is unchanged; everything actionable is appended, so
+ * these assert the appended clause and never the whole string.
+ */
+describe("allowlist rejection messages", () => {
+  it("names the near miss, the permitted set, and the config key for a filter field", () => {
+    const detail = issuesOf(() => normalizer.normalizeWire({ "filter[emial][eq]": "a" }, config))[0]!.detail;
+    expect(detail).toContain("Field 'emial' cannot be used for filtering.");
+    expect(detail).toContain("Did you mean 'email'?");
+    expect(detail).toContain("Filterable fields on User:");
+    expect(detail).toContain("Add it to allowlists.filterable on the User config to permit it.");
+  });
+
+  it("names allowlists.sortable for a sort field", () => {
+    const detail = issuesOf(() => normalizer.normalizeWire({ sort: "-emial" }, config))[0]!.detail;
+    expect(detail).toContain("Did you mean 'email'?");
+    expect(detail).toContain("allowlists.sortable on the User config");
+  });
+
+  it("names allowlists.selectable for a selected field", () => {
+    const detail = issuesOf(() => normalizer.normalizeWire({ fields: "emial" }, config))[0]!.detail;
+    expect(detail).toContain("Did you mean 'email'?");
+    expect(detail).toContain("allowlists.selectable on the User config");
+  });
+
+  it("names the same key for a programmatic filter expression", () => {
+    const detail = issuesOf(() =>
+      normalizer.normalizeInput(
+        { filter: { kind: "condition", field: "emial", operator: "EQ", value: "a" } } as never,
+        config,
+      ),
+    )[0]!.detail;
+    expect(detail).toContain("Did you mean 'email'?");
+    expect(detail).toContain("allowlists.filterable on the User config");
+  });
+
+  it("says the same thing through the programmatic entry point", () => {
+    // The two entry points share one gate, so the security posture and the
+    // message quality cannot diverge between them.
+    const wire = issuesOf(() => normalizer.normalizeWire({ sort: "emial" }, config))[0]!.detail;
+    const programmatic = issuesOf(() =>
+      normalizer.normalizeInput({ sort: [{ field: "emial", direction: "asc" }] } as never, config),
+    )[0]!.detail;
+    expect(programmatic).toBe(wire);
+  });
+
+  it("offers no suggestion when nothing is close, and still names the fix", () => {
+    const detail = issuesOf(() => normalizer.normalizeWire({ sort: "passwordHash" }, config))[0]!.detail;
+    expect(detail).not.toContain("Did you mean");
+    expect(detail).toContain("allowlists.sortable");
+  });
+
+  it("collects every rejection into one round trip", () => {
+    const issues = issuesOf(() => normalizer.normalizeWire({ sort: "emial", fields: "nmae" }, config));
+    expect(issues).toHaveLength(2);
+    expect(issues.every((issue) => issue.detail.includes("Did you mean"))).toBe(true);
+  });
+});
