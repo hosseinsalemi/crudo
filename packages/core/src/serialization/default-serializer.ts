@@ -18,15 +18,29 @@ import { dtoShapeKeys } from "../dto/dto-shape.js";
 type ErasedComputedFields = Readonly<Record<string, { resolve(entity: never, context: never): unknown }>>;
 
 const NO_COMPUTED_FIELDS: ErasedComputedFields = Object.freeze({});
+const NO_RELATIONS: ReadonlySet<string> = new Set<string>();
 
 /** The projection rules for one entity type, resolved from the catalog. */
 interface Projection {
   /** Allowed keys, or `null` when the shape is unknown (own keys apply). */
   readonly keys: readonly string[] | null;
-  /** Relation property names — never emitted unless the node is included. */
-  readonly relations: readonly string[];
+  /**
+   * Relation property names — never emitted unless the node is included.
+   * A `Set` rather than an array: `project` tests every key against it, so
+   * an array would make the per-row cost quadratic in the entity's width.
+   */
+  readonly relations: ReadonlySet<string>;
   /** Computed fields, evaluated instead of read off the row (ADR-0019). */
   readonly computed: ErasedComputedFields;
+}
+
+/**
+ * A sparse fieldset as `project` consumes it. Built once per response (or
+ * once per relation node), never once per row — the same reason
+ * `Projection.relations` is a `Set`.
+ */
+function selectionSet(selection: readonly string[] | null | undefined): ReadonlySet<string> | null {
+  return selection == null ? null : new Set(selection);
 }
 
 /**
@@ -60,7 +74,7 @@ export class DefaultSerializer<Entity = unknown> implements Serializer<Entity> {
   ) {
     this.rootProjection = {
       keys: [...metadata.fields.map((field) => field.name), ...Object.keys(computed)],
-      relations: metadata.relations.map((relation) => relation.name),
+      relations: new Set(metadata.relations.map((relation) => relation.name)),
       computed,
     };
   }
@@ -73,18 +87,27 @@ export class DefaultSerializer<Entity = unknown> implements Serializer<Entity> {
     return this.project(
       entity,
       narrowToDto(this.rootProjection, dto),
-      context.query?.fields.root as readonly string[] | null | undefined,
+      selectionSet(context.query?.fields.root as readonly string[] | null | undefined),
       context.query?.include ?? {},
       context,
     ) as ItemDto;
   }
 
+  /**
+   * The DTO narrowing and the fieldset `Set` are the same for every row of
+   * one response, so they are resolved once here rather than once per item
+   * — this is `serializeItem`'s body with the per-row constants hoisted,
+   * not a second projection path.
+   */
   serializeList<ListDto>(
     entities: readonly Entity[],
     dto: DtoClass<ListDto & object> | null,
     context: KavoContext<Entity>,
   ): readonly ListDto[] {
-    return entities.map((entity) => this.serializeItem(entity, dto as DtoClass<ListDto & object> | null, context));
+    const projection = narrowToDto(this.rootProjection, dto as DtoClass | null);
+    const selection = selectionSet(context.query?.fields.root as readonly string[] | null | undefined);
+    const include = context.query?.include ?? {};
+    return entities.map((entity) => this.project(entity, projection, selection, include, context) as ListDto);
   }
 
   /**
@@ -96,7 +119,7 @@ export class DefaultSerializer<Entity = unknown> implements Serializer<Entity> {
   private project(
     entity: unknown,
     projection: Projection,
-    selection: readonly string[] | null | undefined,
+    selection: ReadonlySet<string> | null,
     include: IncludeTree,
     context: KavoContext<Entity>,
   ): Record<string, unknown> {
@@ -104,8 +127,10 @@ export class DefaultSerializer<Entity = unknown> implements Serializer<Entity> {
     const keys = projection.keys ?? Object.keys(source);
     const result: Record<string, unknown> = {};
     for (const key of keys) {
-      if (projection.relations.includes(key)) continue;
-      if (selection != null && !selection.includes(key)) continue;
+      if (projection.relations.has(key)) continue;
+      // Before the computed branch: a deselected computed field's `resolve`
+      // must never run, or `fields=` would pay for work it discards.
+      if (selection !== null && !selection.has(key)) continue;
       // Own properties only: `keys` can come from a DTO class or from the
       // row itself, and an inherited `constructor`/`toString` must not be
       // mistaken for a declared computed field.
@@ -118,6 +143,11 @@ export class DefaultSerializer<Entity = unknown> implements Serializer<Entity> {
         if (value !== undefined) result[key] = value;
         continue;
       }
+      // Reached only when the key names no computed field: the branch order
+      // above is normative, because a row *can* carry a computed key —
+      // a TypeORM entity with a `get fullName()`, or an adapter row with a
+      // column the metadata seam does not describe. Resolving wins; reading
+      // the row here would resurrect the exact accident ADR-0019 replaced.
       if (key in source) result[key] = source[key];
     }
     for (const [name, node] of Object.entries(include)) {
@@ -134,8 +164,9 @@ export class DefaultSerializer<Entity = unknown> implements Serializer<Entity> {
       return node.relation.cardinality === "many" ? [] : null;
     }
     const target = this.projectionFor(node);
-    const one = (row: unknown): Record<string, unknown> =>
-      this.project(row, target, node.fields, node.children, context);
+    // Resolved once per node, not once per element of a to-many.
+    const selection = selectionSet(node.fields);
+    const one = (row: unknown): Record<string, unknown> => this.project(row, target, selection, node.children, context);
     return Array.isArray(value) ? value.map(one) : one(value);
   }
 
@@ -148,12 +179,12 @@ export class DefaultSerializer<Entity = unknown> implements Serializer<Entity> {
    */
   private projectionFor(node: IncludeNode): Projection {
     const info = this.catalog?.get(node.relation.target());
-    if (info === undefined) return { keys: null, relations: [], computed: NO_COMPUTED_FIELDS };
+    if (info === undefined) return { keys: null, relations: NO_RELATIONS, computed: NO_COMPUTED_FIELDS };
     const dto = info.config.dto.resolve(node.relation.cardinality === "many" ? "list" : "item", "findMany");
     const computed: ErasedComputedFields = info.config.computed;
     return {
       keys: dtoShapeKeys(dto) ?? [...info.metadata.fields.map((field) => field.name), ...Object.keys(computed)],
-      relations: info.metadata.relations.map((relation) => relation.name),
+      relations: new Set(info.metadata.relations.map((relation) => relation.name)),
       computed,
     };
   }
@@ -183,12 +214,15 @@ function narrowToDto(projection: Projection, dto: DtoClass | null): Projection {
  * A nested object carrying more than the id is narrowed to the id, because
  * a deep nested write is not something this layer should do by accident.
  *
- * Computed fields are **never** writable (ADR-0019). Keeping them out of
- * the derived projection is not enough on its own: a registered
- * `create`/`update` DTO *replaces* that projection, so a DTO class naming
- * a computed field would otherwise pass the key straight through to the
- * adapter as if it were a column. They are stripped explicitly, whichever
- * projection is in force.
+ * Computed fields are **never** writable (ADR-0019), and this class is the
+ * inner of the two layers that make that true. A registered
+ * `create`/`update`/`patch` DTO naming a computed field is rejected at
+ * bootstrap (`resolveComputedFields`' neighbour in `resolve-entity-config`),
+ * so through `createCrud` the derived writable projection is the only one
+ * that reaches here and it never carries a computed name. The explicit
+ * strip below is what keeps that true for a `DefaultDeserializer`
+ * constructed directly — it is exported, and its contract is "computed
+ * names never reach the adapter", not "the config resolver checked first".
  */
 export class DefaultDeserializer<Entity = unknown> implements Deserializer<Entity> {
   private readonly writableProjection: readonly string[];
