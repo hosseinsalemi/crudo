@@ -368,15 +368,20 @@ describe("include rejection messages", () => {
     throw new Error("expected QueryValidationException");
   };
 
-  it("tells a relation that does not exist from one that was never opted in", async () => {
+  it("says the same thing for a relation that exists and one that does not", async () => {
+    // The oracle this closes: `Author.posts` is real but never opted in,
+    // `ghosts` is not a relation at all. Inclusion is opt-in and defaults to
+    // empty, so a message that distinguished them would confirm the
+    // existence of every edge the config deliberately closed — one guessed
+    // name per request. Both rejections differ only in the name echoed back.
     const { authors } = blog();
-    const unknown = await detailOf(() =>
+    const real = await detailOf(() => authors.findMany({ include: ["posts"] }));
+    const invented = await detailOf(() =>
       authors.findMany({ include: ["ghosts"] as unknown as readonly IncludePath<Author>[] }),
     );
-    const closed = await detailOf(() => authors.findMany({ include: ["posts"] }));
-    expect(unknown).not.toBe(closed);
-    expect(unknown).toContain("does not exist on Author");
-    expect(closed).toContain("is not includable");
+    expect(real.replace(/posts/g, "X")).toBe(invented.replace(/ghosts/g, "X"));
+    expect(real).toContain("is not includable on Author");
+    expect(invented).toContain("is not includable on Author");
   });
 
   it("names the config key that opts a real relation in", async () => {
@@ -423,7 +428,7 @@ describe("include rejection messages", () => {
     const detail = await detailOf(() =>
       authors.findMany({ include: ["posts.comments"] as unknown as readonly IncludePath<Author>[] }),
     );
-    expect(detail).toContain("on Post is not includable");
+    expect(detail).toContain("is not includable on Post");
     expect(detail).toContain("(in include path 'posts.comments')");
     expect(detail).toContain("on the Post config");
     expect(detail).not.toContain("Author");

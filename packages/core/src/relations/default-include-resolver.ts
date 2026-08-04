@@ -86,30 +86,26 @@ export class DefaultIncludeResolver<Entity extends object = object> implements I
     const tree: Record<string, IncludeNode> = {};
     for (const draft of drafts.values()) {
       const relation = owner.relations.get(draft.name);
-      // Two different mistakes, and the fix differs: a name that is not a
-      // relation at all is a typo, while a relation the config never named
-      // in `relations.edges` is a permission the developer has to grant.
-      // The registry keeps every metadata relation and flips `includable`
-      // only for configured edges, so the two are already distinguishable
-      // here (they were reported identically until issue #7).
-      if (relation === undefined) {
+      // A name that is not a relation at all and a relation the config never
+      // opted in are the same rejection to the client, deliberately: the
+      // registry keeps every metadata relation and flips `includable` only
+      // for configured edges, so wording the two differently would confirm
+      // the existence of the edges `relations.edges` closed on purpose (the
+      // disclosure rule in `errors/message-hints.ts`). What issue #7 was
+      // actually about — the message never naming the config key that grants
+      // inclusion — is fixed without that split, by stating the key as a
+      // conditional the developer can act on and a prober learns nothing from.
+      if (relation === undefined || !relation.includable) {
+        const includable = includableNames(owner);
         issues.push({
           field: draft.path,
           code: "KAVO_QUERY_INVALID_FIELD",
           detail:
-            `Relation '${draft.name}' does not exist on ${owner.entityName}` +
-            `${inPath(draft)}.${suggestion(draft.name, includableNames(owner))}` +
-            ` Includable relations on ${owner.entityName}: ${nameList(includableNames(owner))}.`,
-        });
-        continue;
-      }
-      if (!relation.includable) {
-        issues.push({
-          field: draft.path,
-          code: "KAVO_QUERY_INVALID_FIELD",
-          detail:
-            `Relation '${draft.name}' on ${owner.entityName} is not includable${inPath(draft)}.` +
-            ` Opt in with relations.edges.${draft.name}.includable = true on the ${owner.entityName} config.`,
+            `Relation '${draft.name}' is not includable on ${owner.entityName}${inPath(draft)}.` +
+            `${suggestion(draft.name, includable)}` +
+            ` Includable relations on ${owner.entityName}: ${nameList(includable)}.` +
+            ` If ${owner.entityName} has a '${draft.name}' relation, opt in with` +
+            ` relations.edges.${draft.name}.includable = true on the ${owner.entityName} config.`,
         });
         continue;
       }

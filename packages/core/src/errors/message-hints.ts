@@ -13,7 +13,18 @@
  * filterable/sortable/selectable fields — never the full relation or field
  * registry. That keeps what a rejection enumerates exactly equal to what
  * the client is already allowed to ask for.
+ *
+ * The rule's second half is about what a rejection must *not* confirm: a
+ * message may never differ according to whether the rejected name exists.
+ * Relation inclusion is opt-in and defaults to empty, so a message that
+ * said "exists but is not includable" for one name and "does not exist" for
+ * another would be an existence oracle for the very edges the config closed
+ * on purpose. Advice about names outside the permitted set is therefore
+ * phrased as a conditional ("if X has a 'y' relation"), which is equally
+ * actionable for the developer and answers nothing for a prober.
  */
+
+import type { QueryIssueDto } from "./problem-details.js";
 
 /** Longest candidate list rendered in full before it is truncated. */
 const DEFAULT_LIST_CAP = 10;
@@ -75,6 +86,13 @@ export type AllowlistUsage = keyof typeof ALLOWLIST_KEYS;
  * permitted set, and the config key that would permit the field. Callers
  * own the leading sentence, which stays byte-identical to what it always
  * was — this is purely additive text.
+ *
+ * The config-key advice is phrased as a conditional on purpose. An
+ * allowlist accepts whatever array the config declares — `resolveFieldSelector`
+ * never checks it against `EntityMetadata` — so telling a developer to
+ * allowlist a *typo* would trade this clear 400 for a 500 out of the driver
+ * on the next query. "If it is a column" is the honest form, and it says
+ * nothing about whether the column exists.
  */
 export function allowlistHint(
   field: string,
@@ -86,8 +104,46 @@ export function allowlistHint(
   return (
     (suggestion === undefined ? "" : ` Did you mean '${suggestion}'?`) +
     ` ${ALLOWLIST_ADJECTIVES[usage]} fields on ${entityName}: ${nameList(allowed)}.` +
-    ` Add it to allowlists.${ALLOWLIST_KEYS[usage]} on the ${entityName} config to permit it.`
+    ` If ${entityName} has a '${field}' column, add it to allowlists.${ALLOWLIST_KEYS[usage]}` +
+    ` on the ${entityName} config to permit it.`
   );
+}
+
+/**
+ * How many rejections in one request still carry the actionable clause.
+ *
+ * The hint is not free: `suggestName` walks the whole allowlist per rejected
+ * name, and the prose adds a few hundred bytes to each issue. A request
+ * naming five thousand fields (`?fields=a1,…,a5000` is a legal query string)
+ * would otherwise turn one 400 into a megabyte of text and an O(names ×
+ * allowlist) edit-distance sweep. Past a handful of problems the caller is
+ * not fixing a typo anyway, so the leading sentence carries on alone.
+ *
+ * The counter is the issue array itself, which may already hold unrelated
+ * problems — deliberately conservative: it errs toward dropping the hint.
+ */
+const MAX_HINTED_ISSUES = 5;
+
+/**
+ * Push one allowlist rejection. The single construction site for this
+ * message: the wire path (`DefaultFilterParser`) and the programmatic one
+ * (`QueryNormalizer`) both land here, so the two cannot word the same
+ * rejection differently.
+ */
+export function pushAllowlistIssue(
+  field: string,
+  usage: AllowlistUsage,
+  entityName: string,
+  allowed: readonly string[],
+  issues: QueryIssueDto[],
+): void {
+  issues.push({
+    field,
+    code: "KAVO_QUERY_INVALID_FIELD",
+    detail:
+      `Field '${field}' cannot be used for ${usage}.` +
+      (issues.length < MAX_HINTED_ISSUES ? allowlistHint(field, usage, entityName, allowed) : ""),
+  });
 }
 
 /**
