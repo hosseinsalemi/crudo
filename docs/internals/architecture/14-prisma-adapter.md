@@ -45,6 +45,37 @@ of adding a join. `LIKE`/`ILIKE` map onto `startsWith`/`endsWith`/
 `contains`/`equals` by wildcard position, since Prisma has no raw pattern
 operator.
 
+Two of those translations need more than the AST to be correct, which is
+why `FilterTranslatorOptions` carries the queried `model` and a
+`PrismaRelationGraph` alongside the connector setting:
+
+**Relation-path cardinality.** Prisma accepts the bare nested form only on
+a **to-one** relation; on a list it requires a `some`/`every`/`none`
+wrapper and rejects the bare shape with `Unknown argument`. The grammar
+already implies which one: doc 05 §3 defines a relation-path filter as
+restricting _root_ rows, so a to-many segment nests under `some` —
+`filter[posts.title][eq]=x` is `{ posts: { some: { title: … } } }`, the
+same semantics `@kavo/typeorm` gets for free from a `LEFT JOIN` plus a
+`WHERE` on the joined column. Each segment of a multi-hop path is
+classified independently (`author.posts.title` wraps only the second),
+which is why the graph covers the whole datamodel rather than one entity:
+`EntityMetadata.relations` describes the queried entity alone, and the
+second hop belongs to another model. The graph is derived once from the
+DMMF at bootstrap (`buildRelationGraph`, called by `createInfrastructure`)
+and passed as plain data, so `translateFilter` stays a pure function. A
+segment that resolves to no relation raises
+`KAVO_QUERY_UNSUPPORTED_PARAM` (400) rather than emitting a `where` the
+engine will reject — core's default allowlists hold scalars only, so
+reaching it means a relation path was allowlisted by hand.
+
+**The empty `NOT` group.** `NOT` is variadic and means `NOT(AND(children))`
+(doc 05 §1), but the zero-child case cannot be spelled that way here:
+Prisma **drops** a `NOT` whose operand carries no condition, so
+`{ NOT: { AND: [] } }` matches every row instead of none. The empty
+disjunction `{ OR: [] }` is the contradiction Prisma does honor, and is
+what the translator emits — verified against a real engine in
+`tests/adapter.spec.ts`, which pins all three degenerate groups.
+
 **`ILIKE` and connector support.** Prisma's case-insensitive filter
 (`mode: "insensitive"`) is Postgres/MongoDB-only; MySQL, SQLite, and SQL
 Server reject the argument. There is no reliable way to detect the
@@ -94,7 +125,36 @@ per-database code lists. The original error always travels as `cause`:
 | `P2034` transaction conflict  | `TransactionException` (`retryable: true`) |
 | anything else                 | `PersistenceException` with `cause`        |
 
-## 6. Attachment points for later work
+## 6. Adapter-specific caveats
+
+**`LIKE` cannot express an interior `%`, and has no `_` at all.** Prisma's
+`where` has no raw pattern operator — only `equals`, `startsWith`,
+`endsWith`, and `contains` — so exactly four pattern shapes translate:
+
+| wire pattern | Prisma filter    |
+| ------------ | ---------------- |
+| `john`       | `equals: "john"` |
+| `A%`         | `startsWith: A`  |
+| `%son`       | `endsWith: son`  |
+| `%j%`        | `contains: j`    |
+
+Anything else — an interior wildcard (`a%b`), or any use of the
+single-character wildcard `_`, which Prisma has no equivalent for — is
+**rejected with `KAVO_QUERY_UNSUPPORTED_PARAM` (400)**. It is not
+downgraded to `equals` on the raw pattern: that returned a silently
+different result set from the other three adapters for the same wire
+request, with no error on either side. Escape a literal `%`/`_` with a
+backslash to sidestep the limit, or reach for a raw query. Doc 05 §3
+cross-references this from the grammar side.
+
+The grammar's backslash escape itself _is_ honored: `\%` and `\_` are
+resolved to literal text before the wildcard positions are read, so
+`filter[name][like]=100\%` is `{ equals: "100%" }` — matching what
+`@kavo/typeorm` gets from its bound `ESCAPE` clause and `@kavo/mongoose`
+from `likeToRegExpSource`. `@kavo/mikroorm` is the adapter with the weaker
+escape story here (doc 17 §7).
+
+## 7. Attachment points for later work
 
 - **Transactions:** same unbuilt seam as `@kavo/typeorm` (doc 09 §6) —
   `TransactionManager` has no consumer in this build.
@@ -104,7 +164,7 @@ per-database code lists. The original error always travels as `cause`:
   of (Prisma manages the join table itself). See the package README for
   the escape hatch (a custom operation handler against the raw client).
 
-## 7. Performance posture
+## 8. Performance posture
 
 Filters translate to Prisma's own indexed-field filter operators — no
 raw SQL, no function-wrapping. No N+1: Prisma's `include` already
