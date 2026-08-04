@@ -1084,6 +1084,49 @@ describe("@Kavo Swagger request-body schemas", () => {
     // Envelope items use the leaner `list` DTO projection.
     expect(Object.keys(schema?.properties?.items?.items?.properties ?? {})).toEqual(["id", "title"]);
   });
+
+  type Operation = {
+    parameters?: readonly { name: string; in: string }[];
+    responses?: Record<string, { headers?: Record<string, unknown> }>;
+  };
+  const operation = (path: string, verb: string): Operation | undefined =>
+    (document.paths[path] as Record<string, Operation> | undefined)?.[verb];
+  const headerNames = (path: string, verb: string): readonly string[] =>
+    (operation(path, verb)?.parameters ?? []).filter((p) => p.in === "header").map((p) => p.name);
+
+  it("documents the conditional-request surface the routes actually serve", () => {
+    // The sibling 409 on restore/purge was documented from the start;
+    // 412/304 and the two request headers were the gap.
+    expect(headerNames("/todos/{id}", "get")).toContain("If-None-Match");
+    expect(operation("/todos/{id}", "get")?.responses?.["304"]).toBeDefined();
+
+    for (const verb of ["put", "patch", "delete"] as const) {
+      expect(headerNames("/todos/{id}", verb)).toContain("If-Match");
+      expect(operation("/todos/{id}", verb)?.responses?.["412"]).toBeDefined();
+    }
+  });
+
+  it("documents the ETag response header on tagged responses only", () => {
+    expect(operation("/todos/{id}", "get")?.responses?.["200"]?.headers).toHaveProperty("ETag");
+    expect(operation("/todos", "post")?.responses?.["201"]?.headers).toHaveProperty("ETag");
+    // A collection carries no tag, and a 204 carries no body to tag.
+    expect(operation("/todos", "get")?.responses?.["200"]?.headers).toBeUndefined();
+    expect(operation("/todos/{id}", "delete")?.responses?.["204"]?.headers).toBeUndefined();
+  });
+
+  it("documents nothing conditional when caching.etag is off for the entity", async () => {
+    @Kavo(Todo, { caching: { etag: false } })
+    @Controller("todos")
+    class UncachedController {}
+    await app.close();
+    await bootstrap(UncachedController);
+    const uncached = SwaggerModule.createDocument(app, new DocumentBuilder().setTitle("t").setVersion("0").build());
+    const patch = (uncached.paths["/todos/{id}"] as Record<string, Operation>)["patch"];
+
+    expect((patch?.parameters ?? []).filter((p) => p.in === "header")).toHaveLength(0);
+    expect(patch?.responses?.["412"]).toBeUndefined();
+    expect(patch?.responses?.["200"]?.headers).toBeUndefined();
+  });
 });
 
 describe("@Kavo Swagger DTO slot fallbacks", () => {
