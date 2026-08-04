@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import type { FilterCondition, FilterGroup } from "@kavo/core";
 import { DefaultFilterParser, resolveEntityConfig } from "@kavo/core";
 import { userMetadata } from "./support/user-fixture.js";
@@ -283,6 +283,61 @@ describe("DefaultFilterParser — malformed bracket keys", () => {
     const issues = issuesOf(() => parse({ [key]: value }));
     expect(issues[0]).toMatchObject({ field: "age", code: "KAVO_QUERY_INVALID_OPERATOR" });
     expect(issues[0]?.detail).toContain("filter[age][operator]=value");
+  });
+
+  /**
+   * Regression: `filter[__proto__][x]=v` used to walk into `Object.prototype`
+   * and assign there, because on an ordinary `{}` the key `__proto__` reads
+   * back as the prototype rather than `undefined`. One anonymous GET then
+   * handed every later request in the process a soft-delete flag, a filter,
+   * a pagination limit, or an extra writable body field — the parser's tree
+   * is built before any allowlist check, so the segment never had to be
+   * filterable to get there.
+   */
+  describe("reserved prototype keys", () => {
+    const reserved = ["__proto__", "constructor", "prototype"];
+
+    afterEach(() => {
+      // A leak here would silently arm every later test in the run, so the
+      // guard is unconditional rather than part of one assertion.
+      for (const key of ["withDeleted", "limit", "polluted"]) {
+        delete (Object.prototype as Record<string, unknown>)[key];
+      }
+    });
+
+    it.each(reserved)("does not write through a '%s' segment", (segment) => {
+      issuesOf(() => parse({ [`filter[${segment}][withDeleted]`]: "true" }));
+      expect(Object.prototype.hasOwnProperty.call(Object.prototype, "withDeleted")).toBe(false);
+      expect(({} as Record<string, unknown>)["withDeleted"]).toBeUndefined();
+    });
+
+    it.each(reserved)("rejects a '%s' segment as a non-allowlisted field", (segment) => {
+      // Fail closed and loudly: it is an unknown field like any other, not a
+      // silently dropped key.
+      const issues = issuesOf(() => parse({ [`filter[${segment}][eq]`]: "x" }));
+      expect(issues[0]).toMatchObject({ field: segment, code: "KAVO_QUERY_INVALID_FIELD" });
+    });
+
+    it("does not write through the JSON escape hatch either", () => {
+      // Written as a literal, not via `JSON.stringify({ __proto__: … })` —
+      // in an object literal that key *sets* the prototype, so stringify
+      // would emit `{}` and the test would pass vacuously. `JSON.parse` is
+      // the safe direction (it defines an own property), and the own key
+      // then meets the allowlist like any other unknown field.
+      const issues = issuesOf(() => parse({ filter: String.raw`{"__proto__":{"polluted":{"eq":"x"}}}` }));
+      expect(issues[0]).toMatchObject({ field: "__proto__", code: "KAVO_QUERY_INVALID_FIELD" });
+      expect(({} as Record<string, unknown>)["polluted"]).toBeUndefined();
+    });
+
+    it("keeps a legitimately nested path working", () => {
+      // The guard must not cost the ordinary nested case anything.
+      const root = parse({
+        "filter[or][0][name][eq]": "admin",
+        "filter[or][1][age][gte]": "18",
+      }).root as FilterGroup;
+      expect(root.operator).toBe("OR");
+      expect(root.children).toHaveLength(2);
+    });
   });
 
   it("reports a malformed logical group under its bracketed wire key", () => {

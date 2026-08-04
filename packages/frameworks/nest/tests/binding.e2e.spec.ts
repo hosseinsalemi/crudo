@@ -169,6 +169,80 @@ describe("@Kavo route generation", () => {
   });
 });
 
+/**
+ * Regression, over real HTTP because that is where the damage was: a single
+ * anonymous GET whose query string carried a `__proto__` bracket segment used
+ * to write into `Object.prototype`, and the write then leaked into every
+ * later request in the process through the plain-object reads in the
+ * normalizer and the deserializer. Unit coverage lives in
+ * `packages/core/tests/filter-parser.spec.ts`; what this file adds is the
+ * amplification path — victim requests that never touch the attacking one.
+ */
+describe("@Kavo prototype pollution over the wire", () => {
+  @Kavo(Todo, { softDelete: { strategy: "soft" } })
+  @Controller("todos")
+  class PollutionController {}
+
+  const POLLUTED = ["withDeleted", "onlyDeleted", "limit", "done", "priority", "include"];
+
+  beforeEach(async () => {
+    await bootstrap(PollutionController);
+  });
+
+  afterEach(() => {
+    for (const key of POLLUTED) delete (Object.prototype as Record<string, unknown>)[key];
+  });
+
+  async function attack(segment: string, value: string): Promise<void> {
+    // The attacking request itself is allowed to 400 — what matters is that
+    // it leaves nothing behind.
+    await request(server()).get(`/todos?filter[__proto__][${segment}]=${value}`);
+    expect(Object.prototype.hasOwnProperty.call(Object.prototype, segment)).toBe(false);
+  }
+
+  it("cannot hand a later reader the soft-deleted rows", async () => {
+    await request(server()).post("/todos").send({ title: "live" }).expect(201);
+    await request(server()).post("/todos").send({ title: "deleted" }).expect(201);
+    await request(server()).delete("/todos/2").expect(204);
+
+    await attack("withDeleted", "true");
+
+    const victim = await request(server()).get("/todos").expect(200);
+    expect(victim.body.total).toBe(1);
+    expect(victim.body.items).toEqual([expect.objectContaining({ title: "live" })]);
+  });
+
+  it("cannot smuggle a field into a later writer's body", async () => {
+    // The nastiest amplification: `done` is on the create DTO, so a polluted
+    // prototype used to satisfy the deserializer's `key in source` check and
+    // append itself to bodies that never mentioned it.
+    await attack("done", "true");
+
+    const created = await request(server()).post("/todos").send({ title: "innocent" }).expect(201);
+    expect(created.body).toMatchObject({ title: "innocent", done: false });
+  });
+
+  it("cannot cap or break a later reader's pagination", async () => {
+    for (let i = 1; i <= 3; i++) {
+      await request(server())
+        .post("/todos")
+        .send({ title: `t${i}` })
+        .expect(201);
+    }
+    await attack("limit", "1");
+
+    const victim = await request(server()).get("/todos").expect(200);
+    expect(victim.body.items).toHaveLength(3);
+  });
+
+  it("cannot poison a later reader into a permanent 400", async () => {
+    // `include` on an entity with nothing includable is a 400. Inherited off
+    // the prototype it would make every read fail for every client, forever.
+    await attack("include", "list");
+    await request(server()).get("/todos").expect(200);
+  });
+});
+
 describe("@Kavo page pagination over the wire", () => {
   @Kavo(Todo, { pagination: { strategy: "page", defaultLimit: 2, maxLimit: 3 } })
   @Controller("todos")

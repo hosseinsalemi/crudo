@@ -22,8 +22,14 @@ import { WireQuery } from "@kavo/core";
  * sorting, or field selection.
  */
 export function flattenQuery(query: Readonly<Record<string, unknown>>): Record<string, unknown> {
-  if (query instanceof WireQuery) return { ...query.params };
-  const flat: Record<string, unknown> = {};
+  // Null-prototype throughout: the normalizer reads single params straight
+  // off this object (`rawParams["withDeleted"]`, `rawParams["limit"]`), so
+  // on an ordinary object a polluted `Object.prototype` would be
+  // indistinguishable from a client-supplied param. It also makes
+  // `flat["__proto__"] = …` an ordinary assignment rather than a call into
+  // the prototype setter.
+  const flat = Object.create(null) as Record<string, unknown>;
+  if (query instanceof WireQuery) return Object.assign(flat, query.params);
   for (const [key, value] of Object.entries(query)) {
     flattenInto(flat, key, value);
   }

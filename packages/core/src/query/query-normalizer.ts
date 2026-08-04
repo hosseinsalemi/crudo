@@ -387,7 +387,12 @@ function parseFields<Entity>(
   // `fields[posts.comments]=id,body` — the key is the relation path. The
   // include resolver validates it against the *target* entity's allowlist,
   // so nothing beyond shape is checked here.
-  const relations: Record<string, readonly string[]> = {};
+  //
+  // Null-prototype, for the same reason the filter parser builds its tree
+  // that way: the key is attacker-controlled, and `relations["__proto__"] =
+  // [...]` on an ordinary object invokes the prototype setter — the fieldset
+  // silently vanishes instead of reaching the resolver and being rejected.
+  const relations: Record<string, readonly string[]> = Object.create(null);
   for (const key of Object.keys(rawParams)) {
     const segments = parseBracketKey(key, "fields");
     if (segments === null || segments.length !== 1 || segments[0] === "") continue;

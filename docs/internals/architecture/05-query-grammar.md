@@ -60,7 +60,9 @@ fields:     root: [id, name, email]
 - **Multi-value operators** (`in`, `notIn`): comma-separated by default;
   the repeated-key form `filter[status][in][]=a&filter[status][in][]=b`
   is also accepted.
-- **`between`:** exactly two comma-separated bounds.
+- **`between`:** exactly two comma-separated bounds, in the order given —
+  the pair is never sorted, so `between=65,18` is an empty range rather
+  than a silently corrected one.
 - **`isNull` / `isNotNull`:** boolean-valued. `false` flips to the
   complementary operator (`isNull=false` ≡ `isNotNull=true`), so both
   spellings mean what they read as.
@@ -104,10 +106,15 @@ LOWER(:v)`), identical on every driver. Both operators apply to string
   pass `FieldSelectionInput`, whose three spellings mirror these wire forms
   and collapse to the same normalized selection (doc 03).
 - **Soft delete:** `withDeleted=true` includes soft-deleted rows, which
-  are otherwise excluded from every read (doc 11). On an entity
-  that is not soft-deletable it is rejected with
+  are otherwise excluded from every read (doc 11); `onlyDeleted=true`
+  narrows a read to _only_ those rows — the trash view — and applies to
+  single-row reads as well as lists. On an entity
+  that is not soft-deletable either is rejected with
   `KAVO_QUERY_UNSUPPORTED_PARAM`, not ignored; a non-boolean value is a
-  field-level 400.
+  field-level 400. The two are contradictory ("everything" vs. "only the
+  deleted"), so sending both is `KAVO_QUERY_CONFLICTING_PARAMS`. Neither
+  flag changes include resolution: a trash-view read resolves `include=`
+  exactly as a live one does.
 - **Includes:** `include=posts.comments,profile` — comma-separated
   dot-paths, merged into one validated tree (doc 12). A
   relation that is not on the entity's inclusion allowlist is a 400, never
@@ -140,6 +147,15 @@ LOWER(:v)`), identical on every driver. Both operators apply to string
   in that map and passes through as a string. Include resolution and
   fieldset validation wire in the target entity's config (doc 12), but
   filter-value coercion does not.
+- **Reserved keys:** the bracket tree is built from attacker-controlled
+  segments **before** any allowlist check, so it is built on
+  prototype-less objects. `filter[__proto__][x]=v` therefore assigns an
+  ordinary own key and is rejected as a non-allowlisted field
+  (`KAVO_QUERY_INVALID_FIELD`) rather than writing through to
+  `Object.prototype`. The same applies to `fields[__proto__]`, and the
+  deserializer reads request bodies with an own-property check, so a
+  prototype polluted by anything else in the host application still cannot
+  add a writable field to a request that omitted it.
 - **One exception, all issues:** every violation across filter, sort,
   fields, and pagination is collected into a single
   `QueryValidationException`, so a client fixes its request in one round
@@ -153,7 +169,8 @@ raw query string (flat bracket keys)
   → sort / fields parsing (allowlists)
   → PaginationStrategy    (defaultLimit / maxLimit / 400s)
   → NormalizedQueryContext  { filter, sort, pagination, fields,
-                              include: {}, withDeleted: false, count }
+                              include: {}, withDeleted: false,
+                              onlyDeleted: false, count }
 ```
 
 `QueryNormalizer.normalizeWire` runs the whole pipeline for HTTP input
