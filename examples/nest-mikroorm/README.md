@@ -26,6 +26,15 @@ docker run --rm -e POSTGRES_PASSWORD=kavo -p 5432:5432 postgres:18-alpine
 pnpm build && PGDATABASE=postgres PGPASSWORD=kavo pnpm --filter @kavo/example-nest-mikroorm start
 ```
 
+Unlike `nest-typeorm`, this app has no CockroachDB flavour: MikroORM has no
+dedicated CockroachDB driver, and pointing `@mikro-orm/postgresql` (which
+runs on `knex`) at Cockroach's Postgres-wire-compatible port doesn't work —
+`knex`'s Postgres dialect runs `SELECT version()` on every new connection
+and regex-parses the result to detect the server version; CockroachDB's
+version string doesn't match that pattern, so the parse returns `null` and
+the connection pool throws on every acquire. That's a `knex`/CockroachDB
+incompatibility, not something this app's wiring can work around.
+
 ## What differs from `nest-typeorm`
 
 **Soft delete is declared, not inferred.** `Owner` is soft-deletable in both
