@@ -203,6 +203,10 @@ const config = defineConfig({
                 text: "0021 — Cursor pagination is an opaque keyset union",
                 link: "/internals/adr/0021-cursor-pagination-is-an-opaque-keyset-union",
               },
+              {
+                text: "0022 — Since pagination composes a value|id keyset",
+                link: "/internals/adr/0022-since-pagination-composes-a-value-id-keyset",
+              },
             ],
           },
         ],

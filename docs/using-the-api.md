@@ -117,7 +117,40 @@ Two things cursor pagination does **not** support:
 - **Nullable sort keys.** A cursor cannot resume from a `null`, and which way it fails depends on where your database sorts NULLs. When they sort _first_, a page boundary landing on a null-keyed row returns a 400 naming the column. When they sort _last_ — PostgreSQL's default for `ASC`, sqlite's for `DESC` — the null-keyed rows are **silently omitted from every page**: no error, `meta.nextCursor` goes to `null` as if you had reached the end, and `total` still counts the rows you never saw. Sort only on columns that are never null.
 - **`bigint` and decimal columns**, including as the primary key. Their runtime representation disagrees with the column type Kavo derives from your ORM (a JS `bigint`, a `Decimal` object, or a string depending on the ORM), which a page token cannot round-trip. Kavo raises a configuration error naming the column rather than paging incorrectly.
 
-Finally, the **GraphQL and MCP bindings cannot page a cursor-configured entity.** Both expose `limit`/`offset` only, and a keyset page ignores `offset`, so binding one would answer every paged query with the first page. They refuse at bootstrap with a configuration error instead. Page those entities over REST, or give them an entity-scope `pagination.strategy` of `"offset"`/`"page"`.
+Finally, the **GraphQL and MCP bindings cannot page a cursor- or since-configured entity.** Both expose `limit`/`offset` only, and a keyset page ignores `offset`, so binding one would answer every paged query with the first page (or, under `since`, everything from the beginning). They refuse at bootstrap with a configuration error instead. Page those entities over REST, or give them an entity-scope `pagination.strategy` of `"offset"`/`"page"`.
+
+### Since (seek-by-timestamp) pagination
+
+```
+GET /books?limit=20
+GET /books?limit=20&since=2024-03-01T10:00:00.000Z%7C41
+```
+
+For entities configured with `pagination.strategy: "since"`, a page is defined by "everything after this boundary" against one configured column (`pagination.since.field`, default `"updatedAt"`) — a polling/sync shape, not a bounded traversal.
+
+The next poll's value comes back as **`meta.nextSince`**:
+
+```json
+{
+  "items": [{ "id": 41, "title": "Dune", "updatedAt": "2024-03-01T10:00:00.000Z" }],
+  "limit": 20,
+  "offset": 0,
+  "total": 137,
+  "meta": { "nextSince": "2024-03-01T10:00:00.000Z|41" }
+}
+```
+
+Pass it straight back as `?since=…` on the next poll.
+
+Things to know:
+
+- **A since value is plain, not opaque, but compound.** It is the boundary column's own value plus the row's id, joined by `|` — `2024-03-01T10:00:00.000Z|41`. The id is what makes paging exactly-once even when several rows share the same boundary value; unlike a cursor's token you can still read it, or construct one by hand from a row you already have.
+- **The sort is forced, not chosen.** Every request is ordered by `[since.field, idField]` ascending regardless of any `sort` you send — sending one is a 400, not a silent override. `since.field` must be a `date`- or `string`-kind column (a plain `number`, including an auto-increment id, does not qualify), and — like a cursor sort key — it and `idField` must both be on the `filterable` and `selectable` allowlists as well as `sortable`. Unlike cursor pagination's rules, these are all checked at startup: since the sort is entirely config-known, a misconfigured `since.field` fails immediately rather than on the first request.
+- **Paging is exactly-once**, the same guarantee cursor pagination gives — no row is skipped or repeated, even when many rows share one `since.field` value.
+- **`nextSince` advances even on a partial page.** If a poll asks for 100 rows and only 12 exist, `nextSince` still moves past those 12 — unlike `nextCursor`, it does not wait for a full page, because there is no "last page" in a poll to wait for. A genuinely caught-up poll gets back `items: []` and its own `since` echoed back rather than `null` — there is no "last page" to signal the end of.
+- **`offset` is always `0`,** the same reason a cursor page reports it. `total` is unaffected.
+- **You need a matching composite index**, covering `(since.field, id)` in that order — the same requirement cursor pagination has, for the same reason.
+- **Turn `pagination.count` off** for the same cost reason cursor pagination recommends it.
 
 ## Field selection
 
@@ -185,7 +218,7 @@ A list response (`GET /books`) always has the same shape:
 
 `total` is `null` (and its `COUNT` query skipped) if `pagination.count` is turned off. The key is always present — a list always answers "how many matched", so configuration changes the value, never the shape.
 
-One optional fifth key can join them. `meta` is an open bag for anything the API wants to say about the list that isn't a row: a facet count, a "results are approximate" flag, the next cursor. It appears when the entity's `findMany` handler puts something there — see [custom list metadata](/integrations/nest/configuration#custom-list-metadata) for how — or under [cursor pagination](#cursor-keyset-pagination), which contributes `nextCursor` and is the one key Kavo writes itself. A response with nothing to report has no `meta` key at all rather than an empty `{}`, so read it as `body.meta?.facets`. Nothing in the bag is projected, filtered, or renamed on the way out: what the handler returns is what the client receives.
+One optional fifth key can join them. `meta` is an open bag for anything the API wants to say about the list that isn't a row: a facet count, a "results are approximate" flag, the next cursor or since value. It appears when the entity's `findMany` handler puts something there — see [custom list metadata](/integrations/nest/configuration#custom-list-metadata) for how — or under [cursor pagination](#cursor-keyset-pagination) or [since pagination](#since-seek-by-timestamp-pagination), which contribute `nextCursor`/`nextSince` and are the keys Kavo writes itself. A response with nothing to report has no `meta` key at all rather than an empty `{}`, so read it as `body.meta?.facets`. Nothing in the bag is projected, filtered, or renamed on the way out: what the handler returns is what the client receives.
 
 ## ETags and conditional requests
 
