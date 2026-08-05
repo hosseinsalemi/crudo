@@ -13,7 +13,7 @@ import {
   ConfigurationException,
   NotDeletedException,
   NotFoundException,
-  isCursorPagination,
+  hasKeyset,
   readFilter,
 } from "@kavo/core";
 import { mapDriverError } from "./error-mapping.js";
@@ -118,7 +118,7 @@ export class MongooseRepositoryAdapter<Entity extends object> implements Reposit
       const { pagination } = query;
       const rows = await this.model.find(this.buildWhere(query, context, readFilter(query)), null, {
         ...this.readOptions(this.buildPopulate(query.include), this.buildSort(query)),
-        skip: isCursorPagination(pagination) ? 0 : pagination.offset,
+        skip: hasKeyset(pagination) ? 0 : pagination.offset,
         limit: pagination.limit,
       });
       return rows.map((row) => toPlainResult(row) as Entity);

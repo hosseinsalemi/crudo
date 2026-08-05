@@ -13,7 +13,7 @@ import {
   ConfigurationException,
   NotDeletedException,
   NotFoundException,
-  isCursorPagination,
+  hasKeyset,
   readFilter,
 } from "@kavo/core";
 import { mapDriverError } from "./error-mapping.js";
@@ -103,7 +103,7 @@ export class PrismaRepositoryAdapter<Entity extends object> implements Repositor
       const { pagination } = query;
       const rows = await this.delegate.findMany({
         ...this.buildFindArgs(query, context, readFilter(query)),
-        skip: isCursorPagination(pagination) ? 0 : pagination.offset,
+        skip: hasKeyset(pagination) ? 0 : pagination.offset,
         take: pagination.limit,
       });
       return rows as Entity[];

@@ -14,7 +14,7 @@ import {
   ConfigurationException,
   NotDeletedException,
   NotFoundException,
-  isCursorPagination,
+  hasKeyset,
   readFilter,
 } from "@kavo/core";
 import { wrap, type EntityManager, type MikroORM } from "@mikro-orm/core";
@@ -158,7 +158,7 @@ export class MikroOrmRepositoryAdapter<Entity extends object> implements Reposit
         this.buildWhere(query, context, readFilter(query)) as never,
         {
           ...this.buildFindOptions(query),
-          offset: isCursorPagination(pagination) ? 0 : pagination.offset,
+          offset: hasKeyset(pagination) ? 0 : pagination.offset,
           limit: pagination.limit,
         } as never,
       );
