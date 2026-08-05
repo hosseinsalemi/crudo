@@ -198,7 +198,9 @@ See [NestJS integration](/internals/architecture/10-nestjs-integration) for how 
 
 ### Custom list metadata
 
-The list envelope's `meta` bag (`ListResultDto.meta`) is `{}` until a `findMany` handler fills it. It is the place for anything about the list that isn't a row — facet counts, a freshness stamp, a cursor — and it does not need a DTO or a config key: whatever the handler returns as `meta` is what the client receives.
+The list envelope's `meta` bag (`ListResultDto.meta`) is the place for anything about the list that isn't a row — facet counts, a freshness stamp, a cursor — and it does not need a DTO or a config key: whatever the `findMany` handler returns as `meta` is what the client receives.
+
+It is the envelope's one optional field. Until a handler fills it the key is **absent** from the response, not `{}`, so the common zero-config list doesn't carry an empty bag on every request; a contributor that returns `{}` leaves it absent too. Type it and read it accordingly — `body.meta?.inStock`.
 
 > `ListResultDto.meta` on the **response** and `operations.<id>.meta` above are unrelated. The first is an open bag on the list envelope; the second is `OperationMetadata` — route options the framework layer reads, which never reach a response body.
 
@@ -242,6 +244,7 @@ The adapter has to exist when the class is **declared**, because `@Kavo`'s confi
 | Merge precedence     | The contributor's keys win. The inner handler's `meta` is the base and the contributor merges over it, so the outermost wrap owns any key it names; keys it doesn't name pass through. |
 | Overriding that      | The inner bag is in hand — return `{ ...mine, ...result.meta }` to let the inner handler win instead.                                                                                  |
 | Serialization        | None. `meta` is your data, not entity data: no DTO projection, no `fields=` selection, no renaming. It must be JSON-serializable.                                                      |
+| Nothing contributed  | The key is left off the response entirely. Judged on the merged bag, so `{}` from a contributor is the same as no contributor at all.                                                  |
 | Wrong-shaped handler | Wrapping a handler that doesn't return `{ entities, total }` raises `ConfigurationException` (`KAVO_CONFIG_INVALID`) naming the operation, rather than serving a malformed envelope.   |
 
 The wrapper is a convenience, not a requirement — the engine reads `meta` off whatever the `findMany` handler returns, so a hand-written one works the same way:

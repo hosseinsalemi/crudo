@@ -235,6 +235,21 @@ problem-details response schemas for 400/404. Allowlist-derived
 per-field query documentation needs ORM metadata, which doesn't exist at
 decoration time — revisited in a future DX pass.
 
+`findMany` wraps its `list` element in `listEnvelopeSchema`, whose
+`required` names `items`/`limit`/`offset`/`total` — deliberately not
+`meta`, which the engine omits unless a handler contributed (doc 07 §3.1),
+so a generated client must treat it as optional. `meta` is also the one
+envelope field with nothing to enumerate: `items` is projected through the
+`list` DTO, so `schemaFromDto` reads real fields off it, whereas
+`ListMetaDto` is an open `[key: string]: unknown` bag filled at request
+time by handler code Kavo never sees. It is therefore published as
+`additionalProperties: true` with a prose description rather than a bare
+`{ type: "object" }`, which most generators read as an object permitting
+**no** keys — the opposite of an open bag. Publishing a real per-entity
+`meta` shape would need a new declaration seam and a decision about
+whether it is merely documentation or an enforced projection; the GraphQL
+binding has the same open question (doc 13 §"Out of scope").
+
 ## 5. Testing
 
 `tests/binding.e2e.spec.ts` runs a real Nest app over an in-memory fake
