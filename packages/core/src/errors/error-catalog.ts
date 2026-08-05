@@ -160,6 +160,22 @@ export const ERROR_CATALOG = {
     title: "Invalid configuration",
     message: "Invalid configuration for entity '{entity}' at '{path}': {problem}",
   },
+  KAVO_HTTP_ERROR: {
+    // Nominal only: this code is never thrown by a `KavoException` leaf, so
+    // nothing in the hierarchy binds a fixed status to it. The `@kavo/nest`
+    // filter uses it to wrap a framework-level `HttpException` (a global
+    // `ValidationPipe`, an unmatched route) that reaches the boundary
+    // un-normalized; the response carries that exception's *own* status,
+    // not this one — see doc 06 §6.
+    status: 500,
+    title: "HTTP error",
+    message: "The request failed before reaching the Kavo engine: {detail}",
+  },
+  KAVO_UNEXPECTED_ERROR: {
+    status: 500,
+    title: "Unexpected error",
+    message: "An unexpected error occurred while processing the request.",
+  },
 } as const satisfies Record<KavoErrorCode, ErrorCatalogEntry>;
 
 /** A code present in the shipped catalog. */
