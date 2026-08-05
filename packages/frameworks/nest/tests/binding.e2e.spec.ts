@@ -1035,6 +1035,9 @@ describe("@Kavo Swagger request-body schemas", () => {
     type?: string;
     properties?: Record<string, Schema>;
     items?: Schema;
+    required?: string[];
+    additionalProperties?: boolean;
+    description?: string;
   };
 
   const responseSchema = (op: string, status: string): Schema | undefined =>
@@ -1084,6 +1087,26 @@ describe("@Kavo Swagger request-body schemas", () => {
     expect(Object.keys(schema?.properties ?? {})).toEqual(["items", "limit", "offset", "total", "meta"]);
     // Envelope items use the leaner `list` DTO projection.
     expect(Object.keys(schema?.properties?.items?.items?.properties ?? {})).toEqual(["id", "title"]);
+  });
+
+  it("marks meta as the one envelope field a client cannot assume is present", () => {
+    // `meta` is omitted from the body unless a `findMany` handler
+    // contributes, so the published schema has to say so — otherwise
+    // generated clients type it as always-there and read `.meta.x`.
+    const schema = responseSchema("get", "200");
+    expect(schema?.required).toEqual(["items", "limit", "offset", "total"]);
+    expect(schema?.required).not.toContain("meta");
+  });
+
+  it("documents meta as an open bag rather than an object with no permitted keys", () => {
+    // `ListMetaDto` has no static shape to enumerate at decoration time, so
+    // this is the one envelope field `schemaFromDto` cannot describe. A bare
+    // `{ type: "object" }` with no `properties` reads to most OpenAPI
+    // generators as "no keys allowed", which is the opposite of the truth.
+    const meta = responseSchema("get", "200")?.properties?.meta;
+    expect(meta?.type).toBe("object");
+    expect(meta?.additionalProperties).toBe(true);
+    expect(meta?.description).toContain("findMany");
   });
 });
 
