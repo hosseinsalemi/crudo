@@ -29,13 +29,17 @@ export type BoundKavoService<Entity extends object, Id extends EntityId, CreateD
 >;
 
 /**
- * Refuse to bind an entity this protocol cannot page (ADR-0021 §7).
+ * Refuse to bind an entity this protocol cannot page (ADR-0021 §7, extended
+ * to `since` by ADR-0022).
  *
  * `<name>.findMany` accepts `limit`/`offset` only, and `QueryNormalizer`
- * ignores `offset` under the cursor strategy — so a model calling
- * `todo.findMany({ limit: 20, offset: 40 })` gets rows 1–20 back with no
- * error and no way to tell, and the `nextCursor` it would need is not in the
- * tool's result shape. Failing at bootstrap beats answering wrongly.
+ * ignores `offset` under both keyset strategies — so a model calling
+ * `todo.findMany({ limit: 20, offset: 40 })` against a cursor- or
+ * since-configured entity gets rows 1–20 (or everything from the beginning)
+ * back with no error and no way to tell, and the `nextCursor`/`nextSince` it
+ * would need is not in the tool's result shape. Name-gated on
+ * `"cursor"`/`"since"` rather than structural, the same limitation
+ * ADR-0021 §7 already records. Failing at bootstrap beats answering wrongly.
  * `@kavo/graphql` carries the identical guard; the two packages may not
  * import each other, so it is duplicated rather than shared.
  */
@@ -52,13 +56,14 @@ function paginationStrategyOf(service: object): string | undefined {
 }
 
 function requireOffsetPageable(entityName: string, strategy: string | undefined): void {
-  if (strategy !== "cursor") return;
+  if (strategy !== "cursor" && strategy !== "since") return;
   throw new ConfigurationException(
     entityName,
     "pagination.strategy",
-    `'cursor' is not supported by the MCP binding: '<entity>.findMany' exposes 'limit'/'offset' only, ` +
-      `and a keyset page ignores 'offset' — a paged call would silently return the first page every time. ` +
-      `Either page this entity over REST, or give it an entity-scope 'pagination.strategy' of 'offset'/'page'`,
+    `'${strategy}' is not supported by the MCP binding: '<entity>.findMany' exposes 'limit'/'offset' only, ` +
+      `and a keyset page ignores 'offset' — a paged call would silently return the first page (or everything ` +
+      `from the beginning) every time. Either page this entity over REST, or give it an entity-scope ` +
+      `'pagination.strategy' of 'offset'/'page'`,
   );
 }
 
