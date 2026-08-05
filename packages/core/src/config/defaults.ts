@@ -11,6 +11,10 @@ export const BUILT_IN_DEFAULTS: KavoSettings = Object.freeze({
     maxLimit: 100,
     strategy: "offset",
     count: true,
+    // The documented convention (ADR-0022): only consulted under
+    // `strategy: "since"`, where a missing 'updatedAt' column is a
+    // bootstrap `ConfigurationException`, not a silent fallback.
+    since: Object.freeze({ field: "updatedAt" }),
   }),
   query: Object.freeze({
     maxFilterDepth: 3,

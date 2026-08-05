@@ -1,4 +1,10 @@
-import type { CursorPagination, OffsetPagination, PaginationLimits, PaginationStrategy } from "./pagination.js";
+import type {
+  CursorPagination,
+  OffsetPagination,
+  PaginationLimits,
+  PaginationStrategy,
+  SincePagination,
+} from "./pagination.js";
 import { QueryValidationException } from "../errors/exceptions.js";
 
 /**
@@ -63,7 +69,32 @@ export class CursorPaginationStrategy implements PaginationStrategy {
     const limit = readBoundedInt(rawParams["limit"], "limit", 1);
     return {
       limit: Math.min(limit ?? limits.defaultLimit, limits.maxLimit),
-      cursor: readCursorToken(rawParams["cursor"]),
+      cursor: readToken(rawParams["cursor"], "cursor"),
+      keyset: null,
+    };
+  }
+}
+
+/**
+ * Seek-by-timestamp pagination: flat `limit` plus a plain `since` value
+ * naming the previous poll's boundary (ADR-0022). `O(limit)` and,
+ * unlike `cursor`, meant for polling — "give me everything that changed
+ * since T" — rather than page-by-page traversal.
+ *
+ * Like {@link CursorPaginationStrategy}, this is the whole of what the
+ * strategy can decide on its own: the raw wire value is carried through
+ * undecoded (as a string) and `keyset` left `null`. `QueryNormalizer` forces
+ * the effective sort to `[sinceField, idField]`, decodes `since` against
+ * `sinceField`'s declared kind, and fills `keyset`.
+ */
+export class SincePaginationStrategy implements PaginationStrategy {
+  readonly name = "since";
+
+  normalize(rawParams: Readonly<Record<string, unknown>>, limits: PaginationLimits): SincePagination {
+    const limit = readBoundedInt(rawParams["limit"], "limit", 1);
+    return {
+      limit: Math.min(limit ?? limits.defaultLimit, limits.maxLimit),
+      since: readToken(rawParams["since"], "since"),
       keyset: null,
     };
   }
@@ -71,22 +102,31 @@ export class CursorPaginationStrategy implements PaginationStrategy {
 
 /** Built-in strategies, keyed by the `pagination.strategy` config value. */
 export function builtInPaginationStrategies(): ReadonlyMap<string, PaginationStrategy> {
-  const strategies = [new OffsetPaginationStrategy(), new PagePaginationStrategy(), new CursorPaginationStrategy()];
+  const strategies = [
+    new OffsetPaginationStrategy(),
+    new PagePaginationStrategy(),
+    new CursorPaginationStrategy(),
+    new SincePaginationStrategy(),
+  ];
   return new Map(strategies.map((strategy) => [strategy.name, strategy]));
 }
 
 /**
  * Absent/empty means "first page". Anything that is not a string is a
- * malformed request — a repeated `?cursor=a&cursor=b` arrives as an array,
- * and picking one of the two silently would page from an arbitrary place.
+ * malformed request — a repeated `?cursor=a&cursor=b` (or `?since=a&since=b`)
+ * arrives as an array, and picking one of the two silently would page from
+ * an arbitrary place.
  */
-function readCursorToken(raw: unknown): string | null {
+function readToken(raw: unknown, param: "cursor" | "since"): string | null {
   if (raw === undefined || raw === null || raw === "") return null;
   if (typeof raw !== "string") {
     throw QueryValidationException.single({
-      field: "cursor",
+      field: param,
       code: "KAVO_QUERY_INVALID_VALUE",
-      detail: "'cursor' must be a single opaque token, passed back from the previous page's 'meta.nextCursor'.",
+      detail:
+        param === "cursor"
+          ? "'cursor' must be a single opaque token, passed back from the previous page's 'meta.nextCursor'."
+          : "'since' must be a single value, passed back from the previous poll's 'meta.nextSince'.",
     });
   }
   return raw;

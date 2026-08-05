@@ -28,6 +28,14 @@ export interface QueryContext<Entity = unknown> {
    * that thinks it is paging by keyset is told it is not.
    */
   readonly cursor?: string | null;
+  /**
+   * The previous poll's boundary value, from a previous list response's
+   * `meta.nextSince` — a plain value (an ISO date, a UUIDv7 string, …), never
+   * opaque. Only meaningful under `pagination.strategy: "since"` (ADR-0022);
+   * supplying it under any other strategy is rejected rather than ignored,
+   * for the same reason `cursor` is.
+   */
+  readonly since?: string | null;
   /** Sparse fieldsets; a bare array is sugar for root-only selection. */
   readonly fields?: FieldSelectionInput<Entity>;
   /**
@@ -53,8 +61,9 @@ export interface NormalizedQueryContext<Entity = unknown> {
   readonly filter: Filter<Entity>;
   readonly sort: readonly Sort<Entity>[];
   /**
-   * A union (ADR-0021): narrow with `isCursorPagination` before reading
-   * `offset`, which a keyset page deliberately does not carry.
+   * A union (ADR-0021, extended by ADR-0022): narrow with `isCursorPagination`
+   * or `isSincePagination` before reading `offset`, which a keyset page
+   * deliberately does not carry.
    */
   readonly pagination: Pagination<Entity>;
   readonly fields: FieldSelection<Entity>;

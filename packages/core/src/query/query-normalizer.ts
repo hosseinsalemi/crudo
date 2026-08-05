@@ -1,7 +1,7 @@
 import type { FieldSelection, FieldSelectionInput } from "./field-selection.js";
 import type { Filter, FilterExpression } from "./filter.js";
 import type { NormalizedQueryContext, QueryContext } from "./query-context.js";
-import type { CursorPagination, Pagination, PaginationStrategy } from "./pagination.js";
+import type { CursorPagination, Pagination, PaginationStrategy, SincePagination } from "./pagination.js";
 import type { Sort } from "./sort.js";
 import type { FieldPath } from "../types/field-path.js";
 import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
@@ -14,8 +14,9 @@ import { ConfigurationException, QueryValidationException } from "../errors/exce
 import { pushAllowlistIssue } from "../errors/message-hints.js";
 import { DefaultFilterParser } from "./default-filter-parser.js";
 import { builtInPaginationStrategies } from "./pagination-strategies.js";
-import { isCursorPagination } from "./pagination.js";
+import { isCursorPagination, isSincePagination } from "./pagination.js";
 import { decodeCursor, keysetExpression } from "./cursor.js";
+import { coerceScalar, isIssue } from "./value-coercion.js";
 import { parseBracketKey } from "./bracket-notation.js";
 
 /**
@@ -72,7 +73,7 @@ export class QueryNormalizer<Entity = unknown> {
     }
 
     const clientSort = parseSort(rawParams["sort"], config, issues);
-    const sort = clientSort.length > 0 ? clientSort : defaultSortOf(config);
+    let sort = clientSort.length > 0 ? clientSort : defaultSortOf(config);
     const fields = parseFields(rawParams, config, issues);
     const include = this.resolveIncludes(parseIncludePaths(rawParams["include"], issues), fields, config, issues);
 
@@ -98,11 +99,20 @@ export class QueryNormalizer<Entity = unknown> {
     // (ADR-0021).
     if (isCursorPagination(pagination)) {
       pagination = this.resolveKeyset(pagination, sort, config, issues);
-    } else if (hasCursorParam(rawParams["cursor"])) {
-      // The wire and programmatic paths reject this identically. Dropping a
-      // `?cursor=` on the floor would hand back page 1 forever while the
-      // client believed it was paging.
-      issues.push(cursorUnsupportedIssue(config));
+    } else if (isSincePagination(pagination)) {
+      const resolved = this.resolveSince(pagination, clientSort, config, issues);
+      sort = resolved.sort;
+      pagination = resolved.pagination;
+    }
+    // The wire and programmatic paths reject a keyset param under the wrong
+    // strategy identically. Dropping it on the floor would hand back page 1
+    // forever while the client believed it was paging (ADR-0021, extended
+    // to `since` by ADR-0022).
+    if (!isCursorPagination(pagination) && hasValue(rawParams["cursor"])) {
+      issues.push(keysetParamUnsupportedIssue(config, "cursor"));
+    }
+    if (!isSincePagination(pagination) && hasValue(rawParams["since"])) {
+      issues.push(keysetParamUnsupportedIssue(config, "since"));
     }
 
     if (issues.length > 0) {
@@ -147,7 +157,7 @@ export class QueryNormalizer<Entity = unknown> {
     for (const entry of clientSort) {
       requireAllowlisted(entry.field as string, config, "sorting", issues);
     }
-    const sort = clientSort.length > 0 ? clientSort : defaultSortOf(config);
+    let sort = clientSort.length > 0 ? clientSort : defaultSortOf(config);
 
     const { root: rootFields, relations: relationFields } = collapseFieldSelection<Entity>(input.fields, issues);
     if (rootFields != null) {
@@ -174,19 +184,31 @@ export class QueryNormalizer<Entity = unknown> {
     // The programmatic path does not run the strategy — its input is already
     // typed, so there is nothing to parse — but it must reach the *same*
     // normalized form, or calling the service directly would silently fall
-    // back to offset paging on a cursor-configured entity.
-    const cursorPaged = this.pagesByKeyset(config);
-    // Absent *or empty* means "first page" — `hasCursorParam` is the same
-    // predicate the wire path applies, so a caller holding `nextCursor` in
-    // a string that starts out `""` does not get a 400 where the
-    // equivalent `?cursor=` gets page one.
-    const token = hasCursorParam(input.cursor) ? (input.cursor as string) : null;
-    if (token !== null && !cursorPaged) {
-      issues.push(cursorUnsupportedIssue(config));
+    // back to offset paging on a cursor- or since-configured entity.
+    const shape = this.paginationShape(config);
+    // Absent *or empty* means "first page" — `hasValue` is the same
+    // predicate the wire path applies, so a caller holding `nextCursor`/
+    // `nextSince` in a string that starts out `""` does not get a 400 where
+    // the equivalent `?cursor=`/`?since=` gets page one.
+    const cursorToken = hasValue(input.cursor) ? (input.cursor as string) : null;
+    const sinceToken = hasValue(input.since) ? (input.since as string) : null;
+    if (cursorToken !== null && shape !== "cursor") {
+      issues.push(keysetParamUnsupportedIssue(config, "cursor"));
     }
-    const pagination: Pagination<Entity> = cursorPaged
-      ? this.resolveKeyset({ limit, cursor: token, keyset: null }, sort, config, issues)
-      : { limit, offset };
+    if (sinceToken !== null && shape !== "since") {
+      issues.push(keysetParamUnsupportedIssue(config, "since"));
+    }
+
+    let pagination: Pagination<Entity>;
+    if (shape === "cursor") {
+      pagination = this.resolveKeyset({ limit, cursor: cursorToken, keyset: null }, sort, config, issues);
+    } else if (shape === "since") {
+      const resolved = this.resolveSince({ limit, since: sinceToken, keyset: null }, clientSort, config, issues);
+      sort = resolved.sort;
+      pagination = resolved.pagination;
+    } else {
+      pagination = { limit, offset };
+    }
 
     if (issues.length > 0) {
       throw new QueryValidationException(issues, {
@@ -291,6 +313,114 @@ export class QueryNormalizer<Entity = unknown> {
   }
 
   /**
+   * Force the effective sort to `[since.field, idField]` ascending and
+   * decode `since` — `"<value>|<id>"` — into the *same*
+   * {@link keysetExpression} row-wise comparison cursor pagination uses
+   * (ADR-0022).
+   *
+   * Unlike {@link resolveKeyset}, the sort here is never client-chosen: it
+   * is entirely config-known (`pagination.since.field` plus `idField`), so
+   * a client-supplied `sort` is **rejected**, not merely constrained — the
+   * same treatment a stray `cursor=`/`since=` under the wrong strategy
+   * gets, and for the same reason: silently overriding it would leave a
+   * client believing its `sort` took effect when it didn't. A configured
+   * `query.defaultSort`, by contrast, is silently overridden — being
+   * overridden by a more specific setting is what a default is for.
+   *
+   * The token carries an id precisely because a single-column
+   * `since.field >= value` bound cannot make forward progress once a tied
+   * group (rows sharing one `since.field` value) exceeds `limit`: every
+   * poll would refetch the same leading slice of the tie forever. Composing
+   * `keysetExpression` with `[since.field, idField]` values instead makes
+   * `since` pagination exactly-once within a poll session, the same
+   * guarantee cursor pagination has — `since`'s only remaining difference
+   * from cursor is that the token is plain text, not opaque, and that
+   * `nextSince` advances on every poll rather than only on a full page (see
+   * `KavoEngine.sinceListMeta`).
+   *
+   * Field existence, kind (`date`/`string`), and allowlist membership are
+   * already bootstrap-checked for the built-in `"since"` strategy
+   * (`resolveEntityConfig`, since the sort it forces is entirely
+   * config-known and not client-input-dependent the way cursor's is) — the
+   * checks here are reached only via a third-party strategy emitting a
+   * `SincePagination` under another registered name.
+   */
+  private resolveSince(
+    pagination: SincePagination<Entity>,
+    clientSort: readonly Sort<Entity>[],
+    config: ResolvedEntityConfig<Entity>,
+    issues: QueryIssueDto[],
+  ): { sort: readonly Sort<Entity>[]; pagination: SincePagination<Entity> } {
+    const { idField } = this.metadata;
+    const sinceFieldName = config.settings.pagination.since.field;
+    const forcedSort: readonly Sort<Entity>[] = [
+      { field: sinceFieldName as FieldPath<Entity>, direction: "asc" },
+      { field: idField as FieldPath<Entity>, direction: "asc" },
+    ];
+
+    if (clientSort.length > 0) {
+      issues.push({
+        field: "sort",
+        code: "KAVO_QUERY_CONFLICTING_PARAMS",
+        detail:
+          `Cannot page by 'since': the effective sort is forced to '${sinceFieldName},${idField}' ascending, ` +
+          `so requests may not supply their own 'sort'.`,
+      });
+    }
+
+    const sinceField = this.fields.get(sinceFieldName);
+    const idFieldMeta = this.fields.get(idField);
+    if (
+      sinceField === undefined ||
+      (sinceField.kind !== "date" && sinceField.kind !== "string") ||
+      idFieldMeta === undefined
+    ) {
+      issues.push({
+        field: "pagination.since.field",
+        code: "KAVO_QUERY_CONFLICTING_PARAMS",
+        detail: `'${sinceFieldName}' is not a 'date'- or 'string'-kind column of ${config.entityName}.`,
+      });
+      return { sort: forcedSort, pagination };
+    }
+    if (pagination.since === null) return { sort: forcedSort, pagination };
+
+    const separator = pagination.since.lastIndexOf("|");
+    if (separator < 0) {
+      issues.push(invalidSince(`it is not a valid 'since' token — expected '<value>|<id>'`));
+      return { sort: forcedSort, pagination };
+    }
+    const valueText = pagination.since.slice(0, separator);
+    const idText = pagination.since.slice(separator + 1);
+
+    const value = coerceScalar(valueText, "since", sinceField);
+    if (isIssue(value)) {
+      issues.push(value);
+      return { sort: forcedSort, pagination };
+    }
+    if (value === null) {
+      issues.push(
+        invalidSince(
+          `its value for '${sinceField.name}' is null, and since pagination cannot resume from a null sort key — ` +
+            `sort by a column that is never null`,
+        ),
+      );
+      return { sort: forcedSort, pagination };
+    }
+
+    const id = coerceScalar(idText, "since", idFieldMeta);
+    if (isIssue(id)) {
+      issues.push(id);
+      return { sort: forcedSort, pagination };
+    }
+    if (id === null) {
+      issues.push(invalidSince(`its id half is null, which cannot happen for a real row's primary key`));
+      return { sort: forcedSort, pagination };
+    }
+
+    return { sort: forcedSort, pagination: { ...pagination, keyset: keysetExpression(forcedSort, [value, id]) } };
+  }
+
+  /**
    * Hand the parsed paths and per-relation fieldsets to the resolver,
    * which owns every relation rule. Without a resolver there is
    * no relation graph to validate against, so an `include` is rejected
@@ -319,25 +449,29 @@ export class QueryNormalizer<Entity = unknown> {
   }
 
   /**
-   * Whether this entity's configured strategy pages by keyset — probed
+   * Which shape this entity's configured strategy produces — probed
    * *structurally*, by asking the strategy what it produces for empty
-   * params, rather than by comparing `pagination.strategy` to the string
-   * `"cursor"`. A third-party strategy registered as `"keyset"` that
-   * returns a `CursorPagination` is narrowed correctly by
+   * params, rather than by comparing `pagination.strategy` to the strings
+   * `"cursor"`/`"since"`. A third-party strategy registered as `"keyset"`
+   * that returns a `CursorPagination` is narrowed correctly by
    * `isCursorPagination` on the wire path; comparing the name here would
    * silently downgrade the programmatic path to offset paging and reject
-   * its `cursor` input as unsupported.
+   * its `cursor` input as unsupported (same reasoning for `since`,
+   * ADR-0022).
    *
-   * A strategy that cannot normalize an empty request at all is not a
-   * keyset strategy for this purpose — its own issues surface on the wire
-   * path, where the params it needs actually exist.
+   * A strategy that cannot normalize an empty request at all pages neither
+   * way for this purpose — its own issues surface on the wire path, where
+   * the params it needs actually exist.
    */
-  private pagesByKeyset(config: ResolvedEntityConfig<Entity>): boolean {
+  private paginationShape(config: ResolvedEntityConfig<Entity>): "offset" | "cursor" | "since" {
     const { defaultLimit, maxLimit } = config.settings.pagination;
     try {
-      return isCursorPagination(this.strategyFor(config).normalize({}, { defaultLimit, maxLimit }));
+      const probe = this.strategyFor(config).normalize({}, { defaultLimit, maxLimit });
+      if (isCursorPagination(probe)) return "cursor";
+      if (isSincePagination(probe)) return "since";
+      return "offset";
     } catch (error) {
-      if (error instanceof QueryValidationException) return false;
+      if (error instanceof QueryValidationException) return "offset";
       throw error;
     }
   }
@@ -356,19 +490,24 @@ export class QueryNormalizer<Entity = unknown> {
   }
 }
 
-/** Whether a raw `cursor` wire param was actually supplied (empty means "first page"). */
-function hasCursorParam(raw: unknown): boolean {
+/** Whether a raw `cursor`/`since` wire param was actually supplied (empty means "first page"). */
+function hasValue(raw: unknown): boolean {
   return raw !== undefined && raw !== null && raw !== "";
 }
 
-/** One wording for "this entity does not page by keyset", on both entry points. */
-function cursorUnsupportedIssue<Entity>(config: ResolvedEntityConfig<Entity>): QueryIssueDto {
+/** One wording for "this entity does not page by keyset", on both entry points (ADR-0021, ADR-0022). */
+function keysetParamUnsupportedIssue<Entity>(
+  config: ResolvedEntityConfig<Entity>,
+  param: "cursor" | "since",
+): QueryIssueDto {
   return {
-    field: "cursor",
+    field: param,
     code: "KAVO_QUERY_UNSUPPORTED_PARAM",
     detail:
-      `Query parameter 'cursor' is not supported: ${config.entityName} paginates with ` +
-      `strategy '${config.settings.pagination.strategy}'. Set 'pagination.strategy' to 'cursor' to page by keyset.`,
+      `Query parameter '${param}' is not supported: ${config.entityName} paginates with ` +
+      `strategy '${config.settings.pagination.strategy}'. Set 'pagination.strategy' to '${param}' to page by ${
+        param === "cursor" ? "keyset" : "seeking since a value"
+      }.`,
   };
 }
 
@@ -378,6 +517,15 @@ function cursorSortIssue(field: string, reason: string): QueryIssueDto {
     field: "sort",
     code: "KAVO_QUERY_CONFLICTING_PARAMS",
     detail: `Cursor pagination cannot order by '${field}': it ${reason}.`,
+  };
+}
+
+/** One wording for a rejected `since` token, mirroring `invalidCursor` in `cursor.ts`. */
+function invalidSince(reason: string): QueryIssueDto {
+  return {
+    field: "since",
+    code: "KAVO_QUERY_INVALID_VALUE",
+    detail: `The 'since' parameter was rejected: ${reason}. Pass back 'meta.nextSince' from the previous poll verbatim.`,
   };
 }
 

@@ -13,7 +13,7 @@ import type { Sort } from "../query/sort.js";
  */
 
 /** Built-in pagination strategy names; open for custom strategies. */
-export type PaginationStrategyName = "offset" | "page" | "cursor" | (string & {});
+export type PaginationStrategyName = "offset" | "page" | "cursor" | "since" | (string & {});
 
 export interface PaginationSettings {
   readonly defaultLimit: number;
@@ -21,6 +21,17 @@ export interface PaginationSettings {
   readonly strategy: PaginationStrategyName;
   /** Whether list responses compute `total` (the count query). */
   readonly count: boolean;
+  /**
+   * Only consulted under `strategy: "since"` (ADR-0022). The column
+   * `?since=` seeks against and the effective sort's leading key —
+   * `[since.field, idField]` ascending, forced regardless of client `sort`.
+   * Must be a `date`- or `string`-kind column on the entity, and on the
+   * `filterable`/`selectable` allowlists; a bootstrap error otherwise
+   * (`resolveEntityConfig`), the same treatment `softDelete.field` gets.
+   */
+  readonly since: {
+    readonly field: string;
+  };
 }
 
 export interface QuerySettings {

@@ -28,16 +28,20 @@ export type {
   Pagination,
   OffsetPagination,
   CursorPagination,
+  SincePagination,
   PaginationLimits,
   PaginationStrategy,
 } from "./query/pagination.js";
-export { isCursorPagination } from "./query/pagination.js";
+export { isCursorPagination, isSincePagination, hasKeyset } from "./query/pagination.js";
 // `decodeCursor` and `keysetExpression` are deliberately *not* exported:
 // they are `QueryNormalizer` internals whose contracts only hold when the
 // effective sort has already been validated, and the barrel is an explicit
-// public surface (ADR-0010). Adapters need `readFilter`/`isCursorPagination`;
-// a custom `findMany` handler needs `encodeCursor`/`cursorValuesOf`.
+// public surface (ADR-0010). Adapters need `readFilter`/`isCursorPagination`/
+// `isSincePagination`/`hasKeyset`; a custom `findMany` handler needs
+// `encodeCursor`/`cursorValuesOf` (cursor) or `sinceValueOf` (since,
+// ADR-0022).
 export { encodeCursor, cursorValuesOf, readFilter } from "./query/cursor.js";
+export { sinceValueOf } from "./query/since.js";
 export type { Sort, SortDirection } from "./query/sort.js";
 export type { FieldSelection, FieldSelectionInput } from "./query/field-selection.js";
 export type { NormalizedQueryContext, QueryContext } from "./query/query-context.js";
@@ -175,6 +179,7 @@ export {
   OffsetPaginationStrategy,
   PagePaginationStrategy,
   CursorPaginationStrategy,
+  SincePaginationStrategy,
   builtInPaginationStrategies,
 } from "./query/pagination-strategies.js";
 export { QueryNormalizer } from "./query/query-normalizer.js";

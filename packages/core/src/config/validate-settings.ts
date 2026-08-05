@@ -36,6 +36,13 @@ export function validateSettings(entityName: string, settings: KavoSettings): vo
       `defaultLimit (${settings.pagination.defaultLimit}) exceeds maxLimit (${settings.pagination.maxLimit})`,
     );
   }
+  if (typeof settings.pagination.since.field !== "string" || settings.pagination.since.field === "") {
+    throw new ConfigurationException(
+      entityName,
+      "pagination.since.field",
+      `expected a non-empty field name, got ${JSON.stringify(settings.pagination.since.field)}`,
+    );
+  }
 
   positiveInt("query.maxFilterDepth", settings.query.maxFilterDepth);
   positiveInt("query.maxInValues", settings.query.maxInValues);
