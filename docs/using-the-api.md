@@ -87,6 +87,33 @@ GET /books?fields=id,title
 
 Sparse fieldset for the root resource, validated against the `selectable` allowlist. Narrow an included relation the same way: `fields[author]=id,name`.
 
+## Computed fields
+
+A response can carry fields that have no database column behind them — a `fullName` built from two columns, a formatted total, a flag that depends on who is asking. They are declared once on the entity's config:
+
+```ts
+@Kavo(Book, {
+  computed: {
+    displayTitle: { resolve: (book) => (book.title === null ? null : `${book.title} (${book.year})`) },
+  },
+})
+```
+
+```
+GET /books/1     → { "id": 1, "title": "Dune", "year": 1965, "displayTitle": "Dune (1965)" }
+GET /books?fields=id,displayTitle
+```
+
+From a client's point of view a computed field is an ordinary field: it is in the default response, it can be selected with `fields=`, and it can be narrowed away by an `item`/`list` DTO. Three things it is not:
+
+- **not filterable or sortable** — `filter[displayTitle][eq]=…` and `sort=displayTitle` are a 400, because there is no column to translate to `WHERE`/`ORDER BY`. Filter and sort on the underlying columns instead (`sort=title`);
+- **not writable** — sending one in a `POST`/`PUT`/`PATCH` body is silently ignored, like any other non-writable key (a server-side `create`/`update`/`patch` DTO that _declares_ one is a startup error rather than a silent drop);
+- **not database-side** — it is evaluated after the row is fetched, so it costs no extra query but also cannot make one cheaper.
+
+The one thing worth knowing on the server side: `resolve` must handle every value its columns can hold. It runs per served row with nothing catching it, so a single row it cannot handle turns a whole list response into a 500 — write `book.title?.toUpperCase() ?? null`, not `book.title.toUpperCase()`, against a nullable column.
+
+A computed field declared on a related entity shows up when that relation is included (`?include=author`), resolved from the related entity's own config. See [Configuration](/integrations/nest/configuration#computed) for the descriptor's options and [ADR-0019](/internals/adr/0019-computed-fields-are-serializer-evaluated) for why the three limits are permanent rather than pending.
+
 ## Includes
 
 ```

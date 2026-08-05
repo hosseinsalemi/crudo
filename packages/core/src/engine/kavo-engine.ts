@@ -173,6 +173,9 @@ export class KavoEngine<Entity extends object> {
       // against the settings actually in force for this call.
       softDelete: resolveSoftDelete(this.deps.metadata, settings, `${config.entityName} (${request.operation})`),
       dto: config.dto,
+      // Structural entity config, outside the settings precedence chain
+      // entirely (ADR-0019) — a per-call settings override cannot reach it.
+      computed: config.computed,
       relations: config.relations,
     };
   }
