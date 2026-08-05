@@ -32,25 +32,29 @@ Codes are API surface — renaming one is a breaking change (semver
 policy). Source of truth: `ERROR_CATALOG` in
 `core/src/errors/error-catalog.ts`.
 
-| Code                            | HTTP | Fires when                                                                                       | Payload extensions                |
-| ------------------------------- | ---- | ------------------------------------------------------------------------------------------------ | --------------------------------- |
-| `KAVO_QUERY_INVALID`            | 400  | Any query grammar/allowlist/limit violation (aggregate)                                          | `errors[]` of the sub-codes below |
-| `KAVO_QUERY_INVALID_FIELD`      | 400  | Field not on the filter/sort/select allowlist                                                    | issue-level                       |
-| `KAVO_QUERY_INVALID_OPERATOR`   | 400  | Unknown or misspelled wire operator                                                              | issue-level                       |
-| `KAVO_QUERY_INVALID_VALUE`      | 400  | Coercion failure, malformed bounds, bad pagination value                                         | issue-level                       |
-| `KAVO_QUERY_LIMIT_EXCEEDED`     | 400  | maxFilterDepth / maxInValues exceeded                                                            | issue-level                       |
-| `KAVO_QUERY_UNSUPPORTED_PARAM`  | 400  | `withDeleted`/`onlyDeleted` on a hard-delete entity; `include` when no include resolver is wired | issue-level                       |
-| `KAVO_QUERY_CONFLICTING_PARAMS` | 400  | `withDeleted=true` and `onlyDeleted=true` set together                                           | issue-level                       |
-| `KAVO_NOT_FOUND`                | 404  | Target row missing on findOne/update/patch/delete                                                | —                                 |
-| `KAVO_CONFLICT`                 | 409  | Unique/FK violation mapped by the adapter                                                        | —                                 |
-| `KAVO_ALREADY_DELETED`          | 409  | Soft-deleting an already-deleted row                                                             | —                                 |
-| `KAVO_NOT_DELETED`              | 409  | Restoring or purging a row that is not deleted                                                   | —                                 |
-| `KAVO_OPERATION_DISABLED`       | 405  | Programmatic call to a disabled registry entry (no route exists over HTTP)                       | —                                 |
-| `KAVO_OPERATION_NOT_REGISTERED` | 405  | Programmatic call naming an operation the registry has no entry for at all                       | —                                 |
-| `KAVO_BULK_FAILED`              | 422  | Atomic bulk failure (reserved — bulk is not built)                                               | `items[]` per-index issues        |
-| `KAVO_PERSISTENCE_FAILED`       | 500  | Unrecognized adapter/driver error                                                                | `cause` kept internally           |
-| `KAVO_TRANSACTION_FAILED`       | 500  | Deadlock/serialization failure                                                                   | `retryable` flag                  |
-| `KAVO_CONFIG_INVALID`           | 500  | Bootstrap config error (fails startup, not a response)                                           | —                                 |
+| Code                            | HTTP | Fires when                                                                                                         | Payload extensions                |
+| ------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------- |
+| `KAVO_QUERY_INVALID`            | 400  | Any query grammar/allowlist/limit violation (aggregate)                                                            | `errors[]` of the sub-codes below |
+| `KAVO_QUERY_INVALID_FIELD`      | 400  | Field not on the filter/sort/select allowlist                                                                      | issue-level                       |
+| `KAVO_QUERY_INVALID_OPERATOR`   | 400  | Unknown or misspelled wire operator                                                                                | issue-level                       |
+| `KAVO_QUERY_INVALID_VALUE`      | 400  | Coercion failure, malformed bounds, bad pagination value                                                           | issue-level                       |
+| `KAVO_QUERY_LIMIT_EXCEEDED`     | 400  | maxFilterDepth / maxInValues exceeded                                                                              | issue-level                       |
+| `KAVO_QUERY_UNSUPPORTED_PARAM`  | 400  | `withDeleted`/`onlyDeleted` on a hard-delete entity; `include` when no include resolver is wired                   | issue-level                       |
+| `KAVO_QUERY_CONFLICTING_PARAMS` | 400  | `withDeleted=true` and `onlyDeleted=true` set together                                                             | issue-level                       |
+| `KAVO_NOT_FOUND`                | 404  | Target row missing on findOne/update/patch/delete                                                                  | —                                 |
+| `KAVO_CONFLICT`                 | 409  | Unique/FK violation mapped by the adapter                                                                          | —                                 |
+| `KAVO_ALREADY_DELETED`          | 409  | Soft-deleting an already-deleted row                                                                               | —                                 |
+| `KAVO_NOT_DELETED`              | 409  | Restoring or purging a row that is not deleted                                                                     | —                                 |
+| `KAVO_PRECONDITION_FAILED`      | 412  | `If-Match` names no tag matching the target's current ETag (ADR-0020)                                              | —                                 |
+| `KAVO_PRECONDITION_UNSUPPORTED` | 412  | `If-Match` the engine cannot evaluate — untargeted operation, `caching.etag` off, `findOne` disabled (ADR-0020 §4) | —                                 |
+| `KAVO_OPERATION_DISABLED`       | 405  | Programmatic call to a disabled registry entry (no route exists over HTTP)                                         | —                                 |
+| `KAVO_OPERATION_NOT_REGISTERED` | 405  | Programmatic call naming an operation the registry has no entry for at all                                         | —                                 |
+| `KAVO_BULK_FAILED`              | 422  | Atomic bulk failure (reserved — bulk is not built)                                                                 | `items[]` per-index issues        |
+| `KAVO_PERSISTENCE_FAILED`       | 500  | Unrecognized adapter/driver error                                                                                  | `cause` kept internally           |
+| `KAVO_TRANSACTION_FAILED`       | 500  | Deadlock/serialization failure                                                                                     | `retryable` flag                  |
+| `KAVO_CONFIG_INVALID`           | 500  | Bootstrap config error (fails startup, not a response)                                                             | —                                 |
+| `KAVO_HTTP_ERROR`               | *    | Framework-level `HttpException` reaching the filter without ever going through `KavoEngine.execute` (§6)           | —                                 |
+| `KAVO_UNEXPECTED_ERROR`         | 500  | Any other error reaching the filter without ever going through `KavoEngine.execute` (§6)                           | `cause` kept internally           |
 
 ## 3. Error context & message strategy
 
@@ -82,3 +86,35 @@ document: `type` (`https://kavo.dev/errors/<kebab-code>`), `title` and
 maps it 1:1 with `Content-Type: application/problem+json`; a different
 wire shape means swapping this serializer, never the hierarchy. Core
 never depends on NestJS exceptions — the filter is the boundary.
+
+## 6. Errors that never reach `KavoEngine.execute`
+
+`KavoExceptionFilter` is registered globally (`APP_FILTER`), so it is the
+one error boundary for the whole Nest app, not only `@Kavo`-generated
+routes — a global `ValidationPipe`, an unmatched route, or a bug in
+application code outside a Kavo handler must still answer with
+problem-details (ADR-0009), never Nest's default `{ statusCode, message,
+error }` shape. `@Catch()` (no token) is what makes that possible; the
+filter narrows to HTTP contexts itself (`host.getType() !== "http"`
+rethrows) since a global filter also runs for ws/rpc contexts a
+REST-only framework binding has nothing to map.
+
+`toKavoExceptionShape` (`@kavo/nest/src/unhandled-exception.ts`) adapts
+whatever isn't a `KavoException` into the same `KavoExceptionShape`
+contract `toProblemDetails` already serializes:
+
+- A Nest `HttpException` → `KAVO_HTTP_ERROR`, with the **response's**
+  `status` taken from the exception's own `getStatus()`, not the catalog's
+  (nominal 500) entry — the one place a shape's status legitimately
+  disagrees with its code's catalog row, because Nest already picked the
+  correct one. Its `detail` is the exception's own message (Nest's
+  built-ins, and a `ValidationPipe`'s `message: string[]`, are already
+  meant for a client to see, so this happens regardless of
+  `exposeInternals`).
+- Anything else → `KAVO_UNEXPECTED_ERROR`, fixed at 500, with the original
+  value as `cause` — leaked into `detail` only when `exposeInternals` is
+  on, same as `PersistenceException`.
+
+This mapping lives in `@kavo/nest`, not in the exception hierarchy: these
+are framework-level errors Kavo did not raise and does not own the shape
+of, so no new `KavoException` leaf exists for them.

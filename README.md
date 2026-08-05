@@ -1,5 +1,5 @@
 <p align="center">
-  <img src=".github/assets/kavo.png" alt="A @Kavo-decorated BooksController generates QUERY /books, POST /books, GET /books/:id, PUT /books/:id, DELETE /books/:id, and PATCH /books/:id/restore" width="440" />
+  <img src=".github/assets/intro.png" alt="A @Kavo-decorated BooksController generates QUERY /books, POST /books, GET /books/:id, PUT /books/:id, DELETE /books/:id, and PATCH /books/:id/restore" />
 </p>
 
 <h3 align="center">Turn models into APIs.</h3>

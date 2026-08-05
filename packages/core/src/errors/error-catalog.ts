@@ -81,6 +81,38 @@ export const ERROR_CATALOG = {
     title: "Not deleted",
     message: "{entity} with id '{id}' is not deleted.",
   },
+  KAVO_PRECONDITION_FAILED: {
+    status: 412,
+    title: "Precondition failed",
+    // The current tag is in the message on purpose: it is the value the
+    // client needs to retry, it is already public (it is the `ETag` of a
+    // representation the client is authorized to read), and without it the
+    // only way forward is a blind re-GET. "Authorized to read" is what the
+    // engine checks before throwing this: when `findOne` is not an enabled
+    // operation there is no representation the client may read, so it
+    // never reaches here — `KAVO_PRECONDITION_UNSUPPORTED` is raised
+    // instead, and discloses nothing.
+    message:
+      "The If-Match precondition failed: {entity} with id '{id}' has changed since the ETag the request supplied. " +
+      "Its current ETag is {etag}.",
+  },
+  KAVO_PRECONDITION_UNSUPPORTED: {
+    status: 412,
+    title: "Precondition failed",
+    // `{reason}` is a closed set of phrases written at the single throw
+    // site (`KavoEngine.checkIfMatch`), never caller text — the same
+    // reasoning that makes `{operation}` safe in `KAVO_OPERATION_DISABLED`
+    // below: a placeholder is only a hazard when the value may be absent.
+    //
+    // Fail *closed*: RFC 9110 §13.1.1 forbids performing the method when
+    // `If-Match` evaluates false, and a condition Kavo cannot evaluate is
+    // one it cannot show to be true. Silently performing the write would
+    // hand back a 2xx for a guard that was never applied, which is the
+    // lost update this whole feature exists to prevent.
+    message:
+      "The If-Match precondition on '{operation}' for {entity} cannot be evaluated ({reason}), so the request was " +
+      "refused rather than performed unguarded.",
+  },
   KAVO_OPERATION_DISABLED: {
     status: 405,
     title: "Operation disabled",
@@ -127,6 +159,22 @@ export const ERROR_CATALOG = {
     status: 500,
     title: "Invalid configuration",
     message: "Invalid configuration for entity '{entity}' at '{path}': {problem}",
+  },
+  KAVO_HTTP_ERROR: {
+    // Nominal only: this code is never thrown by a `KavoException` leaf, so
+    // nothing in the hierarchy binds a fixed status to it. The `@kavo/nest`
+    // filter uses it to wrap a framework-level `HttpException` (a global
+    // `ValidationPipe`, an unmatched route) that reaches the boundary
+    // un-normalized; the response carries that exception's *own* status,
+    // not this one — see doc 06 §6.
+    status: 500,
+    title: "HTTP error",
+    message: "The request failed before reaching the Kavo engine: {detail}",
+  },
+  KAVO_UNEXPECTED_ERROR: {
+    status: 500,
+    title: "Unexpected error",
+    message: "An unexpected error occurred while processing the request.",
   },
 } as const satisfies Record<KavoErrorCode, ErrorCatalogEntry>;
 

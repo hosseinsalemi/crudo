@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
-import { Controller, Get, Inject, Param, type INestApplication } from "@nestjs/common";
+import { Controller, Get, Inject, NotFoundException, Param, type INestApplication } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { Test } from "@nestjs/testing";
 import type { DefaultKavoService, NormalizedQueryContext, OperationHandler } from "@kavo/core";
@@ -792,6 +792,92 @@ describe("KavoExceptionFilter — non-Kavo handler failures", () => {
   });
 });
 
+describe("KavoExceptionFilter — errors that never reach KavoEngine.execute", () => {
+  // No `@Kavo` here on purpose, and registered as an ordinary Nest
+  // controller rather than through `KavoModule.forFeature` (which only
+  // accepts `@Kavo` classes): the filter is registered globally
+  // (`APP_FILTER`), so it must also normalize errors from a controller that
+  // has nothing to do with Kavo.
+  @Controller("diagnostics")
+  class DiagnosticsController {
+    @Get("boom-http")
+    boomHttp(): never {
+      throw new NotFoundException("no boom here");
+    }
+
+    @Get("boom-unexpected")
+    boomUnexpected(): never {
+      throw new Error("totally unexpected crash");
+    }
+  }
+
+  async function bootstrapDiagnostics(options: BootstrapOptions = {}): Promise<void> {
+    adapter = new InMemoryTodoAdapter();
+    const moduleRef = await Test.createTestingModule({
+      imports: [KavoModule.forRoot({ infrastructure: fakeInfrastructure(adapter), defaults: options.defaults })],
+      controllers: [DiagnosticsController],
+    }).compile();
+    app = moduleRef.createNestApplication();
+    httpServer = await listen(app);
+  }
+
+  it("wraps a Nest HttpException thrown outside the engine as problem-details, keeping its own status", async () => {
+    await bootstrapDiagnostics();
+    const response = await request(server())
+      .get("/diagnostics/boom-http")
+      .expect(404)
+      .expect("Content-Type", /application\/problem\+json/);
+    expect(response.body).toMatchObject({
+      type: "https://kavo.dev/errors/kavo-http-error",
+      status: 404,
+      code: "KAVO_HTTP_ERROR",
+    });
+    expect(response.body.detail).toContain("no boom here");
+  });
+
+  it("wraps an unrecognized thrown error as problem-details at 500", async () => {
+    await bootstrapDiagnostics();
+    const response = await request(server())
+      .get("/diagnostics/boom-unexpected")
+      .expect(500)
+      .expect("Content-Type", /application\/problem\+json/);
+    expect(response.body).toMatchObject({
+      type: "https://kavo.dev/errors/kavo-unexpected-error",
+      status: 500,
+      code: "KAVO_UNEXPECTED_ERROR",
+    });
+  });
+
+  it("keeps the unrecognized error's message out of the body while exposeInternals is off", async () => {
+    await bootstrapDiagnostics();
+    const response = await request(server()).get("/diagnostics/boom-unexpected").expect(500);
+    expect(JSON.stringify(response.body)).not.toContain("totally unexpected crash");
+  });
+
+  it("leaks the unrecognized error's message only when exposeInternals is turned on", async () => {
+    await bootstrapDiagnostics({ defaults: { errors: { exposeInternals: true } } });
+    const response = await request(server()).get("/diagnostics/boom-unexpected").expect(500);
+    expect(response.body.detail).toContain("totally unexpected crash");
+  });
+
+  it("answers an unmatched route with problem-details too, since the filter is global", async () => {
+    await bootstrapDiagnostics();
+    const response = await request(server())
+      .get("/does-not-exist")
+      .expect(404)
+      .expect("Content-Type", /application\/problem\+json/);
+    expect(response.body).toMatchObject({ code: "KAVO_HTTP_ERROR", status: 404 });
+  });
+
+  it("never reports a correlation instance for either synthetic code, unlike a KavoException", async () => {
+    await bootstrapDiagnostics();
+    const httpError = await request(server()).get("/diagnostics/boom-http").expect(404);
+    const unexpectedError = await request(server()).get("/diagnostics/boom-unexpected").expect(500);
+    expect(httpError.body).not.toHaveProperty("instance");
+    expect(unexpectedError.body).not.toHaveProperty("instance");
+  });
+});
+
 describe("@Kavo soft-delete routes", () => {
   @Kavo(Todo, {
     softDelete: { strategy: "soft" },
@@ -1000,6 +1086,111 @@ describe("@Kavo relation includes", () => {
   });
 });
 
+/**
+ * ADR-0019 claims `@kavo/nest` needs no changes for computed fields:
+ * generated routes go through the same engine, so the serializer produces
+ * them and the allowlists gate them exactly as they do programmatically.
+ * This is the wire-level evidence for that claim.
+ */
+describe("@Kavo computed fields over the wire (ADR-0019)", () => {
+  @Kavo(Todo, {
+    // Defensive by construction: `resolve` must be *total* over anything the
+    // column can hold, because `serializeList` maps it over every row and one
+    // throw takes the whole collection response down (ADR-0019 §1).
+    computed: {
+      slug: { resolve: (todo: Todo) => todo.title?.toLowerCase().replaceAll(" ", "-") ?? null },
+    },
+  })
+  @Controller("todos")
+  class ComputedController {}
+
+  beforeEach(async () => {
+    await bootstrap(ComputedController);
+    await request(server()).post("/todos").send({ title: "Write Docs", priority: 2 }).expect(201);
+  });
+
+  it("emits the computed field on generated read routes with no DTO registered", async () => {
+    expect((await request(server()).get("/todos/1").expect(200)).body).toMatchObject({
+      title: "Write Docs",
+      slug: "write-docs",
+    });
+    expect((await request(server()).get("/todos").expect(200)).body.items[0]).toMatchObject({ slug: "write-docs" });
+  });
+
+  it("is selectable through the wire fieldset", async () => {
+    const response = await request(server()).get("/todos/1?fields=id,slug").expect(200);
+    expect(response.body).toEqual({ id: 1, slug: "write-docs" });
+  });
+
+  it("is rejected as a filter or sort field with problem details", async () => {
+    for (const query of ["filter[slug][eq]=write-docs", "sort=slug"]) {
+      const response = await request(server()).get(`/todos?${query}`).expect(400);
+      expect(response.body).toMatchObject({
+        code: "KAVO_QUERY_INVALID",
+        errors: [{ field: "slug", code: "KAVO_QUERY_INVALID_FIELD" }],
+      });
+    }
+  });
+
+  it("never reaches the adapter from a request body", async () => {
+    await request(server()).post("/todos").send({ title: "Ship It", slug: "hijacked" }).expect(201);
+    expect(adapter.rows[1]).not.toHaveProperty("slug");
+  });
+
+  it("fails at bind time when a registered create DTO declares the computed field", async () => {
+    // The wire consequence this closes: `@ApiBody` is built from the DTO's
+    // runtime shape, so a DTO naming a computed field made OpenAPI advertise
+    // a property the engine unconditionally discards. Rejected at
+    // `createCrud` now, which in a Nest app is provider instantiation.
+    class CreateTodoDto {
+      title = "";
+      slug = "";
+    }
+
+    @Kavo(Todo, {
+      computed: { slug: { resolve: (todo: Todo) => todo.title?.toLowerCase() ?? null } },
+      dto: { create: CreateTodoDto },
+    })
+    @Controller("todos")
+    class ComputedDtoController {}
+
+    const bind = async (): Promise<unknown> => {
+      const moduleRef = await Test.createTestingModule({
+        imports: [
+          KavoModule.forRoot({ infrastructure: fakeInfrastructure(new InMemoryTodoAdapter()) }),
+          KavoModule.forFeature([ComputedDtoController as never]),
+        ],
+      }).compile();
+      return moduleRef.createNestApplication().init();
+    };
+    await expect(bind()).rejects.toMatchObject({
+      code: "KAVO_CONFIG_INVALID",
+      messageParams: { entity: "Todo", path: "dto.create" },
+    });
+  });
+
+  it("turns a throwing resolver into problem details without leaking the message", async () => {
+    @Kavo(Todo, {
+      computed: {
+        note: {
+          resolve: () => {
+            throw new Error("secret internal detail");
+          },
+        },
+      },
+    })
+    @Controller("todos")
+    class ThrowingComputedController {}
+
+    await app.close();
+    await bootstrap(ThrowingComputedController);
+    // The write serializes its result too, so this is where it surfaces.
+    const response = await request(server()).post("/todos").send({ title: "x" }).expect(500);
+    expect(response.body).toMatchObject({ code: "KAVO_PERSISTENCE_FAILED", status: 500 });
+    expect(JSON.stringify(response.body)).not.toContain("secret internal detail");
+  });
+});
+
 describe("@Kavo Swagger request-body schemas", () => {
   class CreateTodoDto {
     title = "";
@@ -1107,6 +1298,49 @@ describe("@Kavo Swagger request-body schemas", () => {
     expect(meta?.type).toBe("object");
     expect(meta?.additionalProperties).toBe(true);
     expect(meta?.description).toContain("findMany");
+  });
+
+  type Operation = {
+    parameters?: readonly { name: string; in: string }[];
+    responses?: Record<string, { headers?: Record<string, unknown> }>;
+  };
+  const operation = (path: string, verb: string): Operation | undefined =>
+    (document.paths[path] as Record<string, Operation> | undefined)?.[verb];
+  const headerNames = (path: string, verb: string): readonly string[] =>
+    (operation(path, verb)?.parameters ?? []).filter((p) => p.in === "header").map((p) => p.name);
+
+  it("documents the conditional-request surface the routes actually serve", () => {
+    // The sibling 409 on restore/purge was documented from the start;
+    // 412/304 and the two request headers were the gap.
+    expect(headerNames("/todos/{id}", "get")).toContain("If-None-Match");
+    expect(operation("/todos/{id}", "get")?.responses?.["304"]).toBeDefined();
+
+    for (const verb of ["put", "patch", "delete"] as const) {
+      expect(headerNames("/todos/{id}", verb)).toContain("If-Match");
+      expect(operation("/todos/{id}", verb)?.responses?.["412"]).toBeDefined();
+    }
+  });
+
+  it("documents the ETag response header on tagged responses only", () => {
+    expect(operation("/todos/{id}", "get")?.responses?.["200"]?.headers).toHaveProperty("ETag");
+    expect(operation("/todos", "post")?.responses?.["201"]?.headers).toHaveProperty("ETag");
+    // A collection carries no tag, and a 204 carries no body to tag.
+    expect(operation("/todos", "get")?.responses?.["200"]?.headers).toBeUndefined();
+    expect(operation("/todos/{id}", "delete")?.responses?.["204"]?.headers).toBeUndefined();
+  });
+
+  it("documents nothing conditional when caching.etag is off for the entity", async () => {
+    @Kavo(Todo, { caching: { etag: false } })
+    @Controller("todos")
+    class UncachedController {}
+    await app.close();
+    await bootstrap(UncachedController);
+    const uncached = SwaggerModule.createDocument(app, new DocumentBuilder().setTitle("t").setVersion("0").build());
+    const patch = (uncached.paths["/todos/{id}"] as Record<string, Operation>)["patch"];
+
+    expect((patch?.parameters ?? []).filter((p) => p.in === "header")).toHaveLength(0);
+    expect(patch?.responses?.["412"]).toBeUndefined();
+    expect(patch?.responses?.["200"]?.headers).toBeUndefined();
   });
 });
 

@@ -14,11 +14,13 @@ KavoRequest
  → Query Resolution       reads only: WireQuery → normalizeWire, QueryContext → normalizeInput
  → Context Assembly       KavoContext: identity, config view, principal, transaction ⟨reserved⟩,
                           normalized query, correlationId, typed state bag
+ → Precondition Check     If-Match writes only: pre-read + hash → 412 / 404 (ADR-0020)
  → DTO Resolution         descriptor.input/output else the doc-4 slot default
  → Deserialization        writes only: body → allowed-key projection
  → Handler Execution      OperationHandler from the registry (built-in, overridden, or custom)
  → Response Mapping       item / ListResultDto envelope / void
  → Serialization          DTO mapping → field selection
+ → ETag                   single-item responses: hash the representation; If-None-Match → notModified
 KavoResponse
 ```
 
@@ -98,6 +100,40 @@ erases the output type — hence the runtime shape check that raises
 Not to be confused with `OperationConfig.meta` (`OperationMetadata`,
 ADR-0007): that is route/framework metadata on a registry entry and never
 reaches a response body.
+
+## 3a. Conditional requests (ADR-0020)
+
+`caching.etag` (doc 08, default on) makes every single-item response
+carry a strong `ETag` — a SHA-256 of the **canonicalized serialized
+representation**, keys sorted so a DTO field reorder is not a spurious
+cache miss. Collection responses carry none. The tag and a
+`notModified` flag ride on `KavoResponse`, so any transport can act on
+them; `@kavo/nest` turns them into the `ETag` header and a `304`.
+
+`If-Match` is the one stage that needs a read the handlers cannot give
+it: `KavoEngineDependencies.reader` exists for it. The engine re-reads
+the target through that reader, hashes the row's **canonical read
+representation** (what `findOne` with no `fields`/`include`/`sort`
+would return, `withDeleted` on a soft-deletable entity so the same read
+serves a deleted row), and raises `PreconditionFailedException` (412)
+when no supplied token matches. It runs on every standard write that
+targets one identified row — `updateOne`, `patchOne`, `deleteOne`,
+`restoreOne`, `purgeOne`.
+
+Everything outside that set is **refused, never dropped**:
+`PreconditionUnsupportedException` (412
+`KAVO_PRECONDITION_UNSUPPORTED`) for an operation that targets no
+single row (`createOne`, any custom operation), for `caching.etag`
+being off, and for `findOne` not being enabled — the three ways the
+check cannot run on a request that changes state. Reads are the one
+exception and ignore `If-Match` outright, since a safe method cannot
+lose an update. A row with no current representation is left to the
+handler rather than 404'd here, so `DELETE` on a soft-deleted row is
+the same 409 with or without the header. `If-Match: *` short-circuits
+before the pre-read: the comparison answers it without a tag.
+
+This is application-level check-then-write, **not** an atomic
+compare-and-swap; the race window is real and stated in the ADR.
 
 ## 4. Patterns
 

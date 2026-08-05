@@ -191,6 +191,14 @@ const config = defineConfig({
                 text: "0018 — Mongoose models are entity identities",
                 link: "/internals/adr/0018-mongoose-models-are-entity-identities",
               },
+              {
+                text: "0019 — Computed fields are serializer-evaluated",
+                link: "/internals/adr/0019-computed-fields-are-serializer-evaluated",
+              },
+              {
+                text: "0020 — Content-hash ETags and the engine read seam",
+                link: "/internals/adr/0020-content-hash-etags-and-the-engine-read-seam",
+              },
             ],
           },
         ],

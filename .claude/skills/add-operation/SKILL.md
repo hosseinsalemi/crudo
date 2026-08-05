@@ -62,9 +62,15 @@ Constraints, because `@Kavo` still owns the route:
 - `operationId` defaults to the method's own name (same inference
   manual-method-wins uses); pass it explicitly when the method name differs.
 - The method's parameters must be in the same fixed position a generated
-  route would use — reads: `(id?, query)`; writes: `(id?, body)` — and must
-  **not** carry their own `@Param`/`@Query`/`@Body`. `@Kavo` applies those
-  itself; a method that also declares its own throws at decoration time.
+  route would use — reads: `(id?, query, preconditions)`; writes:
+  `(id?, body?, preconditions)`, declaring only as many as the method
+  actually uses — and must **not** carry their own `@Param`/`@Query`/`@Body`.
+  `@Kavo` applies those itself; a method that also declares its own throws at
+  decoration time.
+- **An override enforces no `If-Match` by itself.** The check lives in the
+  engine, so a method that replaces the handler must pass the trailing
+  `preconditions` on (`this.base.updateOne(id, data, { preconditions })`)
+  for the guard to still apply (ADR-0020).
 - Overriding an operation that's absent, disabled, or service-only
   (`meta.routes.enabled: false`) throws at decoration time too — there is no
   route for `@Override` to attach to.
