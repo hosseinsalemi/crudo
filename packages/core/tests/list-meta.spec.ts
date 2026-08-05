@@ -99,6 +99,30 @@ describe("ListResultDto.meta — the handler's contribution reaches the envelope
     expect("meta" in list).toBe(false);
   });
 
+  it("drops keys whose value is undefined, and the bag with them", async () => {
+    // `JSON.stringify` erases an `undefined` value, so counting such a key
+    // as a contribution would ship `"meta": {}` to a REST client while a
+    // programmatic caller saw `{ nextCursor: undefined }` — the two-views
+    // divergence omitting the key exists to prevent. A cursor contributor
+    // on a last page is exactly this shape.
+    const { crud } = makeCrud(
+      findManyHandler(fixedHandler({ entities: [], total: 0, meta: { nextCursor: undefined } })),
+    );
+
+    const list = await crud.findMany();
+    expect("meta" in list).toBe(false);
+  });
+
+  it("keeps the bag but not the undefined key when something else contributed", async () => {
+    const { crud } = makeCrud(
+      findManyHandler(fixedHandler({ entities: [], total: 0, meta: { exhausted: true, nextCursor: undefined } })),
+    );
+
+    const list = await crud.findMany();
+    expect(list.meta).toEqual({ exhausted: true });
+    expect("nextCursor" in (list.meta as object)).toBe(false);
+  });
+
   it("drops the bag when every contributor in a wrap chain adds nothing", async () => {
     const { crud } = makeCrud(
       findManyHandler(withListMeta<User>(fixedHandler({ entities: [], total: 0, meta: {} }), () => ({}))),

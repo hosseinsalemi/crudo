@@ -501,7 +501,14 @@ export class KavoEngine<Entity extends object> {
    * (`ListResultDto.meta?`) while `total` is not: `total: null` still
    * answers "how many matched"; `meta: {}` answers nothing. Emptiness is
    * judged after the merge, so a contributor that returns `{}` is the same
-   * as no contributor at all.
+   * as no contributor at all — and so is one whose every value is
+   * `undefined`. Those keys are dropped rather than counted: they are
+   * exactly what `JSON.stringify` erases, so keeping them would hand a
+   * programmatic caller a `{ nextCursor: undefined }` bag while the REST
+   * client saw `"meta": {}` — the very divergence the omit-when-empty rule
+   * exists to prevent. A cursor contributor writing
+   * `{ nextCursor: cursorOrUndefined }` on a last page therefore leaves no
+   * `meta` at all.
    *
    * `meta` never passes through the serializer: it is the caller's own
    * JSON-serializable data, not entity data, so no DTO projection or
@@ -519,7 +526,10 @@ export class KavoEngine<Entity extends object> {
    */
   private listMeta(handlerMeta: ListMetaDto | undefined): ListMetaDto | undefined {
     if (handlerMeta === undefined) return undefined;
-    const copy = { ...handlerMeta };
+    const copy: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(handlerMeta)) {
+      if (value !== undefined) copy[key] = value;
+    }
     return Object.keys(copy).length === 0 ? undefined : copy;
   }
 }

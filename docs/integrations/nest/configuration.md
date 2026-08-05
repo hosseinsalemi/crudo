@@ -302,9 +302,15 @@ The adapter has to exist when the class is **declared**, because `@Kavo`'s confi
 The wrapper is a convenience, not a requirement — the engine reads `meta` off whatever the `findMany` handler returns, so a hand-written one works the same way:
 
 ```ts
+import type { FindManyResult, KavoContext } from "@kavo/core";
+
 const handler = {
   async execute(_input: null, context: KavoContext<Book>) {
-    const inner = await findMany.execute(null, context);
+    // `builtInHandlers(...)` hands back `OperationHandler<Book>`, whose
+    // output type is `unknown` — the same erasure `withListMeta` works
+    // around with its runtime shape check. Hand-rolling the wrap means
+    // narrowing it yourself.
+    const inner = (await findMany.execute(null, context)) as FindManyResult<Book>;
     return { ...inner, meta: { inStock: 1 } };
   },
 };
