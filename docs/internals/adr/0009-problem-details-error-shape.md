@@ -25,3 +25,9 @@ boundary that maps them.
   hierarchy never changes.
 - `exposeInternals` (off by default) governs whether driver detail leaks
   into `detail`/`cause` output.
+- The `@kavo/nest` filter is registered globally and also normalizes errors
+  that never reach `KavoEngine.execute` (an unmatched route, a global
+  `ValidationPipe`, an unexpected error in application code) into the same
+  problem-details shape, so it stays the _one_ wire error shape for the
+  whole app rather than only for `@Kavo`-generated routes (architecture
+  doc 06 §6).

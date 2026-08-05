@@ -53,6 +53,8 @@ policy). Source of truth: `ERROR_CATALOG` in
 | `KAVO_PERSISTENCE_FAILED`       | 500  | Unrecognized adapter/driver error                                                                                  | `cause` kept internally           |
 | `KAVO_TRANSACTION_FAILED`       | 500  | Deadlock/serialization failure                                                                                     | `retryable` flag                  |
 | `KAVO_CONFIG_INVALID`           | 500  | Bootstrap config error (fails startup, not a response)                                                             | —                                 |
+| `KAVO_HTTP_ERROR`               | *    | Framework-level `HttpException` reaching the filter without ever going through `KavoEngine.execute` (§6)           | —                                 |
+| `KAVO_UNEXPECTED_ERROR`         | 500  | Any other error reaching the filter without ever going through `KavoEngine.execute` (§6)                           | `cause` kept internally           |
 
 ## 3. Error context & message strategy
 
@@ -84,3 +86,35 @@ document: `type` (`https://kavo.dev/errors/<kebab-code>`), `title` and
 maps it 1:1 with `Content-Type: application/problem+json`; a different
 wire shape means swapping this serializer, never the hierarchy. Core
 never depends on NestJS exceptions — the filter is the boundary.
+
+## 6. Errors that never reach `KavoEngine.execute`
+
+`KavoExceptionFilter` is registered globally (`APP_FILTER`), so it is the
+one error boundary for the whole Nest app, not only `@Kavo`-generated
+routes — a global `ValidationPipe`, an unmatched route, or a bug in
+application code outside a Kavo handler must still answer with
+problem-details (ADR-0009), never Nest's default `{ statusCode, message,
+error }` shape. `@Catch()` (no token) is what makes that possible; the
+filter narrows to HTTP contexts itself (`host.getType() !== "http"`
+rethrows) since a global filter also runs for ws/rpc contexts a
+REST-only framework binding has nothing to map.
+
+`toKavoExceptionShape` (`@kavo/nest/src/unhandled-exception.ts`) adapts
+whatever isn't a `KavoException` into the same `KavoExceptionShape`
+contract `toProblemDetails` already serializes:
+
+- A Nest `HttpException` → `KAVO_HTTP_ERROR`, with the **response's**
+  `status` taken from the exception's own `getStatus()`, not the catalog's
+  (nominal 500) entry — the one place a shape's status legitimately
+  disagrees with its code's catalog row, because Nest already picked the
+  correct one. Its `detail` is the exception's own message (Nest's
+  built-ins, and a `ValidationPipe`'s `message: string[]`, are already
+  meant for a client to see, so this happens regardless of
+  `exposeInternals`).
+- Anything else → `KAVO_UNEXPECTED_ERROR`, fixed at 500, with the original
+  value as `cause` — leaked into `detail` only when `exposeInternals` is
+  on, same as `PersistenceException`.
+
+This mapping lives in `@kavo/nest`, not in the exception hierarchy: these
+are framework-level errors Kavo did not raise and does not own the shape
+of, so no new `KavoException` leaf exists for them.

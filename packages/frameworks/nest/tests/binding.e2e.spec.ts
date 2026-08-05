@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
-import { Controller, Get, Inject, Param, type INestApplication } from "@nestjs/common";
+import { Controller, Get, Inject, NotFoundException, Param, type INestApplication } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { Test } from "@nestjs/testing";
 import type { DefaultKavoService, NormalizedQueryContext, OperationHandler } from "@kavo/core";
@@ -788,6 +788,84 @@ describe("KavoExceptionFilter — non-Kavo handler failures", () => {
     await bootstrap(ExplodingController);
     const response = await request(server()).post("/todos").send({ title: "x" }).expect(500);
     expect(response.body.instance).toMatch(/^urn:kavo:request:/);
+  });
+});
+
+describe("KavoExceptionFilter — errors that never reach KavoEngine.execute", () => {
+  // No `@Kavo` here on purpose, and registered as an ordinary Nest
+  // controller rather than through `KavoModule.forFeature` (which only
+  // accepts `@Kavo` classes): the filter is registered globally
+  // (`APP_FILTER`), so it must also normalize errors from a controller that
+  // has nothing to do with Kavo.
+  @Controller("diagnostics")
+  class DiagnosticsController {
+    @Get("boom-http")
+    boomHttp(): never {
+      throw new NotFoundException("no boom here");
+    }
+
+    @Get("boom-unexpected")
+    boomUnexpected(): never {
+      throw new Error("totally unexpected crash");
+    }
+  }
+
+  async function bootstrapDiagnostics(options: BootstrapOptions = {}): Promise<void> {
+    adapter = new InMemoryTodoAdapter();
+    const moduleRef = await Test.createTestingModule({
+      imports: [KavoModule.forRoot({ infrastructure: fakeInfrastructure(adapter), defaults: options.defaults })],
+      controllers: [DiagnosticsController],
+    }).compile();
+    app = moduleRef.createNestApplication();
+    httpServer = await listen(app);
+  }
+
+  it("wraps a Nest HttpException thrown outside the engine as problem-details, keeping its own status", async () => {
+    await bootstrapDiagnostics();
+    const response = await request(server())
+      .get("/diagnostics/boom-http")
+      .expect(404)
+      .expect("Content-Type", /application\/problem\+json/);
+    expect(response.body).toMatchObject({
+      type: "https://kavo.dev/errors/kavo-http-error",
+      status: 404,
+      code: "KAVO_HTTP_ERROR",
+    });
+    expect(response.body.detail).toContain("no boom here");
+  });
+
+  it("wraps an unrecognized thrown error as problem-details at 500", async () => {
+    await bootstrapDiagnostics();
+    const response = await request(server())
+      .get("/diagnostics/boom-unexpected")
+      .expect(500)
+      .expect("Content-Type", /application\/problem\+json/);
+    expect(response.body).toMatchObject({
+      type: "https://kavo.dev/errors/kavo-unexpected-error",
+      status: 500,
+      code: "KAVO_UNEXPECTED_ERROR",
+    });
+  });
+
+  it("keeps the unrecognized error's message out of the body while exposeInternals is off", async () => {
+    await bootstrapDiagnostics();
+    const response = await request(server()).get("/diagnostics/boom-unexpected").expect(500);
+    expect(JSON.stringify(response.body)).not.toContain("totally unexpected crash");
+  });
+
+  it("leaks the unrecognized error's message only when exposeInternals is turned on", async () => {
+    await bootstrapDiagnostics({ defaults: { errors: { exposeInternals: true } } });
+    const response = await request(server()).get("/diagnostics/boom-unexpected").expect(500);
+    expect(response.body.detail).toContain("totally unexpected crash");
+  });
+
+  it("answers an unmatched route with problem-details too, since the filter is global", async () => {
+    await bootstrapDiagnostics();
+    const response = await request(server())
+      .get("/does-not-exist")
+      .expect(404)
+      .expect("Content-Type", /application\/problem\+json/);
+    expect(response.body).toMatchObject({ code: "KAVO_HTTP_ERROR", status: 404 });
   });
 });
 

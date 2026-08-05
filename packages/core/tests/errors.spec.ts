@@ -46,6 +46,8 @@ const CATALOG: Readonly<Record<CatalogedErrorCode, { status: number; title: stri
   KAVO_PERSISTENCE_FAILED: { status: 500, title: "Persistence failure" },
   KAVO_TRANSACTION_FAILED: { status: 500, title: "Transaction failure" },
   KAVO_CONFIG_INVALID: { status: 500, title: "Invalid configuration" },
+  KAVO_HTTP_ERROR: { status: 500, title: "HTTP error" },
+  KAVO_UNEXPECTED_ERROR: { status: 500, title: "Unexpected error" },
 };
 
 /** Every `KAVO_*` code literal appearing anywhere in core's source. */
