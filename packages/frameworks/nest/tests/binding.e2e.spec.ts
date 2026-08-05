@@ -867,6 +867,14 @@ describe("KavoExceptionFilter — errors that never reach KavoEngine.execute", (
       .expect("Content-Type", /application\/problem\+json/);
     expect(response.body).toMatchObject({ code: "KAVO_HTTP_ERROR", status: 404 });
   });
+
+  it("never reports a correlation instance for either synthetic code, unlike a KavoException", async () => {
+    await bootstrapDiagnostics();
+    const httpError = await request(server()).get("/diagnostics/boom-http").expect(404);
+    const unexpectedError = await request(server()).get("/diagnostics/boom-unexpected").expect(500);
+    expect(httpError.body).not.toHaveProperty("instance");
+    expect(unexpectedError.body).not.toHaveProperty("instance");
+  });
 });
 
 describe("@Kavo soft-delete routes", () => {

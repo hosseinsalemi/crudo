@@ -16,8 +16,12 @@ function isHttpExceptionBody(value: unknown): value is HttpExceptionBody {
  * or `{ statusCode, message, error }` for Nest's built-ins (`NotFoundException`,
  * a `ValidationPipe`'s `BadRequestException` with `message: string[]`). Either way
  * it is text the throw site meant a client to see — Nest's own default handler
- * would have shown it verbatim — so it is safe to surface regardless of
- * `exposeInternals`.
+ * would have shown it verbatim, with no `exposeInternals`-equivalent gate of
+ * its own — so surfacing it here regardless of `exposeInternals` mirrors
+ * Nest's existing behavior rather than exposing anything new. It is *not*
+ * governed by `errors.exposeInternals` the way `KAVO_UNEXPECTED_ERROR`'s
+ * `cause` is below — an app throwing `HttpException`s with internal detail
+ * in the message was already showing that detail before this filter existed.
  */
 function messageFrom(exception: HttpException): string {
   const response = exception.getResponse();

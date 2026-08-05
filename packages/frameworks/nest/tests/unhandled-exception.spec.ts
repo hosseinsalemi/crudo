@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BadRequestException, NotFoundException } from "@nestjs/common";
+import { BadRequestException, HttpException, NotFoundException } from "@nestjs/common";
 import { toKavoExceptionShape } from "../src/unhandled-exception.js";
 
 describe("toKavoExceptionShape", () => {
@@ -26,10 +26,26 @@ describe("toKavoExceptionShape", () => {
     expect(shape.detail).not.toContain("db pool exhausted");
   });
 
-  it("maps a non-Error thrown value to KAVO_UNEXPECTED_ERROR without throwing itself", () => {
-    const shape = toKavoExceptionShape("just a string throw");
+  it.each([
+    ["a string", "just a string throw"],
+    ["null", null],
+    ["undefined", undefined],
+    ["a plain object", { reason: "not an Error at all" }],
+  ])("maps %s thrown value to KAVO_UNEXPECTED_ERROR without throwing itself", (_label, thrown) => {
+    const shape = toKavoExceptionShape(thrown);
     expect(shape.code).toBe("KAVO_UNEXPECTED_ERROR");
     expect(shape.status).toBe(500);
-    expect(shape.cause).toBe("just a string throw");
+    expect(shape.cause).toBe(thrown);
+  });
+
+  it("falls back to the HttpException's own .message when getResponse() has no message field", () => {
+    const shape = toKavoExceptionShape(new HttpException({ statusCode: 400 }, 400));
+    expect(shape.status).toBe(400);
+    expect(shape.detail.length).toBeGreaterThan(0);
+  });
+
+  it("never sets a correlation instance for either synthetic shape", () => {
+    expect(toKavoExceptionShape(new NotFoundException("x")).context.correlationId).toBeUndefined();
+    expect(toKavoExceptionShape(new Error("x")).context.correlationId).toBeUndefined();
   });
 });
