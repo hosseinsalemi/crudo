@@ -199,6 +199,10 @@ const config = defineConfig({
                 text: "0020 — Content-hash ETags and the engine read seam",
                 link: "/internals/adr/0020-content-hash-etags-and-the-engine-read-seam",
               },
+              {
+                text: "0021 — Cursor pagination is an opaque keyset union",
+                link: "/internals/adr/0021-cursor-pagination-is-an-opaque-keyset-union",
+              },
             ],
           },
         ],

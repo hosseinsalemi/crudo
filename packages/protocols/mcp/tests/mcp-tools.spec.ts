@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { builtInHandlers, createKavo, withListMeta } from "@kavo/core";
+import { builtInHandlers, ConfigurationException, createKavo, withListMeta } from "@kavo/core";
 import { crudTools } from "@kavo/mcp";
 import {
   InMemoryNoteAdapter,
@@ -160,5 +160,34 @@ describe("crudTools", () => {
     const purged = await find(bindings, "note.purgeOne").handler({ id: created.id });
     expect(JSON.parse((purged.content[0] as { text: string }).text)).toEqual({ purged: true });
     expect(adapter.rows).toHaveLength(0);
+  });
+});
+
+describe("cursor-paginated entities are refused at bootstrap", () => {
+  /** `<entity>.findMany` exposes `limit`/`offset` only, and a keyset ignores `offset` (ADR-0021 §7). */
+  function cursorTodoService() {
+    return createKavo({
+      defaults: {
+        pagination: { strategy: "cursor" },
+        query: { defaultSort: [{ field: "id", direction: "asc" }] },
+      },
+    } as never).createCrud(Todo, undefined, { adapter: new InMemoryTodoAdapter(), metadata: todoMetadata });
+  }
+
+  it("throws rather than silently answering a paged findMany with page one", () => {
+    expect(() => crudTools({ name: "Todo", service: cursorTodoService() })).toThrow(ConfigurationException);
+  });
+
+  it("names the entity, the config key, and the way out", () => {
+    expect(() => crudTools({ name: "Todo", service: cursorTodoService() })).toThrow(/pagination\.strategy/);
+    expect(() => crudTools({ name: "Todo", service: cursorTodoService() })).toThrow(/'offset'\/'page'/);
+  });
+
+  it("still binds an offset-paginated entity", () => {
+    const service = createKavo().createCrud(Todo, undefined, {
+      adapter: new InMemoryTodoAdapter(),
+      metadata: todoMetadata,
+    });
+    expect(() => crudTools({ name: "Todo", service })).not.toThrow();
   });
 });

@@ -104,11 +104,22 @@ opt-in only, same rule as `@kavo/typeorm`.
 
 ## 4. Pagination & count strategy
 
-`skip`/`take` from the normalized `limit`/`offset`, same as
-`@kavo/typeorm`. `count()` is a dedicated `delegate.count()` call built
-from the same filter — never fetch-then-length: the engine only calls
-`count` when `pagination.count` is true, so `total: null` costs zero
-extra queries.
+`findMany` filters by `readFilter(query)` rather than `query.filter`,
+same seam as `@kavo/typeorm`: it AND-s in the keyset predicate under
+cursor pagination and is the identity function under offset pagination
+(ADR-0021). The read narrows with `isCursorPagination` before touching
+`.offset` — a `CursorPagination` carries none — and passes `skip: 0` on a
+cursor page, since the keyset predicate already excludes everything
+before it; `take: pagination.limit` bounds the page either way. Prisma's
+own `cursor`/`skip: 1` pagination option is deliberately not used: it
+takes a unique _id_ and cannot express a multi-column keyset with mixed
+sort directions.
+
+`count()` is a dedicated `delegate.count()` call built from `query.filter`
+— not `readFilter(query)`, since `total` is the size of the whole match
+set, not of what remains after the cursor — never fetch-then-length: the
+engine only calls `count` when `pagination.count` is true, so
+`total: null` costs zero extra queries.
 
 ## 5. Error-mapping table
 

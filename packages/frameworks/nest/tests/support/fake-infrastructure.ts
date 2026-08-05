@@ -7,7 +7,7 @@ import type {
   NormalizedQueryContext,
   RepositoryAdapter,
 } from "@kavo/core";
-import { AlreadyDeletedException, NotDeletedException, NotFoundException } from "@kavo/core";
+import { AlreadyDeletedException, NotDeletedException, NotFoundException, isCursorPagination } from "@kavo/core";
 
 /**
  * Test entity for binding tests — no ORM anywhere near this package. The
@@ -126,7 +126,9 @@ export class InMemoryTodoAdapter implements RepositoryAdapter<Todo> {
 
   async findMany(query: NormalizedQueryContext<Todo>, context: KavoContext<Todo>): Promise<readonly Todo[]> {
     this.lastQuery = query;
-    const { offset, limit } = query.pagination;
+    const { limit } = query.pagination;
+    // Offset-only fixture: narrow rather than assume (ADR-0021).
+    const offset = isCursorPagination(query.pagination) ? 0 : query.pagination.offset;
     return this.live(query, context).slice(offset, offset + limit);
   }
 

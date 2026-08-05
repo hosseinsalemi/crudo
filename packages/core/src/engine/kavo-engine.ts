@@ -5,17 +5,19 @@ import type { DtoClass, DtoSlot } from "../dto/dto.js";
 import type { ListMetaDto } from "../dto/list-result.js";
 import type { Deserializer, Serializer } from "../serialization/serializer.js";
 import type { EntityId } from "../types/entity-id.js";
-import type { EntityMetadata } from "../metadata/entity-metadata.js";
+import type { EntityMetadata, FieldMetadata } from "../metadata/entity-metadata.js";
 import type { EntityReader } from "../persistence/entity-reader.js";
 import type { ErrorHandler } from "../errors/kavo-exception-shape.js";
 import type { NormalizedQueryContext } from "../query/query-context.js";
 import type { QueryContext } from "../query/query-context.js";
+import type { Pagination } from "../query/pagination.js";
 import type { OperationDescriptor, OperationRegistry } from "../operations/operation-registry.js";
 import type { StandardOperationId } from "../operations/operation.js";
 import type { RequestPreconditions } from "../caching/etag.js";
 import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
 import type { KavoSettings } from "../config/settings.js";
 import {
+  ConfigurationException,
   OperationDisabledException,
   OperationNotRegisteredException,
   PreconditionFailedException,
@@ -24,6 +26,8 @@ import {
 } from "../errors/exceptions.js";
 import { nameList } from "../errors/message-hints.js";
 import { QueryNormalizer } from "../query/query-normalizer.js";
+import { isCursorPagination } from "../query/pagination.js";
+import { cursorValuesOf, encodeCursor } from "../query/cursor.js";
 import { WILDCARD, computeEtag, strongMatch, weakMatch } from "../caching/etag.js";
 import { createKavoContext, randomUuid } from "../context/default-kavo-context.js";
 import { mergeSettings } from "../config/merge-settings.js";
@@ -129,7 +133,17 @@ const INPUT_SLOTS: Readonly<Partial<Record<StandardOperationId, DtoSlot>>> = {
  * — `createCrud` supplies the defaults, callers may supply their own.
  */
 export class KavoEngine<Entity extends object> {
-  constructor(private readonly deps: KavoEngineDependencies<Entity>) {}
+  /**
+   * `EntityMetadata.fields` by name — the lookup `cursorValuesOf` needs to
+   * check a page token's values against their declared `FieldKind`. Built
+   * once here rather than per response; the metadata is frozen at
+   * `createCrud`.
+   */
+  private readonly cursorFields: ReadonlyMap<string, FieldMetadata>;
+
+  constructor(private readonly deps: KavoEngineDependencies<Entity>) {
+    this.cursorFields = new Map(deps.metadata.fields.map((field) => [field.name, field]));
+  }
 
   get registry(): OperationRegistry<Entity> {
     return this.deps.registry;
@@ -429,22 +443,26 @@ export class KavoEngine<Entity extends object> {
     const { serializer, config } = this.deps;
 
     if (descriptor.id === "findMany") {
-      const { entities, total, meta } = result as FindManyResult<Entity>;
+      const listResult = result as FindManyResult<Entity>;
       const listDto = (descriptor.output as DtoClass<object> | null) ?? config.dto.resolve("list", descriptor.id);
-      const pagination = context.query?.pagination ?? { limit: 0, offset: 0 };
-      const listMeta = this.listMeta(meta);
+      const pagination: Pagination<Entity> = context.query?.pagination ?? { limit: 0, offset: 0 };
+      const listMeta = this.listMeta(listResult, context);
       return {
         operation: descriptor.id,
         item: null,
         list: {
-          items: serializer.serializeList(entities, listDto, context),
+          items: serializer.serializeList(listResult.entities, listDto, context),
           limit: pagination.limit,
-          offset: pagination.offset,
+          // A keyset page has no absolute position in the match set, and
+          // `offset` is a non-nullable envelope field, so cursor pages report
+          // `0` (ADR-0021) — the honest reading of "how many rows precede
+          // `items[0]` *in what this response describes*".
+          offset: isCursorPagination(pagination) ? 0 : pagination.offset,
           // `total` is a required envelope field typed `number | null`, but
           // a custom handler can return `{ entities }` alone. Left
           // `undefined` the key would vanish from the JSON body entirely,
           // so normalize the absent case to the documented `null`.
-          total: total ?? null,
+          total: listResult.total ?? null,
           // Spread rather than `meta: listMeta`: assigning `undefined` would
           // leave the key on the object (`"meta" in list`, `Object.keys`)
           // even though `JSON.stringify` drops it, so a programmatic caller
@@ -490,9 +508,14 @@ export class KavoEngine<Entity extends object> {
    *
    * A named step rather than an inline spread because this is the single
    * merge point for everything that can contribute to it, and the handler
-   * is only the first contributor: a pagination strategy computing
-   * `meta.nextCursor` (#118) belongs to the engine, not to whatever
-   * handler happens to be configured, and folds in here.
+   * is only the first contributor: `meta.nextCursor` under cursor
+   * pagination (ADR-0021) belongs to the engine, not to whatever handler
+   * happens to be configured, and folds in here.
+   *
+   * The strategy's keys are the **base**, the handler's merge over them: a
+   * handler (or a `withListMeta` contributor) that names `nextCursor`
+   * explicitly is stating intent, and the same "more specific wins"
+   * direction runs through every other precedence chain in Kavo.
    *
    * `undefined` — not `{}` — when nothing contributed, so `mapResponse`
    * can leave the key off the envelope entirely. An empty bag carries no
@@ -501,37 +524,73 @@ export class KavoEngine<Entity extends object> {
    * (`ListResultDto.meta?`) while `total` is not: `total: null` still
    * answers "how many matched"; `meta: {}` answers nothing. Emptiness is
    * judged after the merge, so a contributor that returns `{}` is the same
-   * as no contributor at all — and so is one whose every value is
-   * `undefined`. Those keys are dropped rather than counted: they are
-   * exactly what `JSON.stringify` erases, so keeping them would hand a
-   * programmatic caller a `{ nextCursor: undefined }` bag while the REST
-   * client saw `"meta": {}` — the very divergence the omit-when-empty rule
-   * exists to prevent. A cursor contributor writing
-   * `{ nextCursor: cursorOrUndefined }` on a last page therefore leaves no
-   * `meta` at all.
+   * as no contributor at all.
+   *
+   * A cursor page is never that case: `nextCursor` is `null` — not
+   * `undefined` — on the last page, because "there is no page after this
+   * one" is an answer, and a client walking the chain has to be told it has
+   * reached the end rather than left to infer it from a missing key.
    *
    * `meta` never passes through the serializer: it is the caller's own
    * JSON-serializable data, not entity data, so no DTO projection or
    * field selection applies to it and it reaches the wire verbatim.
    *
-   * The copy is deliberate, and it is *not* the same situation as `items`:
-   * `items` is a fresh array of freshly serialized DTOs on every request,
-   * whereas `handlerMeta` can be the very same object each time — a
-   * hand-written handler returning a module-scope constant is the
+   * Every path returns a fresh object literal rather than `result.meta`
+   * itself, and the copy is deliberate: it is *not* the same situation as
+   * `items`. `items` is a fresh array of freshly serialized DTOs on every
+   * request, whereas `result.meta` can be the very same object each time —
+   * a hand-written handler returning a module-scope constant is the
    * documented alternative to `withListMeta`. Handing that object out by
    * reference would let one response's consumer mutate every later
    * response's bag. Shallow is the right depth: it makes the envelope's
    * own key set private without deep-cloning caller data that only has to
    * survive `JSON.stringify`.
    */
-  private listMeta(handlerMeta: ListMetaDto | undefined): ListMetaDto | undefined {
-    if (handlerMeta === undefined) return undefined;
-    const copy: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(handlerMeta)) {
-      if (value !== undefined) copy[key] = value;
+  private listMeta(result: FindManyResult<Entity>, context: KavoContext<Entity>): ListMetaDto | undefined {
+    const query = context.query;
+    if (query === null || !isCursorPagination(query.pagination)) return compactMeta(result.meta);
+    // `hasMore` is the sentinel the built-in handler reports from its
+    // `limit + 1` over-fetch. A replacement handler that does not report it
+    // is taken at its word: no signal, no next page.
+    const last = result.hasMore === true ? result.entities[result.entities.length - 1] : undefined;
+    const nextCursor =
+      last === undefined ? null : encodeCursor(cursorValuesOf(last, query.sort, this.cursorFields, context.entityName));
+    // A token identical to the one that produced this page means the page
+    // did not advance — the signature of an adapter that honours the
+    // `limit + 1` over-fetch but still reads `query.filter` instead of
+    // `readFilter(query)`, so every page is page 1 and `hasMore` never goes
+    // false. A client following `nextCursor` would loop forever; erroring
+    // beats looping (ADR-0021).
+    if (nextCursor !== null && nextCursor === query.pagination.cursor) {
+      throw new ConfigurationException(
+        context.entityName,
+        "pagination.strategy",
+        `cursor pagination did not advance: the page produced the same token it was given, which means the ` +
+          `repository adapter ignored the keyset predicate. An adapter's 'findMany' must filter by ` +
+          `'readFilter(query)', not by 'query.filter'`,
+      );
     }
-    return Object.keys(copy).length === 0 ? undefined : copy;
+    return compactMeta({ nextCursor, ...result.meta });
   }
+}
+
+/**
+ * The merged bag with `undefined`-valued keys dropped, and `undefined` in
+ * place of a bag left empty by that — the single place emptiness is judged,
+ * so every contributor is held to the same rule.
+ *
+ * Those keys are dropped rather than counted because they are exactly what
+ * `JSON.stringify` erases: keeping them would hand a programmatic caller a
+ * `{ facets: undefined }` bag while the REST client saw `"meta": {}` — the
+ * very divergence the omit-when-empty rule exists to prevent.
+ */
+function compactMeta(meta: ListMetaDto | undefined): ListMetaDto | undefined {
+  if (meta === undefined) return undefined;
+  const copy: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(meta)) {
+    if (value !== undefined) copy[key] = value;
+  }
+  return Object.keys(copy).length === 0 ? undefined : copy;
 }
 
 /**

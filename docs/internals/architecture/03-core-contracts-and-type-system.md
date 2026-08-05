@@ -189,19 +189,19 @@ signatures" is precisely the failure an exemption would have allowed.
 
 ## 5. Contract inventory
 
-| Area          | Contracts                                                                                                                                                              |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Service       | `KavoService`, `KavoCallOptions`, `IdentifiedInput`                                                                                                                    |
-| Persistence   | `EntityReader`, `EntityWriter`, `RepositoryAdapter`                                                                                                                    |
-| Transactions  | `TransactionManager`, `TransactionContext`, `TransactionOptions` — not implemented, see below                                                                          |
-| Query         | `Filter*`, `FilterExpression`, `Sort`, `Pagination`, `PaginationStrategy`, `FieldSelection`, `QueryContext`, `NormalizedQueryContext`, `FilterParser`, `FilterBuilder` |
-| DTO           | `Dto`, `DtoClass`, `OperationDtoMap`, `DtoResolver`, `ListResultDto`, `ListMetaDto`, `BulkResultDto` (bulk reserved)                                                   |
-| Errors        | `KavoExceptionShape`, `KavoErrorCode`, `ErrorHandler`, `ProblemDetailsDto`                                                                                             |
-| Config        | `KavoSettings` (+ per-area settings), `GlobalConfig`, `EntityConfig`, `OperationConfig`, `ResolvedEntityConfig`                                                        |
-| Operations    | `OperationId`, `OperationHandler`, `OperationMetadata`, `OperationDescriptor`, `OperationRegistry`                                                                     |
-| Relations     | `RelationDescriptor`, `RelationRegistry`, `IncludeTree`, `IncludeNode`, `IncludeResolver`, `EntityCatalog`                                                             |
-| Context       | `KavoContext`, `KavoContextState`, `StateKey`, `KavoRequest`, `KavoResponse`                                                                                           |
-| Serialization | `Serializer`, `Deserializer`                                                                                                                                           |
+| Area          | Contracts                                                                                                                                                                                                                            |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Service       | `KavoService`, `KavoCallOptions`, `IdentifiedInput`                                                                                                                                                                                  |
+| Persistence   | `EntityReader`, `EntityWriter`, `RepositoryAdapter`                                                                                                                                                                                  |
+| Transactions  | `TransactionManager`, `TransactionContext`, `TransactionOptions` — not implemented, see below                                                                                                                                        |
+| Query         | `Filter*`, `FilterExpression`, `Sort`, `Pagination`, `OffsetPagination`, `CursorPagination`, `isCursorPagination`, `PaginationStrategy`, `FieldSelection`, `QueryContext`, `NormalizedQueryContext`, `FilterParser`, `FilterBuilder` |
+| DTO           | `Dto`, `DtoClass`, `OperationDtoMap`, `DtoResolver`, `ListResultDto`, `ListMetaDto`, `BulkResultDto` (bulk reserved)                                                                                                                 |
+| Errors        | `KavoExceptionShape`, `KavoErrorCode`, `ErrorHandler`, `ProblemDetailsDto`                                                                                                                                                           |
+| Config        | `KavoSettings` (+ per-area settings), `GlobalConfig`, `EntityConfig`, `OperationConfig`, `ResolvedEntityConfig`                                                                                                                      |
+| Operations    | `OperationId`, `OperationHandler`, `OperationMetadata`, `OperationDescriptor`, `OperationRegistry`                                                                                                                                   |
+| Relations     | `RelationDescriptor`, `RelationRegistry`, `IncludeTree`, `IncludeNode`, `IncludeResolver`, `EntityCatalog`                                                                                                                           |
+| Context       | `KavoContext`, `KavoContextState`, `StateKey`, `KavoRequest`, `KavoResponse`                                                                                                                                                         |
+| Serialization | `Serializer`, `Deserializer`                                                                                                                                                                                                         |
 
 `TransactionManager` / `TransactionOptions` / `TransactionPropagation` are
 declared but **intentionally unimplemented**, and no adapter provides them.
@@ -213,3 +213,16 @@ it — the `@remarks` at `core/src/persistence/transaction-manager.ts` is the
 definition-site record.
 `TransactionContext` is the exception: it is live, threaded through
 `KavoContext` and `KavoCallOptions` as an opaque adapter handle.
+
+`Pagination` is a **union**, `OffsetPagination | CursorPagination<Entity>`,
+not a single scalar shape (ADR-0021). The discriminant is the _presence of
+`cursor`_, exposed as the guard `isCursorPagination`, rather than a `kind`
+tag — that keeps `OffsetPagination` structurally identical to the
+pre-union shape, so every existing producer (including a third-party
+`PaginationStrategy`) stays assignable untouched. `CursorPagination` is
+`{ limit, cursor, keyset }` and deliberately carries **no** `offset`: a
+keyset page has no absolute position in the match set, and a `0` there
+would hand every adapter a number that means nothing and that a future
+reader would reasonably `skip()` by. A consumer that reads `.offset` —
+an adapter, a custom `EntityReader`, a test fixture — must narrow with
+`isCursorPagination` first.

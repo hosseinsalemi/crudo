@@ -6,8 +6,16 @@ import type {
   NormalizedQueryContext,
   RepositoryAdapter,
   ResolvedSoftDelete,
+  Filter,
 } from "@kavo/core";
-import { AlreadyDeletedException, ConfigurationException, NotDeletedException, NotFoundException } from "@kavo/core";
+import {
+  AlreadyDeletedException,
+  ConfigurationException,
+  NotDeletedException,
+  NotFoundException,
+  isCursorPagination,
+  readFilter,
+} from "@kavo/core";
 import { mapDriverError } from "./error-mapping.js";
 import { translateFilter, type FilterTranslatorOptions, type MongoWhere } from "./filter-translator.js";
 import { asModel } from "./metadata.js";
@@ -104,10 +112,14 @@ export class MongooseRepositoryAdapter<Entity extends object> implements Reposit
 
   async findMany(query: NormalizedQueryContext<Entity>, context: KavoContext<Entity>): Promise<readonly Entity[]> {
     try {
-      const rows = await this.model.find(this.buildWhere(query, context), null, {
+      // `readFilter` folds in the keyset predicate under cursor pagination
+      // (a no-op otherwise), and a cursor page has no `offset` to skip by —
+      // the keyset predicate *is* the skip.
+      const { pagination } = query;
+      const rows = await this.model.find(this.buildWhere(query, context, readFilter(query)), null, {
         ...this.readOptions(this.buildPopulate(query.include), this.buildSort(query)),
-        skip: query.pagination.offset,
-        limit: query.pagination.limit,
+        skip: isCursorPagination(pagination) ? 0 : pagination.offset,
+        limit: pagination.limit,
       });
       return rows.map((row) => toPlainResult(row) as Entity);
     } catch (error) {
@@ -125,13 +137,12 @@ export class MongooseRepositoryAdapter<Entity extends object> implements Reposit
     }
   }
 
-  private buildWhere(query: NormalizedQueryContext<Entity>, context: KavoContext<Entity>): MongoWhere {
-    return this.scopeToLive(
-      translateFilter(query.filter, this.filterOptions),
-      context,
-      query.withDeleted,
-      query.onlyDeleted,
-    );
+  private buildWhere(
+    query: NormalizedQueryContext<Entity>,
+    context: KavoContext<Entity>,
+    filter: Filter<Entity> = query.filter,
+  ): MongoWhere {
+    return this.scopeToLive(translateFilter(filter, this.filterOptions), context, query.withDeleted, query.onlyDeleted);
   }
 
   private readOptions(populate: readonly PopulateSpec[] | undefined, sort?: Record<string, 1 | -1>) {

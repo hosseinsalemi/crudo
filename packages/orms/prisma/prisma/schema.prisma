@@ -81,6 +81,25 @@ model Invoice {
   archivedAt DateTime?
 }
 
+// ── cursor-pagination.spec.ts ───────────────────────────────────────────
+
+model Post {
+  id        Int       @id @default(autoincrement())
+  title     String
+  score     Int
+  status    String
+  createdAt DateTime
+  deletedAt DateTime?
+  comments  Comment[]
+}
+
+model Comment {
+  id     Int   @id @default(autoincrement())
+  body   String
+  postId Int?
+  post   Post? @relation(fields: [postId], references: [id])
+}
+
 // ── database-isolation.spec.ts ──────────────────────────────────────────
 
 model Scratch {

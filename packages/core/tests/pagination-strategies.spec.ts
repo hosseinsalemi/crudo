@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { PaginationLimits } from "@kavo/core";
-import { OffsetPaginationStrategy, PagePaginationStrategy, builtInPaginationStrategies } from "@kavo/core";
+import {
+  CursorPaginationStrategy,
+  OffsetPaginationStrategy,
+  PagePaginationStrategy,
+  builtInPaginationStrategies,
+} from "@kavo/core";
 import { issuesOf } from "./support/query-issues.js";
 
 const limits: PaginationLimits = { defaultLimit: 20, maxLimit: 100 };
@@ -121,9 +126,9 @@ describe("PagePaginationStrategy — page[number]/page[size]", () => {
 });
 
 describe("builtInPaginationStrategies", () => {
-  it("ships exactly the two built-ins, keyed by strategy name", () => {
+  it("ships exactly the three built-ins, keyed by strategy name", () => {
     const strategies = builtInPaginationStrategies();
-    expect([...strategies.keys()].sort()).toEqual(["offset", "page"]);
+    expect([...strategies.keys()].sort()).toEqual(["cursor", "offset", "page"]);
   });
 
   it("keys each strategy by its own name property", () => {
@@ -132,9 +137,10 @@ describe("builtInPaginationStrategies", () => {
     }
   });
 
-  it("maps the names to the two exported classes", () => {
+  it("maps the names to the three exported classes", () => {
     const strategies = builtInPaginationStrategies();
     expect(strategies.get("offset")).toBeInstanceOf(OffsetPaginationStrategy);
     expect(strategies.get("page")).toBeInstanceOf(PagePaginationStrategy);
+    expect(strategies.get("cursor")).toBeInstanceOf(CursorPaginationStrategy);
   });
 });

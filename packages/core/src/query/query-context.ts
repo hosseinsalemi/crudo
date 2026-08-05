@@ -19,7 +19,15 @@ export interface QueryContext<Entity = unknown> {
   readonly filter?: FilterExpression<Entity> | null;
   readonly sort?: readonly Sort<Entity>[];
   readonly limit?: number;
+  /** Ignored under `pagination.strategy: "cursor"`, which pages by `cursor`. */
   readonly offset?: number;
+  /**
+   * Opaque page token from a previous list response's `meta.nextCursor`.
+   * Only meaningful under `pagination.strategy: "cursor"`; supplying it
+   * under any other strategy is rejected rather than ignored, so a caller
+   * that thinks it is paging by keyset is told it is not.
+   */
+  readonly cursor?: string | null;
   /** Sparse fieldsets; a bare array is sugar for root-only selection. */
   readonly fields?: FieldSelectionInput<Entity>;
   /**
@@ -44,7 +52,11 @@ export interface QueryContext<Entity = unknown> {
 export interface NormalizedQueryContext<Entity = unknown> {
   readonly filter: Filter<Entity>;
   readonly sort: readonly Sort<Entity>[];
-  readonly pagination: Pagination;
+  /**
+   * A union (ADR-0021): narrow with `isCursorPagination` before reading
+   * `offset`, which a keyset page deliberately does not carry.
+   */
+  readonly pagination: Pagination<Entity>;
   readonly fields: FieldSelection<Entity>;
   /** Validated include tree; empty object when nothing is included. */
   readonly include: IncludeTree;

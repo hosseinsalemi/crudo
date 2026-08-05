@@ -14,6 +14,49 @@ import { ConfigurationException } from "@kavo/core";
 import { GraphQLJSON } from "./json-scalar.js";
 
 /**
+ * Refuse to bind an entity this protocol cannot page (ADR-0021 §7).
+ *
+ * The list field takes `limit`/`offset` only, and `QueryNormalizer` ignores
+ * `offset` under the cursor strategy — so `todos(limit: 20, offset: 40)`
+ * against a cursor-configured entity returns rows 1–20 with no error and no
+ * way for the client to tell. `nextCursor` lives in `meta`, which this
+ * binding's `<Name>List` type does not carry, so page 2 is unreachable
+ * either way. `pagination.strategy` is entity-scope, so a single
+ * `defaults: { pagination: { strategy: "cursor" } }` would silently degrade
+ * every bound entity to page-one-with-wrong-answers.
+ *
+ * Adding `cursor`/`meta` to the schema is the eventual fix; failing at
+ * bootstrap is the correct behavior until then, and stays correct after.
+ * `@kavo/mcp` carries the same guard for the same reason — the two packages
+ * may not import each other, so the check is duplicated rather than shared.
+ */
+/**
+ * The bound entity's configured `pagination.strategy`, read structurally.
+ *
+ * `BoundKavoService` is a `Pick` of the *methods* a schema wires up, and
+ * adding `engine` to it would drag `ResolvedEntityConfig<Entity>` — whose
+ * allowlists are `FieldPath<Entity>[]` — into an invariant position, so
+ * `discovery.ts`'s erased `BoundKavoService<object, …>` would stop accepting
+ * any real service. A real `DefaultKavoService` always has the engine;
+ * `undefined` here means a hand-rolled stand-in with nothing to check.
+ */
+function paginationStrategyOf(service: object): string | undefined {
+  const engine = (service as { engine?: { config?: { settings?: { pagination?: { strategy?: string } } } } }).engine;
+  return engine?.config?.settings?.pagination?.strategy;
+}
+
+function requireOffsetPageable(entityName: string, strategy: string | undefined, protocolName: string): void {
+  if (strategy !== "cursor") return;
+  throw new ConfigurationException(
+    entityName,
+    "pagination.strategy",
+    `'cursor' is not supported by the ${protocolName} binding: its list field exposes 'limit'/'offset' only, ` +
+      `and a keyset page ignores 'offset' — a paged query would silently return the first page every time. ` +
+      `Either page this entity over REST, or give it an entity-scope 'pagination.strategy' of 'offset'/'page'`,
+  );
+}
+
+/**
  * `sort: ["-createdAt", "name"]` → `[{ field: "createdAt", direction: "desc" }, { field: "name", direction: "asc" }]`
  * — the same leading-`-` convention REST's `?sort=` wire param uses, translated here instead of through core's
  * wire-string parser (this binding calls the programmatic `QueryContext` surface, which takes `Sort[]` objects
@@ -118,6 +161,7 @@ export function crudFields<
 } {
   const { name, service, itemType, createInputType, updateInputType, patchInputType, deleteOne, restoreOne, purgeOne } =
     options;
+  requireOffsetPageable(name, paginationStrategyOf(service), "GraphQL");
   const fieldName = lowerFirst(name);
   const idArgs = { id: { type: new GraphQLNonNull(GraphQLInt) } };
 

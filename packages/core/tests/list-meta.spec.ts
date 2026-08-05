@@ -397,3 +397,46 @@ describe("withListMeta — wrapping a findMany handler to add envelope metadata"
     expect(ran).toBe(false);
   });
 });
+
+describe("withListMeta under cursor pagination — the strategy's key is the base", () => {
+  /** The same wrap-the-built-in path, on a cursor-paginated entity. */
+  function cursorWrapped(compute: (result: FindManyResult<User>, context: KavoContext<User>) => ListMetaDto) {
+    const adapter = new InMemoryUserAdapter();
+    const crud = createKavo({
+      defaults: {
+        pagination: { strategy: "cursor" },
+        query: { defaultSort: [{ field: "id", direction: "asc" }] },
+      },
+    } as never).createCrud(
+      User,
+      findManyHandler(withListMeta<User>(builtInHandlers<User>(adapter)("findMany"), compute)),
+      { adapter, metadata: userMetadata },
+    );
+    return { crud, adapter };
+  }
+
+  it("keeps nextCursor alongside a contributor's own keys", async () => {
+    const { crud } = cursorWrapped(() => ({ generatedIn: "3ms" }));
+    for (const age of [1, 2, 3]) {
+      await crud.createOne({ ...ADA, age } as never);
+    }
+
+    const list = await crud.findMany({ limit: 2 } as never);
+    expect(list.meta).toBeDefined();
+    expect(list.meta?.["generatedIn"]).toBe("3ms");
+    expect(typeof list.meta?.["nextCursor"]).toBe("string");
+  });
+
+  it("lets a contributor that names nextCursor explicitly win", async () => {
+    // The documented precedence at `KavoEngine.listMeta`: the strategy's key
+    // is the base and the handler's merges over it, the same "more specific
+    // wins" direction every other precedence chain in Kavo runs (ADR-0021).
+    const { crud } = cursorWrapped(() => ({ nextCursor: "mine" }));
+    for (const age of [1, 2, 3]) {
+      await crud.createOne({ ...ADA, age } as never);
+    }
+
+    const list = await crud.findMany({ limit: 2 } as never);
+    expect(list.meta?.["nextCursor"]).toBe("mine");
+  });
+});

@@ -371,14 +371,23 @@ which changes how an entity's `ClassRef` identity is obtained — the premise
 
 ## 8. Performance posture
 
-Counting is a dedicated `em.count` issued only when `query.count` is true,
-so `total: null` costs zero queries — never fetch-then-length. Pagination
-is `limit`/`offset` on the root, applied by MikroORM independently of
-`populate`, so relation loading never multiplies the rows pagination
-counts. Metadata derivation and adapter construction are cached per entity
-at bootstrap, not repeated per request. The per-operation `em.fork()` is
-cheap — it allocates a manager and an empty identity map, it does not touch
-the connection pool.
+Counting is a dedicated `em.count` issued against `query.filter` — never
+`readFilter(query)`, since `total` is the size of the whole match set, not
+of what remains after the cursor — only when `query.count` is true, so
+`total: null` costs zero queries; never fetch-then-length. `findMany`'s
+own `em.find` filters by `readFilter(query)` instead: under cursor
+pagination it AND-s the keyset predicate onto the client filter and
+composes through the same declarative `FilterQuery` nesting as any other
+filter (§2) — no join aliases, no adapter-side branching — and it is the
+identity function under offset pagination (ADR-0021). The read narrows
+with `isCursorPagination` before touching `.offset` — a `CursorPagination`
+carries none — and passes `offset: 0` on a cursor page, since the keyset
+predicate already excludes everything before it; `limit` bounds the page
+either way, applied by MikroORM independently of `populate`, so relation
+loading never multiplies the rows pagination counts. Metadata derivation
+and adapter construction are cached per entity at bootstrap, not repeated
+per request. The per-operation `em.fork()` is cheap — it allocates a
+manager and an empty identity map, it does not touch the connection pool.
 
 ## 9. The reference application
 

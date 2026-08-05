@@ -7,8 +7,16 @@ import type {
   NormalizedQueryContext,
   RepositoryAdapter,
   ResolvedSoftDelete,
+  Filter,
 } from "@kavo/core";
-import { AlreadyDeletedException, ConfigurationException, NotDeletedException, NotFoundException } from "@kavo/core";
+import {
+  AlreadyDeletedException,
+  ConfigurationException,
+  NotDeletedException,
+  NotFoundException,
+  isCursorPagination,
+  readFilter,
+} from "@kavo/core";
 import { wrap, type EntityManager, type MikroORM } from "@mikro-orm/core";
 import { mapDriverError } from "./error-mapping.js";
 import { translateFilter, type FilterTranslatorOptions, type MikroWhere } from "./filter-translator.js";
@@ -141,13 +149,17 @@ export class MikroOrmRepositoryAdapter<Entity extends object> implements Reposit
 
   async findMany(query: NormalizedQueryContext<Entity>, context: KavoContext<Entity>): Promise<readonly Entity[]> {
     try {
+      // `readFilter` folds in the keyset predicate under cursor pagination
+      // (a no-op otherwise), and a cursor page has no `offset` to skip by —
+      // the keyset predicate *is* the skip.
+      const { pagination } = query;
       const rows = await this.fork().find(
         this.entity,
-        this.buildWhere(query, context) as never,
+        this.buildWhere(query, context, readFilter(query)) as never,
         {
           ...this.buildFindOptions(query),
-          offset: query.pagination.offset,
-          limit: query.pagination.limit,
+          offset: isCursorPagination(pagination) ? 0 : pagination.offset,
+          limit: pagination.limit,
         } as never,
       );
       return toPlainAll(rows).map((row) => pruneIncluded(row, query.include));
@@ -169,13 +181,12 @@ export class MikroOrmRepositoryAdapter<Entity extends object> implements Reposit
   }
 
   /** The translated filter, narrowed to the request's soft-delete scope. */
-  private buildWhere(query: NormalizedQueryContext<Entity>, context: KavoContext<Entity>): MikroWhere {
-    return this.scopeToLive(
-      translateFilter(query.filter, this.filterOptions),
-      context,
-      query.withDeleted,
-      query.onlyDeleted,
-    );
+  private buildWhere(
+    query: NormalizedQueryContext<Entity>,
+    context: KavoContext<Entity>,
+    filter: Filter<Entity> = query.filter,
+  ): MikroWhere {
+    return this.scopeToLive(translateFilter(filter, this.filterOptions), context, query.withDeleted, query.onlyDeleted);
   }
 
   private buildFindOptions(query: NormalizedQueryContext<Entity>): MikroFindOptions {

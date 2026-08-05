@@ -1,14 +1,15 @@
 /**
  * Open, extensible metadata bag on the list envelope, kept out of the
- * envelope's first-class fields. Core never writes to it: the whole key is
- * absent until something contributes.
+ * envelope's first-class fields. The whole key is absent until something
+ * contributes.
  *
  * What fills it is the `findMany` handler's optional `FindManyResult.meta`
  * — return it and the engine merges it onto the envelope verbatim, with no
  * DTO projection and no field selection. `withListMeta(handler, compute)`
  * is the ergonomic wrap for the common "add one stat" case. It is also the
- * seam pagination strategies (`meta.cursor`) and consumer middleware
- * extend.
+ * seam pagination strategies and consumer middleware extend: cursor
+ * pagination is the one contributor core itself writes, folding in
+ * `meta.nextCursor` (ADR-0021).
  *
  * Not to be confused with `OperationConfig.meta` (`OperationMetadata`,
  * ADR-0007), which is route/framework metadata and never reaches a
@@ -30,7 +31,13 @@ export interface ListResultDto<ListDto> {
   readonly items: readonly ListDto[];
   /** Effective page size the server applied. */
   readonly limit: number;
-  /** Zero-based index of `items[0]` within the full match set. */
+  /**
+   * Zero-based index of `items[0]` within the full match set.
+   *
+   * Always `0` under cursor pagination: a keyset page knows only what comes
+   * after a row, not how many rows precede it, and this field is not
+   * nullable (ADR-0021). Cursor clients page with `meta.nextCursor`.
+   */
   readonly offset: number;
   /**
    * Total matching items; `null` when counting is disabled — `COUNT(*)` is

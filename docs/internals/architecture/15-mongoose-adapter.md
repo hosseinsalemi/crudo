@@ -230,10 +230,22 @@ An empty `$set` is skipped rather than sent, since MongoDB rejects it and
 
 ## 5. Pagination & count strategy
 
-`skip`/`limit` from the normalized `limit`/`offset`, same as the other two
-adapters. `count()` is a dedicated `countDocuments()` call built from the
-same filter — never fetch-then-length: the engine only calls `count` when
-`pagination.count` is true, so `total: null` costs zero extra queries.
+`findMany` filters by `readFilter(query)` rather than `query.filter`:
+under cursor pagination it AND-s the keyset predicate onto the client
+filter, translated by the same `translateFilter` as any other AST node —
+the `GT`/`LT`/`GTE`/`LTE` comparisons `keysetExpression` builds become
+`$gt`/`$lt`/`$gte`/`$lte`, and its `OR`-of-`AND` shape becomes `$or`/`$and`
+per §2 — and it is the identity function under offset pagination
+(ADR-0021). The read narrows with `isCursorPagination` before touching
+`.offset` — a `CursorPagination` carries none — and passes `skip: 0` on a
+cursor page, since the keyset predicate already excludes the rows before
+it; `limit: pagination.limit` bounds the page either way.
+
+`count()` is a dedicated `countDocuments()` call built from `query.filter`
+— not `readFilter(query)`, since `total` is the size of the whole match
+set, not of what remains after the cursor — never fetch-then-length: the
+engine only calls `count` when `pagination.count` is true, so
+`total: null` costs zero extra queries.
 
 ## 6. Error-mapping table
 

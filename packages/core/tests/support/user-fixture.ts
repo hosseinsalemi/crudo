@@ -1,5 +1,13 @@
-import type { KavoContext, EntityId, EntityMetadata, NormalizedQueryContext, RepositoryAdapter } from "@kavo/core";
-import { NotFoundException } from "@kavo/core";
+import type {
+  KavoContext,
+  EntityId,
+  EntityMetadata,
+  FilterExpression,
+  NormalizedQueryContext,
+  RepositoryAdapter,
+  Sort,
+} from "@kavo/core";
+import { NotFoundException, isCursorPagination, readFilter } from "@kavo/core";
 
 /** Test entity: plain class, fields initialized so shapes exist at runtime. */
 export class User {
@@ -33,10 +41,11 @@ export const userMetadata: EntityMetadata<User> = {
 };
 
 /**
- * In-memory adapter for engine tests: honors pagination and records the
- * queries it receives; filter evaluation is the *database's* job and is
- * covered by the @kavo/typeorm integration tests, not re-implemented
- * here.
+ * In-memory adapter for engine tests: honors sorting and pagination, records
+ * the queries it receives, and evaluates just enough of the filter AST
+ * (`EQ`/`NE`/`GT`/`GTE`/`LT`/`LTE` plus `AND`/`OR`/`NOT`) for keyset
+ * pagination to page for real. Full filter translation is the *database's*
+ * job and is covered by the per-ORM integration suites.
  */
 export class InMemoryUserAdapter implements RepositoryAdapter<User> {
   rows: User[] = [];
@@ -54,12 +63,18 @@ export class InMemoryUserAdapter implements RepositoryAdapter<User> {
 
   async findMany(query: NormalizedQueryContext<User>): Promise<readonly User[]> {
     this.lastQuery = query;
-    const { offset, limit } = query.pagination;
-    return this.rows.slice(offset, offset + limit);
+    // `readFilter`, not `query.filter` — the same call every real adapter
+    // makes, so the keyset predicate is applied here too.
+    const matched = this.match(readFilter(query).root).sort(comparatorFor(query.sort));
+    const { pagination } = query;
+    if (isCursorPagination(pagination)) return matched.slice(0, pagination.limit);
+    return matched.slice(pagination.offset, pagination.offset + pagination.limit);
   }
 
-  async count(_query: NormalizedQueryContext<User>): Promise<number> {
-    return this.rows.length;
+  async count(query: NormalizedQueryContext<User>): Promise<number> {
+    // `query.filter`, deliberately: `total` spans the whole match set, so a
+    // cursor never narrows it.
+    return this.match(query.filter.root).length;
   }
 
   async create(data: Partial<User>): Promise<User> {
@@ -96,6 +111,10 @@ export class InMemoryUserAdapter implements RepositoryAdapter<User> {
     await this.delete(id);
   }
 
+  private match(root: FilterExpression<User> | null): User[] {
+    return this.rows.filter((row) => matches(row, root));
+  }
+
   private async require(id: EntityId): Promise<User> {
     const row = await this.findOneById(id);
     if (row === null) {
@@ -109,4 +128,53 @@ export class InMemoryUserAdapter implements RepositoryAdapter<User> {
 
 export function contextStub(): KavoContext<User> {
   return {} as KavoContext<User>;
+}
+
+/** Multi-key comparator; list order is precedence, as `Sort` documents. */
+function comparatorFor(sort: readonly Sort<User>[]): (left: User, right: User) => number {
+  return (left, right) => {
+    for (const entry of sort) {
+      const sign = compare(valueOf(left, entry.field as string), valueOf(right, entry.field as string));
+      if (sign !== 0) return entry.direction === "desc" ? -sign : sign;
+    }
+    return 0;
+  };
+}
+
+function matches(row: User, node: FilterExpression<User> | null): boolean {
+  if (node === null) return true;
+  if (node.kind === "group") {
+    if (node.operator === "NOT") return !matches(row, node.children[0]!);
+    const test = (child: FilterExpression<User>): boolean => matches(row, child);
+    return node.operator === "AND" ? node.children.every(test) : node.children.some(test);
+  }
+  const actual = valueOf(row, node.field as string);
+  const expected = node.value as number | string | boolean | Date | null;
+  switch (node.operator) {
+    case "EQ":
+      return compare(actual, expected) === 0;
+    case "NE":
+      return compare(actual, expected) !== 0;
+    case "GT":
+      return compare(actual, expected) > 0;
+    case "GTE":
+      return compare(actual, expected) >= 0;
+    case "LT":
+      return compare(actual, expected) < 0;
+    case "LTE":
+      return compare(actual, expected) <= 0;
+    default:
+      throw new Error(`InMemoryUserAdapter does not evaluate '${node.operator}'`);
+  }
+}
+
+function valueOf(row: User, field: string): number | string | boolean | Date | null {
+  return (row as unknown as Record<string, number | string | boolean | Date | null>)[field] ?? null;
+}
+
+function compare(left: unknown, right: unknown): number {
+  const a = left instanceof Date ? left.getTime() : left;
+  const b = right instanceof Date ? right.getTime() : right;
+  if (a === b) return 0;
+  return (a as never) < (b as never) ? -1 : 1;
 }
