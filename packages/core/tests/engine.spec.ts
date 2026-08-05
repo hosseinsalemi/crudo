@@ -73,7 +73,10 @@ describe("KavoEngine pipeline", () => {
     expect(list.limit).toBe(2);
     expect(list.offset).toBe(1);
     expect(list.total).toBe(5);
-    expect(list.meta).toEqual({});
+    // `meta` is optional and nothing contributed here, so the key is absent
+    // rather than an empty bag.
+    expect(list.meta).toBeUndefined();
+    expect("meta" in list).toBe(false);
   });
 
   it("reports total: null when counting is disabled", async () => {

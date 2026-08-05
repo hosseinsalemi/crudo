@@ -2,6 +2,7 @@ import type { KavoContext } from "../context/kavo-context.js";
 import type { KavoRequest } from "../context/kavo-request.js";
 import type { KavoResponse } from "../context/kavo-response.js";
 import type { DtoClass, DtoSlot } from "../dto/dto.js";
+import type { ListMetaDto } from "../dto/list-result.js";
 import type { Deserializer, Serializer } from "../serialization/serializer.js";
 import type { EntityId } from "../types/entity-id.js";
 import type { EntityMetadata } from "../metadata/entity-metadata.js";
@@ -428,9 +429,10 @@ export class KavoEngine<Entity extends object> {
     const { serializer, config } = this.deps;
 
     if (descriptor.id === "findMany") {
-      const { entities, total } = result as FindManyResult<Entity>;
+      const { entities, total, meta } = result as FindManyResult<Entity>;
       const listDto = (descriptor.output as DtoClass<object> | null) ?? config.dto.resolve("list", descriptor.id);
       const pagination = context.query?.pagination ?? { limit: 0, offset: 0 };
+      const listMeta = this.listMeta(meta);
       return {
         operation: descriptor.id,
         item: null,
@@ -438,8 +440,17 @@ export class KavoEngine<Entity extends object> {
           items: serializer.serializeList(entities, listDto, context),
           limit: pagination.limit,
           offset: pagination.offset,
-          total,
-          meta: {},
+          // `total` is a required envelope field typed `number | null`, but
+          // a custom handler can return `{ entities }` alone. Left
+          // `undefined` the key would vanish from the JSON body entirely,
+          // so normalize the absent case to the documented `null`.
+          total: total ?? null,
+          // Spread rather than `meta: listMeta`: assigning `undefined` would
+          // leave the key on the object (`"meta" in list`, `Object.keys`)
+          // even though `JSON.stringify` drops it, so a programmatic caller
+          // and a REST client would disagree about whether the envelope has
+          // a `meta`. Omitted means omitted, on both sides.
+          ...(listMeta === undefined ? {} : { meta: listMeta }),
         },
         // Collection ETags are out of scope (issue #120): a list's identity
         // spans pagination, sort and filter, which is a different feature
@@ -470,6 +481,56 @@ export class KavoEngine<Entity extends object> {
       // deliberately leaves out rather than half-implements.
       notModified: etag !== null && descriptor.kind === "read" && weakMatch(preconditions?.ifNoneMatch ?? [], etag),
     };
+  }
+
+  /**
+   * Assemble the list envelope's `meta` (`ListResultDto.meta` — the
+   * response bag, never `OperationConfig.meta`/`OperationMetadata`,
+   * ADR-0007).
+   *
+   * A named step rather than an inline spread because this is the single
+   * merge point for everything that can contribute to it, and the handler
+   * is only the first contributor: a pagination strategy computing
+   * `meta.nextCursor` (#118) belongs to the engine, not to whatever
+   * handler happens to be configured, and folds in here.
+   *
+   * `undefined` — not `{}` — when nothing contributed, so `mapResponse`
+   * can leave the key off the envelope entirely. An empty bag carries no
+   * information, and the common zero-config list is exactly the case that
+   * would pay for it on every response. This is why the field is optional
+   * (`ListResultDto.meta?`) while `total` is not: `total: null` still
+   * answers "how many matched"; `meta: {}` answers nothing. Emptiness is
+   * judged after the merge, so a contributor that returns `{}` is the same
+   * as no contributor at all — and so is one whose every value is
+   * `undefined`. Those keys are dropped rather than counted: they are
+   * exactly what `JSON.stringify` erases, so keeping them would hand a
+   * programmatic caller a `{ nextCursor: undefined }` bag while the REST
+   * client saw `"meta": {}` — the very divergence the omit-when-empty rule
+   * exists to prevent. A cursor contributor writing
+   * `{ nextCursor: cursorOrUndefined }` on a last page therefore leaves no
+   * `meta` at all.
+   *
+   * `meta` never passes through the serializer: it is the caller's own
+   * JSON-serializable data, not entity data, so no DTO projection or
+   * field selection applies to it and it reaches the wire verbatim.
+   *
+   * The copy is deliberate, and it is *not* the same situation as `items`:
+   * `items` is a fresh array of freshly serialized DTOs on every request,
+   * whereas `handlerMeta` can be the very same object each time — a
+   * hand-written handler returning a module-scope constant is the
+   * documented alternative to `withListMeta`. Handing that object out by
+   * reference would let one response's consumer mutate every later
+   * response's bag. Shallow is the right depth: it makes the envelope's
+   * own key set private without deep-cloning caller data that only has to
+   * survive `JSON.stringify`.
+   */
+  private listMeta(handlerMeta: ListMetaDto | undefined): ListMetaDto | undefined {
+    if (handlerMeta === undefined) return undefined;
+    const copy: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(handlerMeta)) {
+      if (value !== undefined) copy[key] = value;
+    }
+    return Object.keys(copy).length === 0 ? undefined : copy;
   }
 }
 

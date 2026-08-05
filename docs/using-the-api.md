@@ -143,7 +143,9 @@ A list response (`GET /books`) always has the same shape:
 }
 ```
 
-`total` is omitted (and its `COUNT` query skipped) if `pagination.count` is turned off.
+`total` is `null` (and its `COUNT` query skipped) if `pagination.count` is turned off. The key is always present — a list always answers "how many matched", so configuration changes the value, never the shape.
+
+One optional fifth key can join them. `meta` is an open bag for anything the API wants to say about the list that isn't a row: a facet count, a "results are approximate" flag, a cursor. It appears **only** when the entity's `findMany` handler puts something there — see [custom list metadata](/integrations/nest/configuration#custom-list-metadata) for how — so a response with nothing to report has no `meta` key at all rather than an empty `{}`. Read it as `body.meta?.facets`. Kavo never writes to it itself, and nothing in it is projected, filtered, or renamed on the way out: what the handler returns is what the client receives.
 
 ## ETags and conditional requests
 

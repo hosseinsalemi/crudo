@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import { Controller, type INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
+import { withListMeta } from "@kavo/core";
 import type { KavoModuleOptions } from "@kavo/nest";
 import { Kavo, KavoModule } from "@kavo/nest";
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
@@ -235,6 +236,62 @@ describe("@Kavo custom meta.routes on a standard, non-@Override'd operation", ()
     await request(server()).post("/todos").send({ title: "x" }).expect(201);
 
     await request(server()).delete("/todos/1").expect(404);
+  });
+});
+
+describe("ListResultDto.meta over the wire — what a findMany handler contributes (issue #122)", () => {
+  /** Arbitrary JSON-serializable shapes, not just primitives. */
+  const CONTRIBUTED = {
+    facets: { done: { true: 1, false: 2 } },
+    appliedFilters: ["done"],
+    cursor: null,
+    exhausted: false,
+    queriedAt: 1700000000000,
+  };
+
+  @Kavo(Todo, {
+    operations: {
+      findMany: {
+        handler: withListMeta<Todo>(
+          {
+            async execute() {
+              return { entities: [Object.assign(new Todo(), { id: 7, title: "wired" })], total: 1 };
+            },
+          },
+          () => CONTRIBUTED,
+        ),
+      },
+    },
+  })
+  @Controller("todos")
+  class ListMetaController {}
+
+  @Kavo(Todo)
+  @Controller("todos")
+  class PlainController {}
+
+  it("serves the contributed meta verbatim, alongside an untouched envelope", async () => {
+    await bootstrap(ListMetaController);
+
+    const response = await request(server()).get("/todos").expect(200);
+    // `meta` is the caller's own data: it crosses the wire unserialized by
+    // any DTO, so the whole object graph survives the JSON round trip.
+    expect(response.body.meta).toEqual(CONTRIBUTED);
+    expect(response.body.items).toMatchObject([{ id: 7, title: "wired" }]);
+    expect(response.body.total).toBe(1);
+  });
+
+  it("leaves meta off the wire entirely when nothing contributes one", async () => {
+    await bootstrap(PlainController);
+    await request(server()).post("/todos").send({ title: "x" }).expect(201);
+
+    const response = await request(server()).get("/todos").expect(200);
+    // The zero-config list is the common case, and an empty bag would be
+    // pure noise on every one of its responses. The four fields that always
+    // mean something stay put — including `total`, which reports `null`
+    // rather than vanishing when counting is off.
+    expect(Object.keys(response.body as Record<string, unknown>)).toEqual(["items", "limit", "offset", "total"]);
+    expect(response.body).not.toHaveProperty("meta");
   });
 });
 

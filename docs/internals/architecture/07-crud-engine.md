@@ -49,7 +49,7 @@ caller didn't forward one), and the typed `state` bag
 
 Ordinary registry entries (ADR-0006), one adapter call each plus the
 "missing vs. error" decision — adapters return `null`, handlers raise
-`NotFoundException`. `findMany` returns `{ entities, total }` where
+`NotFoundException`. `findMany` returns `{ entities, total, meta? }` where
 `total` is only computed when `pagination.count` is true (a separate
 count query, never `getManyAndCount`). `deleteOne`/`restoreOne`/
 `purgeOne` are equally ordinary entries — the delete strategy is resolved
@@ -61,6 +61,45 @@ not a TODO.
 The engine also coerces URL path ids against the id column's kind, so
 `GET /users/abc` on a numeric key is a clean 400 rather than a driver
 error.
+
+### 3.1 The list envelope's `meta`
+
+`FindManyResult.meta` is optional and the built-in handler never sets it,
+so a zero-config list carries no `meta` at all. What makes it a real seam
+is that response mapping **merges** what it finds there rather than
+discarding it (issue #122): an overriding or wrapping `findMany` handler
+returns `meta` alongside `entities`/`total`, and it lands on
+`ListResultDto.meta` verbatim. `meta` is caller data, not entity data, so
+it never passes through the serializer — no DTO projection, no `fields=`
+selection, no renaming.
+
+`ListResultDto.meta` is the envelope's one **optional** field, and the
+contrast with `total` is the reason. `total` reports `null` rather than
+disappearing when `pagination.count` is off, because every list answers
+"how many matched" and `null` is that answer; an empty `meta` answers
+nothing, and the zero-config list — the common case — is exactly what
+would pay for it on every response. So emptiness means omission: the key
+is left off the object entirely, not set to `undefined`, or `Object.keys`
+and `JSON.stringify` would disagree about whether the envelope has one.
+Emptiness is judged after the merge, so a contributor returning `{}` is
+indistinguishable from no contributor. Consumers read `meta?.x`.
+
+`KavoEngine.listMeta` is that single merge point, named rather than
+inlined because the handler is only the first contributor: a pagination
+strategy computing `meta.nextCursor` belongs to the engine, not to
+whichever handler happens to be configured, and folds in there.
+`withListMeta(handler, compute)` (`core/src/engine/with-list-meta.ts`) is
+the ergonomic wrap for the common case; its merge precedence is the
+contributor's keys over the wrapped handler's, matching the direction
+config precedence already runs (global → entity → operation → per-call).
+It is typed against `OperationHandler<Entity>` so it composes with
+`builtInHandlers(...)` and `OperationConfig.handler` without a cast, which
+erases the output type — hence the runtime shape check that raises
+`ConfigurationException` instead of assembling a malformed envelope.
+
+Not to be confused with `OperationConfig.meta` (`OperationMetadata`,
+ADR-0007): that is route/framework metadata on a registry entry and never
+reaches a response body.
 
 ## 3a. Conditional requests (ADR-0020)
 

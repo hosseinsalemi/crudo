@@ -309,7 +309,22 @@ function successBodyFor(
   }
 }
 
-/** The list envelope, wrapping the resolved list-element schema. */
+/**
+ * The list envelope, wrapping the resolved list-element schema.
+ *
+ * `required` names the four fields every list response carries, which
+ * leaves `meta` as the one a client must not assume: it is omitted from
+ * the body unless a `findMany` handler contributed to it.
+ *
+ * `meta` is also the one field with no static shape to document. Unlike
+ * `items` — projected through the `list` DTO, so `schemaFromDto` can read
+ * real fields off it — `ListMetaDto` is an open `[key: string]: unknown`
+ * bag filled at request time by handler code Kavo never sees, so there is
+ * nothing to enumerate at decoration time. `additionalProperties: true`
+ * says exactly that; without it, a bare `{ type: "object" }` with no
+ * `properties` reads to most OpenAPI generators as an object with *no*
+ * permitted keys, which is the opposite of what this field is.
+ */
 function listEnvelopeSchema(
   element: { type: "object"; properties: Record<string, object> } | null,
   title: string,
@@ -317,6 +332,7 @@ function listEnvelopeSchema(
   return {
     title: `${title}List`,
     type: "object",
+    required: ["items", "limit", "offset", "total"],
     properties: {
       items: {
         type: "array",
@@ -325,7 +341,15 @@ function listEnvelopeSchema(
       limit: { type: "integer" },
       offset: { type: "integer" },
       total: { type: "integer", nullable: true },
-      meta: { type: "object" },
+      meta: {
+        type: "object",
+        additionalProperties: true,
+        description:
+          "Open metadata bag about the list itself, filled by the findMany " +
+          "handler (see FindManyResult.meta / withListMeta). Absent when " +
+          "nothing contributed; its keys are application-defined and are " +
+          "not projected through a DTO.",
+      },
     },
   };
 }

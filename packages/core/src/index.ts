@@ -174,6 +174,7 @@ export {
   type StandardHandlerFactory,
 } from "./operations/default-operation-registry.js";
 export { builtInHandlers, type FindManyResult, type IdentifiedWrite } from "./engine/built-in-handlers.js";
+export { withListMeta, type ListMetaContributor } from "./engine/with-list-meta.js";
 export { KavoEngine, WireQuery, type KavoEngineDependencies } from "./engine/kavo-engine.js";
 export { DefaultKavoContextState, createKavoContext, type KavoContextInit } from "./context/default-kavo-context.js";
 export { DefaultRelationRegistry } from "./relations/default-relation-registry.js";
