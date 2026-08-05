@@ -6,7 +6,7 @@ import type {
   RelationDescriptor,
   RepositoryAdapter,
 } from "@kavo/core";
-import { NotFoundException, isCursorPagination } from "@kavo/core";
+import { NotFoundException, hasKeyset } from "@kavo/core";
 
 /**
  * A small relation graph for include tests:
@@ -102,8 +102,8 @@ export class SeededAdapter<Entity extends object> implements RepositoryAdapter<E
 
   async findMany(query: NormalizedQueryContext<Entity>): Promise<readonly Entity[]> {
     this.lastQuery = query;
-    // Offset-only fixture: narrow rather than assume (ADR-0021).
-    const offset = isCursorPagination(query.pagination) ? 0 : query.pagination.offset;
+    // Offset-only fixture: narrow rather than assume (ADR-0021, ADR-0022).
+    const offset = hasKeyset(query.pagination) ? 0 : query.pagination.offset;
     return this.rows.slice(offset, offset + query.pagination.limit);
   }
 

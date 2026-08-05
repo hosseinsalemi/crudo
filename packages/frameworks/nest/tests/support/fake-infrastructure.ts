@@ -7,7 +7,7 @@ import type {
   NormalizedQueryContext,
   RepositoryAdapter,
 } from "@kavo/core";
-import { AlreadyDeletedException, NotDeletedException, NotFoundException, isCursorPagination } from "@kavo/core";
+import { AlreadyDeletedException, NotDeletedException, NotFoundException, hasKeyset } from "@kavo/core";
 
 /**
  * Test entity for binding tests — no ORM anywhere near this package. The
@@ -128,7 +128,7 @@ export class InMemoryTodoAdapter implements RepositoryAdapter<Todo> {
     this.lastQuery = query;
     const { limit } = query.pagination;
     // Offset-only fixture: narrow rather than assume (ADR-0021).
-    const offset = isCursorPagination(query.pagination) ? 0 : query.pagination.offset;
+    const offset = hasKeyset(query.pagination) ? 0 : query.pagination.offset;
     return this.live(query, context).slice(offset, offset + limit);
   }
 

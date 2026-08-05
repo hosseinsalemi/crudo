@@ -1,5 +1,5 @@
 import type { KavoContext, EntityId, EntityMetadata, NormalizedQueryContext, RepositoryAdapter } from "@kavo/core";
-import { NotFoundException, isCursorPagination } from "@kavo/core";
+import { NotFoundException, hasKeyset } from "@kavo/core";
 
 /** Third entity — the only one that's soft-deletable, so `restoreOne`/`purgeOne` have something real to exercise. */
 export class Note {
@@ -36,7 +36,7 @@ export class InMemoryNoteAdapter implements RepositoryAdapter<Note> {
   async findMany(query: NormalizedQueryContext<Note>): Promise<readonly Note[]> {
     const { limit } = query.pagination;
     // Offset-only fixture: narrow rather than assume (ADR-0021).
-    const offset = isCursorPagination(query.pagination) ? 0 : query.pagination.offset;
+    const offset = hasKeyset(query.pagination) ? 0 : query.pagination.offset;
     return this.rows.filter((row) => row.deletedAt === null).slice(offset, offset + limit);
   }
 
@@ -132,7 +132,7 @@ export class InMemoryTagAdapter implements RepositoryAdapter<Tag> {
   async findMany(query: NormalizedQueryContext<Tag>): Promise<readonly Tag[]> {
     const { limit } = query.pagination;
     // Offset-only fixture: narrow rather than assume (ADR-0021).
-    const offset = isCursorPagination(query.pagination) ? 0 : query.pagination.offset;
+    const offset = hasKeyset(query.pagination) ? 0 : query.pagination.offset;
     return this.rows.slice(offset, offset + limit);
   }
 
@@ -209,7 +209,7 @@ export class InMemoryTodoAdapter implements RepositoryAdapter<Todo> {
     this.lastQuery = query;
     const { limit } = query.pagination;
     // Offset-only fixture: narrow rather than assume (ADR-0021).
-    const offset = isCursorPagination(query.pagination) ? 0 : query.pagination.offset;
+    const offset = hasKeyset(query.pagination) ? 0 : query.pagination.offset;
     return this.rows.slice(offset, offset + limit);
   }
 
