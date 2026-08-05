@@ -14,11 +14,13 @@ KavoRequest
  → Query Resolution       reads only: WireQuery → normalizeWire, QueryContext → normalizeInput
  → Context Assembly       KavoContext: identity, config view, principal, transaction ⟨reserved⟩,
                           normalized query, correlationId, typed state bag
+ → Precondition Check     If-Match writes only: pre-read + hash → 412 / 404 (ADR-0020)
  → DTO Resolution         descriptor.input/output else the doc-4 slot default
  → Deserialization        writes only: body → allowed-key projection
  → Handler Execution      OperationHandler from the registry (built-in, overridden, or custom)
  → Response Mapping       item / ListResultDto envelope / void
  → Serialization          DTO mapping → field selection
+ → ETag                   single-item responses: hash the representation; If-None-Match → notModified
 KavoResponse
 ```
 
@@ -71,13 +73,24 @@ error.
 ### 3.1 The list envelope's `meta`
 
 `FindManyResult.meta` is optional and the built-in handler never sets it,
-so a zero-config list still reports `meta: {}`. What makes it a real seam
+so a zero-config list carries no `meta` at all. What makes it a real seam
 is that response mapping **merges** what it finds there rather than
 discarding it (issue #122): an overriding or wrapping `findMany` handler
 returns `meta` alongside `entities`/`total`, and it lands on
 `ListResultDto.meta` verbatim. `meta` is caller data, not entity data, so
 it never passes through the serializer — no DTO projection, no `fields=`
 selection, no renaming.
+
+`ListResultDto.meta` is the envelope's one **optional** field, and the
+contrast with `total` is the reason. `total` reports `null` rather than
+disappearing when `pagination.count` is off, because every list answers
+"how many matched" and `null` is that answer; an empty `meta` answers
+nothing, and the zero-config list — the common case — is exactly what
+would pay for it on every response. So emptiness means omission: the key
+is left off the object entirely, not set to `undefined`, or `Object.keys`
+and `JSON.stringify` would disagree about whether the envelope has one.
+Emptiness is judged after the merge, so a contributor returning `{}` is
+indistinguishable from no contributor. Consumers read `meta?.x`.
 
 `KavoEngine.listMeta` is that single merge point, named rather than
 inlined because the handler is only the first contributor. Under cursor
@@ -103,6 +116,40 @@ erases the output type — hence the runtime shape check that raises
 Not to be confused with `OperationConfig.meta` (`OperationMetadata`,
 ADR-0007): that is route/framework metadata on a registry entry and never
 reaches a response body.
+
+## 3a. Conditional requests (ADR-0020)
+
+`caching.etag` (doc 08, default on) makes every single-item response
+carry a strong `ETag` — a SHA-256 of the **canonicalized serialized
+representation**, keys sorted so a DTO field reorder is not a spurious
+cache miss. Collection responses carry none. The tag and a
+`notModified` flag ride on `KavoResponse`, so any transport can act on
+them; `@kavo/nest` turns them into the `ETag` header and a `304`.
+
+`If-Match` is the one stage that needs a read the handlers cannot give
+it: `KavoEngineDependencies.reader` exists for it. The engine re-reads
+the target through that reader, hashes the row's **canonical read
+representation** (what `findOne` with no `fields`/`include`/`sort`
+would return, `withDeleted` on a soft-deletable entity so the same read
+serves a deleted row), and raises `PreconditionFailedException` (412)
+when no supplied token matches. It runs on every standard write that
+targets one identified row — `updateOne`, `patchOne`, `deleteOne`,
+`restoreOne`, `purgeOne`.
+
+Everything outside that set is **refused, never dropped**:
+`PreconditionUnsupportedException` (412
+`KAVO_PRECONDITION_UNSUPPORTED`) for an operation that targets no
+single row (`createOne`, any custom operation), for `caching.etag`
+being off, and for `findOne` not being enabled — the three ways the
+check cannot run on a request that changes state. Reads are the one
+exception and ignore `If-Match` outright, since a safe method cannot
+lose an update. A row with no current representation is left to the
+handler rather than 404'd here, so `DELETE` on a soft-deleted row is
+the same 409 with or without the header. `If-Match: *` short-circuits
+before the pre-read: the comparison answers it without a tag.
+
+This is application-level check-then-write, **not** an atomic
+compare-and-swap; the race window is real and stated in the ADR.
 
 ## 4. Patterns
 

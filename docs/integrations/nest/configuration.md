@@ -81,6 +81,20 @@ This is the shape of `defaults` above, and also of every entity-scope, operation
 | `maxDepth`       | `number`                          | (inherits `relations.maxIncludeDepth`) | Overrides the include-depth limit for the subtree below this relation only.                                                                                               |
 | `strategy`       | `"join"` \| `"batch"` \| `"auto"` | `"auto"`                               | How the relation loads: `join` (single query, correct for to-one), `batch` (per-level `WHERE parentId IN (...)`, correct for to-many), or `auto` (picks per cardinality). |
 
+### `caching`
+
+| Field  | Type      | Default | What it does                                                                                                                                     |
+| ------ | --------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `etag` | `boolean` | `true`  | Whether single-item responses carry an `ETag`, and whether `If-None-Match` (→ `304`) and `If-Match` (→ `412`) are honored. One key, both halves. |
+
+`false` at any scope turns both halves off together — no tag is computed and `If-None-Match` is ignored. `If-Match` is the exception: it is **refused** with `412 KAVO_PRECONDITION_UNSUPPORTED`, not ignored. Answering `2xx` would tell a client its write was guarded when nothing checked it, and the per-operation scope makes that easy to arrive at by accident (`operations: { findOne: { caching: { etag: true } }, updateOne: { caching: { etag: false } } }` would serve tags on `GET` and drop the header on `PUT`).
+
+See [ETags and conditional requests](/using-the-api#etags-and-conditional-requests) for the wire behavior, including the explicit limits: the `If-Match` check is check-then-write rather than an atomic compare-and-swap, and a token has to come from an unnarrowed read.
+
+**Redaction belongs in the DTO, not in an interceptor.** Kavo's `KavoResponseInterceptor` is method-scoped and therefore innermost: it sets the `ETag` before any controller- or app-level interceptor runs. An outer interceptor that strips fields per role would ship a hash of the _unredacted_ representation next to a redacted body — and a client's `If-Match` built from it would never match. Shape the response with a per-operation `item` DTO, which the engine serializes through before hashing.
+
+**An `@Override`'d method enforces `If-Match` only if it forwards it.** The check lives in the engine, so a method you wrote in place of a generated one bypasses it. `@Kavo` still hands the tokens to the method as its last parameter; pass them on with `{ preconditions }` on the typed service, or return `service.engine.execute({ …, preconditions })` to also get the `ETag` header back.
+
 ### `softDelete`
 
 | Field      | Type                             | Default       | What it does                                                                                                                                                                                                                               |
@@ -115,7 +129,7 @@ An entity's own `operations.<id>` (below) always wins over this global map.
 
 ## `@Kavo(Entity, config)` — entity-scope config
 
-Every field above (`pagination`, `query`, `errors`, `relations`, `softDelete`) can also be set here, one level above global. In addition, `@Kavo`'s config carries three fields that only make sense per entity:
+Every field above (`pagination`, `query`, `errors`, `relations`, `softDelete`) can also be set here, one level above global. In addition, `@Kavo`'s config carries four fields that only make sense per entity:
 
 ### `dto`
 
@@ -163,7 +177,45 @@ What a request may filter, sort, and select on — including relation paths. Any
 | `sortable`   | same shape                                                    | Fields usable in `sort=`.       |
 | `selectable` | same shape                                                    | Fields usable in `fields=`.     |
 
-`{ exclude: [...] }` means "every own column except these", resolved against entity metadata at bootstrap. Omit a key entirely and it derives from the `query` DTO or entity metadata instead.
+`{ exclude: [...] }` means "every own column (plus, for `selectable`, every selectable computed field) except these", resolved at bootstrap against exactly the base set that key's plain default uses. Omit a key entirely and it derives from the `query` DTO or entity metadata instead.
+
+### `computed`
+
+Response fields with no backing column, derived from an entity that has already been fetched:
+
+```ts
+@Kavo(Book, {
+  computed: {
+    displayTitle: { resolve: (book) => (book.title === null ? null : `${book.title} (${book.year})`) },
+    canEdit: { resolve: (book, context) => book.ownerId === (context.principal as User)?.id },
+  },
+})
+```
+
+| Field        | Type                                        | What it does                                                                                         |
+| ------------ | ------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `resolve`    | `(entity, context: KavoContext) => unknown` | Derives the value. Called once per served item, **synchronously** — see the caveats below.           |
+| `selectable` | `boolean` (default `true`)                  | Whether `fields=` may name the field. `false` makes naming it a 400 — read the note below carefully. |
+
+A declared computed field is in the default `item`/`list` projection with no DTO registration, and in the `selectable` allowlist by default. It is **never** filterable, sortable, or writable — naming one in `allowlists.filterable`/`sortable` is both a type error and a bootstrap `ConfigurationException`, and so is naming one in a registered `create`/`update`/`patch` DTO. (A raw body key is still just dropped, like any other unknown key; the DTO case is a declaration, and every other computed misdeclaration fails at bootstrap too. It also has a wire consequence a silent drop cannot reach: `@ApiBody` is built from the DTO's runtime shape, so OpenAPI would advertise a property the engine unconditionally discards.)
+
+`resolve` returning `undefined` omits the key; `null` emits it — the same distinction a column draws.
+
+**`resolve` must be total, not merely pure.** It runs once per served item and nothing catches it, so **one** row whose resolver throws turns the whole collection endpoint into a 500 — not for that row, for every caller, until the row is fixed. Write it against everything the column can actually hold, including `null`: `resolve: (todo) => todo.title?.toLowerCase() ?? null`, never `todo.title.toLowerCase()` on a nullable column. A `POST` that sets `title: null` succeeds (computed fields are stripped from the payload; `title` is an ordinary column), and `GET /todos` is dead from then on. A throwing resolver surfaces as a 500 `KAVO_PERSISTENCE_FAILED` with the cause attached and the message not leaked.
+
+Keep it a pure function of the entity as well (plus `context.principal` where a field has to vary by caller). It runs per row, so a resolver that queries the database or calls out over the network reintroduces exactly the N+1 that batched includes exist to avoid. Declaring it `async` is a bootstrap error rather than a slow success: the serializer never awaits, so the promise would be emitted as-is and serialize to `{}`.
+
+**`resolve` receives the full fetched row**, not the projected object — selection is "kept internally, stripped late", so every column is present regardless of `fields=` or the registered `item` DTO. A computed field can therefore surface a value a narrowed DTO or `selectable` list deliberately hides. That is deliberate (`resolve` is server-authored code, the same trust level as `exposeInternals`), but it makes the resolver part of the exposure decision: narrowing the DTO does not narrow what the resolver can see.
+
+**What `selectable: false` does and does not mean.** It removes the name from the allowlist, so `?fields=auditNote` is a 400. It does **not** pin the field into every response: selection narrows the projection uniformly, so any request that sends `fields=` at all still drops it, and the client has no way to ask for it back. Read it as "not individually selectable", not "always present". An explicit `allowlists.selectable` list naming the field overrides the flag — an explicit list is always the deliberate answer.
+
+On an **included relation target**, `resolve` receives the _root_ request's `KavoContext` — serving `GET /posts/1?include=author` hands an `Author` computed field a context whose `entityName`, `operation`, `config` and `query` describe Post. Only `principal`, `correlationId`, `transaction` and `state` mean what they say from a relation target.
+
+**The generated OpenAPI response schema does not mention a computed field** when no `item`/`list` DTO is registered: the schema falls back to the entity class, whose columns are all the reflection can see, while the runtime response carries the computed key. Registering an `item`/`list` DTO naming the field fixes the document and the static response type in one move — the same escape hatch, for both consequences.
+
+Let the computed-key type parameter be inferred at the call site: pass the config inline to `@Kavo(...)` (or use `satisfies`), and pin neither an `EntityConfig<Book>` annotation on the config nor explicit type arguments on the call (`@Kavo<Todo, CreateTodoDto>(...)`, `createCrud<Book, CreateBookDto>(...)` — the likelier spelling once an entity has custom DTOs). Either fixes `Computed` to `never`, which erases `computed`'s value types and leaves `resolve`'s parameter implicitly `any`.
+
+See [ADR-0019](/internals/adr/0019-computed-fields-are-serializer-evaluated) for the reasoning and [DTO system §7](/internals/architecture/04-dto-system) for how it interacts with DTO narrowing and field selection.
 
 ### `operations`
 
@@ -198,7 +250,9 @@ See [NestJS integration](/internals/architecture/10-nestjs-integration) for how 
 
 ### Custom list metadata
 
-The list envelope's `meta` bag (`ListResultDto.meta`) is `{}` until a `findMany` handler fills it. It is the place for anything about the list that isn't a row — facet counts, a freshness stamp, a cursor — and it does not need a DTO or a config key: whatever the handler returns as `meta` is what the client receives.
+The list envelope's `meta` bag (`ListResultDto.meta`) is the place for anything about the list that isn't a row — facet counts, a freshness stamp, a cursor — and it does not need a DTO or a config key: whatever the `findMany` handler returns as `meta` is what the client receives.
+
+It is the envelope's one optional field. Until a handler fills it the key is **absent** from the response, not `{}`, so the common zero-config list doesn't carry an empty bag on every request; a contributor that returns `{}` leaves it absent too. Type it and read it accordingly — `body.meta?.inStock`.
 
 > `ListResultDto.meta` on the **response** and `operations.<id>.meta` above are unrelated. The first is an open bag on the list envelope; the second is `OperationMetadata` — route options the framework layer reads, which never reach a response body.
 
@@ -242,14 +296,21 @@ The adapter has to exist when the class is **declared**, because `@Kavo`'s confi
 | Merge precedence     | The contributor's keys win. The inner handler's `meta` is the base and the contributor merges over it, so the outermost wrap owns any key it names; keys it doesn't name pass through. |
 | Overriding that      | The inner bag is in hand — return `{ ...mine, ...result.meta }` to let the inner handler win instead.                                                                                  |
 | Serialization        | None. `meta` is your data, not entity data: no DTO projection, no `fields=` selection, no renaming. It must be JSON-serializable.                                                      |
+| Nothing contributed  | The key is left off the response entirely. Judged on the merged bag, so `{}` from a contributor is the same as no contributor at all.                                                  |
 | Wrong-shaped handler | Wrapping a handler that doesn't return `{ entities, total }` raises `ConfigurationException` (`KAVO_CONFIG_INVALID`) naming the operation, rather than serving a malformed envelope.   |
 
 The wrapper is a convenience, not a requirement — the engine reads `meta` off whatever the `findMany` handler returns, so a hand-written one works the same way:
 
 ```ts
+import type { FindManyResult, KavoContext } from "@kavo/core";
+
 const handler = {
   async execute(_input: null, context: KavoContext<Book>) {
-    const inner = await findMany.execute(null, context);
+    // `builtInHandlers(...)` hands back `OperationHandler<Book>`, whose
+    // output type is `unknown` — the same erasure `withListMeta` works
+    // around with its runtime shape check. Hand-rolling the wrap means
+    // narrowing it yourself.
+    const inner = (await findMany.execute(null, context)) as FindManyResult<Book>;
     return { ...inner, meta: { inStock: 1 } };
   },
 };

@@ -90,10 +90,12 @@ object a caller fills in once.
 
 A successful call returns `{ content: [{ type: "text", text:
 JSON.stringify(result) }] }` — the item (or the `{ items, total, limit,
-offset, meta }` envelope for `findMany`) serialized as MCP's `text` content
+offset }` envelope for `findMany`) serialized as MCP's `text` content
 type. The whole envelope is stringified, so anything a `findMany` handler
-contributes to `meta` (doc 07 §3.1) reaches the tool result unchanged, with
-no per-key schema work here.
+contributes to the optional `meta` (doc 07 §3.1) reaches the tool result
+unchanged, with no per-key schema work here — and when nothing does, the
+key is absent from the stringified result exactly as it is from a REST
+body.
 A `KavoException` the engine raises (`NotFoundException`,
 `OperationDisabledException`, a conflict, …) is caught and turned into an
 **`isError: true`** tool result (`${code}: ${detail}` as the text) instead

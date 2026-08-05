@@ -40,7 +40,13 @@ const ITEM = { id: 1, name: "Ada" };
 const LIST = { items: [ITEM], limit: 20, offset: 0, total: 1, meta: {} };
 
 function recorded(): { service: DefaultKavoService<User>; engine: RecordingEngine } {
-  const engine = new RecordingEngine({ operation: "recorded", item: ITEM, list: LIST });
+  const engine = new RecordingEngine({
+    operation: "recorded",
+    item: ITEM,
+    list: LIST,
+    etag: null,
+    notModified: false,
+  });
   return {
     service: new DefaultKavoService<User>(engine as unknown as KavoEngine<User>),
     engine,

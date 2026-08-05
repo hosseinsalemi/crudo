@@ -93,7 +93,8 @@ describe("listen — the e2e bootstrap", () => {
     // requests reached *this* app.
     const created = await request(server).post("/todos").send({ title: "same binding" }).expect(201);
     const listed = await request(server).get("/todos").expect(200);
-    expect(listed.body).toMatchObject({ limit: expect.any(Number), offset: 0, total: 1, meta: {} });
+    expect(listed.body).toMatchObject({ limit: expect.any(Number), offset: 0, total: 1 });
+    expect(listed.body).not.toHaveProperty("meta");
     expect(listed.body.items).toEqual([expect.objectContaining({ id: created.body.id, title: "same binding" })]);
 
     // Still ours, still the same port — supertest never took the server

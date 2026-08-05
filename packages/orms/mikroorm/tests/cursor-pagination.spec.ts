@@ -2,7 +2,13 @@ import "reflect-metadata";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Collection, MikroORM } from "@mikro-orm/core";
 import { Entity, ManyToOne, OneToMany, PrimaryKey, Property } from "@mikro-orm/decorators/legacy";
-import { QueryValidationException, type DefaultKavoService, type KavoInstance } from "@kavo/core";
+import {
+  QueryValidationException,
+  type DefaultKavoService,
+  type ListMetaDto,
+  type ListResultDto,
+  type KavoInstance,
+} from "@kavo/core";
 import { createMikroOrmKavo } from "@kavo/mikroorm";
 import { clearDatabase, newTestOrm } from "./support/database.js";
 
@@ -93,13 +99,26 @@ async function seed(count: number): Promise<void> {
   }
 }
 
+/**
+ * The `nextCursor` a cursor page carries.
+ *
+ * `ListResultDto.meta` is optional and absent when nothing contributed to
+ * it (#122), but a cursor page always contributes: `nextCursor` is `null`
+ * on the last page rather than missing. Asserting that here is what lets
+ * every call site read the token directly.
+ */
+function nextCursorOf(list: Pick<ListResultDto<unknown>, "meta">): string | null {
+  expect(list.meta).toBeDefined();
+  return (list.meta as ListMetaDto)["nextCursor"] as string | null;
+}
+
 async function walk(limit: number, query: Record<string, unknown> = {}): Promise<string[]> {
   const titles: string[] = [];
   let cursor: string | null = null;
   for (let page = 0; page < 50; page++) {
     const result = await posts.findMany({ ...query, limit, cursor } as never);
     titles.push(...result.items.map((item) => (item as Post).title));
-    cursor = result.meta["nextCursor"] as string | null;
+    cursor = nextCursorOf(result);
     if (cursor === null) return titles;
   }
   throw new Error("cursor paging did not terminate");
@@ -114,16 +133,16 @@ describe("MikroOrmRepositoryAdapter — keyset pagination", () => {
   it("reports null on the last page and a token before it", async () => {
     await seed(3);
     const first = await posts.findMany({ limit: 2 } as never);
-    expect(typeof first.meta["nextCursor"]).toBe("string");
-    const second = await posts.findMany({ limit: 2, cursor: first.meta["nextCursor"] } as never);
+    expect(typeof nextCursorOf(first)).toBe("string");
+    const second = await posts.findMany({ limit: 2, cursor: nextCursorOf(first) } as never);
     expect(second.items).toHaveLength(1);
-    expect(second.meta["nextCursor"]).toBeNull();
+    expect(nextCursorOf(second)).toBeNull();
   });
 
   it("returns an empty page with no cursor for an empty table", async () => {
     const page = await posts.findMany({ limit: 5 } as never);
     expect(page.items).toEqual([]);
-    expect(page.meta["nextCursor"]).toBeNull();
+    expect(nextCursorOf(page)).toBeNull();
     expect(page.total).toBe(0);
   });
 
@@ -147,9 +166,9 @@ describe("MikroOrmRepositoryAdapter — keyset pagination", () => {
     expect(first.items.map((item) => (item as Post).title)).toEqual(["post-2", "post-4"]);
     expect(first.total).toBe(4);
 
-    const second = await posts.findMany({ ...published, limit: 2, cursor: first.meta["nextCursor"] } as never);
+    const second = await posts.findMany({ ...published, limit: 2, cursor: nextCursorOf(first) } as never);
     expect(second.items.map((item) => (item as Post).title)).toEqual(["post-6", "post-8"]);
-    expect(second.meta["nextCursor"]).toBeNull();
+    expect(nextCursorOf(second)).toBeNull();
   });
 
   it("composes with a populate without duplicating or dropping rows", async () => {

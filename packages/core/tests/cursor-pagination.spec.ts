@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type { DeepPartial, EntityMetadata, KavoSettings, ListResultDto, ResolvedEntityConfig, Sort } from "@kavo/core";
+import type {
+  DeepPartial,
+  EntityMetadata,
+  KavoSettings,
+  ListMetaDto,
+  ListResultDto,
+  ResolvedEntityConfig,
+  Sort,
+} from "@kavo/core";
 import {
   ConfigurationException,
   CursorPaginationStrategy,
@@ -47,6 +55,21 @@ async function seed(crud: ReturnType<typeof cursorCrud>["crud"], count: number):
   }
 }
 
+/**
+ * The `nextCursor` a cursor page carries.
+ *
+ * `ListResultDto.meta` is optional and absent when nothing contributed to
+ * it (#122), but a cursor page always contributes: `nextCursor` is `null`
+ * on the last page rather than missing, because "there is no next page" is
+ * an answer. Asserting that here is what lets every call site read the
+ * token directly, and turns a dropped bag into a failure at the assertion
+ * that cared rather than a silent `undefined`.
+ */
+function nextCursorOf(list: Pick<ListResultDto<unknown>, "meta">): string | null {
+  expect(list.meta).toBeDefined();
+  return (list.meta as ListMetaDto)["nextCursor"] as string | null;
+}
+
 /** The whole match set, walked one page at a time, plus the page count. */
 async function walk(
   crud: ReturnType<typeof cursorCrud>["crud"],
@@ -59,7 +82,7 @@ async function walk(
     const page: ListResultDto<unknown> = await crud.findMany({ limit, cursor } as never);
     pages++;
     names.push(...page.items.map((item) => (item as User).name));
-    cursor = page.meta["nextCursor"] as string | null;
+    cursor = nextCursorOf(page);
     if (cursor === null) return { names, pages };
     if (pages > 50) throw new Error("cursor paging did not terminate");
   }
@@ -669,11 +692,11 @@ describe("cursor pagination end to end", () => {
 
     const first = await crud.findMany({ limit: 2 } as never);
     expect(first.items).toHaveLength(2);
-    expect(typeof first.meta["nextCursor"]).toBe("string");
+    expect(typeof nextCursorOf(first)).toBe("string");
 
-    const second = await crud.findMany({ limit: 2, cursor: first.meta["nextCursor"] } as never);
+    const second = await crud.findMany({ limit: 2, cursor: nextCursorOf(first) } as never);
     expect((second.items as User[]).map((user) => user.name)).toEqual(["user-3", "user-4"]);
-    expect(second.meta["nextCursor"]).toBeNull();
+    expect(nextCursorOf(second)).toBeNull();
   });
 
   it("reports nextCursor: null when the page exactly exhausts the match set", async () => {
@@ -684,7 +707,7 @@ describe("cursor pagination end to end", () => {
 
     const page = await crud.findMany({ limit: 4 } as never);
     expect(page.items).toHaveLength(4);
-    expect(page.meta["nextCursor"]).toBeNull();
+    expect(nextCursorOf(page)).toBeNull();
   });
 
   it("never leaks the over-fetched sentinel row into the response", async () => {
@@ -706,7 +729,7 @@ describe("cursor pagination end to end", () => {
     const page = await crud.findMany({ limit: 3 } as never);
     expect(page.items).toHaveLength(3);
     expect(page.limit).toBe(3);
-    expect(typeof page.meta["nextCursor"]).toBe("string");
+    expect(typeof nextCursorOf(page)).toBe("string");
   });
 
   it("returns an empty page with no cursor for an empty match set", async () => {
@@ -714,7 +737,7 @@ describe("cursor pagination end to end", () => {
 
     const page = await crud.findMany({ limit: 5 } as never);
     expect(page.items).toEqual([]);
-    expect(page.meta["nextCursor"]).toBeNull();
+    expect(nextCursorOf(page)).toBeNull();
     expect(page.total).toBe(0);
   });
 
@@ -723,7 +746,7 @@ describe("cursor pagination end to end", () => {
     await seed(crud, 5);
 
     const first = await crud.findMany({ limit: 2 } as never);
-    const second = await crud.findMany({ limit: 2, cursor: first.meta["nextCursor"] } as never);
+    const second = await crud.findMany({ limit: 2, cursor: nextCursorOf(first) } as never);
     expect(first.offset).toBe(0);
     expect(second.offset).toBe(0);
   });
@@ -733,7 +756,7 @@ describe("cursor pagination end to end", () => {
     await seed(crud, 5);
 
     const first = await crud.findMany({ limit: 2 } as never);
-    const second = await crud.findMany({ limit: 2, cursor: first.meta["nextCursor"] } as never);
+    const second = await crud.findMany({ limit: 2, cursor: nextCursorOf(first) } as never);
     expect(first.total).toBe(5);
     expect(second.total).toBe(5);
   });
@@ -744,7 +767,7 @@ describe("cursor pagination end to end", () => {
 
     const page = await crud.findMany({ limit: 2 } as never);
     expect(page.total).toBeNull();
-    expect(typeof page.meta["nextCursor"]).toBe("string");
+    expect(typeof nextCursorOf(page)).toBe("string");
   });
 
   it("pages a descending sort correctly", async () => {
@@ -789,9 +812,9 @@ describe("cursor pagination end to end", () => {
     expect((first.items as User[]).map((user) => user.name)).toEqual(["user-5", "user-6"]);
     expect(first.total).toBe(4);
 
-    const second = await crud.findMany({ ...gteFive, limit: 2, cursor: first.meta["nextCursor"] } as never);
+    const second = await crud.findMany({ ...gteFive, limit: 2, cursor: nextCursorOf(first) } as never);
     expect((second.items as User[]).map((user) => user.name)).toEqual(["user-7", "user-8"]);
-    expect(second.meta["nextCursor"]).toBeNull();
+    expect(nextCursorOf(second)).toBeNull();
   });
 
   it("builds the cursor from the entity, so field selection cannot break paging", async () => {
@@ -805,7 +828,7 @@ describe("cursor pagination end to end", () => {
     const second = await crud.findMany({
       limit: 2,
       fields: { root: ["name"] },
-      cursor: first.meta["nextCursor"],
+      cursor: nextCursorOf(first),
     } as never);
     expect(second.items.map((item) => (item as { name: string }).name)).toEqual(["user-3", "user-4"]);
   });
@@ -830,7 +853,7 @@ describe("cursor pagination end to end", () => {
     expect((first.items as User[]).map((user) => user.name)).toEqual(["user-1", "user-2"]);
     adapter.rows.unshift({ ...new User(), id: 0, name: "user-0", age: 0 });
 
-    const second = await crud.findMany({ limit: 2, cursor: first.meta["nextCursor"] } as never);
+    const second = await crud.findMany({ limit: 2, cursor: nextCursorOf(first) } as never);
     expect((second.items as User[]).map((user) => user.name)).toEqual(["user-3", "user-4"]);
   });
 
@@ -843,7 +866,7 @@ describe("cursor pagination end to end", () => {
     const first = await crud.findMany({ limit: 2 } as never);
     await crud.deleteOne((first.items[1] as User).id);
 
-    const second = await crud.findMany({ limit: 2, cursor: first.meta["nextCursor"] } as never);
+    const second = await crud.findMany({ limit: 2, cursor: nextCursorOf(first) } as never);
     expect((second.items as User[]).map((user) => user.name)).toEqual(["user-3", "user-4"]);
   });
 
@@ -867,7 +890,7 @@ describe("cursor pagination end to end", () => {
     adapter.rows[1]!.name = null as never;
 
     const first = await crud.findMany({ limit: 2 } as never);
-    const token = first.meta["nextCursor"];
+    const token = nextCursorOf(first);
     expect(typeof token).toBe("string");
 
     await expect(crud.findMany({ limit: 2, cursor: token } as never)).rejects.toMatchObject({
@@ -909,7 +932,7 @@ describe("cursor pagination end to end", () => {
 
     const page = await (crud as never as ReturnType<typeof cursorCrud>["crud"]).findMany({ limit: 2 } as never);
     expect(page.items).toHaveLength(2);
-    expect(page.meta["nextCursor"]).toBeNull();
+    expect(nextCursorOf(page)).toBeNull();
   });
 
   it("accepts the wire spelling of a cursor page", async () => {
@@ -920,7 +943,7 @@ describe("cursor pagination end to end", () => {
       operation: "findMany",
       query: new WireQuery({ limit: "2" }),
     } as never);
-    const token = first.list?.meta["nextCursor"] as string;
+    const token = nextCursorOf(first.list ?? {});
     const second = await crud.engine.execute({
       operation: "findMany",
       query: new WireQuery({ limit: "2", cursor: token }),

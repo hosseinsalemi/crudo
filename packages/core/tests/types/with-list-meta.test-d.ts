@@ -1,6 +1,13 @@
 import { expectTypeOf } from "vitest";
 import { builtInHandlers, createKavo, withListMeta } from "@kavo/core";
-import type { FindManyResult, KavoContext, ListMetaContributor, RepositoryAdapter } from "@kavo/core";
+import type {
+  FindManyResult,
+  KavoContext,
+  ListMetaContributor,
+  ListMetaDto,
+  ListResultDto,
+  RepositoryAdapter,
+} from "@kavo/core";
 import { Author } from "../support/blog-fixture.js";
 
 /**
@@ -23,6 +30,18 @@ const withoutMeta: FindManyResult<Author> = { entities: [], total: 0 };
 const withMeta: FindManyResult<Author> = { entities: [], total: 0, meta: { facets: { draft: 2 } } };
 void withoutMeta;
 void withMeta;
+
+// The envelope's own `meta` is optional too — the engine omits the key
+// when nothing contributed — so a consumer has to reach it through `?.`.
+// `total` is the deliberate contrast: it narrows to `number | null`, never
+// `undefined`, because "how many matched" is a question every list answers.
+expectTypeOf<ListResultDto<Author>["meta"]>().toEqualTypeOf<ListMetaDto | undefined>();
+expectTypeOf<ListResultDto<Author>["total"]>().toEqualTypeOf<number | null>();
+
+declare const list: ListResultDto<Author>;
+// @ts-expect-error — `meta` may be absent, so it cannot be indexed directly.
+void list.meta["facets"];
+void list.meta?.["facets"];
 
 // The contributor sees the real result and the real context, both bound
 // to the entity — so `result.entities` is `Author[]`, not `unknown[]`.

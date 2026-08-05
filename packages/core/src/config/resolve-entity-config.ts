@@ -1,13 +1,16 @@
 import type { KavoSettings } from "./settings.js";
 import type { DeepPartial } from "../types/utility.js";
+import type { ComputedFieldDescriptor, ComputedFieldMap } from "./computed-field.js";
 import type { EntityConfig, OperationConfig, QueryFieldSelector } from "./entity-config.js";
 import type { ResolvedEntityConfig, ResolvedQueryAllowlists } from "./resolved-entity-config.js";
+import type { DtoClass } from "../dto/dto.js";
 import type { EntityMetadata } from "../metadata/entity-metadata.js";
 import type { FieldPath } from "../types/field-path.js";
 import type { OperationId, StandardOperationId } from "../operations/operation.js";
 import { BUILT_IN_DEFAULTS } from "./defaults.js";
 import { deepFreeze, mergeSettings } from "./merge-settings.js";
 import { validateSettings } from "./validate-settings.js";
+import { dtoShapeKeys } from "../dto/dto-shape.js";
 import { DefaultDtoResolver } from "../dto/default-dto-resolver.js";
 import { DefaultRelationRegistry } from "../relations/default-relation-registry.js";
 import { resolveSoftDelete } from "../persistence/soft-delete.js";
@@ -31,13 +34,14 @@ const SETTINGS_KEYS = [
   "query",
   "errors",
   "relations",
+  "caching",
   "softDelete",
 ] as const satisfies readonly (keyof KavoSettings)[];
 
 /**
  * An `EntityConfig`/`OperationConfig` mixes settings keys with structural
- * keys (`dto`, `allowlists`, `handler`, …); only the settings subset
- * participates in the merge algebra.
+ * keys (`dto`, `allowlists`, `computed`, `handler`, …); only the settings
+ * subset participates in the merge algebra.
  */
 function pickSettings(config: Readonly<Record<string, unknown>> | undefined): DeepPartial<KavoSettings> | undefined {
   if (config === undefined) return undefined;
@@ -60,7 +64,9 @@ export function resolveEntityConfig<Entity extends object>(
   globalDefaults: DeepPartial<KavoSettings> | undefined,
 ): ResolvedEntityConfig<Entity> {
   const entityName = metadata.name;
-  const allowlists = resolveAllowlists(metadata, entityConfig);
+  const computed = resolveComputedFields(metadata, entityConfig);
+  rejectComputedWriteDtoKeys(entityName, entityConfig, computed);
+  const allowlists = resolveAllowlists(metadata, entityConfig, computed);
   const entitySettings = mergeSettings(
     BUILT_IN_DEFAULTS,
     globalDefaults,
@@ -102,9 +108,142 @@ export function resolveEntityConfig<Entity extends object>(
     allowlists,
     softDelete: resolveSoftDelete(metadata, entitySettings),
     dto: new DefaultDtoResolver<Entity>(entityConfig?.dto),
+    computed,
     relations: new DefaultRelationRegistry<Entity>(metadata.relations, entitySettings.relations.edges, entityName),
   };
   return Object.freeze(resolved);
+}
+
+/** Assignable to `ComputedFieldMap<Entity>` for every `Entity`. */
+const NO_COMPUTED_FIELDS: Readonly<Record<string, never>> = Object.freeze({});
+
+const PROTO_NOT_A_NAME =
+  `'__proto__' cannot name a computed field — it is not an ordinary object key, ` +
+  `so the declaration would silently disappear instead of producing a response field`;
+
+/** The DTO slots whose classes describe a **write** payload (ADR-0019 §4). */
+const WRITE_DTO_SLOTS = ["create", "update", "patch"] as const;
+
+/**
+ * Computed-field resolution (ADR-0019). `computed` carries functions, so
+ * like `dto` it sits outside `SETTINGS_KEYS` and never merges through the
+ * precedence chain — an entity's declaration is the whole story, resolved
+ * once here.
+ *
+ * The ways a declaration can be structurally wrong all fail at bootstrap
+ * rather than as a surprising response later: a name that shadows a real
+ * column or relation (the shadowed value would silently disappear from
+ * every response), a descriptor with no `resolve` function, and the one
+ * name that is not a key at all — `__proto__`, which would set this
+ * accumulator's prototype instead of adding an entry and so vanish
+ * without a word (the same class of hazard as the bracket-segment fix in
+ * the filter parser).
+ */
+function resolveComputedFields<Entity extends object>(
+  metadata: EntityMetadata<Entity>,
+  entityConfig: EntityConfig<Entity> | undefined,
+): ComputedFieldMap<Entity> {
+  const entityName = metadata.name;
+  // `EntityConfig<Entity>` fixes the `Computed` parameter to `never`, so
+  // the declared record erases to `{}` at this internal call site; the
+  // key/value types are recovered here, once.
+  const declared = (entityConfig as { readonly computed?: ComputedFieldMap<Entity> } | undefined)?.computed;
+  if (declared === undefined) return NO_COMPUTED_FIELDS;
+
+  // `__proto__` has two spellings and only one of them is a key. The
+  // computed form (`{ ["__proto__"]: … }`) creates an own key and is caught
+  // in the loop below; the literal form (`{ __proto__: … }`) invokes the
+  // prototype *setter* instead, so it never reaches `Object.keys` — the
+  // declaration would register nothing and throw nothing, which is exactly
+  // the outcome the message promises to prevent. A non-standard prototype
+  // on the declared record is that spelling's only observable trace.
+  const prototype = Object.getPrototypeOf(declared) as object | null;
+  if (prototype !== null && prototype !== Object.prototype) {
+    throw new ConfigurationException(entityName, "computed.__proto__", PROTO_NOT_A_NAME);
+  }
+
+  const columns = new Set(metadata.fields.map((field) => field.name));
+  const relations = new Set(metadata.relations.map((relation) => relation.name));
+  const resolved: Record<string, ComputedFieldDescriptor<Entity>> = {};
+  for (const name of Object.keys(declared)) {
+    const descriptor = declared[name];
+    if (name === "__proto__") {
+      throw new ConfigurationException(entityName, `computed.${name}`, PROTO_NOT_A_NAME);
+    }
+    if (typeof descriptor?.resolve !== "function") {
+      throw new ConfigurationException(
+        entityName,
+        `computed.${name}`,
+        `computed field '${name}' has no 'resolve' function — a computed field is defined by ` +
+          `how it is derived, e.g. { resolve: (entity) => … }`,
+      );
+    }
+    if (columns.has(name) || relations.has(name)) {
+      const kind = columns.has(name) ? "column" : "relation";
+      throw new ConfigurationException(
+        entityName,
+        `computed.${name}`,
+        `computed field '${name}' collides with an existing ${kind} on '${entityName}' — ` +
+          `a computed field must have a name of its own, or the ${kind} would never reach a response`,
+      );
+    }
+    // The serializer emits `resolve`'s return value as-is and never awaits
+    // it (ADR-0019), so an `async` resolver would put a pending promise in
+    // the response — `{}` once serialized to JSON. Catching the shape
+    // people actually write turns a silently wrong body into a bootstrap
+    // failure; a plain function that happens to return a promise still
+    // gets through, which is the limit of what is detectable here.
+    if (descriptor.resolve.constructor?.name === "AsyncFunction") {
+      throw new ConfigurationException(
+        entityName,
+        `computed.${name}`,
+        `computed field '${name}' has an async 'resolve' — computed fields are resolved ` +
+          `synchronously per served item and the promise would be emitted unawaited; ` +
+          `fetch what it needs before serialization (a custom handler, or an eager relation)`,
+      );
+    }
+    resolved[name] = descriptor;
+  }
+  return Object.freeze(resolved);
+}
+
+/**
+ * A registered `create`/`update`/`patch` DTO naming a computed field is a
+ * bootstrap error, like every other computed misconfiguration (ADR-0019).
+ *
+ * `DefaultDeserializer` would strip the key anyway — that strip stays, as
+ * the defence for anyone constructing a deserializer directly — but a
+ * silent per-request drop is the wrong report for a declaration that can
+ * be judged wrong once, at the moment it is made. It also has a wire
+ * consequence the strip cannot reach: `@kavo/nest` builds `@ApiBody` from
+ * the DTO's runtime shape, so OpenAPI would advertise a property the
+ * engine unconditionally discards.
+ *
+ * Only classes with a runtime shape are checkable; a purely declarative
+ * DTO yields `null` from `dtoShapeKeys` and falls back to the derived
+ * writable projection, which never contains a computed name.
+ */
+function rejectComputedWriteDtoKeys<Entity extends object>(
+  entityName: string,
+  entityConfig: EntityConfig<Entity> | undefined,
+  computed: ComputedFieldMap<Entity>,
+): void {
+  const names = new Set(Object.keys(computed));
+  if (names.size === 0) return;
+  const dto = entityConfig?.dto as Readonly<Record<string, DtoClass | undefined>> | undefined;
+  if (dto === undefined) return;
+  for (const slot of WRITE_DTO_SLOTS) {
+    const declared = dtoShapeKeys(dto[slot] ?? null)?.find((key) => names.has(key));
+    if (declared === undefined) continue;
+    throw new ConfigurationException(
+      entityName,
+      `dto.${slot}`,
+      `the '${slot}' DTO declares '${declared}', which is a computed field on '${entityName}' — ` +
+        `a computed field has no column behind it, so the value is stripped from every write ` +
+        `payload while the generated OpenAPI body still advertises the property; drop it from the ` +
+        `DTO, or make it a real column if it is meant to be written`,
+    );
+  }
 }
 
 /**
@@ -113,18 +252,42 @@ export function resolveEntityConfig<Entity extends object>(
  * columns** — relation paths are never filterable/sortable/selectable
  * unless opted in explicitly. Anything outside the list is a 400 at query
  * time, never a silent drop.
+ *
+ * Computed fields join the `selectable` base set (so `fields=fullName`
+ * works with no further configuration) unless the descriptor opts out with
+ * `selectable: false`, and are barred from `filterable`/`sortable`
+ * outright — there is no column to translate to `WHERE`/`ORDER BY`
+ * (ADR-0019).
  */
 function resolveAllowlists<Entity extends object>(
   metadata: EntityMetadata<Entity>,
   entityConfig: EntityConfig<Entity> | undefined,
+  computed: ComputedFieldMap<Entity>,
 ): ResolvedQueryAllowlists<Entity> {
   const ownColumns = metadata.fields.map((field) => field.name) as unknown as readonly FieldPath<Entity>[];
+  const selectableBase = [
+    ...(ownColumns as readonly string[]),
+    ...Object.keys(computed).filter((name) => computed[name]?.selectable !== false),
+  ] as unknown as readonly FieldPath<Entity>[];
   const configured = entityConfig?.allowlists;
-  return deepFreeze({
+  const allowlists = {
     filterable: resolveFieldSelector(ownColumns, configured?.filterable),
     sortable: resolveFieldSelector(ownColumns, configured?.sortable),
-    selectable: resolveFieldSelector(ownColumns, configured?.selectable),
-  });
+    selectable: resolveFieldSelector(selectableBase, configured?.selectable),
+  };
+  for (const key of ["filterable", "sortable"] as const) {
+    for (const field of allowlists[key] as readonly string[]) {
+      if (!Object.prototype.hasOwnProperty.call(computed, field)) continue;
+      throw new ConfigurationException(
+        metadata.name,
+        `allowlists.${key}`,
+        `'${field}' is a computed field on '${metadata.name}', which can never be ${
+          key === "filterable" ? "filtered on" : "sorted on"
+        } — it has no column to translate to ${key === "filterable" ? "WHERE" : "ORDER BY"}`,
+      );
+    }
+  }
+  return deepFreeze(allowlists);
 }
 
 /**
@@ -151,19 +314,21 @@ export function validateDefaultSort<Entity>(
 }
 
 /**
- * Resolves one allowlist key's raw selector against the entity's own
- * columns: an explicit array is used as-is; `{ exclude }` resolves to
- * `ownColumns` minus the named paths, so a column outside `ownColumns` can
- * never appear via `exclude` and stays fail-closed like the plain default.
+ * Resolves one allowlist key's raw selector against that key's **base
+ * set** — own columns for `filterable`/`sortable`, own columns plus the
+ * selectable computed fields for `selectable`. An explicit array is used
+ * as-is; `{ exclude }` resolves to `base` minus the named paths, so a path
+ * outside `base` can never appear via `exclude` and stays fail-closed like
+ * the plain default.
  */
 function resolveFieldSelector<Entity>(
-  ownColumns: readonly FieldPath<Entity>[],
+  base: readonly FieldPath<Entity>[],
   selector: QueryFieldSelector<Entity> | undefined,
 ): readonly FieldPath<Entity>[] {
-  if (selector === undefined) return ownColumns;
+  if (selector === undefined) return base;
   if (!("exclude" in selector)) return selector;
   const excluded = new Set(selector.exclude);
-  return ownColumns.filter((column) => !excluded.has(column));
+  return base.filter((path) => !excluded.has(path));
 }
 
 /**
@@ -179,6 +344,7 @@ export function describeResolvedConfig<Entity>(
     entityName: config.entityName,
     settings: config.settings,
     allowlists: config.allowlists,
+    computed: Object.keys(config.computed),
     softDelete: config.softDelete,
     relations: config.relations.all().map((relation) => ({
       name: relation.name,

@@ -55,6 +55,7 @@ export type { ProblemDetailsDto, QueryIssueDto } from "./errors/problem-details.
 // ── Configuration ─────────────────────────────────────────────────────
 export type {
   KavoSettings,
+  CachingSettings,
   ErrorSettings,
   PaginationSettings,
   QuerySettings,
@@ -66,6 +67,7 @@ export type {
 } from "./config/settings.js";
 export type { GlobalConfig } from "./config/global-config.js";
 export type { EntityConfig, OperationConfig, QueryAllowlists, QueryFieldSelector } from "./config/entity-config.js";
+export type { ComputedFieldDescriptor, ComputedFieldMap } from "./config/computed-field.js";
 export type { ResolvedEntityConfig, ResolvedQueryAllowlists } from "./config/resolved-entity-config.js";
 
 // ── Operations ────────────────────────────────────────────────────────
@@ -84,6 +86,15 @@ export { DefaultIncludeResolver } from "./relations/default-include-resolver.js"
 export type { KavoContext, KavoContextState, StateKey } from "./context/kavo-context.js";
 export type { KavoRequest } from "./context/kavo-request.js";
 export type { KavoResponse } from "./context/kavo-response.js";
+
+// ── HTTP caching (ADR-0020) ───────────────────────────────────────────
+// The *type* only. `computeEtag` stays internal on purpose: exporting it
+// would make "SHA-256 of the canonicalized representation" a public
+// promise, and ADR-0020's own consequences say a version-column scheme may
+// supersede it. Nothing in the workspace needs it — `@kavo/nest` consumes
+// the tag off `KavoResponse` — so the barrel keeps to what has a consumer
+// (ADR-0010).
+export type { RequestPreconditions } from "./caching/etag.js";
 
 // ── Serialization ─────────────────────────────────────────────────────
 export type { Deserializer, Serializer } from "./serialization/serializer.js";
@@ -137,6 +148,8 @@ export {
   OperationDisabledException,
   OperationNotRegisteredException,
   PersistenceException,
+  PreconditionFailedException,
+  PreconditionUnsupportedException,
   QueryValidationException,
   TransactionException,
   type KavoExceptionOptions,

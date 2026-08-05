@@ -4,25 +4,31 @@ import type { KavoResponse } from "../context/kavo-response.js";
 import type { DtoClass, DtoSlot } from "../dto/dto.js";
 import type { ListMetaDto } from "../dto/list-result.js";
 import type { Deserializer, Serializer } from "../serialization/serializer.js";
+import type { EntityId } from "../types/entity-id.js";
 import type { EntityMetadata, FieldMetadata } from "../metadata/entity-metadata.js";
+import type { EntityReader } from "../persistence/entity-reader.js";
 import type { ErrorHandler } from "../errors/kavo-exception-shape.js";
 import type { NormalizedQueryContext } from "../query/query-context.js";
 import type { QueryContext } from "../query/query-context.js";
 import type { Pagination } from "../query/pagination.js";
 import type { OperationDescriptor, OperationRegistry } from "../operations/operation-registry.js";
 import type { StandardOperationId } from "../operations/operation.js";
+import type { RequestPreconditions } from "../caching/etag.js";
 import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
 import type { KavoSettings } from "../config/settings.js";
 import {
   ConfigurationException,
   OperationDisabledException,
   OperationNotRegisteredException,
+  PreconditionFailedException,
+  PreconditionUnsupportedException,
   QueryValidationException,
 } from "../errors/exceptions.js";
 import { nameList } from "../errors/message-hints.js";
 import { QueryNormalizer } from "../query/query-normalizer.js";
 import { isCursorPagination } from "../query/pagination.js";
 import { cursorValuesOf, encodeCursor } from "../query/cursor.js";
+import { WILDCARD, computeEtag, strongMatch, weakMatch } from "../caching/etag.js";
 import { createKavoContext, randomUuid } from "../context/default-kavo-context.js";
 import { mergeSettings } from "../config/merge-settings.js";
 import { validateSettings } from "../config/validate-settings.js";
@@ -48,7 +54,53 @@ export interface KavoEngineDependencies<Entity extends object> {
   readonly deserializer: Deserializer<Entity>;
   readonly normalizer: QueryNormalizer<Entity>;
   readonly errorHandler: ErrorHandler;
+  /**
+   * The read half of the entity's adapter, for the one thing a handler
+   * cannot do: evaluate an `If-Match` precondition, which needs both a
+   * read of the current row *and* the serializer that turns it into the
+   * representation the ETag was computed from (ADR-0020). Handlers close
+   * over the adapter privately and have no serializer, so the pre-read
+   * lives here rather than inside `updateOne`/`patchOne`/`deleteOne`.
+   */
+  readonly reader: EntityReader<Entity>;
 }
+
+/**
+ * The standard writes that target one identified row, which is exactly the
+ * set whose `If-Match` the engine can evaluate: it re-reads that row and
+ * hashes its canonical representation (ADR-0020 §4).
+ *
+ * `restoreOne`/`purgeOne` are in the set even though they act on a
+ * *soft-deleted* row (ADR-0013): the pre-read asks for `withDeleted`, and
+ * that flag changes only the filter, never the projection — so the tag it
+ * produces is byte-identical to the one `GET /books/1?withDeleted=true`
+ * served the client. Leaving them out is what let `DELETE /books/1/purge`
+ * accept an `If-Match` and hard-delete anyway.
+ *
+ * Anything *not* in this set — `createOne`, and every custom operation,
+ * whose target nothing in the schema describes — cannot be evaluated, and
+ * is refused rather than performed unguarded
+ * ({@link PreconditionUnsupportedException}). That is the same reason the
+ * table is keyed by `StandardOperationId`.
+ */
+const PRECONDITION_TARGETS: ReadonlySet<StandardOperationId> = new Set<StandardOperationId>([
+  "updateOne",
+  "patchOne",
+  "deleteOne",
+  "restoreOne",
+  "purgeOne",
+]);
+
+/**
+ * Why an `If-Match` could not be evaluated — a closed set, rendered into
+ * `KAVO_PRECONDITION_UNSUPPORTED`'s `{reason}` and written here rather
+ * than anywhere a caller can reach.
+ */
+const UNEVALUABLE = {
+  notTargeted: "the operation does not target one identified row, so there is no representation to compare against",
+  cachingOff: "caching.etag is disabled for it, so no ETag is computed for this entity's representations",
+  noCanonicalRead: "findOne is not an enabled operation, so this entity exposes no canonical representation to read",
+} as const;
 
 /**
  * Which DTO slot feeds each standard write operation's input. `Partial` is
@@ -66,8 +118,9 @@ const INPUT_SLOTS: Readonly<Partial<Record<StandardOperationId, DtoSlot>>> = {
  * The request pipeline (Template Method over one lifecycle):
  *
  * operation resolution → config resolution → query resolution (reads) →
- * context assembly → DTO resolution → deserialization → handler
- * execution → response mapping → serialization.
+ * context assembly → precondition evaluation (`If-Match` writes) → DTO
+ * resolution → deserialization → handler execution → response mapping →
+ * serialization → ETag / `If-None-Match`.
  *
  * Query resolution runs ahead of the spec's stage order (which lists it
  * after deserialization) because the context carries the normalized query
@@ -159,11 +212,128 @@ export class KavoEngine<Entity extends object> {
       correlationId,
     });
 
+    const preconditions = request.preconditions ?? request.options?.preconditions ?? null;
+    // Before the handler, so a failed precondition never reaches the
+    // adapter — the check is check-then-write, not compare-and-swap
+    // (ADR-0020), and that is exactly why it must be as late as possible
+    // and still ahead of the write.
+    await this.checkIfMatch(request, descriptor, configView, preconditions, correlationId);
+
     const input = this.resolveInput(request, descriptor, context);
 
     const result = await descriptor.handler.execute(input, context);
 
-    return this.mapResponse(descriptor, result, context);
+    return this.mapResponse(descriptor, result, context, preconditions);
+  }
+
+  /**
+   * `If-Match`: reject the write when the target's current ETag is not one
+   * the client named.
+   *
+   * Three outcomes, and the third is the one worth naming. **Evaluated**
+   * for the standard single-row writes: the row is re-read and its
+   * canonical tag compared. **Ignored** for reads — `If-Match` is a
+   * lost-update guard, a safe method cannot lose an update, and
+   * `If-None-Match` is the read-side conditional (ADR-0020 §4).
+   * **Refused** for everything else: an unevaluable precondition on a
+   * request that changes state is answered with
+   * `PreconditionUnsupportedException` rather than a silent `return`,
+   * because a client that asked for a guard and did not get one must find
+   * out from the response rather than from a lost update.
+   *
+   * A target with no current representation at all is *not* decided here:
+   * the check falls through and the handler raises its own error, so
+   * `DELETE` on a soft-deleted row is the same 409 with or without an
+   * `If-Match` header. The identity of an error must not depend on whether
+   * a cache header was sent.
+   */
+  private async checkIfMatch(
+    request: KavoRequest<Entity>,
+    descriptor: OperationDescriptor<Entity>,
+    config: ResolvedEntityConfig<Entity>,
+    preconditions: RequestPreconditions | null,
+    correlationId: string,
+  ): Promise<void> {
+    const ifMatch = preconditions?.ifMatch;
+    if (ifMatch === undefined) return;
+    if (descriptor.kind === "read") return;
+
+    const refuse = (reason: string): never => {
+      throw new PreconditionUnsupportedException({
+        messageParams: { entity: config.entityName, operation: descriptor.id, reason },
+        context: { entityName: config.entityName, operation: descriptor.id, correlationId },
+      });
+    };
+    if (!PRECONDITION_TARGETS.has(descriptor.id as StandardOperationId)) refuse(UNEVALUABLE.notTargeted);
+    if (!config.settings.caching.etag) refuse(UNEVALUABLE.cachingOff);
+    // The 412 below names the current tag, which is only safe to disclose
+    // when the client could have read it for itself. No enabled `findOne`
+    // means no canonical representation to read — and an unconditional
+    // hash in an error message would be an offline oracle over a
+    // low-entropy row.
+    if (this.deps.registry.get("findOne")?.enabled !== true) refuse(UNEVALUABLE.noCanonicalRead);
+
+    // `*` is "only if it exists", which the pre-read cannot make more or
+    // less true — `strongMatch` returns on the wildcard without looking at
+    // the tag. Short-circuiting here spares a read, a serialization and a
+    // SHA-256 whose answer was a constant, and a target that turns out not
+    // to exist still raises from the handler.
+    if (ifMatch.includes(WILDCARD)) return;
+
+    const id = this.coerceId(request.id) as EntityId;
+    const etag = await this.canonicalEtag(id, request, config, correlationId);
+    // No current representation: the row is gone, or an adapter would
+    // refuse this write for a reason of its own. Either way the handler
+    // owns the answer.
+    if (etag === null) return;
+    if (strongMatch(ifMatch, etag)) return;
+    throw new PreconditionFailedException({
+      messageParams: { entity: config.entityName, id: String(id), etag },
+      context: { entityName: config.entityName, operation: descriptor.id, correlationId },
+    });
+  }
+
+  /**
+   * The ETag of the target row's **canonical read representation** — what
+   * `findOne` on that id with no `fields`/`include`/`sort` params would
+   * return. That is the representation a client's `If-Match` token came
+   * from, so it is the one the token is compared against; an ETag taken
+   * from a field-narrowed read identifies a different representation and
+   * will not match (ADR-0020).
+   *
+   * The pre-read asks for `withDeleted`, which is what makes the check
+   * work for `restoreOne`/`purgeOne`: it widens the *filter* and never
+   * touches the projection, so a live row hashes exactly as
+   * `GET /books/1` would and a soft-deleted one exactly as
+   * `GET /books/1?withDeleted=true` would. `null` means the row is not
+   * there under any view — the caller lets the handler decide what that
+   * is, rather than turning every such case into a 404.
+   */
+  private async canonicalEtag(
+    id: EntityId,
+    request: KavoRequest<Entity>,
+    config: ResolvedEntityConfig<Entity>,
+    correlationId: string,
+  ): Promise<string | null> {
+    const { reader, serializer, normalizer } = this.deps;
+    // `withDeleted` is only a legal query param on a soft-deletable entity
+    // — the normalizer rejects it outright otherwise (a client that thinks
+    // it is seeing deleted rows should be told it is not), and on a
+    // hard-delete entity there is nothing for it to widen anyway.
+    const softDeletable = config.softDelete.strategy === "soft";
+    const query = normalizer.normalizeInput(softDeletable ? { withDeleted: true } : undefined, config);
+    const context = createKavoContext<Entity>({
+      operation: "findOne",
+      config,
+      principal: request.options?.principal,
+      transaction: request.options?.transaction ?? null,
+      query,
+      correlationId,
+    });
+    const entity = await reader.findOneById(id, query, context);
+    if (entity === null) return null;
+    const itemDto = config.dto.resolve("item", "findOne") as DtoClass<object> | null;
+    return computeEtag(serializer.serializeItem(entity, itemDto, context));
   }
 
   private configViewFor(request: KavoRequest<Entity>): ResolvedEntityConfig<Entity> {
@@ -188,6 +358,9 @@ export class KavoEngine<Entity extends object> {
       // against the settings actually in force for this call.
       softDelete: resolveSoftDelete(this.deps.metadata, settings, `${config.entityName} (${request.operation})`),
       dto: config.dto,
+      // Structural entity config, outside the settings precedence chain
+      // entirely (ADR-0019) — a per-call settings override cannot reach it.
+      computed: config.computed,
       relations: config.relations,
     };
   }
@@ -261,17 +434,19 @@ export class KavoEngine<Entity extends object> {
     return value;
   }
 
-  private mapResponse(
+  private async mapResponse(
     descriptor: OperationDescriptor<Entity>,
     result: unknown,
     context: KavoContext<Entity>,
-  ): KavoResponse {
+    preconditions: RequestPreconditions | null,
+  ): Promise<KavoResponse> {
     const { serializer, config } = this.deps;
 
     if (descriptor.id === "findMany") {
       const listResult = result as FindManyResult<Entity>;
       const listDto = (descriptor.output as DtoClass<object> | null) ?? config.dto.resolve("list", descriptor.id);
       const pagination: Pagination<Entity> = context.query?.pagination ?? { limit: 0, offset: 0 };
+      const listMeta = this.listMeta(listResult, context);
       return {
         operation: descriptor.id,
         item: null,
@@ -288,21 +463,41 @@ export class KavoEngine<Entity extends object> {
           // `undefined` the key would vanish from the JSON body entirely,
           // so normalize the absent case to the documented `null`.
           total: listResult.total ?? null,
-          meta: this.listMeta(listResult, context),
+          // Spread rather than `meta: listMeta`: assigning `undefined` would
+          // leave the key on the object (`"meta" in list`, `Object.keys`)
+          // even though `JSON.stringify` drops it, so a programmatic caller
+          // and a REST client would disagree about whether the envelope has
+          // a `meta`. Omitted means omitted, on both sides.
+          ...(listMeta === undefined ? {} : { meta: listMeta }),
         },
+        // Collection ETags are out of scope (issue #120): a list's identity
+        // spans pagination, sort and filter, which is a different feature
+        // from hashing one representation.
+        etag: null,
+        notModified: false,
       };
     }
 
     if (result === null || result === undefined) {
       // Void results: deleteOne and purgeOne.
-      return { operation: descriptor.id, item: null, list: null };
+      return { operation: descriptor.id, item: null, list: null, etag: null, notModified: false };
     }
 
     const itemDto = (descriptor.output as DtoClass<object> | null) ?? config.dto.resolve("item", descriptor.id);
+    const item = serializer.serializeItem(result as Entity, itemDto, context);
+    // `context.config` is the per-call view, so `caching.etag` honors an
+    // override at any scope down to this one request.
+    const etag = context.config.settings.caching.etag ? await computeEtag(item) : null;
     return {
       operation: descriptor.id,
-      item: serializer.serializeItem(result as Entity, itemDto, context),
+      item,
       list: null,
+      etag,
+      // `If-None-Match` is a cache-revalidation question, so it is only
+      // answered for reads. On a write RFC 9110 gives it "only if absent"
+      // semantics, which is a create-conditionally feature this issue
+      // deliberately leaves out rather than half-implements.
+      notModified: etag !== null && descriptor.kind === "read" && weakMatch(preconditions?.ifNoneMatch ?? [], etag),
     };
   }
 
@@ -311,18 +506,30 @@ export class KavoEngine<Entity extends object> {
    * response bag, never `OperationConfig.meta`/`OperationMetadata`,
    * ADR-0007).
    *
-   * A named step rather than an inline `?? {}` because this is the single
+   * A named step rather than an inline spread because this is the single
    * merge point for everything that can contribute to it, and the handler
    * is only the first contributor: `meta.nextCursor` under cursor
    * pagination (ADR-0021) belongs to the engine, not to whatever handler
-   * happens to be configured, and folds in here. `meta` is a required
-   * envelope field, so a handler that contributes nothing still yields an
-   * empty bag — never `undefined`.
+   * happens to be configured, and folds in here.
    *
    * The strategy's keys are the **base**, the handler's merge over them: a
    * handler (or a `withListMeta` contributor) that names `nextCursor`
    * explicitly is stating intent, and the same "more specific wins"
    * direction runs through every other precedence chain in Kavo.
+   *
+   * `undefined` — not `{}` — when nothing contributed, so `mapResponse`
+   * can leave the key off the envelope entirely. An empty bag carries no
+   * information, and the common zero-config list is exactly the case that
+   * would pay for it on every response. This is why the field is optional
+   * (`ListResultDto.meta?`) while `total` is not: `total: null` still
+   * answers "how many matched"; `meta: {}` answers nothing. Emptiness is
+   * judged after the merge, so a contributor that returns `{}` is the same
+   * as no contributor at all.
+   *
+   * A cursor page is never that case: `nextCursor` is `null` — not
+   * `undefined` — on the last page, because "there is no page after this
+   * one" is an answer, and a client walking the chain has to be told it has
+   * reached the end rather than left to infer it from a missing key.
    *
    * `meta` never passes through the serializer: it is the caller's own
    * JSON-serializable data, not entity data, so no DTO projection or
@@ -339,9 +546,9 @@ export class KavoEngine<Entity extends object> {
    * own key set private without deep-cloning caller data that only has to
    * survive `JSON.stringify`.
    */
-  private listMeta(result: FindManyResult<Entity>, context: KavoContext<Entity>): ListMetaDto {
+  private listMeta(result: FindManyResult<Entity>, context: KavoContext<Entity>): ListMetaDto | undefined {
     const query = context.query;
-    if (query === null || !isCursorPagination(query.pagination)) return { ...result.meta };
+    if (query === null || !isCursorPagination(query.pagination)) return compactMeta(result.meta);
     // `hasMore` is the sentinel the built-in handler reports from its
     // `limit + 1` over-fetch. A replacement handler that does not report it
     // is taken at its word: no signal, no next page.
@@ -363,8 +570,27 @@ export class KavoEngine<Entity extends object> {
           `'readFilter(query)', not by 'query.filter'`,
       );
     }
-    return { nextCursor, ...result.meta };
+    return compactMeta({ nextCursor, ...result.meta });
   }
+}
+
+/**
+ * The merged bag with `undefined`-valued keys dropped, and `undefined` in
+ * place of a bag left empty by that — the single place emptiness is judged,
+ * so every contributor is held to the same rule.
+ *
+ * Those keys are dropped rather than counted because they are exactly what
+ * `JSON.stringify` erases: keeping them would hand a programmatic caller a
+ * `{ facets: undefined }` bag while the REST client saw `"meta": {}` — the
+ * very divergence the omit-when-empty rule exists to prevent.
+ */
+function compactMeta(meta: ListMetaDto | undefined): ListMetaDto | undefined {
+  if (meta === undefined) return undefined;
+  const copy: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(meta)) {
+    if (value !== undefined) copy[key] = value;
+  }
+  return Object.keys(copy).length === 0 ? undefined : copy;
 }
 
 /**

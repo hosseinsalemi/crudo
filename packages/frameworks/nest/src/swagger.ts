@@ -15,6 +15,7 @@ type SwaggerModule = {
   ApiOperation(options: object): MethodDecorator;
   ApiParam(options: object): MethodDecorator;
   ApiQuery(options: object): MethodDecorator;
+  ApiHeader(options: object): MethodDecorator;
   ApiBody(options: object): MethodDecorator;
   ApiResponse(options: object): MethodDecorator;
 };
@@ -61,6 +62,30 @@ const PROBLEM_DETAILS_SCHEMA = {
     },
   },
 } as const;
+
+const ETAG_RESPONSE_HEADER = {
+  description: "Strong entity-tag of this exact representation; usable as an If-None-Match or If-Match token.",
+  schema: { type: "string" },
+} as const;
+
+/**
+ * Whether `caching.etag` is on for this operation, as far as decoration
+ * time can tell (ADR-0012): the entity and operation scopes of the config
+ * `@Kavo` was handed. The global scope arrives with
+ * `KavoModule.forRoot`, long after this runs, so `true` is the answer when
+ * neither scope says otherwise — matching the built-in default.
+ */
+function cachingEnabled(config: EntityConfig<object> | undefined, operationId: string): boolean {
+  const scoped = config as
+    | {
+        caching?: { etag?: boolean };
+        operations?: Record<string, { caching?: { etag?: boolean } } | boolean | undefined>;
+      }
+    | undefined;
+  const operation = scoped?.operations?.[operationId];
+  const perOperation = typeof operation === "object" ? operation.caching?.etag : undefined;
+  return perOperation ?? scoped?.caching?.etag ?? true;
+}
 
 const LIST_QUERY_PARAMS: readonly { name: string; description: string }[] = [
   {
@@ -156,13 +181,52 @@ export function applySwaggerMetadata(
     apply(swagger.ApiBody(bodyOptionsFor(bodyDto)));
   }
 
+  // Conditional requests (ADR-0020). Whether a *response* actually carries
+  // an `ETag` depends on `caching.etag`, which is resolved through the full
+  // precedence chain at bootstrap; decoration time can only see the entity
+  // and operation scopes of it (ADR-0012), so a `false` at the global scope
+  // leaves these documented and inert — the same limitation the query-param
+  // documentation above already lives with.
+  const cached = cachingEnabled(config, descriptor.id);
+  const tagged = cached && route.status !== 204 && descriptor.id !== "findMany";
   apply(
     swagger.ApiResponse({
       status: route.status,
       description: "Success",
+      ...(tagged ? { headers: { ETag: ETAG_RESPONSE_HEADER } } : {}),
       ...successBodyFor(descriptor, route, entity, dtoResolver),
     }),
   );
+  if (cached && route.hasIdParam) {
+    if (descriptor.kind === "read") {
+      apply(
+        swagger.ApiHeader({
+          name: "If-None-Match",
+          required: false,
+          description: "Revalidate a cached copy: a matching entity-tag answers 304 with no body.",
+        }),
+      );
+      apply(swagger.ApiResponse({ status: 304, description: "The client's cached representation is still current." }));
+    } else {
+      apply(
+        swagger.ApiHeader({
+          name: "If-Match",
+          required: false,
+          description:
+            "Apply this write only if the row's current ETag is one of these entity-tags. " +
+            "Take the tag from an unnarrowed read — a 'fields='/'include='-narrowed one identifies " +
+            "a different representation and will not match.",
+        }),
+      );
+      apply(
+        swagger.ApiResponse({
+          status: 412,
+          description: "The If-Match precondition failed or cannot be evaluated (RFC 9457 problem details).",
+          schema: PROBLEM_DETAILS_SCHEMA,
+        }),
+      );
+    }
+  }
   apply(
     swagger.ApiResponse({
       status: 400,
@@ -245,7 +309,22 @@ function successBodyFor(
   }
 }
 
-/** The list envelope, wrapping the resolved list-element schema. */
+/**
+ * The list envelope, wrapping the resolved list-element schema.
+ *
+ * `required` names the four fields every list response carries, which
+ * leaves `meta` as the one a client must not assume: it is omitted from
+ * the body unless a `findMany` handler contributed to it.
+ *
+ * `meta` is also the one field with no static shape to document. Unlike
+ * `items` — projected through the `list` DTO, so `schemaFromDto` can read
+ * real fields off it — `ListMetaDto` is an open `[key: string]: unknown`
+ * bag filled at request time by handler code Kavo never sees, so there is
+ * nothing to enumerate at decoration time. `additionalProperties: true`
+ * says exactly that; without it, a bare `{ type: "object" }` with no
+ * `properties` reads to most OpenAPI generators as an object with *no*
+ * permitted keys, which is the opposite of what this field is.
+ */
 function listEnvelopeSchema(
   element: { type: "object"; properties: Record<string, object> } | null,
   title: string,
@@ -253,6 +332,7 @@ function listEnvelopeSchema(
   return {
     title: `${title}List`,
     type: "object",
+    required: ["items", "limit", "offset", "total"],
     properties: {
       items: {
         type: "array",
@@ -261,7 +341,15 @@ function listEnvelopeSchema(
       limit: { type: "integer" },
       offset: { type: "integer" },
       total: { type: "integer", nullable: true },
-      meta: { type: "object" },
+      meta: {
+        type: "object",
+        additionalProperties: true,
+        description:
+          "Open metadata bag about the list itself, filled by the findMany " +
+          "handler (see FindManyResult.meta / withListMeta). Absent when " +
+          "nothing contributed; its keys are application-defined and are " +
+          "not projected through a DTO.",
+      },
     },
   };
 }

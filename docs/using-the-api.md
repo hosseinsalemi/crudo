@@ -127,6 +127,33 @@ GET /books?fields=id,title
 
 Sparse fieldset for the root resource, validated against the `selectable` allowlist. Narrow an included relation the same way: `fields[author]=id,name`.
 
+## Computed fields
+
+A response can carry fields that have no database column behind them — a `fullName` built from two columns, a formatted total, a flag that depends on who is asking. They are declared once on the entity's config:
+
+```ts
+@Kavo(Book, {
+  computed: {
+    displayTitle: { resolve: (book) => (book.title === null ? null : `${book.title} (${book.year})`) },
+  },
+})
+```
+
+```
+GET /books/1     → { "id": 1, "title": "Dune", "year": 1965, "displayTitle": "Dune (1965)" }
+GET /books?fields=id,displayTitle
+```
+
+From a client's point of view a computed field is an ordinary field: it is in the default response, it can be selected with `fields=`, and it can be narrowed away by an `item`/`list` DTO. Three things it is not:
+
+- **not filterable or sortable** — `filter[displayTitle][eq]=…` and `sort=displayTitle` are a 400, because there is no column to translate to `WHERE`/`ORDER BY`. Filter and sort on the underlying columns instead (`sort=title`);
+- **not writable** — sending one in a `POST`/`PUT`/`PATCH` body is silently ignored, like any other non-writable key (a server-side `create`/`update`/`patch` DTO that _declares_ one is a startup error rather than a silent drop);
+- **not database-side** — it is evaluated after the row is fetched, so it costs no extra query but also cannot make one cheaper.
+
+The one thing worth knowing on the server side: `resolve` must handle every value its columns can hold. It runs per served row with nothing catching it, so a single row it cannot handle turns a whole list response into a 500 — write `book.title?.toUpperCase() ?? null`, not `book.title.toUpperCase()`, against a nullable column.
+
+A computed field declared on a related entity shows up when that relation is included (`?include=author`), resolved from the related entity's own config. See [Configuration](/integrations/nest/configuration#computed) for the descriptor's options and [ADR-0019](/internals/adr/0019-computed-fields-are-serializer-evaluated) for why the three limits are permanent rather than pending.
+
 ## Includes
 
 ```
@@ -152,14 +179,65 @@ A list response (`GET /books`) always has the same shape:
   "items": [{ "id": 1, "title": "Dune" }],
   "limit": 20,
   "offset": 0,
-  "total": 1,
-  "meta": {}
+  "total": 1
 }
 ```
 
-`total` is `null` (and its `COUNT` query skipped) if `pagination.count` is turned off. The key is always present — the envelope's shape does not change with configuration, only the value does.
+`total` is `null` (and its `COUNT` query skipped) if `pagination.count` is turned off. The key is always present — a list always answers "how many matched", so configuration changes the value, never the shape.
 
-`meta` is an open bag for anything the API wants to say about the list that isn't a row: a facet count, a "results are approximate" flag, the next cursor. It carries `nextCursor` under [cursor pagination](#cursor-keyset-pagination), and is otherwise `{}` unless the entity's `findMany` handler puts something there — see [custom list metadata](/integrations/nest/configuration#custom-list-metadata) for how. `nextCursor` is the one key core writes itself; nothing in the bag is projected, filtered, or renamed on the way out, so apart from that key, what the handler returns is what the client receives.
+One optional fifth key can join them. `meta` is an open bag for anything the API wants to say about the list that isn't a row: a facet count, a "results are approximate" flag, the next cursor. It appears when the entity's `findMany` handler puts something there — see [custom list metadata](/integrations/nest/configuration#custom-list-metadata) for how — or under [cursor pagination](#cursor-keyset-pagination), which contributes `nextCursor` and is the one key Kavo writes itself. A response with nothing to report has no `meta` key at all rather than an empty `{}`, so read it as `body.meta?.facets`. Nothing in the bag is projected, filtered, or renamed on the way out: what the handler returns is what the client receives.
+
+## ETags and conditional requests
+
+Every single-item response — `POST /books`, `GET /books/1`, `PUT`, `PATCH`, and `PATCH /books/1/restore` — carries a strong `ETag`:
+
+```
+ETag: "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+```
+
+It is a hash of the exact representation being returned, so it changes whenever any field in the response does. List responses (`GET /books`) do not carry one.
+
+### `If-None-Match` — skip a body you already have
+
+```
+GET /books/1
+If-None-Match: "9f86d0…"
+```
+
+If your copy is still current you get `304 Not Modified` with an empty body and the same `ETag`. If it isn't, you get the ordinary `200` and a fresh tag. `*` matches any existing representation.
+
+### `If-Match` — don't overwrite a version you never saw
+
+```
+PATCH /books/1
+If-Match: "9f86d0…"
+```
+
+Supported on every route that targets one book: `PUT /books/1`, `PATCH /books/1`, `DELETE /books/1`, and the soft-delete routes `PATCH /books/1/restore` and `DELETE /books/1/purge`. If the book's current tag is one you named, the write goes ahead and the response carries the new tag. If it isn't — somebody else changed the book since you read it — the write is refused with `412 Precondition Failed` and a `KAVO_PRECONDITION_FAILED` problem document naming the current tag, and **nothing is written**. `*` matches any existing representation, so `If-Match: *` means "only if it still exists".
+
+For restore and purge, the tag to send is the one from `GET /books/1?withDeleted=true` — a soft-deleted book is what those routes act on, and an ordinary `GET /books/1` will not show it to you.
+
+If the book doesn't exist at all, or is in a state the route refuses, you get that route's own error rather than a `412`: `404` for a book that isn't there, `409 KAVO_ALREADY_DELETED` for `DELETE` on one that is already soft-deleted. Sending a conditional header never changes which error you get, only whether the write happens.
+
+### `If-Match` where Kavo can't check it
+
+Kavo refuses rather than quietly proceeds. A `412 KAVO_PRECONDITION_UNSUPPORTED` means the header was understood and the write did **not** happen, but the guard could not be evaluated at all — so retrying it unchanged will not help. Three ways to see it:
+
+- **On a route that doesn't target one row** — `POST /books`, and any custom operation you add. Kavo knows what row `PATCH /books/1` is about; it cannot know what a custom `POST /books/1/publish` is about.
+- **When [`caching.etag`](/integrations/nest/configuration#caching) is off** for that route, at any scope. No tags are issued, so there is nothing to compare — and answering `200` would tell you a guard was applied when none was.
+- **When `findOne` is disabled** on the entity. The check compares against the representation `GET /books/1` would return; with no such route there is none.
+
+`If-Match` on a `GET` is the one case Kavo ignores instead of refusing: a read cannot overwrite anything, and `If-None-Match` above is the read-side conditional.
+
+**A hand-written or `@Override`'d route enforces nothing by itself.** The check runs inside Kavo's engine, so a controller method you wrote replaces it along with everything else — it receives the `If-Match` tokens as its last parameter and must pass them on (`this.base.updateOne(id, data, { preconditions })`) for the guard to apply. See [`caching`](/integrations/nest/configuration#caching).
+
+### Two things to know
+
+**The `If-Match` check is not atomic.** Kavo reads the row, compares the tag, and then writes. There is a real window between the check and the write in which another writer can slip in — so this narrows the last-write-wins race, it does not eliminate it. It is not a database-level compare-and-swap, and Kavo does not claim to be one. If you need that guarantee, enforce it in your own transaction.
+
+**An `If-Match` token has to come from an unnarrowed read.** An ETag identifies one _representation_, so `GET /books/1?fields=title` produces a different tag from `GET /books/1`. Preconditions are evaluated against the full default representation, so a tag taken from a `fields=`- or `include=`-narrowed read will 412. Use the tag from a plain `GET /books/1`. The tag on a write response works too — it is the tag of the body you just got back — but only while that body is the same representation a plain `GET` returns, which stops being true once a relation is configured `defaultInclude`: a write resolves no query, so write responses never carry relations. On such an entity, take the token from a `GET`.
+
+Both halves are one setting, [`caching.etag`](/integrations/nest/configuration#caching) (on by default). Turning it off at any scope stops the tags being generated _and_ stops the conditional headers being honored.
 
 ## Errors
 

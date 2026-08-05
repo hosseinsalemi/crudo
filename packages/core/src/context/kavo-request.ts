@@ -1,5 +1,6 @@
 import type { EntityId } from "../types/entity-id.js";
 import type { EntityInput } from "../types/utility.js";
+import type { RequestPreconditions } from "../caching/etag.js";
 import type { QueryContext } from "../query/query-context.js";
 import type { OperationId } from "../operations/operation.js";
 import type { KavoCallOptions } from "../service/kavo-call-options.js";
@@ -25,4 +26,12 @@ export interface KavoRequest<
   readonly query: QueryDto | null;
   /** Per-call override scope — parameters, never config writes. */
   readonly options: KavoCallOptions | null;
+  /**
+   * Conditional-request tokens (`If-Match` / `If-None-Match`), transport-
+   * agnostic (ADR-0020). Optional so every existing caller keeps compiling;
+   * absent and `null` mean the same thing — no precondition. When both this
+   * and `options.preconditions` are set, this one wins, because it is the
+   * request's own data rather than a per-call override of it.
+   */
+  readonly preconditions?: RequestPreconditions | null;
 }
