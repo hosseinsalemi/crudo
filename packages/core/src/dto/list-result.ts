@@ -1,7 +1,7 @@
 /**
  * Open, extensible metadata bag on the list envelope, kept out of the
- * envelope's first-class fields. Core never writes to it: it is `{}` until
- * something contributes.
+ * envelope's first-class fields. Core never writes to it: the whole key is
+ * absent until something contributes.
  *
  * What fills it is the `findMany` handler's optional `FindManyResult.meta`
  * — return it and the engine merges it onto the envelope verbatim, with no
@@ -37,5 +37,11 @@ export interface ListResultDto<ListDto> {
    * a real cost the config can turn off.
    */
   readonly total: number | null;
-  readonly meta: ListMetaDto;
+  /**
+   * Present only when something contributed to it. Unlike `total` — which
+   * stays `null` rather than disappearing, because "how many matched" is a
+   * question every list answers — an empty bag says nothing, so the key is
+   * omitted rather than shipped as `{}`. Read it as `result.meta?.x`.
+   */
+  readonly meta?: ListMetaDto;
 }

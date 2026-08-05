@@ -100,8 +100,9 @@ describe("@Kavo route generation", () => {
       limit: 2,
       offset: 1,
       total: 5,
-      meta: {},
     });
+    // Nothing contributed to `meta`, so the key never reaches the wire.
+    expect(response.body).not.toHaveProperty("meta");
     expect(response.body.items).toHaveLength(2);
   });
 

@@ -38,12 +38,17 @@ function findManyHandler(handler: OperationHandler<User, unknown, unknown>) {
 const ADA = { name: "Ada", email: "ada@example.com", age: 36 };
 
 describe("ListResultDto.meta — the handler's contribution reaches the envelope", () => {
-  it("is an empty bag when the built-in handler contributes nothing", async () => {
+  it("is absent altogether when the built-in handler contributes nothing", async () => {
     const { crud } = makeCrud();
     await crud.createOne(ADA as never);
 
     const list = await crud.findMany();
-    expect(list.meta).toEqual({});
+    expect(list.meta).toBeUndefined();
+    // Absent, not `undefined`-valued: a key carrying `undefined` still shows
+    // up in `Object.keys`/`in` for a programmatic caller even though
+    // `JSON.stringify` drops it, so the two views would disagree.
+    expect("meta" in list).toBe(false);
+    expect(Object.keys(list)).not.toContain("meta");
   });
 
   it("carries a handler's meta onto the envelope", async () => {
@@ -76,12 +81,31 @@ describe("ListResultDto.meta — the handler's contribution reaches the envelope
     expect(list.meta).toEqual({ keep: { me: true } });
   });
 
-  it("still yields an empty bag when a custom handler omits meta entirely", async () => {
+  it("stays absent when a custom handler omits meta entirely", async () => {
     const { crud } = makeCrud(findManyHandler(fixedHandler({ entities: [], total: 7 })));
 
     const list = await crud.findMany();
-    expect(list.meta).toEqual({});
+    expect("meta" in list).toBe(false);
     expect(list.total).toBe(7);
+  });
+
+  it("drops an empty bag a handler returns explicitly", async () => {
+    // Emptiness is judged on the merged result, not on whether the handler
+    // named the key: `meta: {}` says exactly as little as no `meta` at all,
+    // so both leave the same envelope.
+    const { crud } = makeCrud(findManyHandler(fixedHandler({ entities: [], total: 0, meta: {} })));
+
+    const list = await crud.findMany();
+    expect("meta" in list).toBe(false);
+  });
+
+  it("drops the bag when every contributor in a wrap chain adds nothing", async () => {
+    const { crud } = makeCrud(
+      findManyHandler(withListMeta<User>(fixedHandler({ entities: [], total: 0, meta: {} }), () => ({}))),
+    );
+
+    const list = await crud.findMany();
+    expect("meta" in list).toBe(false);
   });
 
   it("coexists with a null total when counting is disabled", async () => {
@@ -156,6 +180,28 @@ describe("the envelope's total is always present, even when the handler omits it
     expect(list.total).toBeNull();
     expect("total" in list).toBe(true);
     expect(JSON.parse(JSON.stringify(list))).toMatchObject({ total: null });
+  });
+});
+
+describe("the JSON body carries meta only when there is something to carry", () => {
+  // The two envelope fields pull in opposite directions on purpose, and the
+  // difference is only visible after `JSON.stringify` — which is what a REST
+  // or MCP client actually sees.
+  it("omits the key from the serialized envelope when nothing contributed", async () => {
+    const { crud } = makeCrud();
+    await crud.createOne(ADA as never);
+
+    const body = JSON.parse(JSON.stringify(await crud.findMany())) as Record<string, unknown>;
+    expect(Object.keys(body)).toEqual(["items", "limit", "offset", "total"]);
+    expect(body["total"]).toBe(1);
+  });
+
+  it("carries the key through the round trip when a handler contributed", async () => {
+    const { crud } = makeCrud(findManyHandler(fixedHandler({ entities: [], total: 0, meta: { generatedIn: "3ms" } })));
+
+    const body = JSON.parse(JSON.stringify(await crud.findMany())) as Record<string, unknown>;
+    expect(Object.keys(body)).toEqual(["items", "limit", "offset", "total", "meta"]);
+    expect(body["meta"]).toEqual({ generatedIn: "3ms" });
   });
 });
 

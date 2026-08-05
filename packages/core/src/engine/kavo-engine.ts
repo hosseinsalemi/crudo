@@ -258,6 +258,7 @@ export class KavoEngine<Entity extends object> {
       const { entities, total, meta } = result as FindManyResult<Entity>;
       const listDto = (descriptor.output as DtoClass<object> | null) ?? config.dto.resolve("list", descriptor.id);
       const pagination = context.query?.pagination ?? { limit: 0, offset: 0 };
+      const listMeta = this.listMeta(meta);
       return {
         operation: descriptor.id,
         item: null,
@@ -270,7 +271,12 @@ export class KavoEngine<Entity extends object> {
           // `undefined` the key would vanish from the JSON body entirely,
           // so normalize the absent case to the documented `null`.
           total: total ?? null,
-          meta: this.listMeta(meta),
+          // Spread rather than `meta: listMeta`: assigning `undefined` would
+          // leave the key on the object (`"meta" in list`, `Object.keys`)
+          // even though `JSON.stringify` drops it, so a programmatic caller
+          // and a REST client would disagree about whether the envelope has
+          // a `meta`. Omitted means omitted, on both sides.
+          ...(listMeta === undefined ? {} : { meta: listMeta }),
         },
       };
     }
@@ -293,13 +299,20 @@ export class KavoEngine<Entity extends object> {
    * response bag, never `OperationConfig.meta`/`OperationMetadata`,
    * ADR-0007).
    *
-   * A named step rather than an inline `?? {}` because this is the single
+   * A named step rather than an inline spread because this is the single
    * merge point for everything that can contribute to it, and the handler
    * is only the first contributor: a pagination strategy computing
    * `meta.nextCursor` (#118) belongs to the engine, not to whatever
-   * handler happens to be configured, and folds in here. `meta` is a
-   * required envelope field, so a handler that contributes nothing still
-   * yields an empty bag — never `undefined`.
+   * handler happens to be configured, and folds in here.
+   *
+   * `undefined` — not `{}` — when nothing contributed, so `mapResponse`
+   * can leave the key off the envelope entirely. An empty bag carries no
+   * information, and the common zero-config list is exactly the case that
+   * would pay for it on every response. This is why the field is optional
+   * (`ListResultDto.meta?`) while `total` is not: `total: null` still
+   * answers "how many matched"; `meta: {}` answers nothing. Emptiness is
+   * judged after the merge, so a contributor that returns `{}` is the same
+   * as no contributor at all.
    *
    * `meta` never passes through the serializer: it is the caller's own
    * JSON-serializable data, not entity data, so no DTO projection or
@@ -315,8 +328,10 @@ export class KavoEngine<Entity extends object> {
    * own key set private without deep-cloning caller data that only has to
    * survive `JSON.stringify`.
    */
-  private listMeta(handlerMeta: ListMetaDto | undefined): ListMetaDto {
-    return { ...handlerMeta };
+  private listMeta(handlerMeta: ListMetaDto | undefined): ListMetaDto | undefined {
+    if (handlerMeta === undefined) return undefined;
+    const copy = { ...handlerMeta };
+    return Object.keys(copy).length === 0 ? undefined : copy;
   }
 }
 

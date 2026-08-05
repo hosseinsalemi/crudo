@@ -281,12 +281,17 @@ describe("ListResultDto.meta over the wire — what a findMany handler contribut
     expect(response.body.total).toBe(1);
   });
 
-  it("still serves an empty meta bag when nothing contributes one", async () => {
+  it("leaves meta off the wire entirely when nothing contributes one", async () => {
     await bootstrap(PlainController);
     await request(server()).post("/todos").send({ title: "x" }).expect(201);
 
     const response = await request(server()).get("/todos").expect(200);
-    expect(response.body.meta).toEqual({});
+    // The zero-config list is the common case, and an empty bag would be
+    // pure noise on every one of its responses. The four fields that always
+    // mean something stay put — including `total`, which reports `null`
+    // rather than vanishing when counting is off.
+    expect(Object.keys(response.body as Record<string, unknown>)).toEqual(["items", "limit", "offset", "total"]);
+    expect(response.body).not.toHaveProperty("meta");
   });
 });
 
