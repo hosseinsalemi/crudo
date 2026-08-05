@@ -55,9 +55,10 @@ export interface KavoInstance {
     QueryDto = QueryContext<Entity>,
     ItemDto = Entity,
     ListDto = ItemDto,
+    Computed extends string = never,
   >(
     entity: ClassRef<Entity>,
-    config?: EntityConfig<Entity, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto>,
+    config?: EntityConfig<Entity, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto, Computed>,
     runtime?: KavoRuntime<Entity>,
   ): DefaultKavoService<Entity, EntityId, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto>;
 
@@ -128,8 +129,8 @@ export function createKavo(options: KavoOptions = {}): KavoInstance {
         metadata: metadata as EntityMetadata<Entity>,
         config: resolved,
         registry,
-        serializer: new DefaultSerializer(metadata as EntityMetadata<Entity>, catalog),
-        deserializer: new DefaultDeserializer(metadata as EntityMetadata<Entity>, catalog),
+        serializer: new DefaultSerializer(metadata as EntityMetadata<Entity>, catalog, resolved.computed),
+        deserializer: new DefaultDeserializer(metadata as EntityMetadata<Entity>, catalog, resolved.computed),
         normalizer: new QueryNormalizer(
           metadata as EntityMetadata<Entity>,
           options.paginationStrategies ?? [],
@@ -190,9 +191,10 @@ export function createCrud<
   QueryDto = QueryContext<Entity>,
   ItemDto = Entity,
   ListDto = ItemDto,
+  Computed extends string = never,
 >(
   entity: ClassRef<Entity>,
-  config?: EntityConfig<Entity, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto>,
+  config?: EntityConfig<Entity, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto, Computed>,
   runtime?: KavoRuntime<Entity>,
 ): DefaultKavoService<Entity, EntityId, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto> {
   return createKavo().createCrud(entity, config, runtime);

@@ -88,3 +88,32 @@ void CompatibleHandlerController;
 @Controller("wrong-entity-todos")
 class WrongEntityController {}
 void WrongEntityController;
+
+// The `Computed` parameter (ADR-0019) is inferred from `computed`'s keys at
+// the decoration site, so an explicit selectable list can name a computed
+// field with no cast.
+@Kavo(Todo, {
+  computed: { slug: { resolve: (todo) => todo.title.toLowerCase() } },
+  allowlists: { selectable: ["id", "title", "slug"] },
+})
+@Controller("computed-todos")
+class ComputedController {}
+void ComputedController;
+
+@Kavo(Todo, {
+  computed: { slug: { resolve: (todo) => todo.title.toLowerCase() } },
+  // @ts-expect-error — and never a filterable one: it has no column.
+  allowlists: { filterable: ["slug"] },
+})
+@Controller("computed-filter-todos")
+class ComputedFilterController {}
+void ComputedFilterController;
+
+@Kavo(Todo, {
+  computed: { slug: { resolve: (todo) => todo.title.toLowerCase() } },
+  // @ts-expect-error — nor a sortable one.
+  allowlists: { sortable: ["slug"] },
+})
+@Controller("computed-sort-todos")
+class ComputedSortController {}
+void ComputedSortController;

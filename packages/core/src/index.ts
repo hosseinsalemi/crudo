@@ -54,6 +54,7 @@ export type {
 } from "./config/settings.js";
 export type { GlobalConfig } from "./config/global-config.js";
 export type { EntityConfig, OperationConfig, QueryAllowlists, QueryFieldSelector } from "./config/entity-config.js";
+export type { ComputedFieldDescriptor, ComputedFieldMap } from "./config/computed-field.js";
 export type { ResolvedEntityConfig, ResolvedQueryAllowlists } from "./config/resolved-entity-config.js";
 
 // ── Operations ────────────────────────────────────────────────────────

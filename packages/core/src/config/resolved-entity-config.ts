@@ -1,4 +1,5 @@
 import type { KavoSettings } from "./settings.js";
+import type { ComputedFieldMap } from "./computed-field.js";
 import type { FieldPath } from "../types/field-path.js";
 import type { DtoResolver } from "../dto/dto.js";
 import type { OperationId } from "../operations/operation.js";
@@ -36,6 +37,13 @@ export interface ResolvedEntityConfig<Entity = unknown> {
   readonly softDelete: ResolvedSoftDelete;
   /** Bootstrap-cached DTO resolution. */
   readonly dto: DtoResolver<Entity>;
+  /**
+   * Declared computed fields, validated at bootstrap — an empty record when
+   * the entity declares none. Read by the serializer (to evaluate them) and
+   * by the deserializer (to keep them out of writes), for this entity and,
+   * through the catalog, for any relation target (ADR-0019).
+   */
+  readonly computed: ComputedFieldMap<Entity>;
   /** Relation edges of this entity. */
   readonly relations: RelationRegistry<Entity>;
 }

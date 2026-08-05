@@ -129,7 +129,7 @@ An entity's own `operations.<id>` (below) always wins over this global map.
 
 ## `@Kavo(Entity, config)` — entity-scope config
 
-Every field above (`pagination`, `query`, `errors`, `relations`, `softDelete`) can also be set here, one level above global. In addition, `@Kavo`'s config carries three fields that only make sense per entity:
+Every field above (`pagination`, `query`, `errors`, `relations`, `softDelete`) can also be set here, one level above global. In addition, `@Kavo`'s config carries four fields that only make sense per entity:
 
 ### `dto`
 
@@ -177,7 +177,45 @@ What a request may filter, sort, and select on — including relation paths. Any
 | `sortable`   | same shape                                                    | Fields usable in `sort=`.       |
 | `selectable` | same shape                                                    | Fields usable in `fields=`.     |
 
-`{ exclude: [...] }` means "every own column except these", resolved against entity metadata at bootstrap. Omit a key entirely and it derives from the `query` DTO or entity metadata instead.
+`{ exclude: [...] }` means "every own column (plus, for `selectable`, every selectable computed field) except these", resolved at bootstrap against exactly the base set that key's plain default uses. Omit a key entirely and it derives from the `query` DTO or entity metadata instead.
+
+### `computed`
+
+Response fields with no backing column, derived from an entity that has already been fetched:
+
+```ts
+@Kavo(Book, {
+  computed: {
+    displayTitle: { resolve: (book) => (book.title === null ? null : `${book.title} (${book.year})`) },
+    canEdit: { resolve: (book, context) => book.ownerId === (context.principal as User)?.id },
+  },
+})
+```
+
+| Field        | Type                                        | What it does                                                                                         |
+| ------------ | ------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `resolve`    | `(entity, context: KavoContext) => unknown` | Derives the value. Called once per served item, **synchronously** — see the caveats below.           |
+| `selectable` | `boolean` (default `true`)                  | Whether `fields=` may name the field. `false` makes naming it a 400 — read the note below carefully. |
+
+A declared computed field is in the default `item`/`list` projection with no DTO registration, and in the `selectable` allowlist by default. It is **never** filterable, sortable, or writable — naming one in `allowlists.filterable`/`sortable` is both a type error and a bootstrap `ConfigurationException`, and so is naming one in a registered `create`/`update`/`patch` DTO. (A raw body key is still just dropped, like any other unknown key; the DTO case is a declaration, and every other computed misdeclaration fails at bootstrap too. It also has a wire consequence a silent drop cannot reach: `@ApiBody` is built from the DTO's runtime shape, so OpenAPI would advertise a property the engine unconditionally discards.)
+
+`resolve` returning `undefined` omits the key; `null` emits it — the same distinction a column draws.
+
+**`resolve` must be total, not merely pure.** It runs once per served item and nothing catches it, so **one** row whose resolver throws turns the whole collection endpoint into a 500 — not for that row, for every caller, until the row is fixed. Write it against everything the column can actually hold, including `null`: `resolve: (todo) => todo.title?.toLowerCase() ?? null`, never `todo.title.toLowerCase()` on a nullable column. A `POST` that sets `title: null` succeeds (computed fields are stripped from the payload; `title` is an ordinary column), and `GET /todos` is dead from then on. A throwing resolver surfaces as a 500 `KAVO_PERSISTENCE_FAILED` with the cause attached and the message not leaked.
+
+Keep it a pure function of the entity as well (plus `context.principal` where a field has to vary by caller). It runs per row, so a resolver that queries the database or calls out over the network reintroduces exactly the N+1 that batched includes exist to avoid. Declaring it `async` is a bootstrap error rather than a slow success: the serializer never awaits, so the promise would be emitted as-is and serialize to `{}`.
+
+**`resolve` receives the full fetched row**, not the projected object — selection is "kept internally, stripped late", so every column is present regardless of `fields=` or the registered `item` DTO. A computed field can therefore surface a value a narrowed DTO or `selectable` list deliberately hides. That is deliberate (`resolve` is server-authored code, the same trust level as `exposeInternals`), but it makes the resolver part of the exposure decision: narrowing the DTO does not narrow what the resolver can see.
+
+**What `selectable: false` does and does not mean.** It removes the name from the allowlist, so `?fields=auditNote` is a 400. It does **not** pin the field into every response: selection narrows the projection uniformly, so any request that sends `fields=` at all still drops it, and the client has no way to ask for it back. Read it as "not individually selectable", not "always present". An explicit `allowlists.selectable` list naming the field overrides the flag — an explicit list is always the deliberate answer.
+
+On an **included relation target**, `resolve` receives the _root_ request's `KavoContext` — serving `GET /posts/1?include=author` hands an `Author` computed field a context whose `entityName`, `operation`, `config` and `query` describe Post. Only `principal`, `correlationId`, `transaction` and `state` mean what they say from a relation target.
+
+**The generated OpenAPI response schema does not mention a computed field** when no `item`/`list` DTO is registered: the schema falls back to the entity class, whose columns are all the reflection can see, while the runtime response carries the computed key. Registering an `item`/`list` DTO naming the field fixes the document and the static response type in one move — the same escape hatch, for both consequences.
+
+Let the computed-key type parameter be inferred at the call site: pass the config inline to `@Kavo(...)` (or use `satisfies`), and pin neither an `EntityConfig<Book>` annotation on the config nor explicit type arguments on the call (`@Kavo<Todo, CreateTodoDto>(...)`, `createCrud<Book, CreateBookDto>(...)` — the likelier spelling once an entity has custom DTOs). Either fixes `Computed` to `never`, which erases `computed`'s value types and leaves `resolve`'s parameter implicitly `any`.
+
+See [ADR-0019](/internals/adr/0019-computed-fields-are-serializer-evaluated) for the reasoning and [DTO system §7](/internals/architecture/04-dto-system) for how it interacts with DTO narrowing and field selection.
 
 ### `operations`
 

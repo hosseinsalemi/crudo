@@ -999,6 +999,111 @@ describe("@Kavo relation includes", () => {
   });
 });
 
+/**
+ * ADR-0019 claims `@kavo/nest` needs no changes for computed fields:
+ * generated routes go through the same engine, so the serializer produces
+ * them and the allowlists gate them exactly as they do programmatically.
+ * This is the wire-level evidence for that claim.
+ */
+describe("@Kavo computed fields over the wire (ADR-0019)", () => {
+  @Kavo(Todo, {
+    // Defensive by construction: `resolve` must be *total* over anything the
+    // column can hold, because `serializeList` maps it over every row and one
+    // throw takes the whole collection response down (ADR-0019 §1).
+    computed: {
+      slug: { resolve: (todo: Todo) => todo.title?.toLowerCase().replaceAll(" ", "-") ?? null },
+    },
+  })
+  @Controller("todos")
+  class ComputedController {}
+
+  beforeEach(async () => {
+    await bootstrap(ComputedController);
+    await request(server()).post("/todos").send({ title: "Write Docs", priority: 2 }).expect(201);
+  });
+
+  it("emits the computed field on generated read routes with no DTO registered", async () => {
+    expect((await request(server()).get("/todos/1").expect(200)).body).toMatchObject({
+      title: "Write Docs",
+      slug: "write-docs",
+    });
+    expect((await request(server()).get("/todos").expect(200)).body.items[0]).toMatchObject({ slug: "write-docs" });
+  });
+
+  it("is selectable through the wire fieldset", async () => {
+    const response = await request(server()).get("/todos/1?fields=id,slug").expect(200);
+    expect(response.body).toEqual({ id: 1, slug: "write-docs" });
+  });
+
+  it("is rejected as a filter or sort field with problem details", async () => {
+    for (const query of ["filter[slug][eq]=write-docs", "sort=slug"]) {
+      const response = await request(server()).get(`/todos?${query}`).expect(400);
+      expect(response.body).toMatchObject({
+        code: "KAVO_QUERY_INVALID",
+        errors: [{ field: "slug", code: "KAVO_QUERY_INVALID_FIELD" }],
+      });
+    }
+  });
+
+  it("never reaches the adapter from a request body", async () => {
+    await request(server()).post("/todos").send({ title: "Ship It", slug: "hijacked" }).expect(201);
+    expect(adapter.rows[1]).not.toHaveProperty("slug");
+  });
+
+  it("fails at bind time when a registered create DTO declares the computed field", async () => {
+    // The wire consequence this closes: `@ApiBody` is built from the DTO's
+    // runtime shape, so a DTO naming a computed field made OpenAPI advertise
+    // a property the engine unconditionally discards. Rejected at
+    // `createCrud` now, which in a Nest app is provider instantiation.
+    class CreateTodoDto {
+      title = "";
+      slug = "";
+    }
+
+    @Kavo(Todo, {
+      computed: { slug: { resolve: (todo: Todo) => todo.title?.toLowerCase() ?? null } },
+      dto: { create: CreateTodoDto },
+    })
+    @Controller("todos")
+    class ComputedDtoController {}
+
+    const bind = async (): Promise<unknown> => {
+      const moduleRef = await Test.createTestingModule({
+        imports: [
+          KavoModule.forRoot({ infrastructure: fakeInfrastructure(new InMemoryTodoAdapter()) }),
+          KavoModule.forFeature([ComputedDtoController as never]),
+        ],
+      }).compile();
+      return moduleRef.createNestApplication().init();
+    };
+    await expect(bind()).rejects.toMatchObject({
+      code: "KAVO_CONFIG_INVALID",
+      messageParams: { entity: "Todo", path: "dto.create" },
+    });
+  });
+
+  it("turns a throwing resolver into problem details without leaking the message", async () => {
+    @Kavo(Todo, {
+      computed: {
+        note: {
+          resolve: () => {
+            throw new Error("secret internal detail");
+          },
+        },
+      },
+    })
+    @Controller("todos")
+    class ThrowingComputedController {}
+
+    await app.close();
+    await bootstrap(ThrowingComputedController);
+    // The write serializes its result too, so this is where it surfaces.
+    const response = await request(server()).post("/todos").send({ title: "x" }).expect(500);
+    expect(response.body).toMatchObject({ code: "KAVO_PERSISTENCE_FAILED", status: 500 });
+    expect(JSON.stringify(response.body)).not.toContain("secret internal detail");
+  });
+});
+
 describe("@Kavo Swagger request-body schemas", () => {
   class CreateTodoDto {
     title = "";
