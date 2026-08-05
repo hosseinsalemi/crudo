@@ -10,7 +10,7 @@ import type { EntityReader } from "../persistence/entity-reader.js";
 import type { ErrorHandler } from "../errors/kavo-exception-shape.js";
 import type { NormalizedQueryContext } from "../query/query-context.js";
 import type { QueryContext } from "../query/query-context.js";
-import type { Pagination } from "../query/pagination.js";
+import type { Pagination, SincePagination } from "../query/pagination.js";
 import type { OperationDescriptor, OperationRegistry } from "../operations/operation-registry.js";
 import type { StandardOperationId } from "../operations/operation.js";
 import type { RequestPreconditions } from "../caching/etag.js";
@@ -26,8 +26,9 @@ import {
 } from "../errors/exceptions.js";
 import { nameList } from "../errors/message-hints.js";
 import { QueryNormalizer } from "../query/query-normalizer.js";
-import { isCursorPagination } from "../query/pagination.js";
+import { hasKeyset, isSincePagination } from "../query/pagination.js";
 import { cursorValuesOf, encodeCursor } from "../query/cursor.js";
+import { sinceValueOf } from "../query/since.js";
 import { WILDCARD, computeEtag, strongMatch, weakMatch } from "../caching/etag.js";
 import { createKavoContext, randomUuid } from "../context/default-kavo-context.js";
 import { mergeSettings } from "../config/merge-settings.js";
@@ -134,15 +135,15 @@ const INPUT_SLOTS: Readonly<Partial<Record<StandardOperationId, DtoSlot>>> = {
  */
 export class KavoEngine<Entity extends object> {
   /**
-   * `EntityMetadata.fields` by name — the lookup `cursorValuesOf` needs to
-   * check a page token's values against their declared `FieldKind`. Built
-   * once here rather than per response; the metadata is frozen at
-   * `createCrud`.
+   * `EntityMetadata.fields` by name — the lookup `cursorValuesOf`/
+   * `sinceValueOf` need to check a page token's values against their
+   * declared `FieldKind`. Built once here rather than per response; the
+   * metadata is frozen at `createCrud`.
    */
-  private readonly cursorFields: ReadonlyMap<string, FieldMetadata>;
+  private readonly entityFields: ReadonlyMap<string, FieldMetadata>;
 
   constructor(private readonly deps: KavoEngineDependencies<Entity>) {
-    this.cursorFields = new Map(deps.metadata.fields.map((field) => [field.name, field]));
+    this.entityFields = new Map(deps.metadata.fields.map((field) => [field.name, field]));
   }
 
   get registry(): OperationRegistry<Entity> {
@@ -457,7 +458,7 @@ export class KavoEngine<Entity extends object> {
           // `offset` is a non-nullable envelope field, so cursor pages report
           // `0` (ADR-0021) — the honest reading of "how many rows precede
           // `items[0]` *in what this response describes*".
-          offset: isCursorPagination(pagination) ? 0 : pagination.offset,
+          offset: hasKeyset(pagination) ? 0 : pagination.offset,
           // `total` is a required envelope field typed `number | null`, but
           // a custom handler can return `{ entities }` alone. Left
           // `undefined` the key would vanish from the JSON body entirely,
@@ -509,13 +510,14 @@ export class KavoEngine<Entity extends object> {
    * A named step rather than an inline spread because this is the single
    * merge point for everything that can contribute to it, and the handler
    * is only the first contributor: `meta.nextCursor` under cursor
-   * pagination (ADR-0021) belongs to the engine, not to whatever handler
-   * happens to be configured, and folds in here.
+   * pagination (ADR-0021) and `meta.nextSince` under since pagination
+   * (ADR-0022) belong to the engine, not to whatever handler happens to be
+   * configured, and fold in here.
    *
    * The strategy's keys are the **base**, the handler's merge over them: a
-   * handler (or a `withListMeta` contributor) that names `nextCursor`
-   * explicitly is stating intent, and the same "more specific wins"
-   * direction runs through every other precedence chain in Kavo.
+   * handler (or a `withListMeta` contributor) that names `nextCursor`/
+   * `nextSince` explicitly is stating intent, and the same "more specific
+   * wins" direction runs through every other precedence chain in Kavo.
    *
    * `undefined` — not `{}` — when nothing contributed, so `mapResponse`
    * can leave the key off the envelope entirely. An empty bag carries no
@@ -529,7 +531,14 @@ export class KavoEngine<Entity extends object> {
    * A cursor page is never that case: `nextCursor` is `null` — not
    * `undefined` — on the last page, because "there is no page after this
    * one" is an answer, and a client walking the chain has to be told it has
-   * reached the end rather than left to infer it from a missing key.
+   * reached the end rather than left to infer it from a missing key. A
+   * since-paginated page is *never* on "the last page" in that sense —
+   * polling has no end — so an exhausted poll echoes the request's own
+   * `since` back rather than reporting `null` (ADR-0022). That echo can
+   * itself be `null`, though: a first poll (`since` absent) against zero
+   * matching rows has no boundary to echo, so `nextSince` is `null` there
+   * too — the guarantee is "never invents an end-of-results `null`," not
+   * "never `null` at all."
    *
    * `meta` never passes through the serializer: it is the caller's own
    * JSON-serializable data, not entity data, so no DTO projection or
@@ -548,20 +557,22 @@ export class KavoEngine<Entity extends object> {
    */
   private listMeta(result: FindManyResult<Entity>, context: KavoContext<Entity>): ListMetaDto | undefined {
     const query = context.query;
-    if (query === null || !isCursorPagination(query.pagination)) return compactMeta(result.meta);
+    if (query === null || !hasKeyset(query.pagination)) return compactMeta(result.meta);
+    if (isSincePagination(query.pagination)) return this.sinceListMeta(query.pagination, result, context);
+    const pagination = query.pagination;
     // `hasMore` is the sentinel the built-in handler reports from its
     // `limit + 1` over-fetch. A replacement handler that does not report it
     // is taken at its word: no signal, no next page.
     const last = result.hasMore === true ? result.entities[result.entities.length - 1] : undefined;
     const nextCursor =
-      last === undefined ? null : encodeCursor(cursorValuesOf(last, query.sort, this.cursorFields, context.entityName));
+      last === undefined ? null : encodeCursor(cursorValuesOf(last, query.sort, this.entityFields, context.entityName));
     // A token identical to the one that produced this page means the page
     // did not advance — the signature of an adapter that honours the
     // `limit + 1` over-fetch but still reads `query.filter` instead of
     // `readFilter(query)`, so every page is page 1 and `hasMore` never goes
     // false. A client following `nextCursor` would loop forever; erroring
     // beats looping (ADR-0021).
-    if (nextCursor !== null && nextCursor === query.pagination.cursor) {
+    if (nextCursor !== null && nextCursor === pagination.cursor) {
       throw new ConfigurationException(
         context.entityName,
         "pagination.strategy",
@@ -571,6 +582,48 @@ export class KavoEngine<Entity extends object> {
       );
     }
     return compactMeta({ nextCursor, ...result.meta });
+  }
+
+  /**
+   * `meta.nextSince`, the since-pagination counterpart of `nextCursor`
+   * (ADR-0022). Unlike `nextCursor`, this is computed from the **last
+   * returned row regardless of `hasMore`**, not only when the page is
+   * full: since-pagination is a continuous poll, not a bounded traversal,
+   * so the boundary must always advance past what the client has already
+   * seen — leaving it `undefined`/unchanged on a partial page would make
+   * the next poll re-fetch rows this one already returned.
+   *
+   * On an empty page (`entities.length === 0`, a genuinely exhausted poll —
+   * the `<value>|<id>` token makes `since` pagination exactly-once *within*
+   * a poll session, so this is no longer reachable merely because a tied
+   * group outran `limit`) there is no new boundary to report, so this
+   * echoes the request's own `since` back — `pagination.since ?? null` —
+   * rather than inventing an end-of-results `null`: there is no "last page"
+   * to signal the end of, and a caught-up client needs a value to poll with
+   * next, not nothing. On a *first* poll against zero matching rows, that
+   * echo is genuinely `null` (there was no prior boundary to echo), which
+   * is the one case `nextSince` is falsy — every other empty page echoes a
+   * real value.
+   *
+   * Deliberately **not** ported: cursor's "did not advance" `ConfigurationException`.
+   * With the id half of the token now breaking every tie, an unchanged
+   * `nextSince` genuinely means "nothing new," not a broken adapter — it is
+   * not an error here.
+   */
+  private sinceListMeta(
+    pagination: SincePagination<Entity>,
+    result: FindManyResult<Entity>,
+    context: KavoContext<Entity>,
+  ): ListMetaDto | undefined {
+    const sinceFieldName = context.config.settings.pagination.since.field;
+    const sinceField = this.entityFields.get(sinceFieldName);
+    const idField = this.entityFields.get(this.deps.metadata.idField);
+    const last = result.entities[result.entities.length - 1];
+    const nextSince =
+      last === undefined || sinceField === undefined || idField === undefined
+        ? (pagination.since ?? null)
+        : sinceValueOf(last, sinceField, idField, context.entityName);
+    return compactMeta({ nextSince, ...result.meta });
   }
 }
 

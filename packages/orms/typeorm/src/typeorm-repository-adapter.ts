@@ -14,7 +14,7 @@ import {
   ConfigurationException,
   NotDeletedException,
   NotFoundException,
-  isCursorPagination,
+  hasKeyset,
   readFilter,
 } from "@kavo/core";
 import type { DataSource, DeepPartial, ObjectLiteral, Repository, SelectQueryBuilder } from "typeorm";
@@ -108,7 +108,7 @@ export class TypeOrmRepositoryAdapter<Entity extends ObjectLiteral> implements R
       // the keyset predicate *is* the skip.
       const { pagination } = query;
       const entities = await this.buildQuery(query, context, { filter: readFilter(query) })
-        .skip(isCursorPagination(pagination) ? 0 : pagination.offset)
+        .skip(hasKeyset(pagination) ? 0 : pagination.offset)
         .take(pagination.limit)
         .getMany();
       await this.loadBatches(entities, this.entity, query.include);

@@ -7,7 +7,7 @@ import type {
   RepositoryAdapter,
   Sort,
 } from "@kavo/core";
-import { NotFoundException, isCursorPagination, readFilter } from "@kavo/core";
+import { NotFoundException, hasKeyset, readFilter } from "@kavo/core";
 
 /** Test entity: plain class, fields initialized so shapes exist at runtime. */
 export class User {
@@ -67,7 +67,7 @@ export class InMemoryUserAdapter implements RepositoryAdapter<User> {
     // makes, so the keyset predicate is applied here too.
     const matched = this.match(readFilter(query).root).sort(comparatorFor(query.sort));
     const { pagination } = query;
-    if (isCursorPagination(pagination)) return matched.slice(0, pagination.limit);
+    if (hasKeyset(pagination)) return matched.slice(0, pagination.limit);
     return matched.slice(pagination.offset, pagination.offset + pagination.limit);
   }
 

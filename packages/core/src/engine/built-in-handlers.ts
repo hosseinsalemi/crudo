@@ -7,7 +7,7 @@ import type { StandardOperationId } from "../operations/operation.js";
 import type { StandardHandlerFactory } from "../operations/default-operation-registry.js";
 import type { NormalizedQueryContext } from "../query/query-context.js";
 import { NotFoundException } from "../errors/exceptions.js";
-import { isCursorPagination } from "../query/pagination.js";
+import { hasKeyset } from "../query/pagination.js";
 
 /** What `findMany` hands back to the engine for envelope assembly. */
 export interface FindManyResult<Entity> {
@@ -28,12 +28,12 @@ export interface FindManyResult<Entity> {
   readonly meta?: ListMetaDto;
   /**
    * Whether at least one more row exists past this page — the has-more
-   * signal `meta.nextCursor` needs, since "null on the last page" cannot be
-   * answered by the page itself (ADR-0021).
+   * signal `meta.nextCursor`/`meta.nextSince` needs, since "null on the
+   * last page" cannot be answered by the page itself (ADR-0021, ADR-0022).
    *
-   * Only the cursor-paginated path sets it, by over-fetching `limit + 1` and
-   * dropping the sentinel row. Offset paging answers the same question from
-   * `total` and leaves this `undefined`.
+   * Only a keyset-paginated path (cursor or since) sets it, by over-fetching
+   * `limit + 1` and dropping the sentinel row. Offset paging answers the
+   * same question from `total` and leaves this `undefined`.
    */
   readonly hasMore?: boolean;
 }
@@ -85,20 +85,22 @@ export function builtInHandlers<Entity extends object>(
         if (query === null) {
           throw new Error("findMany requires a normalized query on the context");
         }
-        // Over-fetch by one for cursor paging, then drop the sentinel. It
-        // lives here rather than in each adapter for two reasons: the four
-        // adapters would otherwise implement the same off-by-one four times,
-        // and `findMany`'s contract stays "return exactly what the query
-        // asks for" — a custom adapter needs no cursor awareness at all
-        // beyond honoring `readFilter` (ADR-0021).
-        const cursorPaged = isCursorPagination(query.pagination);
-        const fetched = await adapter.findMany(cursorPaged ? overFetch(query) : query, context);
-        const hasMore = cursorPaged && fetched.length > query.pagination.limit;
+        // Over-fetch by one for keyset paging (cursor or since), then drop
+        // the sentinel. It lives here rather than in each adapter for two
+        // reasons: the four adapters would otherwise implement the same
+        // off-by-one four times, and `findMany`'s contract stays "return
+        // exactly what the query asks for" — a custom adapter needs no
+        // keyset awareness at all beyond honoring `readFilter` (ADR-0021,
+        // ADR-0022).
+        const keysetPaged = hasKeyset(query.pagination);
+        const fetched = await adapter.findMany(keysetPaged ? overFetch(query) : query, context);
+        const hasMore = keysetPaged && fetched.length > query.pagination.limit;
         const entities = hasMore ? fetched.slice(0, query.pagination.limit) : fetched;
         // Counting deliberately uses the *unmodified* query: `total` is the
-        // size of the whole match set, not of what remains after the cursor.
+        // size of the whole match set, not of what remains after the
+        // cursor/since boundary.
         const total = query.count ? await adapter.count(query, context) : null;
-        return cursorPaged ? { entities, total, hasMore } : { entities, total };
+        return keysetPaged ? { entities, total, hasMore } : { entities, total };
       },
     },
     updateOne: {

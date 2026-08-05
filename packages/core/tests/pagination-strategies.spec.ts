@@ -126,9 +126,9 @@ describe("PagePaginationStrategy — page[number]/page[size]", () => {
 });
 
 describe("builtInPaginationStrategies", () => {
-  it("ships exactly the three built-ins, keyed by strategy name", () => {
+  it("ships exactly the four built-ins, keyed by strategy name", () => {
     const strategies = builtInPaginationStrategies();
-    expect([...strategies.keys()].sort()).toEqual(["cursor", "offset", "page"]);
+    expect([...strategies.keys()].sort()).toEqual(["cursor", "offset", "page", "since"]);
   });
 
   it("keys each strategy by its own name property", () => {

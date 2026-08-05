@@ -46,14 +46,51 @@ export interface CursorPagination<Entity = unknown> {
 }
 
 /**
+ * Seek-by-timestamp semantics: "take `limit` rows at or after `since`, in
+ * `[sinceField, idField]` order" — a polling/sync shape, distinct from
+ * {@link CursorPagination} at the wire (a plain, human-readable value
+ * instead of an opaque token) even though it reuses the same keyset
+ * machinery internally (ADR-0022).
+ *
+ * There is deliberately **no `offset`**, for the same reason
+ * {@link CursorPagination} has none: a keyset page has no absolute position
+ * in the match set.
+ */
+export interface SincePagination<Entity = unknown> {
+  /** Effective page size, after clamping to the configured `maxLimit`. */
+  readonly limit: number;
+  /**
+   * The wire value the client sent, verbatim; `null` on the first poll — the
+   * same "strategy carries the raw token, `QueryNormalizer` decodes it" split
+   * {@link CursorPagination.cursor} uses. Unlike `cursor` this is never
+   * opaque: once decoded (into `keyset`) it is the sort field's own value,
+   * safe to read or construct by hand (ADR-0022).
+   */
+  readonly since: string | null;
+  /**
+   * The decoded `[since.field, idField]` value pair, composed into the
+   * *same* row-wise `keysetExpression` cursor pagination builds — the id
+   * half is what makes since pagination exactly-once even when rows tie on
+   * `since.field` (ADR-0022). `null` on the first poll.
+   *
+   * Filled by `QueryNormalizer`, mirroring {@link CursorPagination.keyset}.
+   * Adapters should not read this directly — `readFilter(query)` composes it
+   * with the client filter.
+   */
+  readonly keyset: FilterExpression<Entity> | null;
+}
+
+/**
  * Normalized pagination — the internal form every strategy produces and
  * every adapter consumes.
  *
  * A **union**, not one shape (ADR-0021): offset and keyset paging are
  * different enough that collapsing them costs correctness. Narrow with
- * {@link isCursorPagination} before reading `offset`.
+ * {@link isCursorPagination} or {@link isSincePagination} before reading
+ * `offset`, or with {@link hasKeyset} when only the keyset predicate matters
+ * (ADR-0022).
  */
-export type Pagination<Entity = unknown> = OffsetPagination | CursorPagination<Entity>;
+export type Pagination<Entity = unknown> = OffsetPagination | CursorPagination<Entity> | SincePagination<Entity>;
 
 /** Limits a strategy must respect, sourced from resolved config. */
 export interface PaginationLimits {
@@ -72,12 +109,38 @@ export function isCursorPagination<Entity>(pagination: Pagination<Entity>): pagi
 }
 
 /**
+ * Narrow {@link Pagination} to its since variant. The discriminant is the
+ * presence of `since`, mirroring {@link isCursorPagination} (ADR-0022).
+ */
+export function isSincePagination<Entity>(pagination: Pagination<Entity>): pagination is SincePagination<Entity> {
+  return "since" in pagination;
+}
+
+/**
+ * Narrow {@link Pagination} to whichever variant carries a keyset predicate
+ * — {@link CursorPagination} or {@link SincePagination} — without caring
+ * which. Both shapes are structurally identical for this purpose (`keyset:
+ * FilterExpression<Entity> | null`), so call sites that only compose or
+ * over-fetch on the keyset (`readFilter`, the `findMany` over-fetch, the
+ * envelope's `offset: 0`) use this instead of `isCursorPagination(p) ||
+ * isSincePagination(p)`, which would need a third arm every time a future
+ * keyset strategy is added (ADR-0022).
+ */
+export function hasKeyset<Entity>(
+  pagination: Pagination<Entity>,
+): pagination is CursorPagination<Entity> | SincePagination<Entity> {
+  return "keyset" in pagination;
+}
+
+/**
  * Pluggable translation from wire pagination params to {@link Pagination}.
  * Built-ins: `offset` (flat `limit`/`offset`, the default), `page`
- * (`page[number]`/`page[size]`, 1-indexed), and `cursor` (`limit` plus an
- * opaque `cursor` token). A strategy may publish extra response data through
- * `ListMetaDto` (`meta.nextCursor`) — the envelope contract itself never
- * changes per strategy.
+ * (`page[number]`/`page[size]`, 1-indexed), `cursor` (`limit` plus an
+ * opaque `cursor` token), and `since` (`limit` plus a plain, human-readable
+ * `since` value — seek-by-timestamp polling, ADR-0022). A strategy may
+ * publish extra response data through `ListMetaDto` (`meta.nextCursor`,
+ * `meta.nextSince`) — the envelope contract itself never changes per
+ * strategy.
  */
 export interface PaginationStrategy {
   /** Strategy id referenced by config (`pagination.strategy`). */
@@ -86,8 +149,9 @@ export interface PaginationStrategy {
    * Normalize raw wire params. Missing params fall back to `defaultLimit`;
    * out-of-range values are clamped or rejected per the query grammar.
    *
-   * A strategy that returns a {@link CursorPagination} leaves `keyset` at
-   * `null`; the normalizer fills it once the effective sort is known.
+   * A strategy that returns a {@link CursorPagination} or {@link
+   * SincePagination} leaves `keyset` at `null`; the normalizer fills it once
+   * the effective sort is known.
    */
   normalize(rawParams: Readonly<Record<string, unknown>>, limits: PaginationLimits): Pagination;
 }

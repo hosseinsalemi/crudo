@@ -189,6 +189,34 @@ LOWER(:v)`), identical on every driver. Both operators apply to string
   back page one forever. Cursors are opaque, never signed — ADR-0021 §2
   explains why that is sufficient.
 
+  The fourth built-in, `since`, is a **polling** shape — "give me everything
+  that changed since T" — not a bounded traversal, and its `Pagination`
+  variant is a third `hasKeyset` member alongside offset and cursor:
+  `{ limit, since, keyset }` (ADR-0022). Wire form is flat `limit` plus a
+  **plain, compound** `since` value — `"<since.field value>|<id>"`,
+  e.g. `2024-03-01T10:00:00.000Z|42` — against `pagination.since.field`
+  (default `"updatedAt"`, a documented convention core cannot detect the
+  way it detects a soft-delete marker). Never opaque, unlike `cursor`: an
+  adopter can read or construct one by hand. The effective sort is
+  **forced** to `[since.field, idField]` ascending regardless of any
+  client-supplied `sort`, which is rejected outright
+  (`KAVO_QUERY_CONFLICTING_PARAMS` on `sort`) rather than silently
+  overridden. `QueryNormalizer.resolveSince` splits the token on its last
+  `|`, decodes each half, and composes them with the **same**
+  `keysetExpression` cursor pagination builds — the id half is what makes
+  `since` pagination exactly-once even when rows tie on `since.field`
+  (ADR-0022 explains why an earlier, id-less `sinceField >= value` design
+  was rejected: a tied group larger than one page never advances without
+  it). The next poll's value comes back as `meta.nextSince`, computed from
+  the last returned row **regardless of whether the page filled up**
+  (unlike `nextCursor`, which is `null` on a non-full page) — polling has
+  no "last page" to signal the end of, so an exhausted poll echoes the
+  request's own `since` back rather than reporting `null`. `since.field`'s
+  existence, `date`/`string` kind, and `filterable`/`selectable`
+  membership (`idField`'s too) are bootstrap-checked (`resolveEntityConfig`),
+  not per-request, because the forced sort is entirely config-known before
+  any request arrives.
+
 - **Field selection:** `fields=id,name,email` — sparse fieldset for the
   root resource, validated against the selectable allowlist.
   `fields[<relation path>]=id,title` narrows an included node, validated

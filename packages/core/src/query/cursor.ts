@@ -4,7 +4,7 @@ import type { Sort } from "./sort.js";
 import type { FieldMetadata } from "../metadata/entity-metadata.js";
 import type { QueryIssueDto } from "../errors/problem-details.js";
 import type { FieldPath } from "../types/field-path.js";
-import { isCursorPagination } from "./pagination.js";
+import { hasKeyset } from "./pagination.js";
 import { ConfigurationException } from "../errors/exceptions.js";
 
 /**
@@ -203,16 +203,17 @@ export function keysetExpression<Entity>(
 
 /**
  * The filter a **paged read** applies: the client's own filter, AND-ed with
- * the keyset predicate when the query is cursor-paginated.
+ * the keyset predicate when the query is cursor- or since-paginated
+ * (ADR-0022 generalizes this from cursor-only via {@link hasKeyset}).
  *
  * Adapters call this in `findMany` instead of reading `query.filter`
  * directly. `count` deliberately keeps using `query.filter`: `total` is the
- * size of the whole match set, not of what is left after the cursor
- * (`pagination.count` semantics are strategy-independent).
+ * size of the whole match set, not of what is left after the cursor/since
+ * boundary (`pagination.count` semantics are strategy-independent).
  */
 export function readFilter<Entity>(query: NormalizedQueryContext<Entity>): Filter<Entity> {
   const { pagination, filter } = query;
-  if (!isCursorPagination(pagination) || pagination.keyset === null) return filter;
+  if (!hasKeyset(pagination) || pagination.keyset === null) return filter;
   if (filter.root === null) return { root: pagination.keyset };
   return { root: { kind: "group", operator: "AND", children: [filter.root, pagination.keyset] } };
 }

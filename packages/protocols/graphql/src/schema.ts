@@ -14,19 +14,28 @@ import { ConfigurationException } from "@kavo/core";
 import { GraphQLJSON } from "./json-scalar.js";
 
 /**
- * Refuse to bind an entity this protocol cannot page (ADR-0021 §7).
+ * Refuse to bind an entity this protocol cannot page (ADR-0021 §7,
+ * extended to `since` by ADR-0022).
  *
  * The list field takes `limit`/`offset` only, and `QueryNormalizer` ignores
- * `offset` under the cursor strategy — so `todos(limit: 20, offset: 40)`
- * against a cursor-configured entity returns rows 1–20 with no error and no
- * way for the client to tell. `nextCursor` lives in `meta`, which this
- * binding's `<Name>List` type does not carry, so page 2 is unreachable
- * either way. `pagination.strategy` is entity-scope, so a single
- * `defaults: { pagination: { strategy: "cursor" } }` would silently degrade
- * every bound entity to page-one-with-wrong-answers.
+ * `offset` under both keyset strategies — so `todos(limit: 20, offset: 40)`
+ * against a cursor- or since-configured entity returns rows 1–20 (or
+ * everything from the beginning) with no error and no way for the client to
+ * tell. `nextCursor`/`nextSince` live in `meta`, which this binding's
+ * `<Name>List` type does not carry, so page 2 (or the next poll) is
+ * unreachable either way. `pagination.strategy` is entity-scope, so a single
+ * `defaults: { pagination: { strategy: "cursor" } }` (or `"since"`) would
+ * silently degrade every bound entity to page-one-with-wrong-answers.
  *
- * Adding `cursor`/`meta` to the schema is the eventual fix; failing at
- * bootstrap is the correct behavior until then, and stays correct after.
+ * This check is name-gated on `"cursor"`/`"since"` rather than structural —
+ * unlike `QueryNormalizer`, which can probe a strategy's *output* shape,
+ * this runs at schema-build time with no request to normalize, so it cannot
+ * ask a strategy what it would produce. A third-party keyset strategy under
+ * another name is not caught here, the same limitation ADR-0021 §7 already
+ * records for cursor.
+ *
+ * Adding `cursor`/`since`/`meta` to the schema is the eventual fix; failing
+ * at bootstrap is the correct behavior until then, and stays correct after.
  * `@kavo/mcp` carries the same guard for the same reason — the two packages
  * may not import each other, so the check is duplicated rather than shared.
  */
@@ -46,13 +55,14 @@ function paginationStrategyOf(service: object): string | undefined {
 }
 
 function requireOffsetPageable(entityName: string, strategy: string | undefined, protocolName: string): void {
-  if (strategy !== "cursor") return;
+  if (strategy !== "cursor" && strategy !== "since") return;
   throw new ConfigurationException(
     entityName,
     "pagination.strategy",
-    `'cursor' is not supported by the ${protocolName} binding: its list field exposes 'limit'/'offset' only, ` +
-      `and a keyset page ignores 'offset' — a paged query would silently return the first page every time. ` +
-      `Either page this entity over REST, or give it an entity-scope 'pagination.strategy' of 'offset'/'page'`,
+    `'${strategy}' is not supported by the ${protocolName} binding: its list field exposes 'limit'/'offset' only, ` +
+      `and a keyset page ignores 'offset' — a paged query would silently return the first page (or everything ` +
+      `from the beginning) every time. Either page this entity over REST, or give it an entity-scope ` +
+      `'pagination.strategy' of 'offset'/'page'`,
   );
 }
 

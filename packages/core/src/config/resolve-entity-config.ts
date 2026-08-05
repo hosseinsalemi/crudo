@@ -74,6 +74,7 @@ export function resolveEntityConfig<Entity extends object>(
   );
   validateSettings(entityName, entitySettings);
   validateDefaultSort(entityName, entitySettings, allowlists);
+  validateSincePagination(entityName, metadata, entitySettings, allowlists);
 
   // Per-operation settings views, precomputed for every operation that
   // declares overrides. `false` (disabled) contributes no settings — the
@@ -91,6 +92,7 @@ export function resolveEntityConfig<Entity extends object>(
     const scope = `${entityName}.operations.${operation}`;
     validateSettings(scope, merged);
     validateDefaultSort(scope, merged, allowlists);
+    validateSincePagination(scope, metadata, merged, allowlists);
     // Resolve for its validation side effect: a per-operation scope that
     // demands soft delete on an entity without a marker field must fail at
     // bootstrap, not on the first request (the engine recomputes the
@@ -308,6 +310,70 @@ export function validateDefaultSort<Entity>(
         scope,
         "query.defaultSort",
         `field '${entry.field}' is not in the sortable allowlist`,
+      );
+    }
+  }
+}
+
+/**
+ * Bootstrap validation for `pagination.strategy: "since"` (ADR-0022):
+ * `pagination.since.field` names a real, `date`- or `string`-kind column
+ * on `filterable` and `selectable`, and `idField` (the forced sort's
+ * tiebreaker) is too. Unlike cursor pagination's equivalent check
+ * (`QueryNormalizer.resolveKeyset`, run per request against the *effective*
+ * sort, which is client-choosable), the since strategy's sort is *forced*
+ * and entirely config-known — the same reason `resolveSoftDelete` validates
+ * its marker field here rather than per request. A third-party strategy
+ * that also emits a `since`-shaped `Pagination` under another name is not
+ * covered — this check is name-gated on the literal `"since"`, the same
+ * way the settings-shape checks above are.
+ *
+ * No-op for any other strategy, including a custom one registered as
+ * `"since"` by name coincidence — that misconfiguration surfaces instead
+ * as a normal per-request query issue once `QueryNormalizer` runs.
+ */
+function validateSincePagination<Entity extends object>(
+  scope: string,
+  metadata: EntityMetadata<Entity>,
+  settings: KavoSettings,
+  allowlists: ResolvedQueryAllowlists<Entity>,
+): void {
+  if (settings.pagination.strategy !== "since") return;
+  const { field } = settings.pagination.since;
+  const filterable = allowlists.filterable as readonly string[];
+  const selectable = allowlists.selectable as readonly string[];
+
+  const sinceColumn = metadata.fields.find((column) => column.name === field);
+  if (sinceColumn === undefined) {
+    throw new ConfigurationException(
+      scope,
+      "pagination.since.field",
+      `entity '${metadata.name}' has no '${field}' column — set 'pagination.since.field' to an existing column`,
+    );
+  }
+  if (sinceColumn.kind !== "date" && sinceColumn.kind !== "string") {
+    throw new ConfigurationException(
+      scope,
+      "pagination.since.field",
+      `'${field}' must be a 'date'- or 'string'-kind column to page by, got '${sinceColumn.kind}'`,
+    );
+  }
+  for (const [column, reason] of [
+    [field, "'pagination.since.field'"],
+    [metadata.idField, "the forced tiebreaker 'idField'"],
+  ] as const) {
+    if (!filterable.includes(column)) {
+      throw new ConfigurationException(
+        scope,
+        "pagination.since.field",
+        `${reason} '${column}' must be on the filterable allowlist for 'since' pagination to compose its keyset predicate`,
+      );
+    }
+    if (!selectable.includes(column)) {
+      throw new ConfigurationException(
+        scope,
+        "pagination.since.field",
+        `${reason} '${column}' must be on the selectable allowlist for 'since' pagination to read the next boundary off a row`,
       );
     }
   }
