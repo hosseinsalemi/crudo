@@ -341,9 +341,14 @@ export class QueryNormalizer<Entity = unknown> {
    * Field existence, kind (`date`/`string`), and allowlist membership are
    * already bootstrap-checked for the built-in `"since"` strategy
    * (`resolveEntityConfig`, since the sort it forces is entirely
-   * config-known and not client-input-dependent the way cursor's is) — the
-   * checks here are reached only via a third-party strategy emitting a
-   * `SincePagination` under another registered name.
+   * config-known and not client-input-dependent the way cursor's is). The
+   * same two allowlists (`filterable`, `selectable` — the reasons are
+   * identical to cursor's, ADR-0021 §2) are re-checked here too, so a
+   * third-party strategy emitting a `SincePagination` under another
+   * registered name — which bypasses the bootstrap check entirely, since
+   * that check is name-gated on `"since"` — cannot compose a keyset
+   * predicate over, or leak via `meta.nextSince`, a column the allowlists
+   * exclude.
    */
   private resolveSince(
     pagination: SincePagination<Entity>,
@@ -382,6 +387,13 @@ export class QueryNormalizer<Entity = unknown> {
       });
       return { sort: forcedSort, pagination };
     }
+    const before = issues.length;
+    for (const name of [sinceFieldName, idField]) {
+      if (requireAllowlisted(name, config, "filtering", issues)) {
+        requireAllowlisted(name, config, "selection", issues);
+      }
+    }
+    if (issues.length > before) return { sort: forcedSort, pagination };
     if (pagination.since === null) return { sort: forcedSort, pagination };
 
     const separator = pagination.since.lastIndexOf("|");

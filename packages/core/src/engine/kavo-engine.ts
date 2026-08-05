@@ -533,8 +533,12 @@ export class KavoEngine<Entity extends object> {
    * one" is an answer, and a client walking the chain has to be told it has
    * reached the end rather than left to infer it from a missing key. A
    * since-paginated page is *never* on "the last page" in that sense —
-   * polling has no end — so `nextSince` is never `null`: exhausted, it
-   * echoes the request's own `since` back (ADR-0022).
+   * polling has no end — so an exhausted poll echoes the request's own
+   * `since` back rather than reporting `null` (ADR-0022). That echo can
+   * itself be `null`, though: a first poll (`since` absent) against zero
+   * matching rows has no boundary to echo, so `nextSince` is `null` there
+   * too — the guarantee is "never invents an end-of-results `null`," not
+   * "never `null` at all."
    *
    * `meta` never passes through the serializer: it is the caller's own
    * JSON-serializable data, not entity data, so no DTO projection or
@@ -593,9 +597,13 @@ export class KavoEngine<Entity extends object> {
    * the `<value>|<id>` token makes `since` pagination exactly-once *within*
    * a poll session, so this is no longer reachable merely because a tied
    * group outran `limit`) there is no new boundary to report, so this
-   * echoes the request's own `since` back rather than reporting `null` —
-   * there is no "last page" to signal the end of, and a caught-up client
-   * needs a value to poll with next, not nothing.
+   * echoes the request's own `since` back — `pagination.since ?? null` —
+   * rather than inventing an end-of-results `null`: there is no "last page"
+   * to signal the end of, and a caught-up client needs a value to poll with
+   * next, not nothing. On a *first* poll against zero matching rows, that
+   * echo is genuinely `null` (there was no prior boundary to echo), which
+   * is the one case `nextSince` is falsy — every other empty page echoes a
+   * real value.
    *
    * Deliberately **not** ported: cursor's "did not advance" `ConfigurationException`.
    * With the id half of the token now breaking every tie, an unchanged

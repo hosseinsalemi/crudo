@@ -109,8 +109,11 @@ differences from `cursor` are only:
 - on a **genuinely empty** page — no rows at or after the boundary at all,
   which with the id tiebreaker now really does mean "caught up," not "tie
   exceeded `limit`" — the response echoes the request's own `since` back
-  rather than reporting `null`. There is no "last page" to signal the end
-  of, and a caught-up client needs a value to poll with next, not nothing.
+  rather than inventing an end-of-results `null`. There is no "last page"
+  to signal the end of, and a caught-up client needs a value to poll with
+  next, not nothing. That echo is genuinely `null` on a _first_ poll
+  (`since` absent) against zero matching rows — there is no prior boundary
+  to echo — so `nextSince` is falsy exactly there, and nowhere else.
 
 **Deliberately not ported: cursor's "did not advance" `ConfigurationException`.**
 With the id half now breaking every tie, an unchanged `nextSince` across

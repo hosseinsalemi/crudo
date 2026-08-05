@@ -8,6 +8,7 @@ import type {
   ListMetaDto,
   ListResultDto,
   NormalizedQueryContext,
+  PaginationStrategy,
   RepositoryAdapter,
   Sort,
 } from "@kavo/core";
@@ -251,6 +252,47 @@ describe("SincePaginationStrategy", () => {
   });
 });
 
+describe("QueryNormalizer.resolveSince enforces the allowlists directly, not only via bootstrap", () => {
+  // `resolveEntityConfig`'s bootstrap check is name-gated on the literal
+  // string "since" (it has no strategy instance to probe structurally), so
+  // a third-party strategy that emits a since-shaped `Pagination` under
+  // another registered name bypasses it entirely. `resolveSince` must
+  // still refuse to compose a keyset — or leak via `meta.nextSince` — over
+  // a column the allowlists exclude, exactly as `resolveKeyset` already
+  // does for cursor pagination (ADR-0021 §2, ADR-0022).
+  class ThirdPartySince implements PaginationStrategy {
+    readonly name = "poll";
+    normalize(rawParams: Readonly<Record<string, unknown>>) {
+      const raw = rawParams["since"];
+      return { limit: 20, since: typeof raw === "string" ? raw : null, keyset: null };
+    }
+  }
+
+  function pollCrud() {
+    const adapter = new InMemoryEventAdapter();
+    const crud = createKavo({
+      defaults: { pagination: { strategy: "poll", since: { field: "occurredAt" } } },
+      paginationStrategies: [new ThirdPartySince()],
+    } as never).createCrud(Event, { allowlists: { filterable: { exclude: ["occurredAt"] } } } as never, {
+      adapter,
+      metadata: eventMetadata,
+    });
+    return crud;
+  }
+
+  it("bypasses the bootstrap check (proving the gap this test targets is real)", () => {
+    // No ConfigurationException at createCrud — `validateSincePagination`
+    // never runs, because `strategy` is `"poll"`, not the literal `"since"`.
+    expect(() => pollCrud()).not.toThrow();
+  });
+
+  it("still rejects a since.field excluded from the filterable allowlist at request time", async () => {
+    const client = pollCrud();
+    const issues = await issuesOfAsync(() => client.findMany({ since: "2024-01-01T00:00:00.000Z|1" } as never));
+    expect(issues[0]?.detail).toContain("filterable");
+  });
+});
+
 // ── Bootstrap validation (resolveEntityConfig) ───────────────────────────
 
 describe("bootstrap validation of pagination.since.field", () => {
@@ -411,25 +453,40 @@ describe("since pagination end to end", () => {
     const { crud: client } = crud();
     await seed(client, 4);
 
+    // Establish a real boundary first, so the second call actually builds a
+    // keyset — the AND-composition this test names is between that keyset
+    // and the client filter, not between an unfiltered offset-0 page and a
+    // filter (which `readFilter` would pass through unchanged either way).
+    const first = await client.findMany({ limit: 1 } as never);
+    const boundary = nextSinceOf(first);
+
     const page = await client.findMany({
       limit: 10,
-      filter: { kind: "condition", field: "name", operator: "NE", value: "event-2" },
+      since: boundary,
+      filter: { kind: "condition", field: "name", operator: "NE", value: "event-3" },
     } as never);
-    expect((page.items as Event[]).map((event) => event.name)).toEqual(["event-1", "event-3", "event-4"]);
+    // Without the since boundary this would include event-1; without the
+    // filter it would include event-3. Both narrow the same result.
+    expect((page.items as Event[]).map((event) => event.name)).toEqual(["event-2", "event-4"]);
   });
 
   it("excludes soft-deleted rows by default, composing with the since boundary", async () => {
     const { crud: client } = crud();
     await seed(client, 3);
-    const all = await client.findMany({ limit: 10 } as never);
-    const middle = (all.items as Event[])[1]!;
+    const first = await client.findMany({ limit: 1 } as never);
+    const boundary = nextSinceOf(first);
+    const middle = (await client.findMany({ limit: 1, since: boundary } as never)).items[0] as Event;
+    expect(middle.name).toBe("event-2");
     await client.deleteOne(middle.id as never);
 
-    const page = await client.findMany({ limit: 10 } as never);
-    expect((page.items as Event[]).map((event) => event.name)).toEqual(["event-1", "event-3"]);
+    // Polling from before the deleted row: it is excluded from the default
+    // (live-only) scope, composing with the since boundary rather than
+    // replacing it.
+    const page = await client.findMany({ limit: 10, since: boundary } as never);
+    expect((page.items as Event[]).map((event) => event.name)).toEqual(["event-3"]);
 
-    const withDeleted = await client.findMany({ limit: 10, withDeleted: true } as never);
-    expect((withDeleted.items as Event[]).map((event) => event.name)).toEqual(["event-1", "event-2", "event-3"]);
+    const withDeleted = await client.findMany({ limit: 10, since: boundary, withDeleted: true } as never);
+    expect((withDeleted.items as Event[]).map((event) => event.name)).toEqual(["event-2", "event-3"]);
   });
 
   it("reports offset 0 and total across the whole match set, same as cursor pagination", async () => {
