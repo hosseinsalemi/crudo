@@ -21,6 +21,7 @@ built-in defaults → global (createKavo) → entity (createCrud)
 | `errors.exposeInternals`                         | `false`                  | leak driver detail into responses                                      |
 | `relations.maxIncludeDepth` / `maxIncludedNodes` | 2 / 10                   | include depth budget and total node cap                                |
 | `relations.edges.<name>`                         | `{}`                     | per-relation `includable` / `defaultInclude` / `maxDepth` / `strategy` |
+| `caching.etag`                                   | `true`                   | ETag on single-item responses + `If-None-Match`/`If-Match` (ADR-0020)  |
 | `softDelete.field` / `strategy`                  | `"deletedAt"` / `"auto"` | `auto` = soft when the entity has the marker field, `false` disables   |
 | `operations.<id>`                                | `{}` (unset)             | global operation-enablement default (issue #38); see below             |
 | `bulk.mode` / `maxBatchSize`                     | `"atomic"` / 500         | reserved (bulk is not built)                                           |

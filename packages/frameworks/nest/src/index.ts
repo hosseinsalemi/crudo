@@ -17,6 +17,8 @@ export { Override, type OverrideMetadata } from "./override.decorator.js";
 export { KavoModule, type KavoModuleAsyncOptions, type KavoGraphQLOption, type KavoMcpOption } from "./kavo.module.js";
 export type { KavoModuleOptions } from "./kavo-options.js";
 export { KavoExceptionFilter } from "./kavo-exception.filter.js";
+export { KavoResponseInterceptor } from "./kavo-response.interceptor.js";
+export { ConditionalRequest, parseEntityTags } from "./conditional-request.decorator.js";
 export { flattenQuery } from "./flatten-query.js";
 export { enumProp, oneOfArray, type SchemaHint } from "./schema-hints.js";
 export { KAVO_INSTANCE, KAVO_MODULE_OPTIONS, getKavoServiceToken, boundKavoService } from "./tokens.js";

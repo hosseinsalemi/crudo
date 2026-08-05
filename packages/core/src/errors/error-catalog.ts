@@ -81,6 +81,38 @@ export const ERROR_CATALOG = {
     title: "Not deleted",
     message: "{entity} with id '{id}' is not deleted.",
   },
+  KAVO_PRECONDITION_FAILED: {
+    status: 412,
+    title: "Precondition failed",
+    // The current tag is in the message on purpose: it is the value the
+    // client needs to retry, it is already public (it is the `ETag` of a
+    // representation the client is authorized to read), and without it the
+    // only way forward is a blind re-GET. "Authorized to read" is what the
+    // engine checks before throwing this: when `findOne` is not an enabled
+    // operation there is no representation the client may read, so it
+    // never reaches here — `KAVO_PRECONDITION_UNSUPPORTED` is raised
+    // instead, and discloses nothing.
+    message:
+      "The If-Match precondition failed: {entity} with id '{id}' has changed since the ETag the request supplied. " +
+      "Its current ETag is {etag}.",
+  },
+  KAVO_PRECONDITION_UNSUPPORTED: {
+    status: 412,
+    title: "Precondition failed",
+    // `{reason}` is a closed set of phrases written at the single throw
+    // site (`KavoEngine.checkIfMatch`), never caller text — the same
+    // reasoning that makes `{operation}` safe in `KAVO_OPERATION_DISABLED`
+    // below: a placeholder is only a hazard when the value may be absent.
+    //
+    // Fail *closed*: RFC 9110 §13.1.1 forbids performing the method when
+    // `If-Match` evaluates false, and a condition Kavo cannot evaluate is
+    // one it cannot show to be true. Silently performing the write would
+    // hand back a 2xx for a guard that was never applied, which is the
+    // lost update this whole feature exists to prevent.
+    message:
+      "The If-Match precondition on '{operation}' for {entity} cannot be evaluated ({reason}), so the request was " +
+      "refused rather than performed unguarded.",
+  },
   KAVO_OPERATION_DISABLED: {
     status: 405,
     title: "Operation disabled",

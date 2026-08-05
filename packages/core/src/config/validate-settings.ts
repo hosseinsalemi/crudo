@@ -93,6 +93,18 @@ export function validateSettings(entityName: string, settings: KavoSettings): vo
     }
   }
 
+  // `softDelete` is the one key in this schema that `false` disables
+  // wholesale, and the resemblance invites `caching: false` — which would
+  // otherwise blow up as a TypeError instead of naming the key.
+  if (typeof settings.caching !== "object" || settings.caching === null) {
+    throw new ConfigurationException(
+      entityName,
+      "caching",
+      `expected { etag: boolean }, got ${JSON.stringify(settings.caching)} — to turn ETags off, set 'caching.etag' to false`,
+    );
+  }
+  bool("caching.etag", settings.caching.etag);
+
   if (settings.softDelete !== false) {
     if (
       typeof settings.softDelete !== "object" ||

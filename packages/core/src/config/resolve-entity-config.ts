@@ -34,6 +34,7 @@ const SETTINGS_KEYS = [
   "query",
   "errors",
   "relations",
+  "caching",
   "softDelete",
 ] as const satisfies readonly (keyof KavoSettings)[];
 
