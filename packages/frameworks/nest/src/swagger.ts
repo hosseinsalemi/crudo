@@ -285,8 +285,12 @@ function successBodyFor(
   dtoResolver: DtoResolver<object>,
 ): object {
   if (route.status === 204) return {};
+  // Descriptor override first, same fallback order as `mapResponse`
+  // (issue #131): the engine serializes through `descriptor.output` ahead
+  // of the entity's root `item`/`list` slot, so documenting the slot alone
+  // would advertise a shape no response actually has.
   const resolve = (slot: "item" | "list"): ClassRef =>
-    (dtoResolver.resolve(slot, descriptor.id) as ClassRef | null) ?? entity;
+    (descriptor.output as ClassRef | null) ?? (dtoResolver.resolve(slot, descriptor.id) as ClassRef | null) ?? entity;
   switch (descriptor.id) {
     case "createOne":
     case "updateOne":

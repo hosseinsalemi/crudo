@@ -236,7 +236,22 @@ Per-operation overrides, keyed by standard operation id. Each entry is either a 
 | `enabled`            | `boolean`                           | Turns the operation on or off explicitly — the long form of the `true`/`false` shorthand, for when the entry also carries settings or `meta`. |
 | `handler`            | `OperationHandler<Entity>`          | Replacement handler function, keeping the default DTO/serialization scaffolding around it.                                                    |
 | `meta`               | `OperationMetadata`                 | Opaque bag consumed by the framework layer — in `@kavo/nest`, this is `{ routes: KavoRouteOptions }`.                                         |
+| `dto`                | `{ input?, output?, query? }`       | Overrides the entity's root `dto` slot for this operation only — see below.                                                                   |
 | _(any settings key)_ | same shape as global `KavoSettings` | Overrides that apply to this operation only, one level above the entity's own settings.                                                       |
+
+**`operations.<id>.dto`** narrows one operation's request body, response, or query contract independently of the entity's root `dto` slots (§`dto` above). Only the fields a given operation actually has are accepted — `input`/`output` on a write, `output`/`query` on a read, neither on `deleteOne`/`purgeOne` (void results):
+
+```ts
+@Kavo(Book, {
+  dto: { item: BookItemDto }, // entity-wide default for every read
+  operations: {
+    findOne: { dto: { output: BookDetailDto } }, // findOne only
+    createOne: { dto: { input: CreateBookRequestDto, output: BookCreatedDto } },
+  },
+})
+```
+
+Fallback order per field: `operations.<id>.dto.<field>` → the entity's root `dto.<slot>` → the entity-derived default. Setting a field an operation doesn't have (`dto.query` on `createOne`, say) is both a type error and a bootstrap `ConfigurationException`. See [DTO system §8](/internals/architecture/04-dto-system#8-per-operation-override-issue-131) for the full applicability table and the fallback chain in the engine.
 
 **`operations.<id>.meta.routes`** (`@kavo/nest`'s `KavoRouteOptions`):
 

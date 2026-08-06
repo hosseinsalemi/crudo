@@ -15,7 +15,11 @@ import type { OperationId } from "../operations/operation.js";
  *
  * Restore and custom operations reuse `item`/`list`;
  * the `operation` argument exists so a future extension could specialize per
- * operation, but v6 resolution is slot-driven only.
+ * operation, but resolution *within this class* stays slot-driven only —
+ * the per-operation override tier (issue #131) sits ahead of it, in the
+ * registry (`OperationDescriptor.input`/`output`/`query`) and the engine's
+ * `descriptor.<field> ?? config.dto.resolve(...)` fallback, so this
+ * resolver only ever sees the request once no override applies.
  */
 export class DefaultDtoResolver<Entity = unknown> implements DtoResolver<Entity> {
   private readonly slots: Readonly<Record<DtoSlot, DtoClass | null>>;

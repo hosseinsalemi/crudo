@@ -2,10 +2,9 @@ import type { KavoSettings } from "./settings.js";
 import type { DeepPartial } from "../types/utility.js";
 import type { FieldPath } from "../types/field-path.js";
 import type { QueryContext } from "../query/query-context.js";
-import type { OperationDtoMap } from "../dto/dto.js";
+import type { OperationDtoMap, OperationDtoOverride } from "../dto/dto.js";
 import type { EntityInput } from "../types/utility.js";
 import type { OperationHandler, OperationMetadata } from "../operations/operation-handler.js";
-import type { StandardOperationId } from "../operations/operation.js";
 import type { ComputedFieldDescriptor } from "./computed-field.js";
 
 /**
@@ -46,8 +45,17 @@ export interface QueryAllowlists<Entity = unknown, Computed extends string = nev
  * Per-operation configuration.
  * Settings keys override entity scope for this operation only; `false` in
  * the parent `operations` record disables the operation outright.
+ *
+ * `DtoOverride` is `StandardOperationsConfig`'s per-id `Pick` of
+ * `OperationDtoOverride` — only the fields that operation actually
+ * supports (issue #131). It defaults to the full override shape so a bare
+ * `OperationConfig<Entity>` (used where no specific operation id is in
+ * scope) still type-checks.
  */
-export interface OperationConfig<Entity = unknown> extends Omit<DeepPartial<KavoSettings>, "operations"> {
+export interface OperationConfig<Entity = unknown, DtoOverride = OperationDtoOverride> extends Omit<
+  DeepPartial<KavoSettings>,
+  "operations"
+> {
   /**
    * Turn the operation on or off explicitly, overriding its default. The
    * long form of the `false` / `true` shorthands in the parent
@@ -59,6 +67,59 @@ export interface OperationConfig<Entity = unknown> extends Omit<DeepPartial<Kavo
   readonly handler?: OperationHandler<Entity>;
   /** Opaque metadata consumed by the framework layer (route options). */
   readonly meta?: OperationMetadata;
+  /**
+   * Overrides the entity's root `dto` slot for this operation only —
+   * `input`/`output`/`query` as applicable to the operation's shape.
+   * Fallback order: this field → the entity's root `dto.<slot>` →
+   * entity-derived default (doc 04 §8).
+   */
+  readonly dto?: DtoOverride;
+}
+
+/**
+ * The `operations` map's per-id DTO override shapes (issue #131): each
+ * standard operation `Pick`s only the `OperationDtoOverride` fields it
+ * actually has — a write op gets `input`/`output`, a read gets
+ * `output`/`query`, and `deleteOne`/`purgeOne` (void results, no query)
+ * get neither, so setting `dto` on them is a type error before it is ever
+ * a bootstrap one. `false`/`true` (the enable/disable shorthand) is still
+ * accepted at every id, unchanged.
+ *
+ * Unlike the root `dto` map, a per-operation override is **not** narrowed
+ * against the entity's own `CreateDto`/`ItemDto`/etc. — those generics are
+ * inferred from the root `dto` slots alone, so constraining an override to
+ * them here would force it to structurally equal the *default* (usually
+ * `Entity` itself) instead of letting the registered class's own shape
+ * flow through to `KavoService`'s `Ops`-based positions (`DtoInputOf`/
+ * `DtoOutputOf`/`DtoQueryOf`, `dto.ts`). Each field is simply `DtoClass<Dto>`
+ * — any class — which is what lets `AuthorProfileDto` (fewer fields than
+ * `Author`) narrow `findOne`'s response independently of `createOne`'s.
+ */
+export interface StandardOperationsConfig<
+  Entity,
+  // Unused by this interface's own fields (see the comment above) — kept as
+  // generic parameters, `_`-prefixed where the linter would otherwise flag
+  // them as unused, purely so `EntityConfig`'s
+  // `Ops extends StandardOperationsConfig<Entity, CreateDto, ..., ListDto>`
+  // constraint keeps the same shape it always has; the DTO generics stay
+  // meaningful for the *root* `dto` map, just not for this per-operation one.
+  _CreateDto = EntityInput<Entity>,
+  UpdateDto = EntityInput<Entity>,
+  _PatchDto = Partial<UpdateDto>,
+  _QueryDto = QueryContext<Entity>,
+  ItemDto = Entity,
+  _ListDto = ItemDto,
+> {
+  readonly createOne?: OperationConfig<Entity, Pick<OperationDtoOverride, "input" | "output">> | boolean;
+  readonly findOne?: OperationConfig<Entity, Pick<OperationDtoOverride, "output" | "query">> | boolean;
+  readonly findMany?: OperationConfig<Entity, Pick<OperationDtoOverride, "output" | "query">> | boolean;
+  readonly updateOne?: OperationConfig<Entity, Pick<OperationDtoOverride, "input" | "output">> | boolean;
+  readonly patchOne?: OperationConfig<Entity, Pick<OperationDtoOverride, "input" | "output">> | boolean;
+  /** Void result, no query — no `dto` override is representable. */
+  readonly deleteOne?: OperationConfig<Entity, never> | boolean;
+  readonly restoreOne?: OperationConfig<Entity, Pick<OperationDtoOverride, "output">> | boolean;
+  /** Void result, no query — no `dto` override is representable. */
+  readonly purgeOne?: OperationConfig<Entity, never> | boolean;
 }
 
 /**
@@ -79,6 +140,14 @@ export interface EntityConfig<
   ItemDto = Entity,
   ListDto = ItemDto,
   Computed extends string = never,
+  // The constraint fixes the shape `operations` accepts; the free
+  // parameter is what lets inference capture the *literal* dto classes a
+  // caller registers per operation, which `DtoInputOf`/`DtoOutputOf`/
+  // `DtoQueryOf` (dto.ts) then read back off `KavoService`'s `Ops`
+  // parameter (issue #131) — the same "constrain, don't fix" shape
+  // `allowlists.selectable`'s `NoInfer<Computed>` already relies on.
+  Ops extends StandardOperationsConfig<Entity, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto> =
+    StandardOperationsConfig<Entity, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto>,
 > extends Omit<DeepPartial<KavoSettings>, "operations"> {
   readonly dto?: OperationDtoMap<Entity, CreateDto, UpdateDto, PatchDto, QueryDto, ItemDto, ListDto>;
   /**
@@ -93,7 +162,9 @@ export interface EntityConfig<
   readonly allowlists?: QueryAllowlists<Entity, NoInfer<Computed>>;
   /**
    * Per-operation overrides. `false` disables the operation; `true`
-   * enables one that is off by default (`purgeOne`, `restoreOne`).
+   * enables one that is off by default (`purgeOne`, `restoreOne`); an
+   * object form may also carry a per-operation `dto` override
+   * (`StandardOperationsConfig`, above).
    */
-  readonly operations?: Partial<Record<StandardOperationId, OperationConfig<Entity> | boolean>>;
+  readonly operations?: Ops;
 }

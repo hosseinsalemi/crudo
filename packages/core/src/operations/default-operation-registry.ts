@@ -2,6 +2,7 @@ import type { OperationDescriptor, OperationRegistry } from "./operation-registr
 import type { OperationCardinality, OperationId, OperationKind, StandardOperationId } from "./operation.js";
 import type { OperationHandler } from "./operation-handler.js";
 import type { EntityConfig } from "../config/entity-config.js";
+import type { DtoClass } from "../dto/dto.js";
 import { ConfigurationException } from "../errors/exceptions.js";
 
 /**
@@ -99,6 +100,59 @@ export const STANDARD_OPERATIONS: Readonly<Record<StandardOperationId, StandardO
 /** Provides the handler for one standard operation id. */
 export type StandardHandlerFactory<Entity> = (id: StandardOperationId) => OperationHandler<Entity>;
 
+type DtoOverrideField = "input" | "output" | "query";
+
+/**
+ * Which `dto.<field>` overrides (issue #131) are meaningful on each
+ * standard operation — `StandardOperationsConfig` (`config/entity-config.ts`)
+ * makes the same rule unrepresentable at the type level via `Pick`; this
+ * is its runtime mirror, for configs built from an erased or cast type
+ * (the same defence `resolveAllowlists` and `rejectComputedWriteDtoKeys`
+ * apply to their own structural invariants). `deleteOne`/`purgeOne` are
+ * void results with no query — neither field applies.
+ */
+const DTO_OVERRIDE_FIELDS: Readonly<Record<StandardOperationId, readonly DtoOverrideField[]>> = Object.freeze({
+  createOne: ["input", "output"],
+  findOne: ["output", "query"],
+  findMany: ["output", "query"],
+  updateOne: ["input", "output"],
+  patchOne: ["input", "output"],
+  deleteOne: [],
+  restoreOne: ["output"],
+  purgeOne: [],
+});
+
+/**
+ * Validates `operations.<id>.dto` against `DTO_OVERRIDE_FIELDS` and
+ * returns the three descriptor fields it resolves to (`null` for an
+ * unset or inapplicable field).
+ */
+function resolveDtoOverride(
+  entityName: string,
+  id: StandardOperationId,
+  settings: { readonly dto?: unknown } | undefined,
+): Pick<OperationDescriptor, "input" | "output" | "query"> {
+  const dto = settings?.dto as Readonly<Partial<Record<DtoOverrideField, DtoClass>>> | undefined;
+  const resolved: Record<DtoOverrideField, DtoClass | null> = { input: null, output: null, query: null };
+  if (dto === undefined) return resolved;
+
+  const allowed = DTO_OVERRIDE_FIELDS[id];
+  for (const field of Object.keys(dto) as DtoOverrideField[]) {
+    if (dto[field] === undefined) continue;
+    if (!allowed.includes(field)) {
+      throw new ConfigurationException(
+        entityName,
+        `operations.${id}.dto.${field}`,
+        allowed.length === 0
+          ? `'${id}' has a void result and no query, so a 'dto.${field}' override has nothing to narrow — remove it`
+          : `'${id}' has no '${field}' position — it only supports ${allowed.map((f) => `'${f}'`).join(", ")}`,
+      );
+    }
+    resolved[field] = dto[field] as DtoClass;
+  }
+  return resolved;
+}
+
 const unboundHandler = (id: OperationId, entityName: string): OperationHandler<unknown> => ({
   execute(): Promise<never> {
     throw new ConfigurationException(
@@ -157,6 +211,7 @@ export function createOperationRegistry<Entity extends object>(
     const settings = typeof operationConfig === "object" ? operationConfig : undefined;
     const byDefault = shape.enabled || (id === "restoreOne" && softDeleteDeclared);
     const defaultForEntity = globalOperations?.[id] ?? byDefault;
+    const dtoOverride = resolveDtoOverride(entityName ?? "entity", id, settings);
     registry.register({
       id,
       kind: shape.kind,
@@ -166,8 +221,7 @@ export function createOperationRegistry<Entity extends object>(
         settings?.handler ??
         handlers?.(id) ??
         (unboundHandler(id, entityName ?? "entity") as unknown as OperationHandler<Entity>),
-      input: null,
-      output: null,
+      ...dtoOverride,
       meta: settings?.meta ?? {},
     });
   }

@@ -49,7 +49,17 @@ export type { FilterParser } from "./query/filter-parser.js";
 export type { FilterBuilder } from "./query/filter-builder.js";
 
 // ── DTO system ────────────────────────────────────────────────────────
-export type { DtoClass, DtoSlot, Dto, DtoResolver, OperationDtoMap } from "./dto/dto.js";
+export type {
+  DtoClass,
+  DtoSlot,
+  Dto,
+  DtoResolver,
+  OperationDtoMap,
+  OperationDtoOverride,
+  DtoInputOf,
+  DtoOutputOf,
+  DtoQueryOf,
+} from "./dto/dto.js";
 export type { ListMetaDto, ListResultDto } from "./dto/list-result.js";
 
 // ── Errors ────────────────────────────────────────────────────────────
@@ -70,7 +80,13 @@ export type {
   PaginationStrategyName,
 } from "./config/settings.js";
 export type { GlobalConfig } from "./config/global-config.js";
-export type { EntityConfig, OperationConfig, QueryAllowlists, QueryFieldSelector } from "./config/entity-config.js";
+export type {
+  EntityConfig,
+  OperationConfig,
+  StandardOperationsConfig,
+  QueryAllowlists,
+  QueryFieldSelector,
+} from "./config/entity-config.js";
 export type { ComputedFieldDescriptor, ComputedFieldMap } from "./config/computed-field.js";
 export type { ResolvedEntityConfig, ResolvedQueryAllowlists } from "./config/resolved-entity-config.js";
 

@@ -37,6 +37,7 @@ function descriptor(overrides: Partial<OperationDescriptor<User>> = {}): Operati
     handler: handlerNamed("original"),
     input: null,
     output: null,
+    query: null,
     meta: {},
     ...overrides,
   };
@@ -258,6 +259,129 @@ describe("createOperationRegistry — the control surface", () => {
       standardHandlers,
     );
     expect(registry.get("findMany")?.meta).toBe(meta);
+  });
+});
+
+describe("createOperationRegistry — per-operation DTO override (issue #131)", () => {
+  class CreateUserRequestDto {}
+  class UserCreatedDto {}
+  class UserProfileDto {}
+  class UserSearchQueryDto {}
+  class UserListItemDto {}
+
+  it("resolves input/output independently for createOne, leaving other operations untouched", () => {
+    const registry = createOperationRegistry<User>(
+      { operations: { createOne: { dto: { input: CreateUserRequestDto, output: UserCreatedDto } } } } as UserConfig,
+      standardHandlers,
+    );
+    expect(registry.get("createOne")).toMatchObject({ input: CreateUserRequestDto, output: UserCreatedDto });
+    expect(registry.get("findOne")).toMatchObject({ input: null, output: null, query: null });
+  });
+
+  it("resolves output and query independently for findOne", () => {
+    const registry = createOperationRegistry<User>(
+      { operations: { findOne: { dto: { output: UserProfileDto, query: UserSearchQueryDto } } } } as UserConfig,
+      standardHandlers,
+    );
+    expect(registry.get("findOne")).toMatchObject({ output: UserProfileDto, query: UserSearchQueryDto, input: null });
+  });
+
+  it("resolves output and query independently for findMany", () => {
+    const registry = createOperationRegistry<User>(
+      { operations: { findMany: { dto: { output: UserListItemDto, query: UserSearchQueryDto } } } } as UserConfig,
+      standardHandlers,
+    );
+    expect(registry.get("findMany")).toMatchObject({
+      output: UserListItemDto,
+      query: UserSearchQueryDto,
+      input: null,
+    });
+  });
+
+  it("lets two operations on the same entity use distinct, independent shapes", () => {
+    const registry = createOperationRegistry<User>(
+      {
+        operations: {
+          createOne: { dto: { input: CreateUserRequestDto, output: UserCreatedDto } },
+          findOne: { dto: { output: UserProfileDto } },
+        },
+      } as UserConfig,
+      standardHandlers,
+    );
+    expect(registry.get("createOne")?.output).toBe(UserCreatedDto);
+    expect(registry.get("findOne")?.output).toBe(UserProfileDto);
+    expect(registry.get("createOne")?.output).not.toBe(registry.get("findOne")?.output);
+  });
+
+  it("resolves output for restoreOne", () => {
+    const registry = createOperationRegistry<User>(
+      { operations: { restoreOne: { dto: { output: UserProfileDto } } } } as UserConfig,
+      standardHandlers,
+    );
+    expect(registry.get("restoreOne")?.output).toBe(UserProfileDto);
+  });
+
+  it("leaves every field null when no operation declares an override", () => {
+    const registry = createOperationRegistry<User>(undefined, standardHandlers);
+    for (const id of Object.keys(STANDARD_OPERATIONS) as StandardOperationId[]) {
+      expect(registry.get(id)).toMatchObject({ input: null, output: null, query: null });
+    }
+  });
+
+  it("rejects an 'input' override on findOne, which has no request body", () => {
+    expect(() =>
+      createOperationRegistry<User>(
+        { operations: { findOne: { dto: { input: CreateUserRequestDto } } } } as UserConfig,
+        standardHandlers,
+        undefined,
+        "User",
+      ),
+    ).toThrowError(ConfigurationException);
+    try {
+      createOperationRegistry<User>(
+        { operations: { findOne: { dto: { input: CreateUserRequestDto } } } } as UserConfig,
+        standardHandlers,
+        undefined,
+        "User",
+      );
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toMatchObject({
+        code: "KAVO_CONFIG_INVALID",
+        messageParams: { path: "operations.findOne.dto.input" },
+      });
+    }
+  });
+
+  it("rejects a 'query' override on createOne, which has no query contract", () => {
+    expect(() =>
+      createOperationRegistry<User>(
+        { operations: { createOne: { dto: { query: UserSearchQueryDto } } } } as UserConfig,
+        standardHandlers,
+      ),
+    ).toThrowError(ConfigurationException);
+  });
+
+  it("rejects any dto override on deleteOne — void result, no query", () => {
+    // `never` makes the mismatch a type error too (see the type-level
+    // suite), so this reaches only through an erased/cast config — the
+    // same defence `resolveAllowlists` and `rejectComputedWriteDtoKeys`
+    // apply to their own structural invariants.
+    expect(() =>
+      createOperationRegistry<User>(
+        { operations: { deleteOne: { dto: { output: UserProfileDto } } } } as unknown as UserConfig,
+        standardHandlers,
+      ),
+    ).toThrowError(ConfigurationException);
+  });
+
+  it("rejects any dto override on purgeOne — void result, no query", () => {
+    expect(() =>
+      createOperationRegistry<User>(
+        { operations: { purgeOne: { dto: { output: UserProfileDto } } } } as unknown as UserConfig,
+        standardHandlers,
+      ),
+    ).toThrowError(ConfigurationException);
   });
 });
 

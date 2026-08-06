@@ -279,6 +279,34 @@ describe("If-Match on a write", () => {
     expect(adapter.rows[0]).toMatchObject({ name: "Ada Lovelace" });
   });
 
+  it("accepts a tag from a findOne with its own output override (issue #131)", async () => {
+    // The canonical read `checkIfMatch` pre-reads for comparison must use
+    // the *same* representation `findOne` actually serves — `descriptor
+    // .output` ahead of the root `item` slot — or every conditional write
+    // against a findOne-overridden entity would 412 against a hash the
+    // client never received.
+    class UserProfileDto {
+      id = 0;
+      name = "";
+    }
+    const adapter = new InMemoryUserAdapter();
+    const crud = createKavo().createCrud(
+      User,
+      { operations: { findOne: { dto: { output: UserProfileDto } } } } as never,
+      { adapter, metadata: userMetadata },
+    );
+    await execute(crud, { operation: "createOne", body: ADA as never });
+    const { etag } = await execute(crud, { operation: "findOne", id: 1 });
+
+    const updated = await execute(crud, {
+      operation: "updateOne",
+      id: 1,
+      body: { name: "Ada Lovelace", email: ADA.email, age: 36, status: "active" } as never,
+      preconditions: ifMatch([etag as string]),
+    });
+    expect(updated.item).toMatchObject({ name: "Ada Lovelace" });
+  });
+
   it("rejects a stale tag with KAVO_PRECONDITION_FAILED and leaves the row untouched", async () => {
     const { crud, adapter, etag } = await seeded();
     await execute(crud, { operation: "patchOne", id: 1, body: { age: 99 } as never });

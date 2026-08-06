@@ -18,6 +18,8 @@ export interface OperationDescriptor<Entity = unknown, Input = unknown, Output =
   readonly input: DtoClass | null;
   /** Explicit output DTO; `null` = the slot default. */
   readonly output: DtoClass | null;
+  /** Explicit query DTO; `null`/absent = the slot default. Typing only — see doc 04 §8. */
+  readonly query?: DtoClass | null;
   readonly meta: OperationMetadata;
 }
 

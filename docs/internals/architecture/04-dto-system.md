@@ -16,7 +16,9 @@ docs** — there is no validation subsystem attached to them.
 | `item`   | Any single-resource response          | Entity, subject to field selection                               |
 | `list`   | Element type in `ListResultDto.items` | Same as `item`'s resolved type                                   |
 
-Restore reuses `item`/`list`; no additional slots exist. The list
+Restore reuses `item`/`list`; no additional slots exist. §8 below adds a
+second, narrower tier of override — one per _operation_, not per slot —
+without introducing a slot of its own. The list
 envelope's `meta` bag is deliberately **not** a slot: it carries the
 caller's own data rather than entity data, so it has no DTO and never
 passes through the serializer (doc 07 §3.1). Having no DTO is also why it
@@ -138,3 +140,65 @@ does not grow the key, and neither does the generated OpenAPI response
 schema, which falls back to the entity class when no `item`/`list` slot is
 registered. Registering an `item`/`list` DTO that names it is how a caller
 gets it statically typed — and documented — as for any other narrowing.
+
+## 8. Per-operation override (issue #131)
+
+The six slots above are entity-wide: every operation that reads `create`
+reads the _same_ `create` DTO. `operations.<id>.dto` adds a narrower tier
+in front of them — a request body, response, or query contract specific to
+one operation on one entity:
+
+```ts
+createCrud(User, {
+  dto: { item: UserItemDto }, // entity-wide default
+  operations: {
+    findOne: { dto: { output: UserProfileDto } }, // findOne only
+    createOne: { dto: { input: CreateUserRequestDto, output: UserCreatedDto } },
+  },
+});
+```
+
+**Fallback order**, per field: `operations.<id>.dto.<field>` → the root
+`dto.<slot>` → the entity-derived default. This is the same chain
+`KavoEngine.mapResponse` already partially walked for `output`
+(`descriptor.output ?? config.dto.resolve(...)`); the change is populating
+`descriptor.input`/`output`/`query` from config instead of leaving them
+`null`, and reaching the same `descriptor.<field> ?? resolve(...)` order
+everywhere a slot is read — including the `If-Match` canonical-read ETag
+(doc 20), which now hashes what `findOne`'s own override actually serves.
+
+**Which fields apply to which operation** — `input` only where there is a
+request body, `query` only where there is a query contract, `output`
+anywhere there is a non-void result:
+
+| Operation                | `input` |     `output`     | `query` |
+| ------------------------ | :-----: | :--------------: | :-----: |
+| `createOne`              |    ✓    |        ✓         |         |
+| `updateOne` / `patchOne` |    ✓    |        ✓         |         |
+| `findOne`                |         |        ✓         |    ✓    |
+| `findMany`               |         | ✓ (list element) |    ✓    |
+| `restoreOne`             |         |        ✓         |         |
+| `deleteOne` / `purgeOne` |         |                  |         |
+
+A field outside this table is a bootstrap `ConfigurationException` — never
+a silent drop — and is also unrepresentable at the type level:
+`EntityConfig`'s `operations` field is typed through
+`StandardOperationsConfig`, which `Pick`s only the applicable
+`OperationDtoOverride` fields per operation id, so e.g. `deleteOne` has no
+`dto` key to set at all. The runtime check exists for the same reason
+`resolveAllowlists` and `rejectComputedWriteDtoKeys` keep one: a config
+built from an erased or cast type has no compiler to catch it.
+
+`query`'s effect is **typing only**, like the root `query` slot (§1): there
+is no validation subsystem, and the query normalizer parses wire params
+structurally against the allowlists regardless of which DTO class is
+registered. Both slots exist so a programmatic caller
+(`KavoService.findOne`/`findMany`) gets a precise parameter type, and so
+`@kavo/nest` can build accurate `@ApiBody`/`@ApiResponse` schemas —
+`operations.<id>.dto.input`/`output` change what `descriptor.input`/
+`output` documents, ahead of the root slot, the same way they change what
+the engine actually deserializes and serializes.
+
+This is per-entity and per-operation only, matching the rest of the DTO
+system: no global default, and no override shared across entities or
+across operations.

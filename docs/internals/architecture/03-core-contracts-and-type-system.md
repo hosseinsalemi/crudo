@@ -8,16 +8,26 @@ later work never needs to mutate `@kavo/core` types.
 
 ## 1. Generic parameters
 
-| Parameter    | Purpose                                                        | Default                                                                           | Override example                                      |
-| ------------ | -------------------------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| `TEntity`    | The ORM-mapped entity class everything is typed against        | — (always inferred from `createCrud(Entity)`)                                     | `KavoService<User>`                                   |
-| `TId`        | Primary-key type; appears in `findOne(id)`, `deleteOne(id)`, … | `EntityId` (`string \| number`)                                                   | `KavoService<User, string>` for UUID keys             |
-| `TCreateDto` | `POST` request body                                            | `EntityInput<TEntity>` (the entity's scalar properties, all optional — see below) | `dto: { create: CreateUserDto }`                      |
-| `TUpdateDto` | `PUT` full-replace body                                        | `EntityInput<TEntity>`                                                            | `dto: { update: UpdateUserDto }`                      |
-| `TPatchDto`  | `PATCH` partial body                                           | `Partial<TUpdateDto>` — follows `update` when that is overridden                  | `dto: { patch: PatchUserDto }`                        |
-| `TQueryDto`  | `GET` list query shape                                         | `QueryContext<TEntity>`                                                           | `dto: { query: UserQueryDto }`                        |
-| `TItemDto`   | Any single-resource response                                   | `TEntity`                                                                         | `dto: { item: UserItemDto }`                          |
-| `TListDto`   | Element type inside `ListResultDto.items`                      | `TItemDto` (follows `item`)                                                       | `dto: { list: UserListDto }` — leaner list projection |
+| Parameter    | Purpose                                                        | Default                                                                           | Override example                                               |
+| ------------ | -------------------------------------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `TEntity`    | The ORM-mapped entity class everything is typed against        | — (always inferred from `createCrud(Entity)`)                                     | `KavoService<User>`                                            |
+| `TId`        | Primary-key type; appears in `findOne(id)`, `deleteOne(id)`, … | `EntityId` (`string \| number`)                                                   | `KavoService<User, string>` for UUID keys                      |
+| `TCreateDto` | `POST` request body                                            | `EntityInput<TEntity>` (the entity's scalar properties, all optional — see below) | `dto: { create: CreateUserDto }`                               |
+| `TUpdateDto` | `PUT` full-replace body                                        | `EntityInput<TEntity>`                                                            | `dto: { update: UpdateUserDto }`                               |
+| `TPatchDto`  | `PATCH` partial body                                           | `Partial<TUpdateDto>` — follows `update` when that is overridden                  | `dto: { patch: PatchUserDto }`                                 |
+| `TQueryDto`  | `GET` list query shape                                         | `QueryContext<TEntity>`                                                           | `dto: { query: UserQueryDto }`                                 |
+| `TItemDto`   | Any single-resource response                                   | `TEntity`                                                                         | `dto: { item: UserItemDto }`                                   |
+| `TListDto`   | Element type inside `ListResultDto.items`                      | `TItemDto` (follows `item`)                                                       | `dto: { list: UserListDto }` — leaner list projection          |
+| `TOps`       | The `operations` config's inferred literal type (issue #131)   | `StandardOperationsConfig<...>` — no operation overrides anything                 | `operations: { findOne: { dto: { output: UserProfileDto } } }` |
+
+`TOps` is unlike the rest of the table: it is not a DTO type itself, and no
+one ever writes it by hand. It exists only so `KavoService`'s per-method
+positions (`DtoInputOf<TOps, "createOne", TCreateDto>`, and the `output`/
+`query` equivalents, doc 4 §8) can read back the literal DTO classes a
+caller registered under `operations.<id>.dto`, falling back to the slot
+generic above when that operation declares no override of its own — the
+same "constrain, don't fix" shape `EntityConfig.allowlists.selectable`
+already uses for `NoInfer<Computed>`.
 
 Design rule: **every parameter defaults from the ones before it**, so type
 inference is a feature — a consumer rarely writes a generic argument by
