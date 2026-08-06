@@ -316,7 +316,7 @@ export class KavoEngine<Entity extends object> {
     config: ResolvedEntityConfig<Entity>,
     correlationId: string,
   ): Promise<string | null> {
-    const { reader, serializer, normalizer } = this.deps;
+    const { reader, serializer, normalizer, registry } = this.deps;
     // `withDeleted` is only a legal query param on a soft-deletable entity
     // — the normalizer rejects it outright otherwise (a client that thinks
     // it is seeing deleted rows should be told it is not), and on a
@@ -333,7 +333,13 @@ export class KavoEngine<Entity extends object> {
     });
     const entity = await reader.findOneById(id, query, context);
     if (entity === null) return null;
-    const itemDto = config.dto.resolve("item", "findOne") as DtoClass<object> | null;
+    // Same fallback `mapResponse` uses for a served `findOne` response
+    // (descriptor override first): "what `findOne` on that id ... would
+    // return" (ADR-0020) means the representation `findOne`'s own
+    // registry entry actually serves, not the entity's root `item` slot.
+    const itemDto =
+      (registry.get("findOne")?.output as DtoClass<object> | null) ??
+      (config.dto.resolve("item", "findOne") as DtoClass<object> | null);
     return computeEtag(serializer.serializeItem(entity, itemDto, context));
   }
 

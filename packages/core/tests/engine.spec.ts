@@ -8,6 +8,7 @@ import {
   toProblemDetails,
 } from "@kavo/core";
 import { InMemoryUserAdapter, User, userMetadata } from "./support/user-fixture.js";
+import { Account, InMemoryAccountAdapter, accountMetadata } from "./support/account-fixture.js";
 
 function makeCrud(config?: Parameters<ReturnType<typeof createKavo>["createCrud"]>[1]) {
   const adapter = new InMemoryUserAdapter();
@@ -227,5 +228,107 @@ describe("KavoEngine pipeline", () => {
     const { kavo } = makeCrud();
     const dump = kavo.describe("User");
     expect(dump).toMatchObject({ entityName: "User" });
+  });
+});
+
+describe("KavoEngine — per-operation DTO override (issue #131)", () => {
+  it("deserializes createOne's body through its own input override, ahead of the root 'create' slot", async () => {
+    class RootCreateDto {
+      name = "";
+      email = "";
+      age = 0;
+    }
+    class CreateUserRequestDto {
+      name = "";
+      email = "";
+      // No `age` field — this DTO's runtime key set is what the
+      // deserializer projects onto, so a client-sent `age` is dropped even
+      // though the root `create` DTO carries it.
+    }
+    const { crud } = makeCrud({
+      dto: { create: RootCreateDto },
+      operations: { createOne: { dto: { input: CreateUserRequestDto } } },
+    } as never);
+    const created = await crud.createOne({ name: "Ada", email: "a@x.io", age: 36 } as never);
+    expect(created).toMatchObject({ name: "Ada", email: "a@x.io" });
+  });
+
+  it("serializes findOne's response through its own output override, independent of createOne's", async () => {
+    class UserProfileDto {
+      id = 0;
+      name = "";
+    }
+    class UserCreatedDto {
+      id = 0;
+      email = "";
+    }
+    const { crud } = makeCrud({
+      operations: {
+        findOne: { dto: { output: UserProfileDto } },
+        createOne: { dto: { output: UserCreatedDto } },
+      },
+    } as never);
+    const created = await crud.createOne({ name: "Ada", email: "a@x.io", age: 36 } as never);
+    expect(Object.keys(created as object)).toEqual(["id", "email"]);
+
+    const found = await crud.findOne(1);
+    expect(Object.keys(found as object)).toEqual(["id", "name"]);
+  });
+
+  it("serializes findMany's list element through its own output override", async () => {
+    class UserListItemDto {
+      id = 0;
+    }
+    const { crud } = makeCrud({
+      operations: { findMany: { dto: { output: UserListItemDto } } },
+    } as never);
+    await crud.createOne({ name: "Ada", email: "a@x.io", age: 36 } as never);
+    const list = await crud.findMany();
+    expect(Object.keys(list.items[0] as object)).toEqual(["id"]);
+  });
+
+  it("serializes restoreOne's response through its own output override", async () => {
+    class AccountProfileDto {
+      id = 0;
+      name = "";
+    }
+    const adapter = new InMemoryAccountAdapter();
+    const crud = createKavo().createCrud(
+      Account,
+      { operations: { restoreOne: { enabled: true, dto: { output: AccountProfileDto } } } } as never,
+      { adapter, metadata: accountMetadata },
+    );
+    await crud.createOne({ name: "Acme" } as never);
+    await crud.deleteOne(1);
+    const restored = await crud.restoreOne(1);
+    expect(Object.keys(restored as object)).toEqual(["id", "name"]);
+  });
+
+  it("falls back to the root dto slot when an operation declares no override", async () => {
+    class UserItemDto {
+      id = 0;
+      name = "";
+    }
+    class UserCreatedDto {
+      id = 0;
+      email = "";
+    }
+    const { crud } = makeCrud({
+      dto: { item: UserItemDto },
+      operations: { createOne: { dto: { output: UserCreatedDto } } },
+    } as never);
+    const created = await crud.createOne({ name: "Ada", email: "a@x.io", age: 36 } as never);
+    expect(Object.keys(created as object)).toEqual(["id", "email"]);
+
+    // `findOne` declared no override, so it still gets the root `item` slot.
+    const found = await crud.findOne(1);
+    expect(Object.keys(found as object)).toEqual(["id", "name"]);
+  });
+
+  it("rejects a dto override that doesn't apply to that operation, at createCrud (bootstrap)", () => {
+    class Bogus {}
+    expect(() => makeCrud({ operations: { deleteOne: { dto: { output: Bogus } } } } as never)).toThrowError(
+      ConfigurationException,
+    );
   });
 });

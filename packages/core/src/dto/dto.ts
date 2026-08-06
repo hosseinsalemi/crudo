@@ -60,3 +60,43 @@ export interface OperationDtoMap<
 export interface DtoResolver<_Entity = unknown> {
   resolve(slot: DtoSlot, operation: OperationId): DtoClass | null;
 }
+
+/**
+ * Per-operation DTO override (issue #131) — the middle tier of the
+ * fallback chain `operations.<id>.dto.<field>` → root `dto.<slot>` →
+ * entity-derived default. Only the fields meaningful to a given operation
+ * are reachable at the type level: `StandardOperationsConfig`
+ * (`config/entity-config.ts`) `Pick`s the applicable subset per operation
+ * id, so e.g. `deleteOne` cannot even be typed with a `dto` key. The same
+ * mismatch is also checked at bootstrap (`createOperationRegistry`), for
+ * configs built from an erased or cast type where the type system cannot
+ * help.
+ */
+export interface OperationDtoOverride<
+  InputDto extends Dto = Dto,
+  OutputDto extends Dto = Dto,
+  QueryDto extends Dto = Dto,
+> {
+  readonly input?: DtoClass<InputDto>;
+  readonly output?: DtoClass<OutputDto>;
+  readonly query?: DtoClass<QueryDto>;
+}
+
+/** The operation entry shape `Ops[Id]` resolves to, or `undefined` when `Id` was never declared. */
+type OperationEntryOf<Ops, Id extends string> = Id extends keyof Ops ? Ops[Id] : undefined;
+
+/**
+ * Extracts the shape a per-operation `dto.<field>` override narrows to,
+ * falling back to `Fallback` (the entity's root-slot-derived type) when
+ * the operation entry declares no override for that field — including
+ * when it is the boolean enable/disable shorthand, which has no `dto` key
+ * to match at all.
+ */
+export type DtoInputOf<Ops, Id extends string, Fallback> =
+  OperationEntryOf<Ops, Id> extends { readonly dto: { readonly input: DtoClass<infer Shape> } } ? Shape : Fallback;
+
+export type DtoOutputOf<Ops, Id extends string, Fallback> =
+  OperationEntryOf<Ops, Id> extends { readonly dto: { readonly output: DtoClass<infer Shape> } } ? Shape : Fallback;
+
+export type DtoQueryOf<Ops, Id extends string, Fallback> =
+  OperationEntryOf<Ops, Id> extends { readonly dto: { readonly query: DtoClass<infer Shape> } } ? Shape : Fallback;
