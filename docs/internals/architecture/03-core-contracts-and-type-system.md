@@ -18,7 +18,7 @@ later work never needs to mutate `@kavo/core` types.
 | `TQueryDto`  | `GET` list query shape                                         | `QueryContext<TEntity>`                                                           | `dto: { query: UserQueryDto }`                                |
 | `TItemDto`   | Any single-resource response                                   | `TEntity`                                                                         | `dto: { item: UserItemDto }`                                  |
 | `TListDto`   | Element type inside `ListResultDto.items`                      | `TItemDto` (follows `item`)                                                       | `dto: { list: UserListDto }` — leaner list projection         |
-| `TOps`       | The `operations` config's inferred literal type (issue #131)   | `StandardOperationsConfig<...>` — no operation overrides anything                 | `operations: { getOne: { dto: { output: UserProfileDto } } }` |
+| `TOps`       | The `operations` config's inferred literal type (issue #131)   | `StandardOperationsConfig<...>` — no operation overrides anything                 | `operations: { findOne: { dto: { output: UserProfileDto } } }` |
 
 `TOps` is unlike the rest of the table: it is not a DTO type itself, and no
 one ever writes it by hand. It exists only so `KavoService`'s per-method

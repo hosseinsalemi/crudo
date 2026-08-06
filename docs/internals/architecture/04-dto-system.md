@@ -152,7 +152,7 @@ one operation on one entity:
 createCrud(User, {
   dto: { item: UserItemDto }, // entity-wide default
   operations: {
-    getOne: { dto: { output: UserProfileDto } }, // findOne only
+    findOne: { dto: { output: UserProfileDto } }, // findOne only
     createOne: { dto: { input: CreateUserRequestDto, output: UserCreatedDto } },
   },
 });
