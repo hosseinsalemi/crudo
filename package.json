@@ -20,6 +20,7 @@
     "depcruise": "depcruise packages examples --config .dependency-cruiser.cjs",
     "generate": "pnpm --filter @kavo/prisma run generate",
     "test": "vitest run",
+    "test:coverage": "vitest run --config vitest.coverage.config.ts",
     "typecheck": "tsc -p tsconfig.tests.json && tsc -p packages/core/tsconfig.tests.json && tsc -p packages/orms/typeorm/tsconfig.tests.json && tsc -p packages/orms/prisma/tsconfig.tests.json && tsc -p packages/orms/mongoose/tsconfig.tests.json && tsc -p packages/orms/mikroorm/tsconfig.tests.json && tsc -p packages/frameworks/nest/tsconfig.tests.json && tsc -p packages/protocols/graphql/tsconfig.tests.json && tsc -p packages/protocols/mcp/tsconfig.tests.json && tsc -p examples/nest-typeorm/tsconfig.tests.json && tsc -p examples/nest-mongoose/tsconfig.tests.json && tsc -p examples/nest-mikroorm/tsconfig.tests.json",
     "lint": "oxlint packages examples tests .github/scripts",
     "prettify": "prettier --write .",
@@ -34,6 +35,7 @@
   "devDependencies": {
     "@swc/core": "^1.15.47",
     "@types/node": "^22.20.1",
+    "@vitest/coverage-v8": "^4.1.10",
     "dependency-cruiser": "^18.1.0",
     "mermaid": "^11.16.1",
     "oxlint": "^1.76.0",

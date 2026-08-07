@@ -115,6 +115,39 @@ describe("the CI split covers the whole gate", () => {
   });
 });
 
+/**
+ * Coverage sits outside the `build`/`test` split on purpose: it re-runs the
+ * whole suite instrumented, so it is not part of `pnpm check` and the two
+ * assertions above deliberately do not see it. That exemption is exactly
+ * what would let the job be deleted without anything going red, so its
+ * existence is asserted here instead.
+ */
+describe("the coverage job", () => {
+  const coverage = jobSteps("coverage");
+
+  it("runs `pnpm run test:coverage`", () => {
+    expect(coverage).toContain("test:coverage");
+  });
+
+  it("generates the Prisma client first, like the test job", () => {
+    expect(coverage).toContain("generate");
+  });
+
+  it("stays out of `pnpm check`, so the local gate is not doubled", () => {
+    expect(gateSteps()).not.toContain("test:coverage");
+  });
+
+  it("is backed by a real script and a config that sets thresholds", () => {
+    // A job running a script that no longer exists fails loudly; a script
+    // running a config with no thresholds passes while measuring nothing.
+    const script = manifest.scripts?.["test:coverage"] ?? "";
+    expect(script).toContain("vitest.coverage.config.ts");
+
+    const config = readFileSync(resolve(REPO_ROOT, "vitest.coverage.config.ts"), "utf8");
+    expect(config).toContain("thresholds");
+  });
+});
+
 describe("the README status badges point at real check runs", () => {
   it("filters on a check-run name ci.yml actually produces", () => {
     const badged = badgedCheckRunNames();

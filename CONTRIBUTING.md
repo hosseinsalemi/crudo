@@ -95,6 +95,20 @@ It runs, in order:
 | `lint`      | `oxlint`                       | Lint rules over `packages` and `examples`           |
 | `test`      | `vitest run`                   | The whole suite                                     |
 
+`pnpm test:coverage` is not in that list on purpose. It runs the same suite
+under v8 instrumentation and fails on the thresholds in
+`vitest.coverage.config.ts`, which would roughly double the command you run
+all day for a signal that only matters per push — so it gets its own CI job
+instead. Run it locally when you want to see what a change left untested;
+`.coverage/index.html` is the browsable report.
+
+The thresholds are a ratchet, not a target, and they are deliberately not 100. Some of what remains uncovered is unreachable by construction —
+`assertNever` arms over closed unions, `??` fallbacks the calling layer has
+already collapsed, guards behind a precondition that makes them dead — and a
+test that forces its way into one of those asserts the shape of the code
+rather than any behavior. Raise the numbers when real coverage rises; don't
+chase the gap.
+
 Note that `typecheck` is a hand-maintained list — the root script names each
 project's `tsconfig.tests.json` explicitly, with no glob and no discovery. **If
 you add a package, or add a first `tests/` directory to one, append it to the
