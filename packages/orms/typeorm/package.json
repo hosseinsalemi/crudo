@@ -3,6 +3,9 @@
   "version": "0.7.1",
   "description": "Kavo TypeORM adapter — implements @kavo/core's RepositoryAdapter and TransactionManager over TypeORM.",
   "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kavo-labs/kavo.git",
