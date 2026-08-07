@@ -202,6 +202,26 @@ describe("realtime — engine emit hook", () => {
     expect(failures[0]).toMatchObject({ transportName: "failing", event: "created" });
   });
 
+  it("never fails the mutation even when onPublishError itself throws", async () => {
+    // Regression: onPublishError reports a transport's own failure to
+    // report — a throw there must not turn back into the "mutation fails"
+    // outcome the whole hook exists to avoid.
+    const { crud } = makeCrud(
+      {
+        realtime: {
+          enabled: true,
+          events: {},
+          onPublishError: () => {
+            throw new Error("logging itself failed");
+          },
+        },
+      } as never,
+      [new FailingTransport()],
+    );
+    const created = await crud.createOne({ name: "Ada", email: "a@x.io", age: 36 } as never);
+    expect(created).toMatchObject({ name: "Ada" });
+  });
+
   it("honors an entity-scope realtime override over the global default (settings precedence)", async () => {
     const globalTransport = new FakeTransport();
     const adapter = new InMemoryUserAdapter();

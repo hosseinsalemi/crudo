@@ -298,8 +298,16 @@ export class KavoEngine<Entity extends object> {
           // already succeeded — a subscriber not hearing about the write
           // is a delivery problem, not a data problem. Core has no ambient
           // logger to fall back on (ADR-0005), so the failure is only
-          // observable through the caller-supplied hook, if any.
-          realtime.onPublishError?.(error, transport, event);
+          // observable through the caller-supplied hook, if any — and that
+          // hook itself is wrapped too: a throwing `onPublishError` must
+          // not turn back into the very "mutation fails" outcome it exists
+          // to report instead of.
+          try {
+            realtime.onPublishError?.(error, transport, event);
+          } catch {
+            // Nothing to do with a failure to report a failure — swallowed
+            // for the same reason the publish rejection above is.
+          }
         }
       }),
     );
