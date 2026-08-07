@@ -150,8 +150,7 @@ export class BooksController {}
   <div class="ai-install">
 
 ```
-/plugin marketplace add kavo-labs/kavo
-/plugin install kavo-skills@kavo-marketplace
+npx skills add kavo-labs/kavo
 ```
 
   <p class="ai-install-note">Fewer tokens, ship faster.</p>
