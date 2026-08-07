@@ -302,3 +302,16 @@ describe("validateSettings — the base of the precedence chain", () => {
     }
   });
 });
+
+describe("validateSettings — pagination.since.field", () => {
+  // The since boundary column is a field *name*, and it is read back off a
+  // row to build `meta.nextSince`. An empty or non-string name would fail
+  // deep inside normalization on the first request instead of at bootstrap.
+  it.each(["", null, 1, false])("rejects %o as a since field name", (value) => {
+    expectRejected({ pagination: { since: { field: value } } }, "pagination.since.field", value);
+  });
+
+  it("accepts a non-empty field name", () => {
+    accept({ pagination: { since: { field: "updatedAt" } } });
+  });
+});

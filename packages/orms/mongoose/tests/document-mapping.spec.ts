@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Schema } from "mongoose";
 import type { DefaultKavoService } from "@kavo/core";
-import { createMongooseKavo } from "@kavo/mongoose";
+import { createMongooseKavo, toPlainDocument } from "@kavo/mongoose";
 import { clearCollections, startTestDatabase, type TestDatabase } from "./support/database.js";
 
 /**
@@ -121,6 +121,34 @@ describe("arbitrary-precision numerics cross the wire as numbers", () => {
     expect(typeof fetched.big).toBe("number");
     expect(typeof fetched.dec).toBe("number");
     expect(() => JSON.stringify(fetched)).not.toThrow();
+  });
+});
+
+describe("toPlainDocument decides what it recurses into", () => {
+  // The two BSON shapes below never reach the engine through the models in
+  // this file, so they are pinned against the exported helper directly.
+
+  it("passes a Buffer through untouched instead of shredding it into an index map", () => {
+    // `Object.entries(Buffer.from("x"))` is `[["0", 120]]`, so a recursion
+    // that treated every object as plain would turn stored binary into
+    // `{"0":120}` on every read. This adapter's contract is the id and
+    // numeric conversion, not a BSON-wide codec.
+    const blob = Buffer.from("x");
+    const plain = toPlainDocument({ blob }) as { blob: unknown };
+    expect(plain.blob).toBe(blob);
+    expect(Buffer.isBuffer(plain.blob)).toBe(true);
+  });
+
+  it("recurses into a null-prototype object, which is what a lean document can be", () => {
+    // This is the whole reason the plain-object test reads the prototype
+    // rather than checking `constructor === Object`: under the stricter test
+    // a lean document would pass straight through and its `_id` would leave
+    // the adapter as a raw ObjectId.
+    const source = Object.assign(Object.create(null) as Record<string, unknown>, {
+      _id: { toHexString: () => "507f1f77bcf86cd799439011" },
+      a: 1,
+    });
+    expect(toPlainDocument(source)).toEqual({ _id: "507f1f77bcf86cd799439011", a: 1 });
   });
 });
 

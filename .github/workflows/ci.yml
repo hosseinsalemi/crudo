@@ -82,6 +82,35 @@ jobs:
       - name: Test
         run: pnpm run generate && pnpm run test
 
+  # Deliberately its own job rather than a step in `pnpm check`. It re-runs
+  # the whole suite under v8 instrumentation, so folding it into the gate
+  # would roughly double the command developers run all day for a signal
+  # that only matters per push. A single node version is enough: coverage
+  # measures which lines the suite reaches, which does not vary by runtime.
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "lts/*"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Fails on the thresholds in `vitest.coverage.config.ts`, so coverage
+      # can only ratchet up. `generate` for the same reason the `test` job
+      # needs it.
+      - name: Coverage
+        run: pnpm run generate && pnpm run test:coverage
+
   format:
     name: format
     runs-on: ubuntu-latest

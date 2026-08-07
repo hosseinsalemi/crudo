@@ -20,6 +20,7 @@ import {
   createKavo,
   hasKeyset,
   readFilter,
+  sinceValueOf,
 } from "@kavo/core";
 import { issuesOf } from "./support/query-issues.js";
 
@@ -580,5 +581,146 @@ describe("since pagination end to end", () => {
     const issues = await issuesOfAsync(() => client.findMany({ limit: 10, since: boundary } as never));
     expect(issues[0]).toMatchObject({ field: "since", code: "KAVO_QUERY_INVALID_VALUE" });
     expect(issues[0]?.detail).toContain("'deletedAt'");
+  });
+});
+
+// ── sinceValueOf: encoding the boundary off a row ────────────────────────
+
+describe("sinceValueOf — a boundary column's runtime type must be encodable", () => {
+  // The since mirror of `cursorValuesOf`'s guard (ADR-0021's documented
+  // bigint/decimal limitation, which ADR-0022 inherits). `meta.nextSince`
+  // is read off the entity before serialization, so a column whose runtime
+  // value is neither string, number, nor Date has no wire form. It must
+  // fail loudly rather than stringify into a token that will not replay.
+  const occurredAt = eventMetadata.fields.find((field) => field.name === "occurredAt")!;
+  const idField = eventMetadata.fields.find((field) => field.name === "id")!;
+  const externalId = eventMetadata.fields.find((field) => field.name === "externalId")!;
+
+  it("joins the boundary value and the id tiebreaker with a pipe", () => {
+    const row = { occurredAt: new Date("2024-01-01T00:00:00.000Z"), id: 7 };
+    expect(sinceValueOf(row, occurredAt, idField, "Event")).toBe("2024-01-01T00:00:00.000Z|7");
+  });
+
+  it("encodes a string boundary column as-is", () => {
+    expect(sinceValueOf({ externalId: "018f2c8e", id: 7 }, externalId, idField, "Event")).toBe("018f2c8e|7");
+  });
+
+  it("writes the literal 'null' for an absent boundary, leaving the replay to reject it", () => {
+    // Deliberately not a throw: an absent boundary column is the
+    // normalizer's problem on replay, where it can name the column in a
+    // 400, not the encoder's to refuse mid-response (ADR-0022).
+    expect(sinceValueOf({ occurredAt: null, id: 7 }, occurredAt, idField, "Event")).toBe("null|7");
+    expect(sinceValueOf({ occurredAt: undefined, id: 7 }, occurredAt, idField, "Event")).toBe("null|7");
+  });
+
+  it("refuses a bigint id rather than emitting a token that cannot round-trip", () => {
+    const encode = () => sinceValueOf({ occurredAt: new Date(0), id: 1n }, occurredAt, idField, "Event");
+    expect(encode).toThrow(ConfigurationException);
+    expect(encode).toThrow(/bigint/);
+  });
+
+  it("names the offending column, its declared kind, and the entity", () => {
+    let message = "";
+    try {
+      sinceValueOf({ occurredAt: new Date(0), id: 1n }, occurredAt, idField, "Event");
+    } catch (thrown) {
+      message = (thrown as Error).message;
+    }
+    expect(message).toContain("'id'");
+    expect(message).toContain("number");
+    expect(message).toContain("Event");
+  });
+
+  it("describes a class instance by its constructor name, so a Decimal column is diagnosable", () => {
+    class Decimal {}
+    expect(() => sinceValueOf({ occurredAt: new Decimal(), id: 1 }, occurredAt, idField, "Event")).toThrow(
+      /Decimal object/,
+    );
+  });
+
+  it("degrades to plain 'object' for a value carrying no constructor", () => {
+    expect(() => sinceValueOf({ occurredAt: Object.create(null), id: 1 }, occurredAt, idField, "Event")).toThrow(
+      /runtime value is a object/,
+    );
+  });
+});
+
+// ── Replaying a token: both halves are validated ─────────────────────────
+
+describe("since token replay validates each half independently", () => {
+  it("rejects a token whose value half does not coerce to the boundary column", async () => {
+    const { crud } = sinceCrud({ pagination: { since: { field: "occurredAt" } } } as never);
+    const issues = await issuesOfAsync(() => crud.findMany({ since: "not-a-date|1" } as never));
+    expect(issues[0]).toMatchObject({ field: "since", code: "KAVO_QUERY_INVALID_VALUE" });
+  });
+
+  it("rejects a token whose id half does not coerce to the id column", async () => {
+    const { crud } = sinceCrud({ pagination: { since: { field: "occurredAt" } } } as never);
+    const issues = await issuesOfAsync(() => crud.findMany({ since: "2024-01-01T01:00:00.000Z|nope" } as never));
+    expect(issues[0]).toMatchObject({ field: "since", code: "KAVO_QUERY_INVALID_VALUE" });
+  });
+});
+
+// ── `since` under the wrong strategy, over the wire ──────────────────────
+
+describe("a since param under a non-since strategy is refused, not ignored", () => {
+  // The programmatic half of this is already pinned; the wire half is the
+  // one a real client hits. Silently dropping the param would serve page 1
+  // forever while the client believed it was polling forward.
+  function offsetCrud() {
+    return createKavo({}).createCrud(Event, undefined, {
+      adapter: new InMemoryEventAdapter(),
+      metadata: eventMetadata,
+    });
+  }
+
+  it("reports KAVO_QUERY_UNSUPPORTED_PARAM for ?since= under offset pagination", async () => {
+    const crud = offsetCrud();
+    const issues = await issuesOfAsync(() =>
+      crud.engine.execute({
+        operation: "findMany",
+        query: new WireQuery({ since: "2024-01-01T00:00:00.000Z|1" }),
+      } as never),
+    );
+    expect(issues[0]).toMatchObject({ field: "since", code: "KAVO_QUERY_UNSUPPORTED_PARAM" });
+  });
+
+  it("treats an empty ?since= as absent rather than unsupported", async () => {
+    const crud = offsetCrud();
+    const response = await crud.engine.execute({
+      operation: "findMany",
+      query: new WireQuery({ since: "" }),
+    } as never);
+    expect(response.list?.items).toEqual([]);
+  });
+});
+
+// ── Bootstrap: the selectable allowlist half ─────────────────────────────
+
+describe("bootstrap validation of pagination.since.field — the selectable allowlist", () => {
+  // The filterable half is what composes the keyset predicate; the
+  // selectable half is what lets the engine read the next boundary back
+  // off a returned row. Both are required, and each fails with its own
+  // wording so the adopter knows which allowlist to fix.
+  function bootstrap(allowlists: unknown) {
+    return () =>
+      createKavo({
+        defaults: { pagination: { strategy: "since", since: { field: "occurredAt" } } },
+      } as never).createCrud(Event, { allowlists } as never, {
+        adapter: new InMemoryEventAdapter(),
+        metadata: eventMetadata,
+      });
+  }
+
+  it("fails fast when the since field is excluded from selectable", () => {
+    expect(bootstrap({ selectable: { exclude: ["occurredAt"] } })).toThrow(/selectable allowlist/);
+  });
+
+  it("fails fast when the forced idField tiebreaker is excluded from selectable", () => {
+    expect(bootstrap({ selectable: { exclude: ["id"] } })).toThrow(/forced tiebreaker 'idField'/);
+  });
+
+  it("fails fast when the forced idField tiebreaker is excluded from filterable", () => {
+    expect(bootstrap({ filterable: { exclude: ["id"] } })).toThrow(/forced tiebreaker 'idField'/);
   });
 });

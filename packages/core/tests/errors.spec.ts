@@ -360,3 +360,46 @@ describe("DefaultErrorHandler — engine boundary mapping", () => {
     });
   });
 });
+
+describe("toProblemDetails — codes the catalog does not know", () => {
+  // The extension path: a consumer subclassing the exception hierarchy
+  // with its own code still has to get a well-formed problem document, not
+  // a crash on a missing catalog entry.
+  const custom: KavoExceptionShape = {
+    code: "KAVO_SOMETHING_CUSTOM" as KavoExceptionShape["code"],
+    status: 418,
+    messageKey: "custom.brewing",
+    messageParams: {},
+    detail: "brewing refused",
+    context: {},
+    cause: undefined,
+  };
+
+  it("falls back to a generic title rather than reading undefined", () => {
+    expect(toProblemDetails(custom)).toMatchObject({ title: "Error", status: 418, code: "KAVO_SOMETHING_CUSTOM" });
+  });
+
+  it("still derives the type URI from the code", () => {
+    expect(toProblemDetails(custom).type).toBe("https://kavo.dev/errors/kavo-something-custom");
+  });
+});
+
+describe("toProblemDetails — describing a cause that is not an Error", () => {
+  // `DefaultErrorHandler` keeps a thrown non-`Error` value as the cause
+  // verbatim, so the serializer has to render one. An `Error` cause reads
+  // as `name: message`; anything else goes through `String`.
+  it("renders a string cause through String, under exposeInternals", () => {
+    const handled = new DefaultErrorHandler().handle("boom", {});
+    expect(toProblemDetails(handled, { exposeInternals: true }).detail).toContain("[cause: boom]");
+  });
+
+  it("renders an Error cause as name and message", () => {
+    const handled = new DefaultErrorHandler().handle(new TypeError("bad"), {});
+    expect(toProblemDetails(handled, { exposeInternals: true }).detail).toContain("[cause: TypeError: bad]");
+  });
+
+  it("keeps the cause out of the document by default", () => {
+    const handled = new DefaultErrorHandler().handle("boom", {});
+    expect(toProblemDetails(handled).detail).not.toContain("boom");
+  });
+});

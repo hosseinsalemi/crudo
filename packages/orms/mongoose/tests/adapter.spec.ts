@@ -7,8 +7,9 @@ import {
   QueryValidationException,
   type DefaultKavoService,
   type KavoInstance,
+  type RepositoryAdapter,
 } from "@kavo/core";
-import { createMongooseKavo } from "@kavo/mongoose";
+import { createInfrastructure, createMongooseKavo } from "@kavo/mongoose";
 import {
   clearCollections,
   ensureIndexes,
@@ -108,6 +109,29 @@ async function seed(): Promise<void> {
   for (const row of rows) await authors.createOne(row as never);
 }
 
+/** A normalized query with no filter — what a custom handler hands the reader. */
+function unfilteredQuery() {
+  return {
+    filter: { root: null },
+    sort: [],
+    include: {},
+    fields: { root: null, relations: {} },
+    pagination: { limit: 10, offset: 0 },
+    count: false,
+    withDeleted: false,
+    onlyDeleted: false,
+  };
+}
+
+/** The context core resolves for `Author`, which configures no soft delete. */
+function hardDeleteContext() {
+  return { entityName: "Author", operation: "findOne", config: { softDelete: { strategy: "hard" } } };
+}
+
+function authorAdapter(): RepositoryAdapter<Author> {
+  return createInfrastructure(database.connection).adapterFor(models.Author as never) as RepositoryAdapter<Author>;
+}
+
 describe("MongooseRepositoryAdapter — CRUD", () => {
   it("creates, reads, updates, patches, deletes against a real MongoDB", async () => {
     const created = (await authors.createOne({ email: "ada@x.io", name: "Ada", age: 36 } as never)) as Author;
@@ -169,6 +193,73 @@ describe("MongooseRepositoryAdapter — CRUD", () => {
     const created = (await authors.createOne({ email: "noop@x.io", name: "Noop", age: 5 } as never)) as Author;
     const patched = (await authors.patchOne(created._id, {} as never)) as Author;
     expect(patched).toMatchObject({ _id: created._id, name: "Noop", age: 5 });
+  });
+
+  it("still answers 404 when a patch carrying no fields addresses an absent document", async () => {
+    // The empty-body path above skips the write entirely, so it also skips
+    // the "matched nothing" signal every other write is 404'd by — it reads
+    // instead, and that read coming back empty is the only thing left to
+    // tell a missing document from an unchanged one.
+    const error = await rejectionOf(authors.patchOne(ABSENT_ID, {} as never));
+    expect(error).toBeInstanceOf(NotFoundException);
+    expect(error.code).toBe("KAVO_NOT_FOUND");
+  });
+});
+
+describe("MongooseRepositoryAdapter — reads that only a custom handler reaches", () => {
+  // Every engine read addresses a document by id and goes through
+  // `findOneById` with a query object, so neither `findOne(query, …)` nor a
+  // null query has a generated route standing behind it. Both are still part
+  // of the adapter's contract — a custom handler or a programmatic caller is
+  // the way in — which is why they are exercised against the adapter
+  // directly here rather than through a service.
+
+  it("returns the single row a by-query read matches", async () => {
+    await seed();
+    const row = await authorAdapter().findOne(
+      {
+        ...unfilteredQuery(),
+        filter: { root: { kind: "condition", field: "name", operator: "EQ", value: "Grace" } },
+      } as never,
+      hardDeleteContext() as never,
+    );
+    expect(row).toMatchObject({ name: "Grace", age: 45 });
+  });
+
+  it("answers null for a by-query read that matches nothing, rather than throwing", async () => {
+    await seed();
+    const row = await authorAdapter().findOne(
+      {
+        ...unfilteredQuery(),
+        filter: { root: { kind: "condition", field: "name", operator: "EQ", value: "Nobody" } },
+      } as never,
+      hardDeleteContext() as never,
+    );
+    expect(row).toBeNull();
+  });
+
+  it("applies the by-query read's sort, so the row it returns is a chosen one", async () => {
+    // `findOne` builds its own sort — the unsorted call would answer in
+    // MongoDB's natural order, so "the youngest author" would be right only
+    // by accident, and a dropped sort would never fail a hit/miss test.
+    await seed();
+    const row = await authorAdapter().findOne(
+      { ...unfilteredQuery(), sort: [{ field: "age", direction: "asc" }] } as never,
+      hardDeleteContext() as never,
+    );
+    expect(row).toMatchObject({ name: "Joan" });
+  });
+
+  it("reads by id with no query at all, and answers null for an absent one", async () => {
+    // `findOneById`'s signature admits a null query — a caller with nothing
+    // to ask beyond the id passes one — so every optional-chained read of
+    // `include`/`withDeleted`/`onlyDeleted` has to hold with no query object
+    // present rather than throwing on a property of null.
+    const created = (await authors.createOne({ email: "byid@x.io", name: "ById", age: 3 } as never)) as Author;
+    const adapter = authorAdapter();
+
+    expect(await adapter.findOneById(created._id, null, hardDeleteContext() as never)).toMatchObject({ name: "ById" });
+    expect(await adapter.findOneById(ABSENT_ID, null, hardDeleteContext() as never)).toBeNull();
   });
 });
 

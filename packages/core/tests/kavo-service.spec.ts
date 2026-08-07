@@ -13,8 +13,10 @@ import type {
 import {
   ConfigurationException,
   DefaultKavoService,
+  NotFoundException,
   OperationDisabledException,
   WireQuery,
+  createCrud,
   createKavo,
 } from "@kavo/core";
 import { InMemoryUserAdapter, User, userMetadata } from "./support/user-fixture.js";
@@ -430,5 +432,48 @@ describe("DefaultKavoService — query paths", () => {
     const { crud, adapter } = makeCrud();
     await crud.createOne(ADA as never);
     expect(adapter.last.query).toBeNull();
+  });
+});
+
+describe("createCrud — the standalone zero-config front door", () => {
+  // The bare `createCrud(Entity, config?, runtime)` free function, which
+  // creates an implicit root instance. Every other suite goes through
+  // `createKavo().createCrud(...)`, so nothing exercised the barrel export
+  // adopters reach for first.
+  it("round-trips a create and a read with no root instance in sight", async () => {
+    const crud = createCrud(User, undefined, { adapter: new InMemoryUserAdapter(), metadata: userMetadata });
+
+    const created = await crud.createOne(ADA as never);
+    expect(created).toMatchObject({ id: 1, name: "Ada" });
+    expect(await crud.findOne(1)).toMatchObject({ email: "ada@example.com" });
+  });
+
+  it("still applies an entity config passed to it", async () => {
+    class UserItemDto {
+      id = 0;
+      name = "";
+    }
+    const crud = createCrud(User, { dto: { item: UserItemDto } } as never, {
+      adapter: new InMemoryUserAdapter(),
+      metadata: userMetadata,
+    });
+
+    const created = await crud.createOne(ADA as never);
+    expect(Object.keys(created as object)).toEqual(["id", "name"]);
+  });
+
+  it("gives each call its own implicit root, which is why createKavo exists", async () => {
+    // Every call builds a fresh root, so two services share nothing — not
+    // the runtime they were handed and not the catalog that root owns.
+    // Entities registered through separate calls cannot see each other,
+    // which is why a multi-entity app wires one `createKavo` instead.
+    const first = createCrud(User, undefined, { adapter: new InMemoryUserAdapter(), metadata: userMetadata });
+    const second = createCrud(User, undefined, { adapter: new InMemoryUserAdapter(), metadata: userMetadata });
+
+    await first.createOne(ADA as never);
+
+    // A plain 404, not an incidental crash: the second service is fully
+    // functional, it simply never saw the row the first one wrote.
+    await expect(second.findOne(1)).rejects.toBeInstanceOf(NotFoundException);
   });
 });

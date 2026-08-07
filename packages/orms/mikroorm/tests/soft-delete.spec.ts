@@ -219,6 +219,23 @@ describe("MikroOrmRepositoryAdapter — soft delete", () => {
   });
 });
 
+describe("MikroOrmRepositoryAdapter — an id that is not there", () => {
+  // A missing row and an already-deleted one are different answers: 404
+  // versus 409. Conflating them would tell a client to retry something that
+  // can never succeed, because there is no row to act on in the first place.
+  it("404s on soft delete of an absent id, rather than reporting a conflict", async () => {
+    await expect(tickets.deleteOne(9999)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it("404s on purge of an absent id under the soft strategy", async () => {
+    // The hard-strategy sibling gets its 404 from `nativeDelete` reporting
+    // zero affected rows; under soft the answer has to come earlier, from the
+    // lookup the already-deleted check does — otherwise a missing id would
+    // surface as "not deleted" (409) instead.
+    await expect(tickets.purgeOne(9999)).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
 describe("MikroOrmRepositoryAdapter — a differently named marker column", () => {
   it("soft-deletes, excludes, and restores over an ordinary column", async () => {
     const created = await invoices.createOne({ number: "INV-1" } as never);

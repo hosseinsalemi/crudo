@@ -3,12 +3,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Column, DataSource, DeleteDateColumn, Entity, PrimaryGeneratedColumn } from "typeorm";
 import {
   AlreadyDeletedException,
+  ConfigurationException,
   ConflictException,
   NotDeletedException,
   NotFoundException,
   type DefaultKavoService,
 } from "@kavo/core";
-import { buildEntityMetadata, createTypeOrmKavo } from "@kavo/typeorm";
+import { buildEntityMetadata, createInfrastructure, createTypeOrmKavo } from "@kavo/typeorm";
 
 /** Soft delete the ORM-declared way: one `@DeleteDateColumn`. */
 @Entity()
@@ -39,15 +40,26 @@ class Invoice {
   archivedAt!: Date | null;
 }
 
+/** No delete column at all: rows go away when deleted. */
+@Entity()
+class Receipt {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column("varchar")
+  number!: string;
+}
+
 let dataSource: DataSource;
 let tickets: DefaultKavoService<Ticket>;
 let invoices: DefaultKavoService<Invoice>;
+let receipts: DefaultKavoService<Receipt>;
 
 beforeAll(async () => {
   dataSource = new DataSource({
     type: "better-sqlite3",
     database: ":memory:",
-    entities: [Ticket, Invoice],
+    entities: [Ticket, Invoice, Receipt],
     synchronize: true,
   });
   await dataSource.initialize();
@@ -59,6 +71,7 @@ beforeAll(async () => {
   invoices = kavo.createCrud(Invoice, {
     softDelete: { field: "archivedAt" },
   }) as DefaultKavoService<Invoice>;
+  receipts = kavo.createCrud(Receipt) as DefaultKavoService<Receipt>;
 });
 
 afterAll(async () => {
@@ -68,7 +81,17 @@ afterAll(async () => {
 beforeEach(async () => {
   await dataSource.getRepository(Ticket).clear();
   await dataSource.getRepository(Invoice).clear();
+  await dataSource.getRepository(Receipt).clear();
 });
+
+/**
+ * The context a programmatic caller assembles by hand. Core refuses to
+ * *enable* `restoreOne`/`purgeOne` on a hard-delete entity at bootstrap, so
+ * the adapter's own guards are only reachable this way.
+ */
+function hardContext(operation: string) {
+  return { entityName: "Receipt", operation, config: { softDelete: { strategy: "hard" } } };
+}
 
 async function newTicket(reference = "T-1"): Promise<number> {
   const created = await tickets.createOne({ reference, title: "broken login" } as never);
@@ -187,5 +210,48 @@ describe("TypeOrmRepositoryAdapter — configured marker column", () => {
 
     const list = await invoices.findMany({ onlyDeleted: true });
     expect(list.items).toMatchObject([{ id: deletedId }]);
+  });
+});
+
+describe("TypeOrmRepositoryAdapter — an id that is not there", () => {
+  // A missing row and an already-deleted row are different answers: 404
+  // versus 409. Conflating them would tell a client to retry a restore that
+  // can never succeed.
+  it("404s on soft delete of an absent id, rather than reporting a conflict", async () => {
+    await expect(tickets.deleteOne(9999)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it("404s on restore of an absent id", async () => {
+    await expect(tickets.restoreOne(9999)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it("404s on purge of an absent id under the soft strategy", async () => {
+    await expect(tickets.purgeOne(9999)).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe("TypeOrmRepositoryAdapter — the adapter's own hard-delete guards", () => {
+  it("refuses restore on a hard-delete entity instead of silently no-opping", async () => {
+    const created = (await receipts.createOne({ number: "R-1" } as never)) as Receipt;
+    const adapter = createInfrastructure(dataSource).adapterFor(Receipt);
+
+    await expect(adapter.restore(created.id, hardContext("restoreOne") as never)).rejects.toBeInstanceOf(
+      ConfigurationException,
+    );
+    await expect(adapter.restore(created.id, hardContext("restoreOne") as never)).rejects.toThrow(
+      /hard delete strategy/,
+    );
+  });
+
+  it("purges a hard-delete row outright, then 404s once it is gone", async () => {
+    // Under a hard strategy `purge` skips the already-deleted check and is
+    // just a delete, so the missing-row answer comes from the row count.
+    const created = (await receipts.createOne({ number: "R-2" } as never)) as Receipt;
+    const adapter = createInfrastructure(dataSource).adapterFor(Receipt);
+
+    await adapter.purge(created.id, hardContext("purgeOne") as never);
+    expect(await dataSource.getRepository(Receipt).countBy({ id: created.id })).toBe(0);
+
+    await expect(adapter.purge(created.id, hardContext("purgeOne") as never)).rejects.toBeInstanceOf(NotFoundException);
   });
 });

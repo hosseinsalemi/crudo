@@ -7,7 +7,16 @@ import { Test } from "@nestjs/testing";
 import type { DefaultKavoService, NormalizedQueryContext, OperationHandler } from "@kavo/core";
 import { ConfigurationException, WireQuery } from "@kavo/core";
 import type { KavoModuleOptions } from "@kavo/nest";
-import { Kavo, KavoModule, Override, enumProp, flattenQuery, getKavoServiceToken, oneOfArray } from "@kavo/nest";
+import {
+  Kavo,
+  KavoModule,
+  Override,
+  boundKavoService,
+  enumProp,
+  flattenQuery,
+  getKavoServiceToken,
+  oneOfArray,
+} from "@kavo/nest";
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
 import { boundServer, listen, type SupertestTarget } from "./support/listen.js";
 
@@ -390,6 +399,28 @@ describe("@Kavo operation control surface", () => {
     expect(response.body).toEqual({ manual: true });
     // Other routes still generate.
     await request(server()).post("/todos").send({ title: "x" }).expect(201);
+  });
+
+  it("boundKavoService(this) reaches the service the discovery binder assigned", async () => {
+    // The access pattern CLAUDE.md tells consumers to prefer over both
+    // `forFeature` and constructor injection, and until now the only one
+    // with no test at all. A hand-written route is the case it exists for.
+    @Kavo(Todo)
+    @Controller("todos")
+    class SelfServingController {
+      @Get("mine")
+      async mine(): Promise<{ titles: string[] }> {
+        const service = boundKavoService<Todo>(this);
+        const list = await service.findMany();
+        return { titles: list.items.map((item) => (item as Todo).title) };
+      }
+    }
+
+    await bootstrap(SelfServingController);
+    await request(server()).post("/todos").send({ title: "own route" }).expect(201);
+
+    const response = await request(server()).get("/todos/mine").expect(200);
+    expect(response.body).toEqual({ titles: ["own route"] });
   });
 
   it("overrides all five singular standard operations, alongside manual-method-wins and a disabled operation (issue #21)", async () => {
@@ -1191,6 +1222,85 @@ describe("@Kavo computed fields over the wire (ADR-0019)", () => {
   });
 });
 
+describe("@Kavo Swagger — per-operation DTO overrides are what gets documented", () => {
+  /**
+   * The engine deserializes through `descriptor.input` and serializes
+   * through `descriptor.output` ahead of the entity's root slots, so
+   * documenting the slot alone would publish a shape no request or
+   * response actually has. `packages/core` covers the registry side of
+   * this; nothing covered the OpenAPI side, which meant an override could
+   * ship documented as the wrong shape with no test to catch it.
+   */
+  class RootCreateDto {
+    title = "";
+    priority = 0;
+  }
+  class OverrideCreateDto {
+    title = "";
+    urgency = 0;
+  }
+  class RootUpdateDto {
+    title = "";
+    done = false;
+  }
+  class RootItemDto {
+    id = 0;
+    title = "";
+  }
+  class OverrideCreatedDto {
+    id = 0;
+    done = false;
+  }
+
+  @Kavo(Todo, {
+    dto: { create: RootCreateDto, update: RootUpdateDto, item: RootItemDto },
+    operations: { createOne: { dto: { input: OverrideCreateDto, output: OverrideCreatedDto } } },
+  })
+  @Controller("todos")
+  class OverriddenDtoController {}
+
+  type Schema = { properties?: Record<string, unknown> };
+
+  let document: ReturnType<typeof SwaggerModule.createDocument>;
+
+  beforeEach(async () => {
+    await bootstrap(OverriddenDtoController);
+    document = SwaggerModule.createDocument(app, new DocumentBuilder().setTitle("t").setVersion("0").build());
+  });
+
+  const requestSchema = (path: string, verb: string): Schema | undefined =>
+    (document.paths[path] as Record<string, { requestBody?: { content?: Record<string, { schema?: Schema }> } }>)?.[
+      verb
+    ]?.requestBody?.content?.["application/json"]?.schema;
+
+  const responseSchema = (path: string, verb: string, status: string): Schema | undefined =>
+    (
+      document.paths[path] as Record<
+        string,
+        { responses?: Record<string, { content?: Record<string, { schema?: Schema }> }> }
+      >
+    )?.[verb]?.responses?.[status]?.content?.["application/json"]?.schema;
+
+  it("documents the operation's input override ahead of the entity's create slot", () => {
+    expect(Object.keys(requestSchema("/todos", "post")?.properties ?? {})).toEqual(["title", "urgency"]);
+  });
+
+  it("documents the operation's output override ahead of the entity's item slot", () => {
+    expect(Object.keys(responseSchema("/todos", "post", "201")?.properties ?? {})).toEqual(["id", "done"]);
+  });
+
+  it("leaves operations that declared no override on the root slots", () => {
+    // The override is scoped, not global: `findOne` still documents `item`.
+    expect(Object.keys(responseSchema("/todos/{id}", "get", "200")?.properties ?? {})).toEqual(["id", "title"]);
+  });
+
+  it("does not leak an operation's input override onto a sibling operation's body", () => {
+    // `updateOne` declared no override, so it documents the root `update`
+    // slot — not `createOne`'s override and not `createOne`'s slot either.
+    expect(Object.keys(requestSchema("/todos/{id}", "put")?.properties ?? {})).toEqual(["title", "done"]);
+  });
+});
+
 describe("@Kavo Swagger request-body schemas", () => {
   class CreateTodoDto {
     title = "";
@@ -1259,6 +1369,94 @@ describe("@Kavo Swagger request-body schemas", () => {
     expect(schema?.properties?.title).toEqual({ type: "string" });
     expect(schema?.properties?.priority).toEqual({ type: "integer" });
     expect(schema?.properties?.done).toEqual({ type: "boolean" });
+  });
+
+  it("distinguishes the JSON number types a field initializer can imply", async () => {
+    // `jsonSchemaForValue` reads the runtime initializer, so an integer and
+    // a fractional default are different documented types, and a `bigint`
+    // documents as an integer rather than falling through to `{}`.
+    class NumericDto {
+      count = 0;
+      ratio = 1.5;
+      ticket = 0n;
+    }
+    @Kavo(Todo, { dto: { create: NumericDto } })
+    @Controller("todos")
+    class NumericController {}
+
+    await app.close();
+    await bootstrap(NumericController);
+    const numericDocument = SwaggerModule.createDocument(
+      app,
+      new DocumentBuilder().setTitle("t").setVersion("0").build(),
+    );
+    const schema = (
+      numericDocument.paths["/todos"] as Record<
+        string,
+        { requestBody?: { content?: Record<string, { schema?: Schema }> } }
+      >
+    )?.["post"]?.requestBody?.content?.["application/json"]?.schema;
+
+    expect(schema?.properties?.count).toEqual({ type: "integer" });
+    expect(schema?.properties?.ratio).toEqual({ type: "number" });
+    expect(schema?.properties?.ticket).toEqual({ type: "integer" });
+  });
+
+  it("keeps a field whose initializer says nothing about its type, as an open schema", async () => {
+    // The key still has to appear: dropping it would publish a body schema
+    // that omits a field the DTO genuinely accepts.
+    class LooseDto {
+      title = "";
+      note = undefined;
+    }
+    @Kavo(Todo, { dto: { create: LooseDto } })
+    @Controller("todos")
+    class LooseController {}
+
+    await app.close();
+    await bootstrap(LooseController);
+    const looseDocument = SwaggerModule.createDocument(
+      app,
+      new DocumentBuilder().setTitle("t").setVersion("0").build(),
+    );
+    const schema = (
+      looseDocument.paths["/todos"] as Record<
+        string,
+        { requestBody?: { content?: Record<string, { schema?: Schema }> } }
+      >
+    )?.["post"]?.requestBody?.content?.["application/json"]?.schema;
+
+    expect(Object.keys(schema?.properties ?? {})).toContain("note");
+    expect(schema?.properties?.note).toEqual({});
+  });
+
+  it("defers to Swagger's own introspection for a DTO with no runtime own properties", async () => {
+    // A declared-only DTO (`title!: string`) erases at runtime, so there
+    // are no initializers to read. Emitting an empty inline schema would
+    // publish "this endpoint takes nothing"; handing Swagger the class
+    // lets its own decorators answer instead.
+    class DeclaredOnlyDto {
+      title!: string;
+    }
+    @Kavo(Todo, { dto: { create: DeclaredOnlyDto } })
+    @Controller("todos")
+    class DeclaredOnlyController {}
+
+    await app.close();
+    await bootstrap(DeclaredOnlyController);
+    const declaredDocument = SwaggerModule.createDocument(
+      app,
+      new DocumentBuilder().setTitle("t").setVersion("0").build(),
+    );
+    const body = (
+      declaredDocument.paths["/todos"] as Record<
+        string,
+        { requestBody?: { content?: Record<string, { schema?: Schema & { $ref?: string } }> } }
+      >
+    )?.["post"]?.requestBody?.content?.["application/json"]?.schema;
+
+    expect(body?.properties).toBeUndefined();
+    expect(body?.$ref).toContain("DeclaredOnlyDto");
   });
 
   it("documents create/put/patch/get-item responses with the item DTO", () => {

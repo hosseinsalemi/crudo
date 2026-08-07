@@ -3,11 +3,23 @@ import { BadRequestException, HttpException, NotFoundException } from "@nestjs/c
 import { toKavoExceptionShape } from "../src/unhandled-exception.js";
 
 describe("toKavoExceptionShape", () => {
-  it("maps a string-body HttpException to KAVO_HTTP_ERROR at its own status", () => {
+  it("maps a built-in HttpException to KAVO_HTTP_ERROR at its own status", () => {
+    // Nest's own subclasses build an *object* body (`{ statusCode, message,
+    // error }`) even when constructed from a string, so this exercises the
+    // object arm. The genuine string-body case is the next test.
     const shape = toKavoExceptionShape(new NotFoundException("no boom here"));
     expect(shape.code).toBe("KAVO_HTTP_ERROR");
     expect(shape.status).toBe(404);
     expect(shape.detail).toContain("no boom here");
+  });
+
+  it("surfaces a bare string response body as the detail", () => {
+    // `new HttpException("...", status)` keeps the response as a raw
+    // string, which an app writing its own exceptions does routinely.
+    const shape = toKavoExceptionShape(new HttpException("plain text body", 418));
+    expect(shape.code).toBe("KAVO_HTTP_ERROR");
+    expect(shape.status).toBe(418);
+    expect(shape.detail).toContain("plain text body");
   });
 
   it("joins an array `message` (ValidationPipe shape) into one detail string", () => {

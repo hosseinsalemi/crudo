@@ -4,8 +4,9 @@ import request from "supertest";
 import { Controller, type INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { withListMeta } from "@kavo/core";
+import type { DefaultKavoService } from "@kavo/core";
 import type { KavoModuleOptions } from "@kavo/nest";
-import { Kavo, KavoModule } from "@kavo/nest";
+import { Kavo, KavoModule, getKavoServiceToken } from "@kavo/nest";
 import { InMemoryTodoAdapter, Todo, fakeInfrastructure } from "./support/fake-infrastructure.js";
 import { boundServer, listen, type SupertestTarget } from "./support/listen.js";
 
@@ -27,6 +28,7 @@ let httpServer: SupertestTarget | undefined;
 interface BootstrapOptions {
   readonly defaults?: KavoModuleOptions["defaults"];
   readonly async?: boolean;
+  readonly paginationStrategies?: KavoModuleOptions["paginationStrategies"];
 }
 
 async function bootstrap(controller: unknown, options: BootstrapOptions = {}): Promise<void> {
@@ -35,7 +37,11 @@ async function bootstrap(controller: unknown, options: BootstrapOptions = {}): P
   const rootModule =
     options.async === true
       ? KavoModule.forRootAsync({ useFactory: () => ({ infrastructure, defaults: options.defaults }) })
-      : KavoModule.forRoot({ infrastructure, defaults: options.defaults });
+      : KavoModule.forRoot({
+          infrastructure,
+          defaults: options.defaults,
+          ...(options.paginationStrategies !== undefined && { paginationStrategies: options.paginationStrategies }),
+        });
   const moduleRef = await Test.createTestingModule({
     imports: [rootModule, KavoModule.forFeature([controller as never])],
   }).compile();
@@ -236,6 +242,81 @@ describe("@Kavo custom meta.routes on a standard, non-@Override'd operation", ()
     await request(server()).post("/todos").send({ title: "x" }).expect(201);
 
     await request(server()).delete("/todos/1").expect(404);
+  });
+});
+
+describe("@Kavo meta.routes.enabled: false — service-only operations", () => {
+  // "Service-only" has to mean both halves: no route, and the operation
+  // still callable in code. Testing only the 404 would pass just as well
+  // if the operation had been disabled outright, which is a different
+  // feature with a different meaning.
+  @Kavo(Todo, { operations: { deleteOne: { meta: { routes: { enabled: false } } } } })
+  @Controller("todos")
+  class ServiceOnlyDeleteController {}
+
+  it("generates no route for the operation", async () => {
+    await bootstrap(ServiceOnlyDeleteController);
+    await request(server()).post("/todos").send({ title: "x" }).expect(201);
+
+    await request(server()).delete("/todos/1").expect(404);
+  });
+
+  it("leaves every other operation's route intact", async () => {
+    await bootstrap(ServiceOnlyDeleteController);
+    const created = await request(server()).post("/todos").send({ title: "x" }).expect(201);
+
+    await request(server())
+      .get(`/todos/${created.body.id as number}`)
+      .expect(200);
+  });
+
+  it("still runs the operation through the injected service", async () => {
+    await bootstrap(ServiceOnlyDeleteController);
+    const created = await request(server()).post("/todos").send({ title: "x" }).expect(201);
+    const id = created.body.id as number;
+
+    const service = app.get<DefaultKavoService<Todo>>(getKavoServiceToken(Todo));
+    await service.deleteOne(id);
+
+    await request(server()).get(`/todos/${id}`).expect(404);
+  });
+});
+
+describe("KavoModule.forRoot({ paginationStrategies }) — a custom strategy reaches the engine", () => {
+  // A declared public option with no coverage of its wiring: a typo in the
+  // thread-through would leave the strategy silently unregistered and the
+  // entity paging by offset, which looks like working software.
+  class EveryOtherRowStrategy {
+    readonly name = "alternating";
+    normalize(rawParams: Readonly<Record<string, unknown>>, limits: { defaultLimit: number }) {
+      const raw = rawParams["page"];
+      const page = typeof raw === "string" ? Number(raw) : 0;
+      return { limit: limits.defaultLimit, offset: page * 2 };
+    }
+  }
+
+  @Kavo(Todo)
+  @Controller("todos")
+  class AlternatingController {}
+
+  it("pages through the registered custom strategy rather than falling back to offset", async () => {
+    await bootstrap(AlternatingController, {
+      defaults: { pagination: { strategy: "alternating", defaultLimit: 1 } },
+      paginationStrategies: [new EveryOtherRowStrategy() as never],
+    });
+    for (const title of ["a", "b", "c"]) {
+      await request(server()).post("/todos").send({ title }).expect(201);
+    }
+
+    const second = await request(server()).get("/todos?page=1").expect(200);
+    expect(second.body.items).toHaveLength(1);
+    expect(second.body.items[0]).toMatchObject({ title: "c" });
+  });
+
+  it("fails loudly when the configured strategy is not registered at all", async () => {
+    await bootstrap(AlternatingController, { defaults: { pagination: { strategy: "missing" } } });
+
+    await request(server()).get("/todos").expect(500);
   });
 });
 

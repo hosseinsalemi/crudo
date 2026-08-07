@@ -8,6 +8,7 @@ import {
   NotFoundException,
   PersistenceException,
   QueryValidationException,
+  createCrud,
   type DefaultKavoService,
   type KavoInstance,
 } from "@kavo/core";
@@ -317,6 +318,43 @@ describe("MikroOrmRepositoryAdapter — relation writes", () => {
   });
 });
 
+describe("MikroOrmRepositoryAdapter — relation values core never narrowed", () => {
+  /**
+   * A service built on core's explicit-runtime path — `createCrud(Entity,
+   * config, runtime)`, no root instance and therefore no entity catalog.
+   * That is the state the adapter's own unwrapping exists for: core's
+   * deserializer narrows a relation to `{ id }` only when the *target* is in
+   * the catalog, so with an empty one the client's raw value reaches the
+   * adapter exactly as it was sent. (Through `createMikroOrmKavo` the catalog
+   * derives every target from MikroORM's own metadata, so core narrows first
+   * and these shapes never get that far.)
+   */
+  function bareBooks(): DefaultKavoService<Book> {
+    return createCrud(Book, undefined, {
+      metadata: buildEntityMetadata(orm, Book),
+      adapter: createInfrastructure(orm).adapterFor(Book),
+    }) as DefaultKavoService<Book>;
+  }
+
+  it("associates a bare scalar id, which MikroORM takes as the foreign key", async () => {
+    const ada = (await authors.createOne({ email: "ada@x.io", name: "Ada", age: 36 } as never)) as Author;
+    const created = (await bareBooks().createOne({ title: "Notes", author: ada.id } as never)) as Book;
+    expect(await readAuthorId(created.id)).toBe(ada.id);
+  });
+
+  it("drops an id-less relation object rather than deep-writing it", async () => {
+    // ADR-0014: relations are associated by id, never deep-written. Handing
+    // `{ name: "nope" }` to `em.create` would leave a nested write one cascade
+    // setting away from working, so an object carrying no id becomes `null` —
+    // the book is written, the smuggled author is not.
+    const before = await orm.em.fork().count(Author, {});
+    const created = (await bareBooks().createOne({ title: "smuggled", author: { name: "nope" } } as never)) as Book;
+
+    expect(await orm.em.fork().count(Author, {})).toBe(before);
+    expect(await readAuthorId(created.id)).toBeUndefined();
+  });
+});
+
 describe("MikroOrmRepositoryAdapter — findOne by query", () => {
   it("returns the first row when the query carries no filter at all", async () => {
     // Regression: MikroORM's validator rejects `em.findOne` with an empty
@@ -330,6 +368,16 @@ describe("MikroOrmRepositoryAdapter — findOne by query", () => {
     const reader = createInfrastructure(orm).adapterFor(Author);
     const row = await reader.findOne(unfilteredQuery() as never, hardDeleteContext() as never);
     expect(row).not.toBeNull();
+  });
+
+  it("returns null when the query matches nothing", async () => {
+    // The limit-1 `em.find` behind this answers with an empty array, so the
+    // adapter has to produce the `null` itself — `findOne`'s contract is "a
+    // row or null", and core reads that null as the 404 signal. An
+    // `undefined` leaking through instead would be serialized as a body.
+    const reader = createInfrastructure(orm).adapterFor(Author);
+    const row = await reader.findOne(unfilteredQuery() as never, hardDeleteContext() as never);
+    expect(row).toBeNull();
   });
 
   it("still applies sort and soft-delete scope on the unfiltered path", async () => {

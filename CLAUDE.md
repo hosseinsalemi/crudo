@@ -16,6 +16,7 @@ pnpm check        # the full gate: generate (Prisma client + fixture schema) + b
 pnpm build        # tsc -b (project references across the workspace — src only)
 pnpm typecheck    # tsc --noEmit over the root tests/ plus every package's and example's tests/ (tsconfig.tests.json)
 pnpm test         # vitest run (whole monorepo)
+pnpm test:coverage # the same suite under v8 coverage, failing on the thresholds in vitest.coverage.config.ts — its own CI job, deliberately not part of `check`
 pnpm depcruise    # enforce package-boundary rules (.dependency-cruiser.cjs)
 pnpm lint         # oxlint over packages/*, examples/*, tests/ and .github/scripts/
 pnpm prettify     # prettier --write . (printWidth 120)

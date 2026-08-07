@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import mongoose, { Schema } from "mongoose";
 import type { ClassRef, FieldMetadata } from "@kavo/core";
 import { ConfigurationException } from "@kavo/core";
-import { buildEntityMetadata } from "@kavo/mongoose";
+import { asModel, buildEntityMetadata } from "@kavo/mongoose";
 
 /**
  * Metadata derivation reads `schema.paths` only — it never talks to a
@@ -169,6 +169,32 @@ describe("buildEntityMetadata — renamed and disabled schema options", () => {
     expect(byName["updated_at"]).toMatchObject({ generated: true });
   });
 
+  it("honours a timestamps pair where only one side is renamed", () => {
+    // `{ updatedAt: "modified_at" }` renames one side and leaves the other at
+    // its default name. Missing the default-named side would make
+    // `createdAt` an ordinary writable field, so it would land in every
+    // derived write DTO and a caller could set the document's creation time.
+    const registry = newRegistry();
+    const Doc = registry.model(
+      "PartiallyRenamed",
+      new Schema({ title: String }, { timestamps: { updatedAt: "modified_at" } }),
+    );
+    const byName = fieldsByName(buildEntityMetadata(Doc as unknown as ClassRef, registry).fields);
+    expect(byName["createdAt"]).toMatchObject({ kind: "date", generated: true });
+    expect(byName["modified_at"]).toMatchObject({ kind: "date", generated: true });
+  });
+
+  it("stamps only the enabled side when one timestamp is switched off", () => {
+    const registry = newRegistry();
+    const Doc = registry.model(
+      "OneSidedTimestamps",
+      new Schema({ title: String }, { timestamps: { createdAt: false } }),
+    );
+    const byName = fieldsByName(buildEntityMetadata(Doc as unknown as ClassRef, registry).fields);
+    expect(byName["createdAt"]).toBeUndefined(); // Mongoose never adds the path
+    expect(byName["updatedAt"]).toMatchObject({ kind: "date", generated: true });
+  });
+
   it("excludes a renamed version key, and includes nothing extra when it is disabled", () => {
     const registry = newRegistry();
     const Renamed = registry.model("Renamed", new Schema({ title: String }, { versionKey: "_version" }));
@@ -267,5 +293,44 @@ describe("buildEntityMetadata — rejected inputs", () => {
     expect(thrown).toBeInstanceOf(ConfigurationException);
     expect((thrown as ConfigurationException).code).toBe("KAVO_CONFIG_INVALID");
     expect((thrown as Error).message).toContain("Mongoose model");
+  });
+
+  it("rejects a primitive and null without reading a property off either", () => {
+    // A class — the case above — is `typeof "function"` and sails past both
+    // of `asModel`'s narrowing guards on its way to the missing `modelName`.
+    // `null` and a bare string reach different arms, and reading
+    // `null.modelName` would be a TypeError from deep inside bootstrap
+    // instead of the exception that names what was actually passed.
+    for (const notAModel of [null, "Author"]) {
+      let thrown: unknown;
+      try {
+        asModel(notAModel as never);
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toBeInstanceOf(ConfigurationException);
+      expect((thrown as ConfigurationException).code).toBe("KAVO_CONFIG_INVALID");
+      expect((thrown as Error).message).toContain("Mongoose model");
+    }
+  });
+
+  it("refuses a schema that disables the _id path", () => {
+    // `{ _id: false }` is legal Mongoose — it is how a subdocument opts out
+    // of its own key — but a collection without `_id` has nothing for Kavo
+    // to address a document by, so it is refused at bootstrap rather than
+    // 404ing every single-document route at runtime.
+    const registry = newRegistry();
+    const NoId = registry.model("NoId", new Schema({ title: String }, { _id: false }));
+    expect(Object.keys(NoId.schema.paths)).not.toContain("_id"); // Mongoose really does this
+
+    let thrown: unknown;
+    try {
+      buildEntityMetadata(NoId as unknown as ClassRef, registry);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(ConfigurationException);
+    expect((thrown as ConfigurationException).code).toBe("KAVO_CONFIG_INVALID");
+    expect((thrown as Error).message).toContain("_id");
   });
 });

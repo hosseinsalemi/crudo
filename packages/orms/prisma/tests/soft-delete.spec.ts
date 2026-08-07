@@ -2,12 +2,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import {
   AlreadyDeletedException,
+  ConfigurationException,
   ConflictException,
   NotDeletedException,
   NotFoundException,
   type DefaultKavoService,
 } from "@kavo/core";
-import { buildEntityMetadata, createPrismaKavo } from "@kavo/prisma";
+import { buildEntityMetadata, createInfrastructure, createPrismaKavo } from "@kavo/prisma";
 import { newTestPrismaClient } from "./support/client.js";
 
 /** Soft delete over a marker column named through config. */
@@ -57,6 +58,19 @@ beforeEach(async () => {
 async function newTicket(reference = "T-1"): Promise<number> {
   const created = await tickets.createOne({ reference, title: "broken login" } as never);
   return (created as Ticket).id;
+}
+
+/** The adapter on its own, so a caller can hand it a context `createCrud` refuses to build. */
+function invoiceAdapter() {
+  return createInfrastructure(client as never, {
+    datamodel: Prisma.dmmf.datamodel,
+    entities: [Ticket, Invoice],
+    caseInsensitiveFilters: false,
+  }).adapterFor(Invoice);
+}
+
+function hardDeleteContext(operation: string) {
+  return { entityName: "Invoice", operation, config: { softDelete: { strategy: "hard" } } };
 }
 
 describe("metadata seam — no auto-detected soft-delete column", () => {
@@ -117,6 +131,25 @@ describe("PrismaRepositoryAdapter — soft delete", () => {
     await expect(tickets.deleteOne(id)).rejects.toBeInstanceOf(AlreadyDeletedException);
   });
 
+  it("404s a delete of an id that never existed, rather than 409ing it as already deleted", async () => {
+    // The two say opposite things to a client: 409 already-deleted describes
+    // a row that is still there and invites a `restore`, while a row that
+    // never existed can never be reached by any follow-up call.
+    await expect(tickets.deleteOne(4242)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it("404s a restore of an id that never existed", async () => {
+    // Absent and present-but-live are separate answers: 404 says no such row,
+    // and the 409 not-deleted above says the row is there but was never
+    // deleted. The existence check is what keeps the two apart.
+    await expect(tickets.restoreOne(4242)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it("404s a purge of an id that never existed", async () => {
+    // Same split as restore, over the same marker column read.
+    await expect(tickets.purgeOne(4242)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
   it("restores a deleted row and refuses to restore a live one", async () => {
     const id = await newTicket();
     await tickets.deleteOne(id);
@@ -168,5 +201,55 @@ describe("PrismaRepositoryAdapter — configured marker column", () => {
 
     const list = await invoices.findMany({ onlyDeleted: true });
     expect(list.items).toMatchObject([{ id: deletedId }]);
+  });
+});
+
+/**
+ * Core refuses to *enable* `restoreOne` or `purgeOne` on a hard-delete entity
+ * at bootstrap, so neither branch below is reachable through `createCrud`.
+ * They are the adapter's second line of defence, for a programmatic caller
+ * that assembles its own context.
+ */
+describe("PrismaRepositoryAdapter — hard-delete strategy guards", () => {
+  it("refuses restore under a hand-built hard-delete context", async () => {
+    // A hard-delete entity names no marker column, so "restore" has nothing
+    // to clear — refusing loudly beats writing null into a column chosen at
+    // random or silently reporting success.
+    const created = (await invoices.createOne({ number: "INV-guard" } as never)) as Invoice;
+
+    let thrown: unknown;
+    try {
+      await invoiceAdapter().restore(created.id, hardDeleteContext("restoreOne") as never);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(ConfigurationException);
+    expect((thrown as ConfigurationException).code).toBe("KAVO_CONFIG_INVALID");
+    expect((thrown as Error).message).toMatch(/hard delete strategy/);
+  });
+
+  it("purges a hard-delete row outright, and 404s by id when it is already gone", async () => {
+    // Under a hard strategy `purge` skips the already-deleted check and is
+    // just a delete — but it still pre-checks existence, and that is what
+    // names the missing row. Letting Prisma's own P2025 answer instead still
+    // maps to a 404, just one whose `id` is blank (see `mapDriverError`), so
+    // the id in `messageParams` is what pins the pre-check.
+    const created = (await invoices.createOne({ number: "INV-purge" } as never)) as Invoice;
+    const adapter = invoiceAdapter();
+
+    await adapter.purge(created.id, hardDeleteContext("purgeOne") as never);
+    expect(await client.invoice.count()).toBe(0);
+
+    let thrown: unknown;
+    try {
+      await adapter.purge(created.id, hardDeleteContext("purgeOne") as never);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(NotFoundException);
+    expect((thrown as NotFoundException).messageParams).toMatchObject({
+      entity: "Invoice",
+      id: String(created.id),
+    });
   });
 });

@@ -108,4 +108,46 @@ describe("KavoModule.forRoot({ graphql: true })", () => {
 
     await request(server).post("/graphql").expect(404);
   });
+
+  it("falls back to the default path when given an options object that omits one", async () => {
+    // `graphql: {}` is what an app writes when it builds the option object
+    // programmatically with no path to contribute; it must mean the same
+    // thing as `graphql: true`, not "mount at undefined".
+    const adapter = new InMemoryTodoAdapter();
+    const moduleRef = await Test.createTestingModule({
+      imports: [KavoModule.forRoot({ infrastructure: fakeInfrastructure(adapter), graphql: {} })],
+      controllers: [TodoController],
+    }).compile();
+    app = moduleRef.createNestApplication();
+    const server = await listen(app);
+
+    const created = await request(server)
+      .post("/graphql")
+      .send({ query: `mutation { createTodo(input: { title: "empty options", done: false }) { id title } }` })
+      .expect(200);
+    expect(created.body.errors).toBeUndefined();
+    expect(created.body.data.createTodo).toEqual({ id: 1, title: "empty options" });
+  });
+
+  it("mounts the same way under forRootAsync", async () => {
+    // The async form resolves its options through a factory and implies
+    // `provideServices`, so the merged schema's container lookups run
+    // through a different branch than `forRoot`'s.
+    const adapter = new InMemoryTodoAdapter();
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        KavoModule.forRootAsync({ useFactory: () => ({ infrastructure: fakeInfrastructure(adapter) }), graphql: true }),
+      ],
+      controllers: [TodoController],
+    }).compile();
+    app = moduleRef.createNestApplication();
+    const server = await listen(app);
+
+    const created = await request(server)
+      .post("/graphql")
+      .send({ query: `mutation { createTodo(input: { title: "async", done: false }) { id title } }` })
+      .expect(200);
+    expect(created.body.errors).toBeUndefined();
+    expect(created.body.data.createTodo).toEqual({ id: 1, title: "async" });
+  });
 });

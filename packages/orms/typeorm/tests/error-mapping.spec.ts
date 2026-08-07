@@ -150,6 +150,17 @@ describe("mapDriverError — the fallback row", () => {
     const lookAlike = Object.assign(new Error("unique violation"), { driverError: { code: "23505" } });
     expect(mapDriverError(lookAlike, context)).toBeInstanceOf(PersistenceException);
   });
+
+  it("still classifies by errno when the driver reports no code", () => {
+    // The SQLite sniffing further down calls `code.startsWith(...)`, which
+    // a missing code would break — so the `?? ""` guard is what lets an
+    // errno-only driver error reach its own row instead of crashing.
+    expect(mapDriverError(queryFailed({ errno: 1062 }), context)).toBeInstanceOf(ConflictException);
+  });
+
+  it("falls back to a persistence failure when there is neither a code nor a known errno", () => {
+    expect(mapDriverError(queryFailed({}), context)).toBeInstanceOf(PersistenceException);
+  });
 });
 
 describe("mapDriverError — cause and context propagation", () => {

@@ -216,6 +216,25 @@ describe("createKavoGraphQLSchema", () => {
     expect(adapter.lastQuery?.filter.root).toEqual({ kind: "condition", field: "done", operator: "EQ", value: true });
   });
 
+  it("reads an unprefixed sort token as ascending, alongside a '-' descending one", async () => {
+    // The `-` prefix is the only descending spelling, so its absence is
+    // what carries "ascending". The MCP binding duplicates this parser
+    // deliberately (the two may not import each other), so both need it.
+    const { adapter, schema } = setup();
+    adapter.rows.push({ id: 1, title: "a", done: false });
+
+    const result = await graphql({
+      schema,
+      source: `query { todos(sort: ["-title", "done"]) { items { id } } }`,
+    });
+
+    expect(result.errors).toBeUndefined();
+    expect(adapter.lastQuery?.sort).toEqual([
+      { field: "title", direction: "desc" },
+      { field: "done", direction: "asc" },
+    ]);
+  });
+
   it("resolves restore/purge mutations against a soft-deletable entity", async () => {
     const adapter = new InMemoryNoteAdapter();
     const service = createKavo().createCrud(
