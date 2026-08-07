@@ -102,7 +102,8 @@ all day for a signal that only matters per push — so it gets its own CI job
 instead. Run it locally when you want to see what a change left untested;
 `.coverage/index.html` is the browsable report.
 
-The thresholds are a ratchet, not a target, and they are deliberately not 100. Some of what remains uncovered is unreachable by construction —
+The thresholds are a ratchet, not a target, and they are deliberately not set
+at 100. Some of what remains uncovered is unreachable by construction —
 `assertNever` arms over closed unions, `??` fallbacks the calling layer has
 already collapsed, guards behind a precondition that makes them dead — and a
 test that forces its way into one of those asserts the shape of the code

@@ -174,12 +174,16 @@ packages or expensive non-tsc pipelines (a future e2e suite is the
 natural checkpoint).
 
 Root scripts: `generate`, `build` (`tsc -b`), `clean`, `typecheck`,
-`depcruise`, `lint`, `test`, `prettify`, `format:check`, `docs:build`,
-`docs:links`, and `check` — the last runs `generate → build → typecheck →
-depcruise → lint → test` and is the verification gate. Three checks sit
-outside it, each as its own CI job: `format:check`, `docs:build` (VitePress,
-which resolves the links inside the pages it renders), and `docs:links`
-(`scripts/check-doc-links.sh`). The last two are complements, not overlaps —
+`depcruise`, `lint`, `test`, `test:coverage`, `prettify`, `format:check`,
+`docs:build`, `docs:links`, and `check` — the last runs `generate → build →
+typecheck → depcruise → lint → test` and is the verification gate. Four
+checks sit outside it, each as its own CI job: `test:coverage` (the same
+suite under v8 instrumentation, failing on the thresholds in
+`vitest.coverage.config.ts` — kept out of the gate because instrumenting a
+second full run doubles the command developers run all day),
+`format:check`, `docs:build` (VitePress, which resolves the links inside the
+pages it renders), and `docs:links` (`scripts/check-doc-links.sh`). The last
+two are complements, not overlaps —
 the docs build never sees a `docs/**.md` reference written from `packages/`
 or `extensions/`, because those are not pages, and it never reads
 `docs/.vitepress/config.mts`, because that is config rather than content. So

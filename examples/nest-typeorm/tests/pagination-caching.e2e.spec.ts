@@ -41,17 +41,17 @@ class Reading {
 @Kavo(Reading, {
   pagination: { strategy: "cursor", defaultLimit: 20, maxLimit: 100 },
   query: { defaultSort: [{ field: "id", direction: "asc" }] },
-} as never)
+})
 @Controller("cursor-readings")
 class CursorReadingController {}
 
 @Kavo(Reading, {
   pagination: { strategy: "since", since: { field: "recordedAt" }, defaultLimit: 20, maxLimit: 100 },
-} as never)
+})
 @Controller("since-readings")
 class SinceReadingController {}
 
-@Kavo(Reading, { caching: { etag: true } } as never)
+@Kavo(Reading, { caching: { etag: true } })
 @Controller("cached-readings")
 class CachedReadingController {}
 

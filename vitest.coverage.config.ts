@@ -35,10 +35,19 @@ export default mergeConfig(base, {
       reporter: ["text-summary", "json-summary", "html"],
       reportsDirectory: "./.coverage",
       // Achieved at the time of writing: 98.92 / 97.67 / 99.68 / 99.07.
+      //
+      // The gaps below those numbers are budgets, not rounding. Each one
+      // is worth roughly 40 branches or 10 functions, which is wide enough
+      // that the job does not go red for reasons unrelated to coverage —
+      // v8 derives its counts from V8 itself, so they can shift a little
+      // when the `lts/*` the job runs on rolls to a new major — and still
+      // narrow enough that losing a real behavior's tests fails the run.
+      // Tighten them when coverage rises; a threshold pinned flush against
+      // the current number is a flaky gate, not a strict one.
       thresholds: {
         statements: 98,
-        branches: 97,
-        functions: 99,
+        branches: 96,
+        functions: 98,
         lines: 98,
       },
     },

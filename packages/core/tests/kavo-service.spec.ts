@@ -13,6 +13,7 @@ import type {
 import {
   ConfigurationException,
   DefaultKavoService,
+  NotFoundException,
   OperationDisabledException,
   WireQuery,
   createCrud,
@@ -461,17 +462,18 @@ describe("createCrud — the standalone zero-config front door", () => {
     expect(Object.keys(created as object)).toEqual(["id", "name"]);
   });
 
-  it("gives each call its own catalog, which is why createKavo exists", async () => {
-    // Two entities registered through the free function cannot see each
-    // other, so a nested include across them is unresolvable. That is the
-    // cost of the implicit root, and it is the reason a multi-entity app
-    // wires one `createKavo` instead.
+  it("gives each call its own implicit root, which is why createKavo exists", async () => {
+    // Every call builds a fresh root, so two services share nothing — not
+    // the runtime they were handed and not the catalog that root owns.
+    // Entities registered through separate calls cannot see each other,
+    // which is why a multi-entity app wires one `createKavo` instead.
     const first = createCrud(User, undefined, { adapter: new InMemoryUserAdapter(), metadata: userMetadata });
     const second = createCrud(User, undefined, { adapter: new InMemoryUserAdapter(), metadata: userMetadata });
 
     await first.createOne(ADA as never);
 
-    // Separate roots mean separate adapters: the row is not shared.
-    await expect(second.findOne(1)).rejects.toThrow();
+    // A plain 404, not an incidental crash: the second service is fully
+    // functional, it simply never saw the row the first one wrote.
+    await expect(second.findOne(1)).rejects.toBeInstanceOf(NotFoundException);
   });
 });
