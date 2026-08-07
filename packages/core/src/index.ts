@@ -73,6 +73,8 @@ export type {
   ErrorSettings,
   PaginationSettings,
   QuerySettings,
+  RealtimeFieldSelector,
+  RealtimeSettings,
   RelationEdgeSettings,
   RelationSettings,
   SoftDeleteMode,
@@ -89,6 +91,10 @@ export type {
 } from "./config/entity-config.js";
 export type { ComputedFieldDescriptor, ComputedFieldMap } from "./config/computed-field.js";
 export type { ResolvedEntityConfig, ResolvedQueryAllowlists } from "./config/resolved-entity-config.js";
+
+// ── Realtime ──────────────────────────────────────────────────────────
+export type { RealtimeEventDto, RealtimeEventId } from "./realtime/realtime-event.js";
+export type { RealtimeTransport } from "./realtime/realtime-transport.js";
 
 // ── Operations ────────────────────────────────────────────────────────
 export type { OperationCardinality, OperationId, OperationKind, StandardOperationId } from "./operations/operation.js";

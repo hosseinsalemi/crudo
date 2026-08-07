@@ -1,6 +1,8 @@
 import type { RelationLoadStrategy } from "../relations/relation-descriptor.js";
 import type { StandardOperationId } from "../operations/operation.js";
 import type { Sort } from "../query/sort.js";
+import type { RealtimeEventDto, RealtimeEventId } from "../realtime/realtime-event.js";
+import type { RealtimeTransport } from "../realtime/realtime-transport.js";
 
 /**
  * The complete, canonical settings schema — one schema for every scope.
@@ -112,6 +114,60 @@ export interface SoftDeleteSettings {
   readonly strategy: SoftDeleteMode;
 }
 
+/**
+ * Which fields a transport may expose an individual subscription to — the
+ * same array-or-`exclude` shape `allowlists.selectable` uses
+ * (`QueryFieldSelector`, entity-config.ts), but plain strings: unlike
+ * `QueryAllowlists`, `KavoSettings` carries no `Entity` type parameter
+ * (`relations.edges`'s keys are plain strings for the same reason), so
+ * there is no layer here to check a field name against real entity paths.
+ */
+export type RealtimeFieldSelector = readonly string[] | { readonly exclude: readonly string[] };
+
+/**
+ * Realtime event publishing. `false` disables the subtree entirely, the
+ * same convention `softDelete` uses.
+ *
+ * Registered transports are **not** a key here, unlike `enabled`/`events`/
+ * `subscribableFields`: a transport is a live object (a socket server, a
+ * broker connection), not configuration data, and this schema is deep-
+ * frozen once resolved (`deepFreeze`, merge-settings.ts) — freezing a
+ * transport's own internal state the way freezing a plain `{ field,
+ * direction }` entry is harmless would break it. `KavoOptions.realtimeTransports` (ADR-0023)
+ * (`kavo.ts`) is where transports are registered instead, once per
+ * `createKavo` root, and reached at runtime through
+ * `ResolvedEntityConfig.realtimeTransports` — structural, like `relations`
+ * and `dto`, not merged through this precedence chain. See the `operations.
+ * <id>.handler` doc for the same reasoning applied to another live-object
+ * exception to "settings are data."
+ */
+export interface RealtimeSettings {
+  readonly enabled: boolean;
+  /**
+   * Per-event opt-out: an id absent here is emitted, like every other
+   * positively-phrased boolean in this schema — enabling realtime means
+   * "emit everything" by default, then dial specific events back with
+   * `false`.
+   */
+  readonly events: Readonly<Partial<Record<RealtimeEventId, boolean>>>;
+  /**
+   * Bounds what a future field-scoped subscription may reach for this
+   * entity (not built yet — this issue only emits whole-item, entity-level
+   * events). Omitted: no field-level subscription is possible here.
+   */
+  readonly subscribableFields?: RealtimeFieldSelector;
+  /**
+   * Called when a transport's `publish` rejects — the failure never fails
+   * the mutation regardless (a subscriber not hearing about a write that
+   * already succeeded is a delivery problem, not a data problem), and
+   * `@kavo/core` has no ambient console/logger to fall back on (ADR-0005:
+   * `packages/core`'s `tsconfig.json` sets `lib: ["ES2022"]` with no DOM/
+   * Node globals, deliberately). Left unset, a failed publish is silently
+   * swallowed.
+   */
+  readonly onPublishError?: (error: unknown, transport: RealtimeTransport, event: RealtimeEventDto) => void;
+}
+
 /** The full settings tree. */
 export interface KavoSettings {
   readonly pagination: PaginationSettings;
@@ -120,6 +176,7 @@ export interface KavoSettings {
   readonly relations: RelationSettings;
   readonly caching: CachingSettings;
   readonly softDelete: SoftDeleteSettings | false;
+  readonly realtime: RealtimeSettings | false;
   /**
    * Global operation enablement, keyed by standard operation id — booleans
    * only, unlike the richer per-entity `EntityConfig.operations` (which also
