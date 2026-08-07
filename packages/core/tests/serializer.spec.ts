@@ -73,6 +73,19 @@ describe("DefaultSerializer — response projection", () => {
     expect(Object.keys(serializer.serializeItem(ada(), OpaqueDto, contextStub()))).toEqual(COLUMNS);
   });
 
+  it("falls back the same way when the DTO's constructor throws", () => {
+    // A DTO with required constructor arguments, or a field initializer
+    // that throws, is an ordinary mistake. Probing its shape must not turn
+    // that into a 500 on every response: the projection degrades, the
+    // request still answers.
+    class NeedsArgumentsDto {
+      constructor() {
+        throw new Error("needs arguments");
+      }
+    }
+    expect(Object.keys(serializer.serializeItem(ada(), NeedsArgumentsDto, contextStub()))).toEqual(COLUMNS);
+  });
+
   it("narrows with the request's fieldset but never widens the DTO", () => {
     // Serialization order is normative: DTO mapping first, then field
     // selection — so `email`, which the DTO hides, cannot be selected back.

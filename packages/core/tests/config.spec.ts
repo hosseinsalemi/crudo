@@ -16,6 +16,20 @@ describe("mergeSettings — merge algebra", () => {
     expect(merged.query.maxFilterDepth).toBe(3);
   });
 
+  it("skips a key whose override value is explicitly undefined", () => {
+    // This is what makes it safe for a framework layer to spread an
+    // options object with optional keys into a settings override: an
+    // absent option must not erase the scope above it. `false` still
+    // disables (see the next test); only `undefined` means "no opinion".
+    const merged = mergeSettings(BUILT_IN_DEFAULTS, { pagination: { count: undefined } });
+    expect(merged.pagination.count).toBe(BUILT_IN_DEFAULTS.pagination.count);
+  });
+
+  it("distinguishes an undefined override from a false one", () => {
+    expect(mergeSettings(BUILT_IN_DEFAULTS, { pagination: { count: undefined } }).pagination.count).toBe(true);
+    expect(mergeSettings(BUILT_IN_DEFAULTS, { pagination: { count: false } }).pagination.count).toBe(false);
+  });
+
   it("lets `false` disable an inheritable feature", () => {
     const merged = mergeSettings(BUILT_IN_DEFAULTS, { softDelete: false });
     expect(merged.softDelete).toBe(false);

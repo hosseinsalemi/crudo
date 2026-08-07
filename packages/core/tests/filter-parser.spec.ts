@@ -518,3 +518,55 @@ describe("DefaultFilterParser — security posture", () => {
     expect(issues[0]).toMatchObject({ field: "age", code: "KAVO_QUERY_INVALID_VALUE" });
   });
 });
+
+describe("DefaultFilterParser — JSON that parses but is not a filter", () => {
+  // The escape hatch already rejects text that is not JSON at all. These
+  // are the inputs that survive `JSON.parse` and would otherwise be walked
+  // as if they were an object.
+  it.each([
+    ["an array", "[1,2]"],
+    ["a bare number", "5"],
+    ["a bare string", '"age"'],
+    ["null", "null"],
+  ])("rejects %s with a query issue rather than a TypeError", (_label, raw) => {
+    const issues = issuesOf(() => parse({ filter: raw }));
+    expect(issues[0]).toMatchObject({ field: "filter", code: "KAVO_QUERY_INVALID_VALUE" });
+  });
+
+  it("reads a scalar multi-value operand as a one-element list", () => {
+    // Only reachable through the JSON hatch, where values keep their JSON
+    // types instead of arriving as comma-joined text.
+    const query = parse({ filter: JSON.stringify({ age: { in: 18 } }) });
+    expect(query.root).toMatchObject({ operator: "IN", value: [18] });
+  });
+});
+
+describe("DefaultFilterParser — an IN list is all-or-nothing", () => {
+  it("emits no condition at all when one member fails coercion", () => {
+    // The alternative would be a silently narrowed list: `age IN (1, 3)`
+    // for a client that asked for three values, which reads as a
+    // successful query returning wrong rows.
+    const issues = issuesOf(() => parse({ "filter[age][in]": "1,abc,3" }));
+    expect(issues[0]).toMatchObject({ field: "age", code: "KAVO_QUERY_INVALID_VALUE" });
+  });
+
+  it("accepts the repeated-key spelling when a framework hands over a bare scalar", () => {
+    // `?filter[status][in][]=active` is an array of one to some parsers and
+    // a plain string to others; both must mean the same thing.
+    const query = parse({ "filter[status][in][]": "active" });
+    expect(query.root).toMatchObject({ operator: "IN", value: ["active"] });
+  });
+
+  it("still accepts the array spelling of the same key", () => {
+    const query = parse({ "filter[status][in][]": ["active", "pending"] });
+    expect(query.root).toMatchObject({ operator: "IN", value: ["active", "pending"] });
+  });
+});
+
+describe("DefaultFilterParser — a bare filter[] key contributes nothing", () => {
+  it("yields an empty filter rather than throwing on the empty path", () => {
+    // An attacker-shaped key on an untrusted-key code path: the contract
+    // worth pinning is that it neither crashes nor smuggles a condition in.
+    expect(parse({ "filter[]": "18" }).root).toBeNull();
+  });
+});

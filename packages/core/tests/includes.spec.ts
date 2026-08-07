@@ -322,6 +322,19 @@ describe("include serialization", () => {
     const list = await posts.findMany({ include: ["author", "comments"] });
     expect(list.items[0]).toMatchObject({ author: null, comments: [] });
   });
+
+  it("normalizes a null to-many relation to an empty array, never null", async () => {
+    // Adapters disagree on whether an unhydrated collection comes back as
+    // `[]` or `null`; the envelope must not leak that difference, or a
+    // client would have to null-check a field the schema types as a list.
+    const fixture = blog({
+      post: { relations: { edges: { comments: { includable: true } } } },
+    });
+    const { posts, postRows } = fixture;
+    postRows.push(Object.assign(new Post(), { id: 11, title: "Null comments", comments: null as never }));
+    const list = await posts.findMany({ include: ["comments"] });
+    expect(list.items[0]).toMatchObject({ comments: [] });
+  });
 });
 
 describe("association by id (ADR-0014)", () => {
@@ -445,6 +458,132 @@ describe("include rejection messages", () => {
     expect(detail).toContain("Did you mean 'title'?");
     expect(detail).toContain("Selectable fields on Post: id, title.");
     expect(detail).toContain("allowlists.selectable on the Post config");
+  });
+});
+
+describe("defaultInclude", () => {
+  it("does not duplicate a relation the client also asked for, and keeps the requested subtree", () => {
+    // The dedupe has to lose to the client's own draft, not the other way
+    // round: a `defaultInclude` node carries no children, so clobbering
+    // would silently drop `posts.comments` from the response.
+    const fixture = blog({
+      author: { relations: { edges: { posts: { includable: true, defaultInclude: true } } } },
+      post: { relations: { edges: { comments: { includable: true } } } },
+    } as never);
+
+    return fixture.authors.findMany({ include: ["posts.comments"] } as never).then(() => {
+      const tree = includeTree(fixture.authorAdapter);
+      expect(Object.keys(tree)).toEqual(["posts"]);
+      expect(Object.keys(tree["posts"]!.children)).toEqual(["comments"]);
+    });
+  });
+
+  it("gives a nested defaultInclude relation its full dotted path", async () => {
+    // `path` is what `fields[...]` and every issue message key off, so a
+    // nested default that reported a bare name would be unaddressable.
+    const fixture = blog({
+      author: { relations: { edges: { posts: { includable: true } } } },
+      post: { relations: { edges: { comments: { includable: true, defaultInclude: true } } } },
+    } as never);
+
+    await fixture.authors.findMany({ include: ["posts"] } as never);
+
+    const tree = includeTree(fixture.authorAdapter);
+    expect(tree["posts"]!.children["comments"]!.path).toBe("posts.comments");
+  });
+});
+
+describe("relations.edges — naming an edge is the opt-in", () => {
+  it("treats an edge that omits includable as includable", async () => {
+    // The registry documents this default; every other test in the file
+    // spells `includable: true`, which would leave it free to regress.
+    const fixture = blog({
+      author: { relations: { edges: { posts: { strategy: "join" } } } },
+    } as never);
+
+    await fixture.authors.findMany({ include: ["posts"] } as never);
+
+    expect(Object.keys(includeTree(fixture.authorAdapter))).toEqual(["posts"]);
+  });
+
+  it("still honours an explicit includable: false", async () => {
+    const fixture = blog({
+      author: { relations: { edges: { posts: { includable: false, strategy: "join" } } } },
+    } as never);
+
+    await expect(fixture.authors.findMany({ include: ["posts"] } as never)).rejects.toBeInstanceOf(
+      QueryValidationException,
+    );
+  });
+
+  it("says 'none' rather than trailing a bare colon when the entity has no relations at all", () => {
+    // `Comment` declares no relations, so the message has an empty list to
+    // render — the one case where the join would produce nothing.
+    expect(() => blog({ comment: { relations: { edges: { ghosts: { includable: true } } } } } as never)).toThrow(
+      /relations: none/,
+    );
+  });
+});
+
+describe("malformed include paths", () => {
+  it.each([
+    ["a trailing dot", "posts."],
+    ["a leading dot", ".posts"],
+    ["a doubled dot", "posts..comments"],
+    ["an empty string", ""],
+  ])("rejects %s as a query issue rather than building an empty-named node", async (_label, path) => {
+    const fixture = blog({
+      author: { relations: { edges: { posts: { includable: true } } } },
+      post: { relations: { edges: { comments: { includable: true } } } },
+    } as never);
+
+    const issues = await fixture.authors
+      .findMany({ include: [path] } as unknown as { include: readonly IncludePath<Author>[] })
+      .then(
+        () => {
+          throw new Error("expected a QueryValidationException");
+        },
+        (error: unknown) => (error as QueryValidationException).issues,
+      );
+
+    expect(issues[0]).toMatchObject({ field: "include", code: "KAVO_QUERY_INVALID_VALUE" });
+  });
+});
+
+describe("an includable relation whose target is unknown to this instance", () => {
+  it("reports an unsupported-param issue on that path instead of throwing a TypeError", async () => {
+    // `Comment` is never registered here, so the catalog cannot resolve
+    // `posts.comments`'s target. A missing `createCrud` call is an ordinary
+    // adopter mistake and must not surface as a crash.
+    const metadata = new Map<unknown, EntityMetadata<object>>([
+      [Author, authorMetadata as EntityMetadata<object>],
+      [Post, postMetadata as EntityMetadata<object>],
+    ]);
+    const authorAdapter = new SeededAdapter<Author>([]);
+    const postAdapter = new SeededAdapter<Post>([]);
+    const adapters = new Map<unknown, unknown>([
+      [Author, authorAdapter],
+      [Post, postAdapter],
+    ]);
+    const kavo = createKavo({
+      infrastructure: {
+        metadataFor: (entity) => metadata.get(entity) as never,
+        adapterFor: (entity) => adapters.get(entity) as never,
+      },
+    });
+    const authors = kavo.createCrud(Author, {
+      relations: { edges: { posts: { includable: true } } },
+    } as never) as DefaultKavoService<Author>;
+    kavo.createCrud(Post, { relations: { edges: { comments: { includable: true } } } } as never);
+
+    const issues = await authors.findMany({ include: ["posts.comments"] } as never).then(
+      () => {
+        throw new Error("expected a QueryValidationException");
+      },
+      (error: unknown) => (error as QueryValidationException).issues,
+    );
+
+    expect(issues[0]).toMatchObject({ field: "posts.comments", code: "KAVO_QUERY_UNSUPPORTED_PARAM" });
   });
 });
 

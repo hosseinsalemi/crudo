@@ -331,4 +331,84 @@ describe("KavoEngine — per-operation DTO override (issue #131)", () => {
       ConfigurationException,
     );
   });
+
+  it("treats an explicitly undefined dto key as unset, not as an inapplicable override", () => {
+    // The counterpart of the rejection above, and what makes it safe to
+    // build an entity config by spreading optional values: `deleteOne`
+    // permits no `dto` fields at all, yet `{ output: undefined }` states
+    // no opinion rather than stating a wrong one.
+    expect(() => makeCrud({ operations: { deleteOne: { dto: { output: undefined } } } } as never)).not.toThrow();
+  });
+});
+
+describe("KavoEngine — custom operations", () => {
+  /** Registers a custom operation and captures what its handler received. */
+  function withArchive(config?: Parameters<ReturnType<typeof createKavo>["createCrud"]>[1]) {
+    const { crud, adapter } = makeCrud(config);
+    const seen: unknown[] = [];
+    crud.engine.registry.register({
+      id: "archiveOne",
+      kind: "write",
+      cardinality: "single",
+      enabled: true,
+      handler: {
+        async execute(input: unknown) {
+          seen.push(input);
+          return null;
+        },
+      },
+      input: null,
+      output: null,
+      meta: {},
+    } as never);
+    return { crud, adapter, seen };
+  }
+
+  it("hands a custom operation invoked without an id the bare body", async () => {
+    // The body is deserialized through the resolved DTO first, the same as
+    // any standard write, so it arrives projected onto entity columns.
+    const { crud, seen } = withArchive();
+    await crud.engine.execute({ operation: "archiveOne", id: null, body: { name: "Ada" } } as never);
+    expect(seen[0]).toEqual({ name: "Ada" });
+  });
+
+  it("hands a custom operation invoked with an id both halves, with the id coerced", async () => {
+    // A custom route whose path carries `:id` passes the segment through as
+    // a string; the engine coerces it against the id column's kind, so the
+    // handler sees `7`, not `"7"`.
+    const { crud, seen } = withArchive();
+    await crud.engine.execute({ operation: "archiveOne", id: "7", body: { name: "Ada" } } as never);
+    expect(seen[0]).toEqual({ id: 7, body: { name: "Ada" } });
+  });
+});
+
+describe("KavoEngine — the per-call config view", () => {
+  it("answers settingsFor with the per-call settings, whichever operation is named", async () => {
+    // The merge already happened at the requested operation's scope, so the
+    // view's `settingsFor` is a constant function. Pinning that keeps a
+    // caller from believing it re-resolves per operation.
+    let observed: unknown;
+    const { crud } = makeCrud({
+      operations: {
+        findMany: {
+          handler: {
+            async execute(
+              _input: unknown,
+              context: { config: { settingsFor(id: string): { pagination: { count: boolean } } } },
+            ) {
+              observed = {
+                own: context.config.settingsFor("findMany").pagination.count,
+                other: context.config.settingsFor("findOne").pagination.count,
+              };
+              return { entities: [], total: null };
+            },
+          },
+        },
+      },
+    } as never);
+
+    await crud.findMany(undefined, { settings: { pagination: { count: false } } } as never);
+
+    expect(observed).toEqual({ own: false, other: false });
+  });
 });

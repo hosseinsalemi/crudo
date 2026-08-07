@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { ClassRef, EntityMetadata } from "@kavo/core";
-import { DefaultEntityCatalog, DefaultIncludeResolver, QueryNormalizer, resolveEntityConfig } from "@kavo/core";
+import {
+  ConfigurationException,
+  DefaultEntityCatalog,
+  DefaultIncludeResolver,
+  QueryNormalizer,
+  QueryValidationException,
+  resolveEntityConfig,
+} from "@kavo/core";
 import { userMetadata } from "./support/user-fixture.js";
 import { accountMetadata } from "./support/account-fixture.js";
 import type { Post } from "./support/blog-fixture.js";
@@ -510,5 +517,209 @@ describe("allowlist rejection messages", () => {
     const issues = issuesOf(() => normalizer.normalizeWire({ sort: "emial", fields: "nmae" }, config));
     expect(issues).toHaveLength(2);
     expect(issues.every((issue) => issue.detail.includes("Did you mean"))).toBe(true);
+  });
+});
+
+/**
+ * The programmatic path does not run `DefaultFilterParser` or any
+ * pagination strategy: its input is already typed, so there is nothing to
+ * parse. That makes `normalizeInput` the *sole* gate for a hand-built
+ * request, and every limit the wire path enforces has to be enforced here
+ * independently. The wire equivalents of these live in
+ * `filter-parser.spec.ts` and `pagination-strategies.spec.ts`, neither of
+ * which this code path shares.
+ */
+describe("QueryNormalizer — programmatic input is bounded, not trusted", () => {
+  it.each([
+    ["a limit below one", { limit: 0 }, "limit"],
+    ["a fractional limit", { limit: 1.5 }, "limit"],
+    ["a negative offset", { offset: -1 }, "offset"],
+    ["a fractional offset", { offset: 2.5 }, "offset"],
+  ])("rejects %s, naming the parameter at fault", (_label, input, field) => {
+    const issues = issuesOf(() => normalizer.normalizeInput(input as never, config));
+    expect(issues[0]).toMatchObject({ field, code: "KAVO_QUERY_INVALID_VALUE" });
+  });
+
+  it("accepts the boundary values either side of those rejections", () => {
+    expect(normalizer.normalizeInput({ limit: 1, offset: 0 }, config).pagination).toEqual({ limit: 1, offset: 0 });
+  });
+
+  it("enforces maxFilterDepth on a hand-built AST", () => {
+    // Four levels of nesting against the default budget of three. Without
+    // this gate a programmatic caller could hand the adapter an
+    // arbitrarily deep tree that the wire path would have refused.
+    const nest = (child: unknown) => ({ kind: "group", operator: "AND", children: [child] });
+    const deep = nest(nest(nest({ kind: "condition", field: "age", operator: "EQ", value: 1 })));
+
+    const issues = issuesOf(() => normalizer.normalizeInput({ filter: deep } as never, config));
+    expect(issues[0]).toMatchObject({ field: "filter", code: "KAVO_QUERY_LIMIT_EXCEEDED" });
+  });
+
+  it("enforces maxInValues on a hand-built IN condition, naming the field and operator", () => {
+    const issues = issuesOf(() =>
+      normalizer.normalizeInput(
+        {
+          filter: {
+            kind: "condition",
+            field: "age",
+            operator: "IN",
+            value: Array.from({ length: 101 }, (_unused, index) => index),
+          },
+        } as never,
+        config,
+      ),
+    );
+    expect(issues[0]).toMatchObject({ field: "age", code: "KAVO_QUERY_LIMIT_EXCEEDED" });
+    expect(issues[0]?.detail).toContain("IN");
+  });
+
+  it("accepts an IN list exactly at the budget", () => {
+    const query = normalizer.normalizeInput(
+      {
+        filter: {
+          kind: "condition",
+          field: "age",
+          operator: "IN",
+          value: Array.from({ length: 100 }, (_unused, index) => index),
+        },
+      } as never,
+      config,
+    );
+    expect(query.filter.root).toMatchObject({ operator: "IN" });
+  });
+});
+
+/**
+ * `pagination.strategy` is validated as a *string* at bootstrap, never
+ * probed against the registry, so a typo survives `createCrud` and
+ * surfaces on the first request instead. That is a deliberate trade (the
+ * registry is per-normalizer, the config is not), which makes the failure
+ * mode worth pinning: a `ConfigurationException` naming both the typo and
+ * the registered alternatives, not a `TypeError` on `undefined`.
+ */
+describe("QueryNormalizer — an unregistered pagination strategy", () => {
+  const typoed = resolveEntityConfig(userMetadata, { pagination: { strategy: "ofset" } } as never, undefined);
+
+  it("throws ConfigurationException rather than collecting a query issue", () => {
+    expect(() => normalizer.normalizeWire({}, typoed)).toThrow(ConfigurationException);
+  });
+
+  it("names the unknown strategy and lists the registered ones", () => {
+    let message = "";
+    try {
+      normalizer.normalizeWire({}, typoed);
+    } catch (thrown) {
+      message = (thrown as Error).message;
+    }
+    expect(message).toContain("'ofset'");
+    expect(message).toMatch(/offset/);
+    expect(message).toMatch(/cursor/);
+    expect(message).toMatch(/since/);
+  });
+
+  it("propagates out of the programmatic path too", () => {
+    // `collectIssues` re-throws anything that is not a
+    // `QueryValidationException`, so a misconfiguration surfaces as a 500
+    // rather than being flattened into a 400 the client cannot act on.
+    expect(() => normalizer.normalizeInput({}, typoed)).toThrow(ConfigurationException);
+  });
+});
+
+/**
+ * A third-party strategy decides the *shape* the programmatic path
+ * normalizes to, which `paginationShape` discovers by probing it with an
+ * empty request. Both arms of that probe's catch matter: a strategy that
+ * rejects an empty request pages as offset (its real issues surface on the
+ * wire, where its params exist), while anything else is a bug and must not
+ * be swallowed.
+ */
+describe("QueryNormalizer — probing a custom pagination strategy", () => {
+  class RejectsEmpty {
+    readonly name = "demanding";
+    normalize() {
+      throw new QueryValidationException([
+        { field: "token", code: "KAVO_QUERY_INVALID_VALUE", detail: "token is required" },
+      ]);
+    }
+  }
+
+  class ThrowsOutright {
+    readonly name = "broken";
+    normalize(): never {
+      throw new Error("boom");
+    }
+  }
+
+  it("treats a strategy that refuses an empty request as offset-shaped", () => {
+    const normalizerWith = new QueryNormalizer(userMetadata, [new RejectsEmpty() as never]);
+    const demanding = resolveEntityConfig(userMetadata, { pagination: { strategy: "demanding" } } as never, undefined);
+
+    expect(normalizerWith.normalizeInput({}, demanding).pagination).toEqual({ limit: 20, offset: 0 });
+  });
+
+  it("rejects a programmatic cursor against that offset shape rather than paging silently", () => {
+    const normalizerWith = new QueryNormalizer(userMetadata, [new RejectsEmpty() as never]);
+    const demanding = resolveEntityConfig(userMetadata, { pagination: { strategy: "demanding" } } as never, undefined);
+
+    const issues = issuesOf(() => normalizerWith.normalizeInput({ cursor: "abc" } as never, demanding));
+    expect(issues[0]).toMatchObject({ field: "cursor", code: "KAVO_QUERY_UNSUPPORTED_PARAM" });
+  });
+
+  it("lets a non-validation throw escape, so a broken strategy is not mistaken for offset paging", () => {
+    const normalizerWith = new QueryNormalizer(userMetadata, [new ThrowsOutright() as never]);
+    const broken = resolveEntityConfig(userMetadata, { pagination: { strategy: "broken" } } as never, undefined);
+
+    expect(() => normalizerWith.normalizeInput({}, broken)).toThrow(/boom/);
+  });
+});
+
+/**
+ * A query string can spell the same parameter twice (`?sort=a&sort=b`),
+ * which every mainstream parser hands over as an array rather than a
+ * string. None of these are reachable from the programmatic path, which
+ * reads its input already typed, so the wire path owns the whole burden of
+ * not trusting the shape it is given.
+ */
+describe("QueryNormalizer — repeated-key and malformed wire spellings", () => {
+  it("accepts the repeated-key array form of include", () => {
+    const query = postNormalizer.normalizeWire({ include: ["comments"] } as never, postConfig);
+    expect(Object.keys(query.include)).toEqual(["comments"]);
+  });
+
+  it("reports a non-string include token instead of throwing", () => {
+    const issues = issuesOf(() => normalizer.normalizeWire({ include: 42 } as never, config));
+    expect(issues[0]).toMatchObject({ field: "include", code: "KAVO_QUERY_INVALID_VALUE" });
+  });
+
+  it("reports a repeated-key sort instead of throwing", () => {
+    const issues = issuesOf(() => normalizer.normalizeWire({ sort: ["name", "email"] } as never, config));
+    expect(issues[0]).toMatchObject({ field: "sort", code: "KAVO_QUERY_INVALID_VALUE" });
+  });
+
+  it("skips an empty token inside sort rather than rejecting it as an empty field name", () => {
+    const query = normalizer.normalizeWire({ sort: "name,,email" }, config);
+    expect(query.sort).toEqual([
+      { field: "name", direction: "asc" },
+      { field: "email", direction: "asc" },
+    ]);
+  });
+
+  it("reports a repeated-key root fields instead of throwing, and selects nothing", () => {
+    const issues = issuesOf(() => normalizer.normalizeWire({ fields: ["id", "name"] } as never, config));
+    expect(issues[0]).toMatchObject({ field: "fields", code: "KAVO_QUERY_INVALID_VALUE" });
+  });
+
+  it("skips an empty token inside fields", () => {
+    const query = normalizer.normalizeWire({ fields: "id,,name" }, config);
+    expect(query.fields.root).toEqual(["id", "name"]);
+  });
+
+  it("reports a non-string relation fieldset under its raw wire key", () => {
+    // The key is echoed verbatim (`fields[comments]`, not `comments`) so
+    // the client can find the parameter it actually sent.
+    const issues = issuesOf(() =>
+      postNormalizer.normalizeWire({ include: "comments", "fields[comments]": ["id"] } as never, postConfig),
+    );
+    expect(issues[0]).toMatchObject({ field: "fields[comments]", code: "KAVO_QUERY_INVALID_VALUE" });
   });
 });

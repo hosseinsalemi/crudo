@@ -117,3 +117,28 @@ describe("entity-tag comparison (RFC 9110 §8.8.3)", () => {
     expect(weakMatch([], '"a"')).toBe(false);
   });
 });
+
+describe("canonicalize — values JSON.stringify cannot encode", () => {
+  // `canonicalize` exists because `JSON.stringify` is not a usable hash
+  // input: it throws on bigint and drops keys non-deterministically. These
+  // are the cases where it has to answer where `JSON.stringify` would not.
+  it("renders a bigint as its quoted decimal string instead of throwing", () => {
+    expect(canonicalize(10n)).toBe('"10"');
+    expect(() => JSON.stringify(10n)).toThrow(TypeError);
+  });
+
+  it("keeps a bigint distinct from the same-valued number, so the tags differ", () => {
+    expect(canonicalize({ n: 10n })).not.toBe(canonicalize({ n: 10 }));
+  });
+
+  it("renders a function or a symbol as null, matching JSON's array behavior", () => {
+    expect(canonicalize([() => undefined])).toBe(canonicalize([null]));
+    expect(canonicalize([Symbol("s")])).toBe(canonicalize([null]));
+  });
+
+  it("still produces a stable tag for a payload carrying one", async () => {
+    const left = await computeEtag({ id: 1, at: 9n });
+    const right = await computeEtag({ at: 9n, id: 1 });
+    expect(left).toBe(right);
+  });
+});

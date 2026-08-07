@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type {
   DeepPartial,
+  EntityId,
   EntityMetadata,
   KavoSettings,
   ListMetaDto,
   ListResultDto,
+  NormalizedQueryContext,
+  RepositoryAdapter,
   ResolvedEntityConfig,
   Sort,
 } from "@kavo/core";
@@ -950,5 +953,110 @@ describe("cursor pagination end to end", () => {
     } as never);
     const items = (second.list?.items ?? []) as readonly User[];
     expect(items.map((user) => user.name)).toEqual(["user-3", "user-4"]);
+  });
+});
+
+/**
+ * An adapter that honours the `limit + 1` over-fetch but reads
+ * `query.filter` instead of `readFilter(query)`, so the keyset predicate
+ * never reaches the rows. Every page is page 1, `hasMore` never goes
+ * false, and the token the engine derives from the last row is the token
+ * it was handed. This is the exact defect ADR-0021's guard exists to
+ * catch, so the fixture reproduces the defect rather than mocking the
+ * symptom.
+ */
+class KeysetIgnoringAdapter implements RepositoryAdapter<User> {
+  constructor(private readonly inner: InMemoryUserAdapter = new InMemoryUserAdapter()) {}
+
+  get rows(): User[] {
+    return this.inner.rows;
+  }
+
+  async findMany(query: NormalizedQueryContext<User>): Promise<readonly User[]> {
+    const ordered = [...this.inner.rows].sort((left, right) => left.id - right.id);
+    return ordered.slice(0, query.pagination.limit);
+  }
+
+  async findOneById(id: EntityId) {
+    return this.inner.findOneById(id);
+  }
+  async findOne(query: NormalizedQueryContext<User>) {
+    return this.inner.findOne(query);
+  }
+  async count(query: NormalizedQueryContext<User>) {
+    return this.inner.count(query);
+  }
+  async create(data: Partial<User>) {
+    return this.inner.create(data);
+  }
+  async update(id: EntityId, data: Partial<User>) {
+    return this.inner.update(id, data);
+  }
+  async patch(id: EntityId, data: Partial<User>) {
+    return this.inner.patch(id, data);
+  }
+  async delete(id: EntityId) {
+    return this.inner.delete(id);
+  }
+  async restore() {
+    return this.inner.restore();
+  }
+  async purge(id: EntityId) {
+    return this.inner.purge(id);
+  }
+}
+
+describe("cursor pagination fails loudly when a page does not advance (ADR-0021)", () => {
+  function ignoringCrud() {
+    const adapter = new KeysetIgnoringAdapter();
+    const crud = createKavo({
+      defaults: {
+        pagination: { strategy: "cursor" },
+        query: { defaultSort: SORT_BY_ID },
+      },
+    } as never).createCrud(User, undefined, { adapter, metadata: userMetadata });
+    return { crud, adapter };
+  }
+
+  it("throws ConfigurationException instead of handing back the token it was given", async () => {
+    const { crud } = ignoringCrud();
+    await seed(crud as never, 5);
+
+    // Page 1 is well-formed even from a broken adapter: there is no
+    // previous token to compare against, so the guard cannot fire yet.
+    const first = await (crud as never as ReturnType<typeof cursorCrud>["crud"]).findMany({ limit: 2 } as never);
+    const token = nextCursorOf(first);
+    expect(typeof token).toBe("string");
+
+    // Page 2 re-derives the same boundary row, which is where a client
+    // following `nextCursor` would begin looping.
+    await expect(
+      (crud as never as ReturnType<typeof cursorCrud>["crud"]).findMany({ limit: 2, cursor: token } as never),
+    ).rejects.toBeInstanceOf(ConfigurationException);
+  });
+
+  it("names the adapter contract that was broken, so the message is actionable", async () => {
+    const { crud } = ignoringCrud();
+    await seed(crud as never, 5);
+
+    const client = crud as never as ReturnType<typeof cursorCrud>["crud"];
+    const token = nextCursorOf(await client.findMany({ limit: 2 } as never));
+
+    await expect(client.findMany({ limit: 2, cursor: token } as never)).rejects.toThrow(
+      /did not advance.*readFilter\(query\)/s,
+    );
+  });
+
+  it("still reports the entity and the config path the failure belongs to", async () => {
+    const { crud } = ignoringCrud();
+    await seed(crud as never, 5);
+
+    const client = crud as never as ReturnType<typeof cursorCrud>["crud"];
+    const token = nextCursorOf(await client.findMany({ limit: 2 } as never));
+
+    const error = await client.findMany({ limit: 2, cursor: token } as never).catch((thrown: unknown) => thrown);
+    expect(error).toBeInstanceOf(ConfigurationException);
+    expect((error as ConfigurationException).message).toContain("User");
+    expect((error as ConfigurationException).message).toContain("pagination.strategy");
   });
 });

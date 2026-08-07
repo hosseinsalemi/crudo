@@ -15,6 +15,7 @@ import {
   DefaultKavoService,
   OperationDisabledException,
   WireQuery,
+  createCrud,
   createKavo,
 } from "@kavo/core";
 import { InMemoryUserAdapter, User, userMetadata } from "./support/user-fixture.js";
@@ -430,5 +431,47 @@ describe("DefaultKavoService — query paths", () => {
     const { crud, adapter } = makeCrud();
     await crud.createOne(ADA as never);
     expect(adapter.last.query).toBeNull();
+  });
+});
+
+describe("createCrud — the standalone zero-config front door", () => {
+  // The bare `createCrud(Entity, config?, runtime)` free function, which
+  // creates an implicit root instance. Every other suite goes through
+  // `createKavo().createCrud(...)`, so nothing exercised the barrel export
+  // adopters reach for first.
+  it("round-trips a create and a read with no root instance in sight", async () => {
+    const crud = createCrud(User, undefined, { adapter: new InMemoryUserAdapter(), metadata: userMetadata });
+
+    const created = await crud.createOne(ADA as never);
+    expect(created).toMatchObject({ id: 1, name: "Ada" });
+    expect(await crud.findOne(1)).toMatchObject({ email: "ada@example.com" });
+  });
+
+  it("still applies an entity config passed to it", async () => {
+    class UserItemDto {
+      id = 0;
+      name = "";
+    }
+    const crud = createCrud(User, { dto: { item: UserItemDto } } as never, {
+      adapter: new InMemoryUserAdapter(),
+      metadata: userMetadata,
+    });
+
+    const created = await crud.createOne(ADA as never);
+    expect(Object.keys(created as object)).toEqual(["id", "name"]);
+  });
+
+  it("gives each call its own catalog, which is why createKavo exists", async () => {
+    // Two entities registered through the free function cannot see each
+    // other, so a nested include across them is unresolvable. That is the
+    // cost of the implicit root, and it is the reason a multi-entity app
+    // wires one `createKavo` instead.
+    const first = createCrud(User, undefined, { adapter: new InMemoryUserAdapter(), metadata: userMetadata });
+    const second = createCrud(User, undefined, { adapter: new InMemoryUserAdapter(), metadata: userMetadata });
+
+    await first.createOne(ADA as never);
+
+    // Separate roots mean separate adapters: the row is not shared.
+    await expect(second.findOne(1)).rejects.toThrow();
   });
 });
