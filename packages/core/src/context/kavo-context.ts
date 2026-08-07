@@ -31,9 +31,18 @@ export interface KavoContext<Entity = unknown> {
   readonly operation: OperationId;
   readonly config: ResolvedEntityConfig<Entity>;
   /**
-   * The authenticated caller — opaque to core. Set by the framework layer
-   * (`@kavo/nest` from the request), available to custom operation
-   * handlers; core never inspects it (v6 ships no policy layer).
+   * The authenticated caller — opaque to core, and available to custom
+   * operation handlers and computed-field resolvers. Core never inspects
+   * it and never populates it: it is whatever the caller put in
+   * `KavoCallOptions.principal`, and `null` when nothing did.
+   *
+   * A programmatic caller passes it per call
+   * (`crud.findOne(id, query, { principal })`). Over HTTP it is the
+   * framework layer's job, and `@kavo/nest` does it only when the app has
+   * said where the caller lives — `KavoModule.forRoot({ principal: true })`
+   * for `request.user`, or an extractor function for anything else.
+   * Without that option a generated route sends no options at all and this
+   * stays `null`.
    */
   readonly principal: unknown;
   /** Active transaction, if any; `null` outside transactions. */

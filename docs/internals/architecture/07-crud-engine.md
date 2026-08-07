@@ -37,8 +37,10 @@ same as `updateOne`/`patchOne` — needs the id to identify its target, and
 ## 2. `KavoContext` contents
 
 Entity + operation identity, the resolved config view (with per-call
-settings already merged), `principal` (opaque to core, set by the
-framework layer), `transaction` (an opaque handle a programmatic caller may
+settings already merged), `principal` (opaque to core, copied from
+`KavoCallOptions.principal` and `null` when the caller sent none — the
+framework layer fills it per request from the module's `principal`
+extractor, doc 10 §1a), `transaction` (an opaque handle a programmatic caller may
 pass through `KavoCallOptions`; `null` otherwise, and nothing in v6 creates
 one — the adapter-level hook is reserved), the normalized
 query for reads (`null` for writes), a `correlationId` (generated if the

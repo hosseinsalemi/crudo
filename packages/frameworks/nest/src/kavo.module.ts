@@ -9,10 +9,12 @@ import { getRegisteredKavoControllers } from "./kavo.decorator.js";
 import { KavoExceptionFilter } from "./kavo-exception.filter.js";
 import { createDefaultGraphQLController, DEFAULT_GRAPHQL_PATH } from "./graphql/default-graphql.controller.js";
 import { createDefaultMcpController, DEFAULT_MCP_PATH } from "./mcp/default-mcp.controller.js";
+import { resolvePrincipalExtractor } from "./principal.js";
 import {
   KAVO_INSTANCE,
   KAVO_MODULE_OPTIONS,
   KAVO_CONTROLLER_METADATA,
+  KAVO_PRINCIPAL_PROPERTY,
   KAVO_SERVICE_PROPERTY,
   getKavoServiceToken,
 } from "./tokens.js";
@@ -273,15 +275,24 @@ function serviceProvider(metadata: KavoControllerMetadata): Provider {
  * real module graph, and still well before the first request, which is all
  * the generated route methods need (they read `KAVO_SERVICE_PROPERTY` at
  * request time, never at construction time).
+ *
+ * The `principal` extractor rides along on the same pass, for the same
+ * reason: routes are generated at decoration time (ADR-0012), long before
+ * this module's options exist, so a per-request value that depends on them
+ * cannot be baked into the generated method. Binding the *function* here
+ * and calling it per request in the handler keeps the module option and the
+ * decoration-time route on the two sides of that seam they belong on.
  */
 @Injectable()
 class KavoBinder implements OnModuleInit {
   constructor(
     private readonly discovery: DiscoveryService,
     @Inject(KAVO_INSTANCE) private readonly kavo: KavoInstance,
+    @Inject(KAVO_MODULE_OPTIONS) private readonly options: KavoModuleOptions,
   ) {}
 
   onModuleInit(): void {
+    const extractPrincipal = resolvePrincipalExtractor(this.options.principal);
     for (const wrapper of this.discovery.getControllers()) {
       const metatype = wrapper.metatype;
       const instance = wrapper.instance as Record<string, unknown> | undefined;
@@ -289,6 +300,7 @@ class KavoBinder implements OnModuleInit {
       const metadata = Reflect.getMetadata(KAVO_CONTROLLER_METADATA, metatype) as KavoControllerMetadata | undefined;
       if (metadata === undefined) continue;
       instance[KAVO_SERVICE_PROPERTY] = this.kavo.createCrud(metadata.entity, metadata.config);
+      instance[KAVO_PRINCIPAL_PROPERTY] = extractPrincipal;
     }
   }
 }

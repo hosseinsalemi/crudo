@@ -29,6 +29,9 @@ boundary) — infrastructure arrives through DI.
   (in `AppModule` or anywhere else) sufficient on its own; no explicit
   per-entity registration is needed for the generated route methods, which
   only read that property at request time, well after `onModuleInit`.
+  The resolved `principal` extractor rides the same pass onto
+  `this[KAVO_PRINCIPAL_PROPERTY]`, for the same reason and with the same
+  timing (§1a).
 - **`KavoModule.forFeature(controllers)`**: registers the controllers
   (redundant if they're already in some module's `controllers:` array) and
   additionally provides the entity's service under
@@ -62,6 +65,42 @@ boundary) — infrastructure arrives through DI.
 per-request concern (principal, transaction, query, correlation id,
 state) through `KavoContext`, so request-scoped providers would buy
 nothing and cost per-request instantiation of the whole graph.
+
+### 1a. The principal (a per-request value under a decoration-time route)
+
+`KavoContext.principal` reaches core one way only —
+`KavoRequest.options.principal`, which the engine copies onto the context
+(`KavoCallOptions` is per-call scope, so this is a parameter, never a
+config write). A programmatic caller fills it directly. A generated route
+has to fill it from the incoming request, and that is the awkward part:
+routes are generated at decoration time (ADR-0012), while both the value
+and the rule for finding it are things decoration time cannot see.
+
+The two halves split along that seam:
+
+- **The rule** is a `KavoModule` option, `principal`: `true` for
+  `request.user`, or a `(request) => unknown` extractor. It is resolved
+  once, in `KavoBinder`, and bound onto the controller **instance** beside
+  the service. Instance-scoped rather than on the prototype for the reason
+  the service already is — the class is process-wide, so a second app in
+  the same process would otherwise inherit the first one's options, which
+  is every `@kavo/nest` test file.
+- **The value** is resolved per request, inside `makeHandler`'s generated
+  function, from the raw request that `applyParamDecorators` now wires as
+  the layout's trailing `@Req()` parameter. Nothing is memoized between
+  requests; nothing is read at decoration time.
+
+Absent the option, the extractor is `undefined` and the handler sends
+`options: null`, byte for byte the request an unconfigured route has
+always sent, so `principal` stays `null` for an app that never opts in.
+Kavo does not authenticate and does not judge: whatever the extractor
+returns is carried opaquely (doc 01 §8), and a throwing extractor fails
+the request rather than degrading to `null`.
+
+Methods Kavo does not generate reach the engine themselves, so nothing
+fills `options` for them; `boundKavoPrincipal(controller, request)` runs
+the same configured extractor for an `@Override`'d method or a fully
+custom route, which is why they get the request in the layout too.
 
 ## 2. Route generation (registry-driven, decoration-time)
 
@@ -135,7 +174,8 @@ overrides get through `context` inside a plain `OperationHandler`.
 
 Because Kavo owns the param wiring, the decorated method must accept
 parameters in the same fixed position a generated route would — reads:
-`(id?, query, preconditions)`; writes: `(id?, body?, preconditions)`;
+`(id?, query, preconditions, request)`; writes:
+`(id?, body?, preconditions, request)`;
 declare only as many as the method actually uses — and must not declare its own
 `@Param`/`@Query`/`@Body`: `@Kavo` checks for existing Nest route-argument
 metadata on the method and fails at decoration time (ADR-0012's only

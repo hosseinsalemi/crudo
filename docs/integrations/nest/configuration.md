@@ -31,11 +31,62 @@ KavoModule.forRootAsync({
 | `infrastructure`       | `KavoInfrastructure`                    | Where entity metadata and the repository adapter come from — `createInfrastructure(dataSource)` or `createInfrastructure(client, opts)`. Required for any `@Kavo` route to actually run.                                                                                                                                                                                                                                                                                                     |
 | `defaults`             | `DeepPartial<KavoSettings>`             | App-wide settings, one level below the built-in defaults and above every entity's own config. See **Settings fields** below for what's in `KavoSettings`.                                                                                                                                                                                                                                                                                                                                    |
 | `paginationStrategies` | `readonly PaginationStrategy[]`         | Registers custom pagination strategies beyond the built-in `"offset"`, so `pagination.strategy` can name one of these instead.                                                                                                                                                                                                                                                                                                                                                               |
+| `principal`            | `boolean \| ((request) => unknown)`     | Where a generated route finds the authenticated caller to put on `KavoContext.principal`. `true` reads `request.user`; a function reads whatever it likes. Unset (or `false`) leaves `principal` `null`. See [The principal](#the-principal) below.                                                                                                                                                                                                                                          |
 | `useFactory`           | `(...args) => KavoModuleOptions`        | (`forRootAsync` only) Builds the options object, e.g. after awaiting `dataSource.initialize()`.                                                                                                                                                                                                                                                                                                                                                                                              |
 | `inject`               | `readonly (string \| symbol \| Type)[]` | (`forRootAsync` only) DI tokens injected as `useFactory`'s arguments.                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `provideServices`      | `boolean`                               | Also provides `getKavoServiceToken(Entity)` as a real DI provider for every `@Kavo`-decorated class the process has seen — needed only if some other class constructor-injects a `@Kavo` entity's service directly.                                                                                                                                                                                                                                                                          |
 | `graphql`              | `boolean \| { path?: string }`          | Mounts a default GraphQL controller merging every entity that called `registerKavoGraphQLTypes` onto one schema. `true` mounts at `POST /graphql`; `{ path }` mounts elsewhere. Implies `provideServices`.                                                                                                                                                                                                                                                                                   |
 | `mcp`                  | `boolean \| { path?: string }`          | Mounts a default MCP controller (Streamable HTTP, stateless) exposing every `@Kavo` entity's full standard toolset — no per-entity opt-in. `true` mounts at `POST /mcp`; `{ path }` mounts elsewhere. Implies `provideServices`. Requires `@modelcontextprotocol/sdk` installed. Carries no auth guard of its own — a guard on an entity's REST controller does not extend to this route; write your own controller extending `BaseKavoMcpController` instead if the MCP surface needs auth. |
+
+### The principal
+
+`KavoContext.principal` is the authenticated caller. Kavo carries it and nothing more: core never reads or judges the value. Your own code does — a [computed field](#computed) that varies by viewer, or a replacement `OperationHandler`.
+
+Two separate jobs get it there, and only the second is Kavo's. Authenticating the caller is yours: a guard, a middleware, `@nestjs/passport`, whatever already runs ahead of the route handler and leaves the caller on the request. Kavo adds no auth dependency and mounts no guard of its own. What `principal` configures is the other half, moving that caller from the request onto the context:
+
+```ts
+KavoModule.forRootAsync({
+  useFactory: () => ({
+    infrastructure: createInfrastructure(dataSource),
+    // `request.user` — where Passport and most hand-rolled guards leave it.
+    principal: true,
+  }),
+});
+
+// Or name the property yourself:
+KavoModule.forRoot({
+  infrastructure: createInfrastructure(dataSource),
+  principal: (request) => (request["session"] as Session | undefined)?.account ?? null,
+});
+```
+
+The extractor runs once per request, inside the generated route handler, and what it returns is that request's `principal`. Nothing is memoized between requests, so one caller's identity can never be served to the next. Keep it synchronous and cheap: read a property some guard already set, rather than verifying a token or querying a table. Throwing from it fails the request with a 500 problem-details document instead of quietly producing `null`.
+
+- Leave `principal` unset and it stays `null`. Nothing is populated by assumption: an ownership predicate that quietly starts answering differently is worse than one you can see is unwired.
+- It reaches standard and custom operations alike — one generated handler builds the request for every route, so a replacement handler on `POST /books/:id/claim` sees the same `context.principal` a plain `GET /books/1` does.
+- It reaches the generated **REST** routes and nothing else. The GraphQL and MCP surfaces (`graphql`/`mcp` above, and controllers extending `BaseKavoGraphQLController`/`BaseKavoMcpController`) call the service directly, so `context.principal` is `null` there whatever this option says — a computed field that varies by viewer answers for an anonymous caller over `POST /graphql`.
+- Programmatic callers pass their own: `crud.findOne(id, query, { principal })`. The module option is HTTP wiring, not a global; a background job has no request to extract from.
+- A method Kavo does not generate passes its own too. An `@Override`'d method or a fully custom route reaches the engine itself, so nothing fills `options` for it. `boundKavoPrincipal(this, request)` runs the extractor the module configured, so the method does not restate where the caller lives:
+
+  ```ts
+  @Override()
+  async findOne(
+    id: EntityId,
+    query: WireQuery,
+    preconditions: RequestPreconditions | null,
+    request: KavoPrincipalRequest,
+  ) {
+    const principal = boundKavoPrincipal(this, request);
+    return boundKavoService<Book>(this).findOne(id, query, {
+      principal,
+      preconditions: preconditions ?? undefined,
+    });
+  }
+  ```
+
+  The request is the trailing parameter of the [fixed layout](/internals/architecture/10-nestjs-integration) Kavo wires for you; declare it only if you want it.
+
+Authorization stays out of scope in both directions: Kavo will not scope rows to the principal, and will not refuse an operation on its behalf. A guard decides who may call the route; a replacement handler decides what they get back.
 
 ## Settings fields (`KavoSettings`)
 
@@ -204,13 +255,15 @@ A declared computed field is in the default `item`/`list` projection with no DTO
 
 **`resolve` must be total, not merely pure.** It runs once per served item and nothing catches it, so **one** row whose resolver throws turns the whole collection endpoint into a 500 — not for that row, for every caller, until the row is fixed. Write it against everything the column can actually hold, including `null`: `resolve: (todo) => todo.title?.toLowerCase() ?? null`, never `todo.title.toLowerCase()` on a nullable column. A `POST` that sets `title: null` succeeds (computed fields are stripped from the payload; `title` is an ordinary column), and `GET /todos` is dead from then on. A throwing resolver surfaces as a 500 `KAVO_PERSISTENCE_FAILED` with the cause attached and the message not leaked.
 
+A resolver reading `context.principal`, like `canEdit` above, needs the module's [`principal`](#the-principal) option set — over HTTP that option is the only thing that fills the field, and without it the caller is `null` on every request, so `canEdit` is uniformly `false` and its inverse uniformly `true`.
+
 Keep it a pure function of the entity as well (plus `context.principal` where a field has to vary by caller). It runs per row, so a resolver that queries the database or calls out over the network reintroduces exactly the N+1 that batched includes exist to avoid. Declaring it `async` is a bootstrap error rather than a slow success: the serializer never awaits, so the promise would be emitted as-is and serialize to `{}`.
 
 **`resolve` receives the full fetched row**, not the projected object — selection is "kept internally, stripped late", so every column is present regardless of `fields=` or the registered `item` DTO. A computed field can therefore surface a value a narrowed DTO or `selectable` list deliberately hides. That is deliberate (`resolve` is server-authored code, the same trust level as `exposeInternals`), but it makes the resolver part of the exposure decision: narrowing the DTO does not narrow what the resolver can see.
 
 **What `selectable: false` does and does not mean.** It removes the name from the allowlist, so `?fields=auditNote` is a 400. It does **not** pin the field into every response: selection narrows the projection uniformly, so any request that sends `fields=` at all still drops it, and the client has no way to ask for it back. Read it as "not individually selectable", not "always present". An explicit `allowlists.selectable` list naming the field overrides the flag — an explicit list is always the deliberate answer.
 
-On an **included relation target**, `resolve` receives the _root_ request's `KavoContext` — serving `GET /posts/1?include=author` hands an `Author` computed field a context whose `entityName`, `operation`, `config` and `query` describe Post. Only `principal`, `correlationId`, `transaction` and `state` mean what they say from a relation target.
+On an **included relation target**, `resolve` receives the _root_ request's `KavoContext` — serving `GET /posts/1?include=author` hands an `Author` computed field a context whose `entityName`, `operation`, `config` and `query` describe Post. Only `principal`, `correlationId`, `transaction` and `state` mean what they say from a relation target — `principal` being whatever the module's [`principal`](#the-principal) option extracted for the root request, or `null` when no option is set.
 
 **The generated OpenAPI response schema does not mention a computed field** when no `item`/`list` DTO is registered: the schema falls back to the entity class, whose columns are all the reflection can see, while the runtime response carries the computed key. Registering an `item`/`list` DTO naming the field fixes the document and the static response type in one move — the same escape hatch, for both consequences.
 

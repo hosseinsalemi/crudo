@@ -15,10 +15,19 @@ export interface OverrideMetadata {
  * already uses; pass it explicitly when the method name differs.
  *
  * The decorated method must accept parameters in the same fixed position
- * `@Kavo` would apply to a generated route — reads: `(id?, query)`; writes:
- * `(id?, body)` — undecorated, since Kavo supplies those decorators itself.
- * Adding your own `@Param`/`@Query`/`@Body` on an overridden method is a
- * decoration-time error (duplicate route-argument metadata).
+ * `@Kavo` would apply to a generated route — reads:
+ * `(id?, query, preconditions, request)`; writes:
+ * `(id?, body?, preconditions, request)` — undecorated, since Kavo supplies
+ * those decorators itself, and declared only as far along as the method
+ * actually reads. Adding your own `@Param`/`@Query`/`@Body` on an
+ * overridden method is a decoration-time error (duplicate route-argument
+ * metadata).
+ *
+ * The two trailing parameters are what an override needs to keep behavior a
+ * generated route would have given it for free: `preconditions` carries the
+ * `If-Match`/`If-None-Match` tokens the engine enforces (ADR-0020), and
+ * `request` is what `boundKavoPrincipal(this, request)` runs the module's
+ * configured `principal` extractor against.
  *
  * For a read operation, `query` arrives already wrapped in `WireQuery` — the
  * same `Query(new WireQueryPipe())` decorator `@Kavo` applies to a generated
