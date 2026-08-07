@@ -80,6 +80,39 @@ describe("crudTools", () => {
     expect(adapter.lastQuery?.filter.root).toEqual({ kind: "condition", field: "done", operator: "EQ", value: true });
   });
 
+  it("reads an unprefixed sort token as ascending, alongside a '-' descending one", async () => {
+    // The `-` prefix is the only descending spelling, so the absence of one
+    // is what carries "ascending". Testing only `-title` leaves the default
+    // direction free to flip unnoticed.
+    const { adapter, bindings } = setup();
+    adapter.rows.push({ id: 1, title: "a", done: false });
+
+    await find(bindings, "todo.findMany").handler({ sort: ["-title", "done"] });
+
+    expect(adapter.lastQuery?.sort).toEqual([
+      { field: "title", direction: "desc" },
+      { field: "done", direction: "asc" },
+    ]);
+  });
+
+  it("lets a non-Kavo throw escape as a protocol error rather than a routine tool result", async () => {
+    // A `KavoException` is a domain answer and becomes `isError` content a
+    // model can reason about. A bug is not an answer: reframing it the same
+    // way would hide a 500 behind a tidy tool response. The engine wraps
+    // adapter throws into `PersistenceFailedException`, so reaching this
+    // path takes a stub service rather than a real one.
+    const bindings = crudTools({
+      name: "Todo",
+      service: {
+        async findOne() {
+          throw new Error("bug");
+        },
+      } as never,
+    });
+
+    await expect(find(bindings, "todo.findOne").handler({ id: 1 })).rejects.toThrow("bug");
+  });
+
   it("carries the list envelope's contributed meta into the tool result unchanged", async () => {
     // Doc 16 §"A successful call returns" claims the whole envelope is
     // stringified, so whatever a `findMany` handler contributes to `meta`

@@ -116,6 +116,63 @@ describe("KavoModule.forRoot({ mcp: true })", () => {
     await mcpRequest(server).send({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }).expect(404);
   });
 
+  it("falls back to the default path when given an options object that omits one", async () => {
+    // `mcp: {}` is what an app writes when it builds the option object
+    // programmatically and has no path to contribute. It has to mean the
+    // same thing as `mcp: true`, not "mount at undefined".
+    const adapter = new InMemoryTodoAdapter();
+    const moduleRef = await Test.createTestingModule({
+      imports: [KavoModule.forRoot({ infrastructure: fakeInfrastructure(adapter), mcp: {} })],
+      controllers: [TodoController],
+    }).compile();
+    app = moduleRef.createNestApplication();
+    const server = await listen(app);
+
+    const listed = await mcpRequest(server).send({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} });
+    expect(listed.status).toBe(200);
+  });
+
+  it("mounts the same way under forRootAsync", async () => {
+    // The async form resolves its options through a factory, so the
+    // controller is built from a different branch than `forRoot`'s.
+    const adapter = new InMemoryTodoAdapter();
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        KavoModule.forRootAsync({ useFactory: () => ({ infrastructure: fakeInfrastructure(adapter) }), mcp: true }),
+      ],
+      controllers: [TodoController],
+    }).compile();
+    app = moduleRef.createNestApplication();
+    const server = await listen(app);
+
+    const listed = await mcpRequest(server).send({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} });
+    expect(listed.status).toBe(200);
+    expect((listed.body.result.tools as { name: string }[]).length).toBeGreaterThan(0);
+  });
+
+  it("treats a tools/call with no arguments key as an empty argument object", async () => {
+    // An MCP client legitimately omits `arguments` for a tool that needs
+    // none, so reading it unguarded would turn a valid call into a crash.
+    const adapter = new InMemoryTodoAdapter();
+    const moduleRef = await Test.createTestingModule({
+      imports: [KavoModule.forRoot({ infrastructure: fakeInfrastructure(adapter), mcp: true })],
+      controllers: [TodoController],
+    }).compile();
+    app = moduleRef.createNestApplication();
+    const server = await listen(app);
+
+    const called = await mcpRequest(server).send({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: "todo.findMany" },
+    });
+
+    expect(called.status).toBe(200);
+    expect(called.body.result.isError).toBeUndefined();
+    expect(JSON.parse(called.body.result.content[0].text)).toMatchObject({ items: [] });
+  });
+
   it("maps a not-found id to an isError tool result over HTTP", async () => {
     const adapter = new InMemoryTodoAdapter();
     const moduleRef = await Test.createTestingModule({
