@@ -32,6 +32,7 @@ interface Manifest {
   name?: string;
   version?: string;
   private?: boolean;
+  engines?: Record<string, string>;
   dependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
   optionalDependencies?: Record<string, string>;
@@ -293,6 +294,32 @@ describe("lockstep versions in this repository", () => {
     const actual = { "packages/core": "0.6.0", "packages/orms/prisma": "0.5.0", "packages/protocols/mcp": "0.5.0" };
 
     expect(findBehind("0.6.0", actual)).toEqual(["packages/protocols/mcp"]);
+  });
+});
+
+/**
+ * The root `package.json` is never published, so its `engines.node` is the
+ * one place the supported Node floor is decided; every published package
+ * must carry a matching literal `engines.node`, or `npm view @kavo/core
+ * engines` (and every sibling) stays empty and an install on an unsupported
+ * Node version succeeds silently. Modelled on the lockstep-version check
+ * above (ADR-0004): the floor is still hand-copied into each manifest, but
+ * drift away from the root's value fails here instead of shipping.
+ */
+describe("engines field lockstep", () => {
+  it("declares a non-empty engines.node on the root manifest", () => {
+    const root = readManifest(".");
+
+    expect(root.engines?.node).toBeTruthy();
+  });
+
+  it("matches every published package's engines.node to the root's", () => {
+    const expectedNode = readManifest(".").engines?.node;
+    const actual = Object.fromEntries(packageDirs.map((dir) => [dir, readManifest(dir).engines?.node]));
+
+    for (const [dir, node] of Object.entries(actual)) {
+      expect(node, `${dir} engines.node`).toBe(expectedNode);
+    }
   });
 });
 
