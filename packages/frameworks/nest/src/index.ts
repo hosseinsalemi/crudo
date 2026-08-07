@@ -21,7 +21,14 @@ export { KavoResponseInterceptor } from "./kavo-response.interceptor.js";
 export { ConditionalRequest, parseEntityTags } from "./conditional-request.decorator.js";
 export { flattenQuery } from "./flatten-query.js";
 export { enumProp, oneOfArray, type SchemaHint } from "./schema-hints.js";
-export { KAVO_INSTANCE, KAVO_MODULE_OPTIONS, getKavoServiceToken, boundKavoService } from "./tokens.js";
+export type { KavoPrincipalExtractor, KavoPrincipalOption, KavoPrincipalRequest } from "./principal.js";
+export {
+  KAVO_INSTANCE,
+  KAVO_MODULE_OPTIONS,
+  getKavoServiceToken,
+  boundKavoService,
+  boundKavoPrincipal,
+} from "./tokens.js";
 export { BaseKavoGraphQLController } from "./graphql/base-kavo-graphql.controller.js";
 export { BaseKavoMcpController } from "./mcp/base-kavo-mcp.controller.js";
 export type { KavoHttpMethod, KavoRouteOptions } from "./operation-metadata.js";

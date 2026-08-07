@@ -1,9 +1,10 @@
-import { Body, Delete, Get, HttpCode, Param, Patch, Post, Put, Query, UseInterceptors } from "@nestjs/common";
+import { Body, Delete, Get, HttpCode, Param, Patch, Post, Put, Query, Req, UseInterceptors } from "@nestjs/common";
 import type {
   ClassRef,
   DefaultKavoService,
   EntityConfig,
   EntityInput,
+  KavoCallOptions,
   OperationDescriptor,
   OperationId,
   QueryContext,
@@ -13,9 +14,15 @@ import type {
 import { ConfigurationException, createOperationRegistry } from "@kavo/core";
 import type { KavoHttpMethod, KavoRouteOptions } from "./operation-metadata.js";
 import type { OverrideMetadata } from "./override.decorator.js";
+import type { KavoPrincipalExtractor, KavoPrincipalRequest } from "./principal.js";
 import { ConditionalRequest } from "./conditional-request.decorator.js";
 import { KavoResponseInterceptor } from "./kavo-response.interceptor.js";
-import { KAVO_CONTROLLER_METADATA, KAVO_OVERRIDE_METADATA, KAVO_SERVICE_PROPERTY } from "./tokens.js";
+import {
+  KAVO_CONTROLLER_METADATA,
+  KAVO_OVERRIDE_METADATA,
+  KAVO_PRINCIPAL_PROPERTY,
+  KAVO_SERVICE_PROPERTY,
+} from "./tokens.js";
 import { WireQueryPipe } from "./wire-query.pipe.js";
 import { applySwaggerMetadata } from "./swagger.js";
 
@@ -144,7 +151,11 @@ interface ResolvedRoute {
  * tokens are handed to the method. Forward them, either as
  * `service.<op>(…, { preconditions })` on the typed surface or by
  * returning `service.engine.execute({ …, preconditions })`, which
- * additionally puts the `ETag` back on the response.
+ * additionally puts the `ETag` back on the response. The same goes for the
+ * principal: a generated route resolves it from the module's `principal`
+ * extractor per request, a replaced method must pass it on itself, and
+ * `boundKavoPrincipal(this, request)` is how it reaches the extractor the
+ * app configured rather than re-deciding where the caller lives.
  *
  * Route generation happens at decoration time (class definition), which is
  * what lets Nest's router see the methods during its normal controller
@@ -341,15 +352,24 @@ function applyRouteDecorators(
 
 /**
  * Parameter layout per generated method (fixed positions):
- * reads → (id?, query, preconditions); writes → (id?, body?, preconditions).
+ * reads → (id?, query, preconditions, request);
+ * writes → (id?, body?, preconditions, request).
  * Nest's param decorators are plain functions; applying them
  * programmatically writes the same route metadata the
  * `@Param`/`@Query`/`@Body` syntax would.
  *
- * The trailing preconditions parameter is unconditional so the two paths
+ * The two trailing parameters are unconditional so the two paths
  * (generated and `@Override`'d) keep identical route metadata: an
- * override that doesn't want `If-Match`/`If-None-Match` simply declares
- * fewer parameters, which is already how it opts out of the others.
+ * override that doesn't want `If-Match`/`If-None-Match` or the raw request
+ * simply declares fewer parameters, which is already how it opts out of
+ * the others. They are last, and in this order, so that adding the request
+ * left every signature written against the older layout intact.
+ *
+ * The request is here for one reason: the principal. Routes are generated
+ * at decoration time (ADR-0012), so the module-scope `principal` extractor
+ * cannot be baked into the generated method — the handler resolves it per
+ * request from the controller instance instead, and needs the request to
+ * run it against.
  */
 function applyParamDecorators(
   prototype: Record<string, unknown>,
@@ -367,6 +387,7 @@ function applyParamDecorators(
     Body()(prototype, methodName, index++);
   }
   ConditionalRequest()(prototype, methodName, index++);
+  Req()(prototype, methodName, index++);
 }
 
 /** Writes that carry a request body — the mirror of `BODYLESS_WRITES`. */
@@ -380,6 +401,8 @@ function usesBody(method: KavoHttpMethod): boolean {
 
 type BoundController = Record<string, unknown> & {
   [KAVO_SERVICE_PROPERTY]: DefaultKavoService<object>;
+  /** `undefined` unless `KavoModule` was configured with a `principal` option. */
+  [KAVO_PRINCIPAL_PROPERTY]?: KavoPrincipalExtractor | undefined;
 };
 
 /**
@@ -394,6 +417,11 @@ type BoundController = Record<string, unknown> & {
  * not-modified flag live on the envelope those methods discard
  * (ADR-0020). One arm instead of nine also means the parameter layout is
  * read from exactly one place, the one that wrote it.
+ *
+ * The `options` it builds are the one thing that is not read off a
+ * parameter: `KavoCallOptions.principal` is core's only channel for the
+ * caller's identity, and it is filled from the module-scope extractor the
+ * binder left on this controller (`callOptionsFor`).
  */
 function makeHandler(
   descriptor: OperationDescriptor<object>,
@@ -410,14 +438,35 @@ function makeHandler(
     const requestId = route.hasIdParam ? (args[index++] as string) : null;
     const query = isRead ? args[index++] : null;
     const body = hasBody ? args[index++] : null;
-    const preconditions = (args[index] ?? null) as RequestPreconditions | null;
+    const preconditions = (args[index++] ?? null) as RequestPreconditions | null;
+    const request = args[index] as KavoPrincipalRequest | undefined;
     return this[KAVO_SERVICE_PROPERTY].engine.execute({
       operation: id,
       id: requestId,
       body: (body ?? null) as never,
       query: (query ?? null) as never,
-      options: null,
+      options: callOptionsFor(this, request),
       preconditions,
     });
   };
+}
+
+/**
+ * The per-call scope a generated route contributes: the caller's
+ * principal, and nothing else — everything else about the request is the
+ * request's own data, not an override of configuration.
+ *
+ * `null` when the app configured no extractor, which is the request an
+ * unconfigured route has always sent, so `KavoContext.principal` stays
+ * `null` for an app that never opts in. Resolved per request, from the
+ * controller instance the binder wrote it onto: nothing here is memoized,
+ * so one caller's identity cannot survive into the next caller's request.
+ */
+function callOptionsFor(
+  controller: BoundController,
+  request: KavoPrincipalRequest | undefined,
+): KavoCallOptions | null {
+  const extractPrincipal = controller[KAVO_PRINCIPAL_PROPERTY];
+  if (extractPrincipal === undefined || request === undefined) return null;
+  return { principal: extractPrincipal(request) };
 }
