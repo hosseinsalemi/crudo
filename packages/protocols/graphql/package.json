@@ -3,6 +3,9 @@
   "version": "0.7.1",
   "description": "Kavo GraphQL binding — builds a GraphQL schema over a createCrud service, delegating every resolver to the same engine REST uses.",
   "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kavo-labs/kavo.git",

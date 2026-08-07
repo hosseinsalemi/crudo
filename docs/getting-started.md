@@ -6,7 +6,7 @@ Today Kavo supports NestJS as the framework, over TypeORM, Prisma, Mongoose, or 
 
 ## Requirements
 
-- **Node.js 20 or newer** — the minimum this project declares. Note that the published packages carry no `engines` field, so your package manager will not warn you on an older release.
+- **Node.js 20 or newer** — every `@kavo/*` package declares `engines.node: ">=20"`, so your package manager will warn (or, under `engine-strict`, refuse) an install on an older release.
 - **ESM** — every `@kavo/*` package ships as ESM only, with no CommonJS entry point. Your app must be ESM too (`"type": "module"` in its `package.json`), which the default `nest new` scaffold is not.
 - **Decorator metadata** — `experimentalDecorators` and `emitDecoratorMetadata` must be on. `@Kavo()` reads your entity's decorator metadata, and so do TypeORM's columns and Nest's DI.
 
