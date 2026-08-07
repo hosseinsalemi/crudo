@@ -9,6 +9,7 @@ import type { RepositoryAdapter } from "./persistence/repository-adapter.js";
 import type { IncludeResolver } from "./relations/include-resolver.js";
 import type { OperationRegistry } from "./operations/operation-registry.js";
 import type { ResolvedEntityConfig } from "./config/resolved-entity-config.js";
+import type { RealtimeTransport } from "./realtime/realtime-transport.js";
 import { KavoEngine } from "./engine/kavo-engine.js";
 import { ConfigurationException } from "./errors/exceptions.js";
 import { DefaultKavoService } from "./service/default-kavo-service.js";
@@ -32,6 +33,13 @@ export interface KavoOptions extends GlobalConfig {
   readonly infrastructure?: KavoInfrastructure;
   /** Custom pagination strategies, addressable via `pagination.strategy`. */
   readonly paginationStrategies?: readonly PaginationStrategy[];
+  /**
+   * Realtime transports every entity's write events publish to — resolved
+   * once here, not per entity and not through `defaults`/`GlobalConfig`
+   * (ADR-0023: a transport, a live object,
+   * cannot live inside the deep-frozen settings tree).
+   */
+  readonly realtimeTransports?: readonly RealtimeTransport[];
 }
 
 /** Per-entity overrides of what the root `infrastructure` would supply. */
@@ -74,6 +82,7 @@ export interface KavoInstance {
  * defaults, derived DTOs and allowlists, standard operations.
  */
 export function createKavo(options: KavoOptions = {}): KavoInstance {
+  validateRealtimeTransports(options.realtimeTransports);
   const registered = new Map<string, Record<string, unknown>>();
   // The cross-entity view nested includes resolve against.
   // Entities that never go through `createCrud` are derived from
@@ -113,6 +122,7 @@ export function createKavo(options: KavoOptions = {}): KavoInstance {
         metadata as EntityMetadata<Entity>,
         config as EntityConfig<Entity> | undefined,
         options.defaults,
+        options.realtimeTransports,
       );
       const registry = createOperationRegistry<Entity>(
         config as EntityConfig<Entity> | undefined,
@@ -152,6 +162,40 @@ export function createKavo(options: KavoOptions = {}): KavoInstance {
       return registered.get(entityName);
     },
   };
+}
+
+/**
+ * Fails fast at `createKavo`, once, rather than per entity — a transport
+ * is shared process-wide, so a malformed one should never surface as N
+ * bootstrap errors, one per `createCrud` call that happens to run first.
+ */
+function validateRealtimeTransports(transports: readonly RealtimeTransport[] | undefined): void {
+  if (transports === undefined) return;
+  for (const [index, transport] of transports.entries()) {
+    const path = `realtimeTransports[${index}]`;
+    const candidate = transport as { name?: unknown; publish?: unknown } | null;
+    if (typeof candidate !== "object" || candidate === null) {
+      throw new ConfigurationException(
+        "createKavo",
+        path,
+        `expected a RealtimeTransport, got ${JSON.stringify(transport)}`,
+      );
+    }
+    if (typeof candidate.name !== "string" || candidate.name.length === 0) {
+      throw new ConfigurationException(
+        "createKavo",
+        `${path}.name`,
+        `expected a non-empty string, got ${JSON.stringify(candidate.name)}`,
+      );
+    }
+    if (typeof candidate.publish !== "function") {
+      throw new ConfigurationException(
+        "createKavo",
+        `${path}.publish`,
+        `expected a function, got ${JSON.stringify(candidate.publish)}`,
+      );
+    }
+  }
 }
 
 /**

@@ -5,6 +5,7 @@ import type { DtoResolver } from "../dto/dto.js";
 import type { OperationId } from "../operations/operation.js";
 import type { RelationRegistry } from "../relations/relation-registry.js";
 import type { ResolvedSoftDelete } from "../persistence/soft-delete.js";
+import type { RealtimeTransport } from "../realtime/realtime-transport.js";
 
 /** Allowlists after bootstrap resolution — complete, never optional. */
 export interface ResolvedQueryAllowlists<Entity = unknown> {
@@ -46,4 +47,11 @@ export interface ResolvedEntityConfig<Entity = unknown> {
   readonly computed: ComputedFieldMap<Entity>;
   /** Relation edges of this entity. */
   readonly relations: RelationRegistry<Entity>;
+  /**
+   * Registered realtime transports — resolved once per `createKavo` root
+   * (`KavoOptions.realtimeTransports`), not per entity and not through the
+   * settings precedence chain: a transport is a live object, so only the
+   * array container is frozen, never its elements (ADR-0023).
+   */
+  readonly realtimeTransports: readonly RealtimeTransport[];
 }

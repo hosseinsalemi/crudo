@@ -259,6 +259,73 @@ describe("validateSettings — soft delete", () => {
   });
 });
 
+describe("validateSettings — realtime", () => {
+  it("accepts `false` — the documented way to disable the feature entirely", () => {
+    expect(() => accept({ realtime: false })).not.toThrow();
+  });
+
+  it("rejects a non-boolean enabled", () => {
+    for (const value of ["true", 1, null]) {
+      expectRejected({ realtime: { enabled: value } }, "realtime.enabled", value);
+    }
+  });
+
+  it("rejects an unknown realtime event id", () => {
+    const error = rejectionOf({ realtime: { enabled: true, events: { archived: true } } });
+    expect(error.code).toBe("KAVO_CONFIG_INVALID");
+    expect(error.messageParams).toMatchObject({ entity: "User", path: "realtime.events.archived" });
+  });
+
+  it("rejects a non-boolean value for a known realtime event id", () => {
+    for (const value of ["off", 1, null]) {
+      expectRejected({ realtime: { enabled: true, events: { patched: value } } }, "realtime.events.patched", value);
+    }
+  });
+
+  it("accepts every documented event id set to a boolean", () => {
+    expect(() =>
+      accept({
+        realtime: {
+          enabled: true,
+          events: { created: true, updated: true, patched: false, deleted: true, restored: false },
+        },
+      }),
+    ).not.toThrow();
+  });
+
+  it("accepts subscribableFields as an explicit array", () => {
+    expect(() =>
+      accept({ realtime: { enabled: true, events: {}, subscribableFields: ["title", "status"] } }),
+    ).not.toThrow();
+  });
+
+  it("accepts subscribableFields as an exclude selector", () => {
+    expect(() =>
+      accept({ realtime: { enabled: true, events: {}, subscribableFields: { exclude: ["internalNotes"] } } }),
+    ).not.toThrow();
+  });
+
+  it("rejects a subscribableFields shape that is neither an array nor { exclude }", () => {
+    for (const value of ["title", 1, { includes: ["title"] }, { exclude: "title" }]) {
+      expectRejected(
+        { realtime: { enabled: true, events: {}, subscribableFields: value } },
+        "realtime.subscribableFields",
+        value,
+      );
+    }
+  });
+
+  it("rejects a non-function onPublishError", () => {
+    for (const value of ["log", 1, {}]) {
+      expectRejected(
+        { realtime: { enabled: true, events: {}, onPublishError: value } },
+        "realtime.onPublishError",
+        value,
+      );
+    }
+  });
+});
+
 describe("validateSettings — global operations default (issue #38)", () => {
   it("rejects an unknown operation id", () => {
     const error = rejectionOf({ operations: { notAnOperation: false } });

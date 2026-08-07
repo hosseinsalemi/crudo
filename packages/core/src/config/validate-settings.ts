@@ -3,6 +3,13 @@ import { ConfigurationException } from "../errors/exceptions.js";
 import { STANDARD_OPERATIONS } from "../operations/default-operation-registry.js";
 
 /**
+ * Mirrors `RealtimeEventId` (realtime/realtime-event.ts) — kept as a plain
+ * `ReadonlySet<string>` rather than importing the type, since this checks
+ * arbitrary keys off `Object.entries` and has no literal-union to narrow to.
+ */
+const REALTIME_EVENT_IDS: ReadonlySet<string> = new Set(["created", "updated", "patched", "deleted", "restored"]);
+
+/**
  * Bootstrap validation. Fails fast with an error naming the
  * entity, the key path, and the offending value — config errors surface at
  * startup, never as mysterious runtime behavior.
@@ -131,6 +138,58 @@ export function validateSettings(entityName: string, settings: KavoSettings): vo
         entityName,
         "softDelete.strategy",
         `expected "auto", "soft", or "hard", got ${JSON.stringify(strategy)}`,
+      );
+    }
+  }
+
+  if (settings.realtime !== false) {
+    const realtime = settings.realtime;
+    if (typeof realtime !== "object" || realtime === null) {
+      throw new ConfigurationException(
+        entityName,
+        "realtime",
+        `expected false or { enabled: boolean, events: {...} }, got ${JSON.stringify(realtime)}`,
+      );
+    }
+    bool("realtime.enabled", realtime.enabled);
+    if (typeof realtime.events !== "object" || realtime.events === null) {
+      throw new ConfigurationException(
+        entityName,
+        "realtime.events",
+        `expected an object, got ${JSON.stringify(realtime.events)}`,
+      );
+    }
+    for (const [id, value] of Object.entries(realtime.events)) {
+      const path = `realtime.events.${id}`;
+      if (!REALTIME_EVENT_IDS.has(id)) {
+        throw new ConfigurationException(
+          entityName,
+          path,
+          `unknown realtime event id ${JSON.stringify(id)} — expected one of ${[...REALTIME_EVENT_IDS].join(", ")}`,
+        );
+      }
+      bool(path, value);
+    }
+    if (realtime.subscribableFields !== undefined) {
+      const selector = realtime.subscribableFields;
+      const invalid = Array.isArray(selector)
+        ? selector.some((field) => typeof field !== "string")
+        : typeof selector !== "object" ||
+          selector === null ||
+          !Array.isArray((selector as { exclude?: unknown }).exclude);
+      if (invalid) {
+        throw new ConfigurationException(
+          entityName,
+          "realtime.subscribableFields",
+          `expected a string array or { exclude: string[] }, got ${JSON.stringify(selector)}`,
+        );
+      }
+    }
+    if (realtime.onPublishError !== undefined && typeof realtime.onPublishError !== "function") {
+      throw new ConfigurationException(
+        entityName,
+        "realtime.onPublishError",
+        `expected a function, got ${JSON.stringify(realtime.onPublishError)}`,
       );
     }
   }

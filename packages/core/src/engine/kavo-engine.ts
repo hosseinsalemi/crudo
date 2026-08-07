@@ -16,6 +16,7 @@ import type { StandardOperationId } from "../operations/operation.js";
 import type { RequestPreconditions } from "../caching/etag.js";
 import type { ResolvedEntityConfig } from "../config/resolved-entity-config.js";
 import type { KavoSettings } from "../config/settings.js";
+import type { RealtimeEventDto, RealtimeEventId } from "../realtime/realtime-event.js";
 import {
   ConfigurationException,
   OperationDisabledException,
@@ -113,6 +114,22 @@ const INPUT_SLOTS: Readonly<Partial<Record<StandardOperationId, DtoSlot>>> = {
   createOne: "create",
   updateOne: "update",
   patchOne: "patch",
+};
+
+/**
+ * Which realtime event a standard write operation's success maps to.
+ * `deleteOne`/`purgeOne` share `"deleted"` — a subscriber only needs to
+ * know the row is gone, not which delete strategy produced that. Absent
+ * ids (every read, and any custom operation) never emit — the vocabulary
+ * is closed to what `RealtimeEventId` names.
+ */
+const REALTIME_EVENT_BY_OPERATION: Readonly<Partial<Record<StandardOperationId, RealtimeEventId>>> = {
+  createOne: "created",
+  updateOne: "updated",
+  patchOne: "patched",
+  deleteOne: "deleted",
+  purgeOne: "deleted",
+  restoreOne: "restored",
 };
 
 /**
@@ -224,7 +241,98 @@ export class KavoEngine<Entity extends object> {
 
     const result = await descriptor.handler.execute(input, context);
 
-    return this.mapResponse(descriptor, result, context, preconditions);
+    const response = await this.mapResponse(descriptor, result, context, preconditions);
+    await this.emitRealtimeEvent(descriptor, request, input, result, response, context);
+    return response;
+  }
+
+  /**
+   * Publish a `RealtimeEventDto` for a write that just succeeded, to every
+   * transport `context.config.realtimeTransports` registers — the engine-level hook
+   * (never a per-handler opt-in like `withListMeta`, since this must fire
+   * for every write on an entity that configured realtime, not only ones a
+   * caller remembered to wrap).
+   *
+   * Every check before the transport loop is ordered cheapest-first and
+   * returns immediately, so an entity with realtime off (the default) or a
+   * write that only maps to `undefined` (every read, any custom operation)
+   * pays for nothing beyond one map lookup and a couple of property reads
+   * — no `RealtimeEventDto` is even constructed.
+   */
+  private async emitRealtimeEvent(
+    descriptor: OperationDescriptor<Entity>,
+    request: KavoRequest<Entity>,
+    input: unknown,
+    result: unknown,
+    response: KavoResponse,
+    context: KavoContext<Entity>,
+  ): Promise<void> {
+    const eventId = REALTIME_EVENT_BY_OPERATION[descriptor.id as StandardOperationId];
+    if (eventId === undefined) return;
+
+    const realtime = context.config.settings.realtime;
+    if (realtime === false || !realtime.enabled) return;
+    const transports = context.config.realtimeTransports;
+    if (transports.length === 0) return;
+    if (realtime.events[eventId] === false) return;
+
+    const id = this.realtimeEntityId(descriptor.id as StandardOperationId, request, result);
+    if (id === undefined) return;
+
+    const event: RealtimeEventDto = {
+      event: eventId,
+      entity: context.entityName,
+      id,
+      channel: `${context.entityName}.${id}`,
+      occurredAt: new Date().toISOString(),
+      item: response.item,
+      ...(eventId === "updated" || eventId === "patched" ? { changed: this.changedFields(input) } : {}),
+    };
+
+    await Promise.all(
+      transports.map(async (transport) => {
+        try {
+          await transport.publish(event);
+        } catch (error) {
+          // A transport's own delivery failure never fails a mutation that
+          // already succeeded — a subscriber not hearing about the write
+          // is a delivery problem, not a data problem. Core has no ambient
+          // logger to fall back on (ADR-0005), so the failure is only
+          // observable through the caller-supplied hook, if any.
+          realtime.onPublishError?.(error, transport, event);
+        }
+      }),
+    );
+  }
+
+  /**
+   * `createOne` has no request id — its id comes off the created row via
+   * the entity's own id field. Every other write op targets an id the
+   * request already carries, already coerced to the id column's kind by
+   * `resolveInput`'s earlier call.
+   */
+  private realtimeEntityId(
+    operationId: StandardOperationId,
+    request: KavoRequest<Entity>,
+    result: unknown,
+  ): string | number | undefined {
+    if (operationId === "createOne") {
+      const value = (result as Record<string, unknown> | null)?.[this.deps.metadata.idField];
+      return typeof value === "string" || typeof value === "number" ? value : undefined;
+    }
+    const id = this.coerceId(request.id);
+    return typeof id === "string" || typeof id === "number" ? id : undefined;
+  }
+
+  /**
+   * `"updated"`/`"patched"` only: the field names present in the write
+   * payload — see `RealtimeEventDto.changed`'s doc for why this is not a
+   * diff against the row's previous value.
+   */
+  private changedFields(input: unknown): readonly string[] {
+    const data = (input as { data?: unknown } | null)?.data;
+    if (typeof data !== "object" || data === null) return [];
+    return Object.keys(data);
   }
 
   /**
@@ -369,6 +477,9 @@ export class KavoEngine<Entity extends object> {
       // entirely (ADR-0019) — a per-call settings override cannot reach it.
       computed: config.computed,
       relations: config.relations,
+      // Same reasoning: transports are resolved once per `createKavo` root,
+      // not per call.
+      realtimeTransports: config.realtimeTransports,
     };
   }
 

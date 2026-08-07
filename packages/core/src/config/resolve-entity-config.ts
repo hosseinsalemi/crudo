@@ -7,6 +7,7 @@ import type { DtoClass } from "../dto/dto.js";
 import type { EntityMetadata } from "../metadata/entity-metadata.js";
 import type { FieldPath } from "../types/field-path.js";
 import type { OperationId, StandardOperationId } from "../operations/operation.js";
+import type { RealtimeTransport } from "../realtime/realtime-transport.js";
 import { BUILT_IN_DEFAULTS } from "./defaults.js";
 import { deepFreeze, mergeSettings } from "./merge-settings.js";
 import { validateSettings } from "./validate-settings.js";
@@ -36,6 +37,7 @@ const SETTINGS_KEYS = [
   "relations",
   "caching",
   "softDelete",
+  "realtime",
 ] as const satisfies readonly (keyof KavoSettings)[];
 
 /**
@@ -62,6 +64,7 @@ export function resolveEntityConfig<Entity extends object>(
   metadata: EntityMetadata<Entity>,
   entityConfig: EntityConfig<Entity> | undefined,
   globalDefaults: DeepPartial<KavoSettings> | undefined,
+  realtimeTransports: readonly RealtimeTransport[] = [],
 ): ResolvedEntityConfig<Entity> {
   const entityName = metadata.name;
   const computed = resolveComputedFields(metadata, entityConfig);
@@ -112,6 +115,9 @@ export function resolveEntityConfig<Entity extends object>(
     dto: new DefaultDtoResolver<Entity>(entityConfig?.dto),
     computed,
     relations: new DefaultRelationRegistry<Entity>(metadata.relations, entitySettings.relations.edges, entityName),
+    // Shallow-frozen: the array itself can't be mutated, but a transport's
+    // own internal state is left alone (ADR-0023).
+    realtimeTransports: Object.freeze([...realtimeTransports]),
   };
   return Object.freeze(resolved);
 }

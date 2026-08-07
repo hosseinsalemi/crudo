@@ -11,20 +11,21 @@ built-in defaults → global (createKavo) → entity (createCrud)
 
 `BUILT_IN_DEFAULTS` (`core/src/config/defaults.ts`):
 
-| Key                                              | Default                  | Notes                                                                  |
-| ------------------------------------------------ | ------------------------ | ---------------------------------------------------------------------- |
-| `pagination.defaultLimit` / `maxLimit`           | 20 / 100                 | `defaultLimit ≤ maxLimit` enforced                                     |
-| `pagination.strategy`                            | `"offset"`               | `"page"` built in; custom via `paginationStrategies`                   |
-| `pagination.count`                               | `true`                   | `false` skips the count query; envelope reports `total: null`          |
-| `query.maxFilterDepth` / `maxInValues`           | 3 / 100                  |                                                                        |
-| `query.defaultSort`                              | `[]` (unset)             | order applied when a request supplies no `sort` (issue #56); see below |
-| `errors.exposeInternals`                         | `false`                  | leak driver detail into responses                                      |
-| `relations.maxIncludeDepth` / `maxIncludedNodes` | 2 / 10                   | include depth budget and total node cap                                |
-| `relations.edges.<name>`                         | `{}`                     | per-relation `includable` / `defaultInclude` / `maxDepth` / `strategy` |
-| `caching.etag`                                   | `true`                   | ETag on single-item responses + `If-None-Match`/`If-Match` (ADR-0020)  |
-| `softDelete.field` / `strategy`                  | `"deletedAt"` / `"auto"` | `auto` = soft when the entity has the marker field, `false` disables   |
-| `operations.<id>`                                | `{}` (unset)             | global operation-enablement default (issue #38); see below             |
-| `bulk.mode` / `maxBatchSize`                     | `"atomic"` / 500         | reserved (bulk is not built)                                           |
+| Key                                                                     | Default                                        | Notes                                                                                            |
+| ----------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `pagination.defaultLimit` / `maxLimit`                                  | 20 / 100                                       | `defaultLimit ≤ maxLimit` enforced                                                               |
+| `pagination.strategy`                                                   | `"offset"`                                     | `"page"` built in; custom via `paginationStrategies`                                             |
+| `pagination.count`                                                      | `true`                                         | `false` skips the count query; envelope reports `total: null`                                    |
+| `query.maxFilterDepth` / `maxInValues`                                  | 3 / 100                                        |                                                                                                  |
+| `query.defaultSort`                                                     | `[]` (unset)                                   | order applied when a request supplies no `sort` (issue #56); see below                           |
+| `errors.exposeInternals`                                                | `false`                                        | leak driver detail into responses                                                                |
+| `relations.maxIncludeDepth` / `maxIncludedNodes`                        | 2 / 10                                         | include depth budget and total node cap                                                          |
+| `relations.edges.<name>`                                                | `{}`                                           | per-relation `includable` / `defaultInclude` / `maxDepth` / `strategy`                           |
+| `caching.etag`                                                          | `true`                                         | ETag on single-item responses + `If-None-Match`/`If-Match` (ADR-0020)                            |
+| `softDelete.field` / `strategy`                                         | `"deletedAt"` / `"auto"`                       | `auto` = soft when the entity has the marker field, `false` disables                             |
+| `realtime.enabled` / `events` / `subscribableFields` / `onPublishError` | `false` (unset) / `{}` (unset) / unset / unset | per-operation event toggles + field allowlist; registered transports are **not** here (ADR-0023) |
+| `operations.<id>`                                                       | `{}` (unset)                                   | global operation-enablement default (issue #38); see below                                       |
+| `bulk.mode` / `maxBatchSize`                                            | `"atomic"` / 500                               | reserved (bulk is not built)                                                                     |
 
 **Schema extensibility rule:** new features add keys to this schema —
 they never add a second config mechanism. The reserved keys above are
@@ -76,6 +77,13 @@ relation registry. There is no runtime mutation API — per-call
 overrides (`KavoCallOptions.settings`) are merged as _parameters_ onto
 the operation view inside the engine, validated, and discarded with the
 request.
+
+`deepFreeze` recurses into everything reachable from the settings tree, so
+a `KavoSettings` key must be plain data — this is why registered realtime
+transports (live objects, not data) are resolved separately, on
+`ResolvedEntityConfig.realtimeTransports` from `KavoOptions.
+realtimeTransports`, the same structural relationship `dto`/`computed`/
+`relations` already have to `settings` (ADR-0023).
 
 ## 4. Bootstrap validation
 
