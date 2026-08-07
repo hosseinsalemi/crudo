@@ -73,12 +73,43 @@ class Widget {
   bulky: string | null = null;
 }
 
+/**
+ * Column types MikroORM cannot give a JavaScript equivalent for: every
+ * property here comes back with a `runtimeType` that narrows nothing
+ * (`"unknown"`, `"any"`, `"Buffer"`), so the *declared* type is the only
+ * thing left to read a field kind off. Custom types and driver-native column
+ * types are the real-world case — Kavo's coercion depends on getting them
+ * right, and there is no reflection to fall back on.
+ */
+@Entity()
+class Reading {
+  @PrimaryKey({ type: "number" })
+  id!: number;
+
+  @Property({ type: "int8", nullable: true })
+  samples: unknown = null;
+
+  @Property({ type: "timestamptz", nullable: true })
+  observedAt: unknown = null;
+
+  @Property({ type: "bool", nullable: true })
+  verified: unknown = null;
+
+  @Property({ type: "jsonb", nullable: true })
+  extra: unknown = null;
+
+  @Property({ type: "blob", nullable: true })
+  raw: unknown = null;
+}
+
 let orm: MikroORM;
 let byName: Record<string, FieldMetadata>;
+let declaredOnly: Record<string, FieldMetadata>;
 
 beforeAll(async () => {
-  orm = await newTestOrm([Widget]);
+  orm = await newTestOrm([Widget, Reading]);
   byName = Object.fromEntries(buildEntityMetadata(orm, Widget).fields.map((field) => [field.name, field]));
+  declaredOnly = Object.fromEntries(buildEntityMetadata(orm, Reading).fields.map((field) => [field.name, field]));
 });
 
 afterAll(async () => {
@@ -108,6 +139,22 @@ describe("buildEntityMetadata — field kinds", () => {
     // `JsonType`'s `runtimeType` is `"any"`, which narrows nothing; the
     // declared type is the only thing left that says "json".
     expect(byName["payload"]).toMatchObject({ kind: "json" });
+  });
+
+  it.each([
+    ["samples", "int8", "number"],
+    ["observedAt", "timestamptz", "date"],
+    ["verified", "bool", "boolean"],
+    ["extra", "jsonb", "json"],
+    ["raw", "blob", "string"],
+  ])("reads %s, declared '%s', as the %s field kind", (field, _declared, kind) => {
+    // The declared-type ladder, one row per rung. It is not a guard: these
+    // are ordinary columns whose `runtimeType` narrows nothing, and getting
+    // one wrong is silent — `filter[observedAt][gt]=2024-01-01` would be
+    // compared as a string, and `int8` values would never coerce to numbers.
+    // The last rung is the honest one: an unrecognized type degrades to
+    // `string`, so comparison still works even though coercion cannot narrow.
+    expect(declaredOnly[field]).toMatchObject({ kind });
   });
 
   it("carries the enum's allowed values as the coercion allowlist", () => {
@@ -223,6 +270,16 @@ describe("buildEntityMetadata — relation targets", () => {
       await named.close();
     }
   });
+
+  // `targetOf`'s final `ConfigurationException` — the guard that stops a
+  // bare string reaching core, where relation targets are matched by class
+  // identity — is deliberately left uncovered. MikroORM's discovery
+  // validator refuses to initialize an ORM whose relation names an
+  // undiscovered entity, so the only way in is to forge the discovered
+  // property afterwards, and a test that rewrites ORM internals asserts
+  // the shape of those internals rather than any behavior of ours.
+  // `@kavo/mongoose` covers the same guard through a supported path,
+  // because an unregistered `ref` there is an ordinary runtime state.
 });
 
 describe("buildEntityMetadata — single-table inheritance", () => {

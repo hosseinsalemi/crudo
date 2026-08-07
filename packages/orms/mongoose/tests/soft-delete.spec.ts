@@ -2,12 +2,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Schema } from "mongoose";
 import {
   AlreadyDeletedException,
+  ConfigurationException,
   ConflictException,
   NotDeletedException,
   NotFoundException,
   type DefaultKavoService,
+  type RepositoryAdapter,
 } from "@kavo/core";
-import { buildEntityMetadata, createMongooseKavo } from "@kavo/mongoose";
+import { buildEntityMetadata, createInfrastructure, createMongooseKavo } from "@kavo/mongoose";
 import {
   clearCollections,
   ensureIndexes,
@@ -234,5 +236,44 @@ describe("MongooseRepositoryAdapter — configured marker field", () => {
 
     const list = await invoices.findMany({ onlyDeleted: true });
     expect(list.items).toMatchObject([{ _id: deleted._id }]);
+  });
+});
+
+describe("MongooseRepositoryAdapter — hard-delete contexts assembled by hand", () => {
+  // Core refuses to *enable* `restoreOne` or `purgeOne` on a hard-delete
+  // entity at bootstrap, so neither guard below is reachable through
+  // `createCrud`. They are the adapter's second line, for a programmatic
+  // caller that assembles its own context and calls the adapter directly.
+
+  function invoiceAdapter(): RepositoryAdapter<Invoice> {
+    return createInfrastructure(database.connection).adapterFor(models.Invoice as never) as RepositoryAdapter<Invoice>;
+  }
+
+  function hardContext(operation: string) {
+    return { entityName: "Invoice", operation, config: { softDelete: { strategy: "hard" } } };
+  }
+
+  it("refuses restore outright on a hard-delete entity instead of silently no-opping", async () => {
+    const created = (await invoices.createOne({ number: "INV-guard" } as never)) as Invoice;
+
+    const error = await rejectionOf(invoiceAdapter().restore(created._id, hardContext("restoreOne") as never));
+    expect(error).toBeInstanceOf(ConfigurationException);
+    expect(error.code).toBe("KAVO_CONFIG_INVALID");
+    expect(error.message).toMatch(/hard delete strategy/);
+  });
+
+  it("purges a hard-delete document outright, then reports it as 404 once it is gone", async () => {
+    // Under a hard strategy `purge` has no delete marker to check, so its
+    // existence pre-check is the only thing between a second call and a
+    // `deleteOne` that quietly matches nothing and reports success.
+    const created = (await invoices.createOne({ number: "INV-purge" } as never)) as Invoice;
+    const adapter = invoiceAdapter();
+
+    await adapter.purge(created._id, hardContext("purgeOne") as never);
+    expect(await models.Invoice.countDocuments({})).toBe(0);
+
+    const error = await rejectionOf(adapter.purge(created._id, hardContext("purgeOne") as never));
+    expect(error).toBeInstanceOf(NotFoundException);
+    expect(error.code).toBe("KAVO_NOT_FOUND");
   });
 });

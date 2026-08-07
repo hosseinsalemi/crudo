@@ -1,8 +1,9 @@
 import "reflect-metadata";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { DataSource } from "typeorm";
-import { Column, CreateDateColumn, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import { Column, CreateDateColumn, Entity, ManyToOne, OneToMany, PrimaryColumn, PrimaryGeneratedColumn } from "typeorm";
 import {
+  ConfigurationException,
   ConflictException,
   NotFoundException,
   PersistenceException,
@@ -10,7 +11,7 @@ import {
   type KavoInstance,
   type DefaultKavoService,
 } from "@kavo/core";
-import { buildEntityMetadata, createTypeOrmKavo } from "@kavo/typeorm";
+import { buildEntityMetadata, createInfrastructure, createTypeOrmKavo } from "@kavo/typeorm";
 
 // Explicit column types throughout: the swc test transform emits decorator
 // metadata, but explicit types keep entities transform-agnostic.
@@ -53,6 +54,37 @@ class Book {
   author!: Author;
 }
 
+/**
+ * The column spellings the rest of the fixtures deliberately avoid.
+ * Everything above uses an explicit driver-type string to stay
+ * transform-agnostic, which leaves the constructor-typed and JSON arms of
+ * `fieldKindOf` unexercised.
+ */
+@Entity()
+class Widget {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column({ type: String })
+  label!: string;
+
+  @Column({ type: Boolean, default: false })
+  active!: boolean;
+
+  @Column("simple-json", { nullable: true })
+  payload!: unknown;
+}
+
+/** Two primary columns: the shape Kavo refuses rather than half-supports. */
+@Entity()
+class CompositeKey {
+  @PrimaryColumn("int")
+  left!: number;
+
+  @PrimaryColumn("int")
+  right!: number;
+}
+
 let dataSource: DataSource;
 let kavo: KavoInstance;
 let authors: DefaultKavoService<Author>;
@@ -61,7 +93,7 @@ beforeAll(async () => {
   dataSource = new DataSource({
     type: "better-sqlite3",
     database: ":memory:",
-    entities: [Author, Book],
+    entities: [Author, Book, Widget, CompositeKey],
     synchronize: true,
   });
   await dataSource.initialize();
@@ -104,6 +136,28 @@ describe("metadata derivation seam", () => {
       cardinality: "many",
       includable: false,
     });
+  });
+
+  it("maps constructor-typed columns, which never reach the driver-string ladder", () => {
+    // `@Column({ type: String })` leaves `column.type` as the constructor
+    // itself, so it is answered before the regex fallbacks below it. Every
+    // other fixture here spells a driver string, which is why this arm was
+    // unexercised.
+    const byName = Object.fromEntries(buildEntityMetadata(dataSource, Widget).fields.map((f) => [f.name, f]));
+    expect(byName["label"]).toMatchObject({ kind: "string" });
+    expect(byName["active"]).toMatchObject({ kind: "boolean" });
+  });
+
+  it("maps a JSON column to the json kind, so core does not coerce it as text", () => {
+    const byName = Object.fromEntries(buildEntityMetadata(dataSource, Widget).fields.map((f) => [f.name, f]));
+    expect(byName["payload"]).toMatchObject({ kind: "json", nullable: true });
+  });
+
+  it("refuses a composite primary key at metadata time, naming the count it found", () => {
+    // Failing here rather than later is the point: a two-column key would
+    // otherwise surface as a wrong-row read on the first `findOne`.
+    expect(() => buildEntityMetadata(dataSource, CompositeKey)).toThrow(ConfigurationException);
+    expect(() => buildEntityMetadata(dataSource, CompositeKey)).toThrow(/exactly one primary column; found 2/);
   });
 });
 
@@ -348,5 +402,82 @@ describe("TypeOrmRepositoryAdapter — query translation", () => {
       },
     });
     expect(list.items.map((b) => (b as Book).title)).toEqual(["Notes"]);
+  });
+});
+
+/** A normalized query with no filter — what a custom handler hands the reader. */
+function unfilteredQuery() {
+  return {
+    filter: { root: null },
+    sort: [],
+    include: {},
+    fields: { root: null, relations: {} },
+    pagination: { limit: 10, offset: 0 },
+    count: false,
+    withDeleted: false,
+    onlyDeleted: false,
+  };
+}
+
+function hardDeleteContext() {
+  return { entityName: "Author", operation: "findOne", config: { softDelete: { strategy: "hard" } } };
+}
+
+describe("TypeOrmRepositoryAdapter — findOne by query", () => {
+  // `findOne` is on the `EntityReader` contract but core never calls it:
+  // every engine read goes through `findOneById`. It exists for custom
+  // handlers and programmatic callers, which is exactly why nothing was
+  // exercising it.
+  it("returns the first row for a query carrying no filter at all", async () => {
+    await seed();
+    const reader = createInfrastructure(dataSource).adapterFor(Author);
+    const row = await reader.findOne(unfilteredQuery() as never, hardDeleteContext() as never);
+    expect(row).not.toBeNull();
+  });
+
+  it("applies the query's sort rather than returning an arbitrary row", async () => {
+    await seed();
+    const reader = createInfrastructure(dataSource).adapterFor(Author);
+    const row = (await reader.findOne(
+      { ...unfilteredQuery(), sort: [{ field: "age", direction: "asc" }] } as never,
+      hardDeleteContext() as never,
+    )) as Author | null;
+    expect(row).toMatchObject({ name: "Joan" });
+  });
+
+  it("applies the query's filter", async () => {
+    await seed();
+    const reader = createInfrastructure(dataSource).adapterFor(Author);
+    const row = (await reader.findOne(
+      {
+        ...unfilteredQuery(),
+        filter: { root: { kind: "condition", field: "status", operator: "EQ", value: "banned" } },
+      } as never,
+      hardDeleteContext() as never,
+    )) as Author | null;
+    expect(row).toMatchObject({ name: "Alan" });
+  });
+
+  it("answers null rather than throwing when nothing matches", async () => {
+    const reader = createInfrastructure(dataSource).adapterFor(Author);
+    expect(await reader.findOne(unfilteredQuery() as never, hardDeleteContext() as never)).toBeNull();
+  });
+});
+
+describe("TypeOrmRepositoryAdapter — findOneById with no query", () => {
+  it("reads a row when the caller passes null for the query", async () => {
+    // The signature admits `null`, so a programmatic caller with no query
+    // to hand must still get its row rather than a crash on `query.include`.
+    await seed();
+    const reader = createInfrastructure(dataSource).adapterFor(Author);
+    const first = (await reader.findOne(unfilteredQuery() as never, hardDeleteContext() as never)) as Author;
+
+    const row = (await reader.findOneById(first.id, null, hardDeleteContext() as never)) as Author | null;
+    expect(row).toMatchObject({ id: first.id });
+  });
+
+  it("answers null for an id that is not there", async () => {
+    const reader = createInfrastructure(dataSource).adapterFor(Author);
+    expect(await reader.findOneById(9999, null, hardDeleteContext() as never)).toBeNull();
   });
 });

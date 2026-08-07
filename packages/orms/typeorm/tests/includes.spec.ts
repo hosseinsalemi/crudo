@@ -65,6 +65,7 @@ let kavo: KavoInstance;
 let blogs: DefaultKavoService<Blog>;
 let joinedBlogs: DefaultKavoService<Blog>;
 let articles: DefaultKavoService<Article>;
+let batchedArticles: DefaultKavoService<Article>;
 const queryLogger = new QueryCountingLogger();
 
 beforeAll(async () => {
@@ -94,6 +95,12 @@ beforeAll(async () => {
   joinedBlogs = createTypeOrmKavo(dataSource).createCrud(Blog, {
     relations: { edges: { articles: { includable: true, strategy: "join" } } },
   }) as DefaultKavoService<Blog>;
+  // A *to-one* forced to `batch`. Left on `auto` a to-one joins, so the
+  // batched to-one path only exists when a config asks for it.
+  batchedArticles = createTypeOrmKavo(dataSource).createCrud(Article, {
+    softDelete: { strategy: "soft" },
+    relations: { edges: { blog: { includable: true, strategy: "batch" } } },
+  } as never) as DefaultKavoService<Article>;
 });
 
 afterAll(async () => {
@@ -225,6 +232,29 @@ describe("Includes and soft delete", () => {
     expect(list.items).toHaveLength(2);
     const deleted = (list.items as readonly { id: number; notes: unknown[] }[]).find((row) => row.id === articleId);
     expect(deleted?.notes).toHaveLength(1);
+  });
+});
+
+describe("TypeOrmRepositoryAdapter — a batched to-one relation", () => {
+  it("embeds the related row when there is one", async () => {
+    const { blogId } = await seed();
+    const list = await batchedArticles.findMany({
+      include: ["blog"],
+      sort: [{ field: "id", direction: "asc" }],
+    });
+    expect(list.items[0]).toMatchObject({ blog: { id: blogId } });
+  });
+
+  it("reports null, never undefined, when the foreign key is empty", async () => {
+    // Core's serializer treats an absent key as "never hydrated" and omits
+    // it; only an explicit `null` says "included, and there is nothing
+    // there". A batched to-one with no match must produce the latter.
+    await dataSource.getRepository(Article).save({ title: "Orphan", blog: null });
+
+    const list = await batchedArticles.findMany({ include: ["blog"] });
+
+    expect(list.items[0]).toHaveProperty("blog");
+    expect((list.items[0] as { blog: unknown }).blog).toBeNull();
   });
 });
 

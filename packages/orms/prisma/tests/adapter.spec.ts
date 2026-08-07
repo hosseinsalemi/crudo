@@ -8,7 +8,7 @@ import {
   type KavoInstance,
   type DefaultKavoService,
 } from "@kavo/core";
-import { buildEntityMetadata, createPrismaKavo } from "@kavo/prisma";
+import { buildEntityMetadata, createInfrastructure, createPrismaKavo } from "@kavo/prisma";
 import { newTestPrismaClient } from "./support/client.js";
 
 // Marker classes: Prisma models have no runtime class of their own, so
@@ -66,6 +66,33 @@ async function seed(): Promise<void> {
   for (const row of rows) await authors.createOne(row as never);
 }
 
+/** The adapter on its own, with no engine in front of it. */
+function authorAdapter() {
+  return createInfrastructure(client as never, {
+    datamodel: Prisma.dmmf.datamodel,
+    entities: [Author, Book],
+    caseInsensitiveFilters: false,
+  }).adapterFor(Author);
+}
+
+/** A normalized query with no filter — what a custom handler hands the reader. */
+function unfilteredQuery() {
+  return {
+    filter: { root: null },
+    sort: [],
+    include: {},
+    fields: { root: null, relations: {} },
+    pagination: { limit: 10, offset: 0 },
+    count: false,
+    withDeleted: false,
+    onlyDeleted: false,
+  };
+}
+
+function hardDeleteContext() {
+  return { entityName: "Author", operation: "findOne", config: { softDelete: { strategy: "hard" } } };
+}
+
 describe("metadata derivation seam", () => {
   it("derives fields, id, generated flags, and relations", () => {
     const metadata = buildEntityMetadata(Prisma.dmmf.datamodel, Author, new Map([["Book", Book] as const]));
@@ -111,6 +138,71 @@ describe("PrismaRepositoryAdapter — CRUD", () => {
     await expect(authors.createOne({ email: "dup@x.io", name: "B", age: 2 } as never)).rejects.toBeInstanceOf(
       ConflictException,
     );
+  });
+});
+
+/**
+ * No engine read reaches `findOne` by query — the standard `findOne` is by
+ * id, so `findOneById` is the only single-row read core ever issues. This
+ * overload exists for custom handlers and programmatic callers, which means
+ * nothing but a direct adapter call keeps it honest.
+ */
+describe("PrismaRepositoryAdapter — findOne by query", () => {
+  it("returns the first row when the query carries no filter at all", async () => {
+    await seed();
+    const row = await authorAdapter().findOne(unfilteredQuery() as never, hardDeleteContext() as never);
+    expect(row).not.toBeNull();
+  });
+
+  it("answers null for a query that matches nothing, rather than throwing", async () => {
+    // A miss is the caller's to interpret — `findOneById` reports it the same
+    // way, and it is the handler above that decides whether it is a 404.
+    await seed();
+    const row = await authorAdapter().findOne(
+      {
+        ...unfilteredQuery(),
+        filter: { root: { kind: "condition", field: "name", operator: "EQ", value: "Nobody" } },
+      } as never,
+      hardDeleteContext() as never,
+    );
+    expect(row).toBeNull();
+  });
+
+  it("applies the query's sort, so the row is the first match and not just any", async () => {
+    await seed();
+    const row = await authorAdapter().findOne(
+      { ...unfilteredQuery(), sort: [{ field: "age", direction: "asc" }] } as never,
+      hardDeleteContext() as never,
+    );
+    expect(row).toMatchObject({ name: "Joan" }); // the youngest, not whichever row came back first
+  });
+
+  it("applies the query's filter", async () => {
+    await seed();
+    const row = await authorAdapter().findOne(
+      {
+        ...unfilteredQuery(),
+        filter: { root: { kind: "condition", field: "status", operator: "EQ", value: "banned" } },
+      } as never,
+      hardDeleteContext() as never,
+    );
+    expect(row).toMatchObject({ name: "Alan" });
+  });
+});
+
+describe("PrismaRepositoryAdapter — findOneById without a query", () => {
+  // The signature admits `null` for a caller that has nothing to narrow by,
+  // so every `query?.` fallback inside `findOneById` has to stand on its own
+  // rather than lean on the engine always supplying a normalized query.
+  it("reads the row by id when the caller passes no query", async () => {
+    const created = (await authors.createOne({ email: "byid@x.io", name: "ById", age: 3 } as never)) as Author;
+    expect(await authorAdapter().findOneById(created.id, null, hardDeleteContext() as never)).toMatchObject({
+      name: "ById",
+    });
+  });
+
+  it("answers null for an id that does not exist", async () => {
+    expect(await authorAdapter().findOneById(4242, null, hardDeleteContext() as never)).toBeNull();
   });
 });
 
@@ -251,6 +343,25 @@ describe("PrismaRepositoryAdapter — query translation", () => {
       filter: { kind: "condition", field: "author.name" as never, operator: "EQ", value: "Ada" },
     });
     expect(list.items.map((b) => (b as Book).title)).toEqual(["Notes"]);
+  });
+
+  it("sorts on an allowlisted relation path", async () => {
+    // Prisma's `orderBy` nests a relation path (`{ author: { name: "asc" } }`)
+    // the same way its `where` does; handed the flat `"author.name"` it
+    // rejects the argument outright, so a sort the allowlist admits would
+    // reach the client as a 500 instead of an ordering.
+    const scoped = kavo.createCrud(Book, {
+      allowlists: { sortable: ["title", "author.name" as never] },
+    }) as DefaultKavoService<Book>;
+    await seed();
+    const all = (await authors.findMany()).items.map((a) => a as Author);
+    const ada = all.find((a) => a.name === "Ada")!;
+    const alan = all.find((a) => a.name === "Alan")!;
+    await client.book.create({ data: { title: "By Alan", authorId: alan.id } });
+    await client.book.create({ data: { title: "By Ada", authorId: ada.id } });
+
+    const list = await scoped.findMany({ sort: [{ field: "author.name" as never, direction: "asc" }] });
+    expect(list.items.map((b) => (b as Book).title)).toEqual(["By Ada", "By Alan"]);
   });
 
   it("filters on a to-many relation path, restricting root rows rather than 500ing", async () => {
