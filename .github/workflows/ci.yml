@@ -82,6 +82,39 @@ jobs:
       - name: Test
         run: pnpm run generate && pnpm run test
 
+  # Verifies the actual Bun binary can consume what the getting-started docs
+  # advertise as `bun add`-installable (tests/bun-compat.spec.ts). Its own job
+  # rather than a step in `test` because it needs a Bun toolchain none of the
+  # other jobs do, and it stays outside `pnpm check` for the same reason
+  # `coverage` and `docs` do: `tests/ci-workflow.spec.ts` only cross-checks
+  # the `build`/`test` split against the gate, so a job outside that split is
+  # exempt by design. The spec itself skips if `bun` is ever missing from
+  # PATH, so this step is never a red gate on its own — only a missing or
+  # broken `setup-bun` action could make it one.
+  bun-compat:
+    name: bun compat
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Bun compatibility
+        run: pnpm vitest run tests/bun-compat.spec.ts
+
   # Deliberately its own job rather than a step in `pnpm check`. It re-runs
   # the whole suite under v8 instrumentation, so folding it into the gate
   # would roughly double the command developers run all day for a signal
