@@ -82,6 +82,55 @@ jobs:
       - name: Test
         run: pnpm run generate && pnpm run test
 
+  # Runs the entire vitest suite with Bun as the runtime executing vitest
+  # itself, not just Node — the mirror image of the `test` job. This is a
+  # real, un-nested top-level run: tests/bun-compat.spec.ts documents that
+  # nesting a full `bun vitest` invocation inside another (Node) vitest
+  # process reliably hangs on mongodb-memory-server contention, which is why
+  # that file only spawns small isolated Bun probes rather than the whole
+  # suite. Run as CI's own process tree, that problem does not exist.
+  #
+  # Its own job rather than a step in `test` because it needs a Bun toolchain
+  # none of the other jobs do, and it stays outside `pnpm check` for the same
+  # reason `coverage` and `docs` do: `tests/ci-workflow.spec.ts` only
+  # cross-checks the `build`/`test` split against the gate, so a job outside
+  # that split is exempt by design.
+  bun-compat:
+    name: test (bun)
+    runs-on: ubuntu-latest
+    # The job's own rationale above is a documented hang failure mode
+    # (mongodb-memory-server contention under nesting). A bound turns any
+    # recurrence into a fast red instead of sitting on a runner for GitHub's
+    # 6-hour default, the same reasoning `docs` uses below.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+      # No `build` step, same as `test`: vitest aliases every `@kavo/*`
+      # specifier straight to package `src/`, so the suite never reads
+      # `dist/`. `generate` is still required for the same reason it is in
+      # `test` — the Prisma client and the SQLite fixture schema. Runs
+      # `pnpm run test:bun` (not a bare `bun run vitest run` here) so
+      # `tests/ci-workflow.spec.ts` can see the invocation the same way it
+      # sees every other job's `pnpm run <script>` step.
+      - name: Test under Bun
+        run: pnpm run generate && pnpm run test:bun
+
   # Deliberately its own job rather than a step in `pnpm check`. It re-runs
   # the whole suite under v8 instrumentation, so folding it into the gate
   # would roughly double the command developers run all day for a signal
