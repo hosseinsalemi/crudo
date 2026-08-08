@@ -17,9 +17,24 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
  * `package.json` build script runs) and then has the actual Bun binary
  * `import` the resulting `dist/index.js` — the same artifact `bun add
  * @kavo/core` would resolve to via its `exports` map — and checks that a
- * representative export survives the round trip. It skips outright when Bun
- * isn't on PATH (CI does not install it), so this never turns into a red gate
- * on a machine that simply lacks the binary.
+ * representative export survives the round trip. Both cases skip outright
+ * when Bun isn't on PATH (CI does not install it), so this never turns into
+ * a red gate on a machine that simply lacks the binary.
+ *
+ * A broader check was tried and deliberately left out: spawning `bun run
+ * vitest run --exclude '**\/*.e2e.spec.ts'` for the *whole* workspace here,
+ * nested inside the outer (Node) vitest process already running this file.
+ * Standalone that command is clean — 74 files, 1588 tests, ~9s, covering the
+ * SWC decorator-metadata transform, TypeORM/Mongoose/MikroORM entities, and
+ * Nest DI all surviving the Bun swap, not just core's plain TS. Nested inside
+ * another vitest run, though, it reliably hangs — `mongodb-memory-server`
+ * instances from the outer and inner runs contend for the same resources —
+ * and because `spawnSync` blocks synchronously, vitest's own test timeout
+ * can't even abort it. That is a test-harness problem, not a Bun
+ * incompatibility, so it doesn't belong here as a spec. Run it directly
+ * (`pnpm generate && bun run vitest run --exclude '**\/*.e2e.spec.ts'`) as its
+ * own top-level command instead — e.g. a separate CI job — never nested
+ * inside another vitest invocation.
  */
 
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
