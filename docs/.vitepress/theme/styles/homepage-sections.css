@@ -349,6 +349,7 @@
   max-width: 640px;
   font-size: 14.5px;
   color: var(--vp-c-text-2);
+  text-align: center;
 }
 
 .realtime-subtitle code {

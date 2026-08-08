@@ -1,16 +1,4 @@
 <template>
-  <div class="realtime-transports">
-    <div
-      v-for="transport in transports"
-      :key="transport.name"
-      class="realtime-transport"
-      :class="{ 'realtime-transport--shipped': transport.shipped }"
-    >
-      <span class="realtime-transport-name">{{ transport.name }}</span>
-      <span class="realtime-transport-status">{{ transport.shipped ? "Ships today" : "Same interface" }}</span>
-    </div>
-  </div>
-
   <div class="realtime-categories">
     <div v-for="category in categories" :key="category.title" class="realtime-category">
       <span class="realtime-category-title">{{ category.title }}</span>
@@ -22,13 +10,6 @@
 </template>
 
 <script setup lang="ts">
-const transports = [
-  { name: "SSE", shipped: true },
-  { name: "WebSocket", shipped: false },
-  { name: "RabbitMQ", shipped: false },
-  { name: "Kafka", shipped: false },
-];
-
 const categories = [
   {
     title: "Client-facing UI",
@@ -42,70 +23,20 @@ const categories = [
     title: "External-facing",
     features: ["Partner webhooks", "Mobile push"],
   },
-  {
-    title: "Bridging",
-    features: ["IoT telemetry → ops dashboard"],
-  },
 ];
 </script>
 
 <style scoped>
-.realtime-transports {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
-  max-width: 720px;
-  margin: 32px auto 0;
-}
-
-.realtime-transport {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 14px 22px;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 10px;
-  background: var(--vp-c-bg-soft);
-  min-width: 130px;
-}
-
-.realtime-transport--shipped {
-  border-color: var(--vp-c-brand-1);
-}
-
-.realtime-transport-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--vp-c-text-1);
-}
-
-.realtime-transport-status {
-  font-size: 11px;
-  color: var(--vp-c-text-3);
-}
-
-.realtime-transport--shipped .realtime-transport-status {
-  color: var(--vp-c-brand-1);
-}
-
 .realtime-categories {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
-  max-width: 1040px;
+  max-width: 820px;
   margin: 32px auto 0;
   text-align: left;
 }
 
-@media (max-width: 900px) {
-  .realtime-categories {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 480px) {
+@media (max-width: 719px) {
   .realtime-categories {
     grid-template-columns: 1fr;
   }
