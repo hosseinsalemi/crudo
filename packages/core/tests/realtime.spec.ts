@@ -259,6 +259,31 @@ describe("realtime — engine emit hook", () => {
   });
 });
 
+describe("realtime — collection-channel support (issue #160)", () => {
+  it("exposes the entity metadata a transport needs to parse a subscribe-time filter", () => {
+    // `event.entity` already doubles as the collection-channel name a
+    // transport routes to — no new `RealtimeEventDto` field — so the only
+    // new core surface issue #160 needs is a way for a transport to build a
+    // `DefaultFilterParser` for the same entity a `RealtimeTransport`
+    // publishes for.
+    const { crud } = makeCrud();
+    expect(crud.engine.metadata).toBe(userMetadata);
+  });
+
+  it("publishes an event whose 'entity' a transport can use as the collection-channel name, unchanged by any per-item channel", async () => {
+    const transport = new FakeTransport();
+    const { crud } = makeCrud({ realtime: { enabled: true, events: {} } } as never, [transport]);
+    await crud.createOne({ name: "Ada", email: "a@x.io", age: 36 } as never);
+    await crud.createOne({ name: "Grace", email: "g@x.io", age: 40 } as never);
+
+    // Two different item channels (`User.1`, `User.2`), the same
+    // collection channel (`entity: "User"`) — exactly what lets one
+    // transport instance route a single event to both kinds of subscriber.
+    expect(transport.events.map((event) => event.channel)).toEqual(["User.1", "User.2"]);
+    expect(transport.events.every((event) => event.entity === "User")).toBe(true);
+  });
+});
+
 describe("realtime — createKavo(options).realtimeTransports validation", () => {
   it("rejects a transport with no publish function", () => {
     expect(() => createKavo({ realtimeTransports: [{ name: "bad" }] } as never)).toThrowError(/publish/);

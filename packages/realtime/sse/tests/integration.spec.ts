@@ -143,3 +143,35 @@ describe("@kavo/sse — end-to-end over a real HTTP server", () => {
     await waitForConnectionCount(transport, 0);
   });
 });
+
+describe("@kavo/sse — end-to-end, verifyToken omitted", () => {
+  let server: Server;
+  let baseUrl: string;
+  let transport: SseTransport;
+
+  beforeEach(async () => {
+    transport = createSseTransport({});
+    server = createServer((req, res) => {
+      void transport.handleRequest(req, res);
+    });
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+    const address = server.address() as AddressInfo;
+    baseUrl = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterEach(async () => {
+    transport.close();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  it("opens the stream over a real socket with no token at all", async () => {
+    const response = await fetch(`${baseUrl}/realtime?channel=Book.1`, {
+      headers: { Accept: "text/event-stream" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/event-stream");
+    expect(transport.connectionCount).toBe(1);
+    await response.body?.cancel();
+  });
+});
