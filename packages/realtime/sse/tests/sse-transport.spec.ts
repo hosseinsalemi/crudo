@@ -252,6 +252,11 @@ describe("createSseTransport — opening a stream", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.ended).toBe(false);
+    expect(res.headers).toMatchObject({
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    });
     expect(transport.connectionCount).toBe(1);
   });
 
@@ -264,6 +269,22 @@ describe("createSseTransport — opening a stream", () => {
     expect(transport.connectionCount).toBe(1);
 
     close();
+    expect(transport.connectionCount).toBe(0);
+  });
+
+  it("unsubscribes the connection once the underlying response errors", async () => {
+    // The other half of cleanup, alongside the request's own 'close' above —
+    // a broken pipe surfaces as an 'error' on the response, not a 'close' on
+    // the request, and both must free the connection or a channel accumulates
+    // dead subscribers forever.
+    const transport = createSseTransport({ verifyToken: () => ({}) });
+    const { req } = fakeRequest("/realtime?channel=Book.1&token=t", { accept: "text/event-stream" });
+    const res = fakeResponse();
+
+    await transport.handleRequest(req, res);
+    expect(transport.connectionCount).toBe(1);
+
+    res.emit("error", new Error("ECONNRESET"));
     expect(transport.connectionCount).toBe(0);
   });
 });
@@ -319,19 +340,33 @@ describe("createSseTransport — publish", () => {
 
     expect(first.frames).toHaveLength(1);
     expect(second.frames).toHaveLength(1);
+    // Same payload delivered to both, not just the same count — a fan-out
+    // bug that mutated per-connection state or reused a stale event object
+    // would still pass a length-only assertion.
+    expect(second.frames[0]).toBe(first.frames[0]);
   });
 
   it("assigns increasing 'id:' values across successive publishes, shared across channels", async () => {
     const transport = createSseTransport({ verifyToken: () => ({}) });
-    const { req } = fakeRequest("/realtime?channel=Book.1&token=t", { accept: "text/event-stream" });
-    const res = fakeResponse();
-    await transport.handleRequest(req, res);
+    const bookRes = fakeResponse();
+    const authorRes = fakeResponse();
+    await transport.handleRequest(
+      fakeRequest("/realtime?channel=Book.1&token=t", { accept: "text/event-stream" }).req,
+      bookRes,
+    );
+    await transport.handleRequest(
+      fakeRequest("/realtime?channel=Author.5&token=t", { accept: "text/event-stream" }).req,
+      authorRes,
+    );
 
-    await transport.publish(createdEvent());
-    await transport.publish(createdEvent({ event: "patched" }));
+    await transport.publish(createdEvent({ channel: "Book.1" }));
+    await transport.publish(createdEvent({ entity: "Author", id: 5, channel: "Author.5" }));
 
     const idOf = (frame: string) => Number(/^id: (\d+)/.exec(frame)![1]);
-    expect(idOf(res.frames[1]!)).toBeGreaterThan(idOf(res.frames[0]!));
+    // One counter shared across every channel on the transport, not a
+    // per-channel one — the second publish landed on a different channel's
+    // connection entirely, and its id must still be greater.
+    expect(idOf(authorRes.frames[0]!)).toBeGreaterThan(idOf(bookRes.frames[0]!));
   });
 
   it("drops a connection whose write buffer exceeds bufferLimitBytes instead of blocking other subscribers", async () => {

@@ -29,11 +29,16 @@ class FakeServerResponse extends EventEmitter {
   writableLength = 0;
   readonly frames: string[] = [];
   private _statusCode = 0;
+  private _headers: Record<string, string | number> = {};
   private _jsonBody: unknown;
   private _ended = false;
 
   get statusCode(): number {
     return this._statusCode;
+  }
+
+  get headers(): Record<string, string | number> {
+    return this._headers;
   }
 
   get jsonBody(): unknown {
@@ -44,8 +49,9 @@ class FakeServerResponse extends EventEmitter {
     return this._ended;
   }
 
-  writeHead(code: number): this {
+  writeHead(code: number, headers?: Record<string, string | number>): this {
     this._statusCode = code;
+    if (headers !== undefined) this._headers = headers;
     return this;
   }
 
@@ -73,6 +79,7 @@ class FakeServerResponse extends EventEmitter {
 
 export interface FakeResponse extends ServerResponse {
   readonly frames: string[];
+  readonly headers: Record<string, string | number>;
   readonly jsonBody: unknown;
   readonly ended: boolean;
 }

@@ -34,6 +34,24 @@ function readSseFrames(body: ReadableStream<Uint8Array>): { next(): Promise<stri
   return { next, cancel: () => reader.cancel() };
 }
 
+/**
+ * A real client disconnect frees the connection asynchronously — the
+ * server only learns about it once the socket teardown propagates to the
+ * request's own `close` event, which `handleRequest` listens for. Polling
+ * is what proves that actually happens over a genuine socket, as opposed
+ * to `sse-transport.spec.ts`'s fake, which only proves the transport reacts
+ * correctly *given* a `close` event, not that Node produces one.
+ */
+async function waitForConnectionCount(transport: SseTransport, expected: number): Promise<void> {
+  const deadline = Date.now() + 2000;
+  while (transport.connectionCount !== expected) {
+    if (Date.now() > deadline) {
+      throw new Error(`connectionCount never reached ${expected}, stuck at ${transport.connectionCount}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
 describe("@kavo/sse — end-to-end over a real HTTP server", () => {
   let server: Server;
   let baseUrl: string;
@@ -76,6 +94,7 @@ describe("@kavo/sse — end-to-end over a real HTTP server", () => {
     });
 
     expect(response.status).toBe(400);
+    expect(response.headers.get("content-type")).toContain("application/json");
     const body = (await response.json()) as { error: string };
     expect(body.error).toContain("price");
     expect(transport.connectionCount).toBe(0);
@@ -101,7 +120,6 @@ describe("@kavo/sse — end-to-end over a real HTTP server", () => {
     await crud.createOne({ title: "Dune", status: "draft", price: 999 } as never);
 
     const frame = await frames.next();
-    frames.cancel();
 
     expect(frame).toMatch(/^id: \d+\n/);
     expect(frame).toContain("event: created\n");
@@ -117,5 +135,11 @@ describe("@kavo/sse — end-to-end over a real HTTP server", () => {
     expect(event.entity).toBe("Book");
     expect(event.channel).toBe("Book.1");
     expect(event.item).toMatchObject({ title: "Dune" });
+
+    expect(transport.connectionCount).toBe(1);
+    await frames.cancel();
+    // Proves the real disconnect path over a genuine socket, not just the
+    // fake-driven mechanism sse-transport.spec.ts exercises.
+    await waitForConnectionCount(transport, 0);
   });
 });
