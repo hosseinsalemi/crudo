@@ -18,23 +18,20 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
  * `import` the resulting `dist/index.js` — the same artifact `bun add
  * @kavo/core` would resolve to via its `exports` map — and checks that a
  * representative export survives the round trip. Both cases skip outright
- * when Bun isn't on PATH (CI does not install it), so this never turns into
- * a red gate on a machine that simply lacks the binary.
+ * when Bun isn't on PATH, so this never turns into a red gate on a machine
+ * that simply lacks the binary.
  *
- * A broader check was tried and deliberately left out: spawning `bun run
- * vitest run --exclude '**\/*.e2e.spec.ts'` for the *whole* workspace here,
- * nested inside the outer (Node) vitest process already running this file.
- * Standalone that command is clean — 74 files, 1588 tests, ~9s, covering the
- * SWC decorator-metadata transform, TypeORM/Mongoose/MikroORM entities, and
- * Nest DI all surviving the Bun swap, not just core's plain TS. Nested inside
- * another vitest run, though, it reliably hangs — `mongodb-memory-server`
- * instances from the outer and inner runs contend for the same resources —
- * and because `spawnSync` blocks synchronously, vitest's own test timeout
- * can't even abort it. That is a test-harness problem, not a Bun
- * incompatibility, so it doesn't belong here as a spec. Run it directly
- * (`pnpm generate && bun run vitest run --exclude '**\/*.e2e.spec.ts'`) as its
- * own top-level command instead — e.g. a separate CI job — never nested
- * inside another vitest invocation.
+ * This file deliberately does NOT also spawn the whole workspace suite under
+ * Bun — that runs as its own top-level step in the `bun-compat` CI job
+ * instead (`bun run vitest run`, ci.yml), and here's why it isn't nested in
+ * here alongside these two probes: spawning `bun run vitest run` from
+ * *inside* the outer (Node) vitest process already running this file
+ * reliably hangs — the inner and outer `mongodb-memory-server` instances
+ * contend for the same resources, and because `spawnSync` blocks
+ * synchronously, vitest's own test timeout can't even abort it. That's a
+ * test-harness artifact of nesting one vitest run inside another, not a Bun
+ * incompatibility, and it disappears once the Bun run is its own top-level
+ * process tree, which is what the CI job gives it.
  */
 
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
