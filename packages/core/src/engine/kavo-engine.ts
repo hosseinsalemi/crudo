@@ -171,6 +171,16 @@ export class KavoEngine<Entity extends object> {
     return this.deps.config;
   }
 
+  /**
+   * The frozen entity metadata this engine was built from — a transport
+   * (e.g. `@kavo/sse`'s filtered subscriptions, issue #160) needs it
+   * alongside `config` to construct a `DefaultFilterParser` for the same
+   * entity, without core exposing anything ORM- or transport-specific.
+   */
+  get metadata(): EntityMetadata<Entity> {
+    return this.deps.metadata;
+  }
+
   async execute(request: KavoRequest<Entity>): Promise<KavoResponse> {
     const { config, errorHandler } = this.deps;
     const correlationId = randomUuid();

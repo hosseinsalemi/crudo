@@ -1,1 +1,6 @@
-export { createSseTransport, type SseTransport, type SseTransportOptions } from "./sse-transport.js";
+export {
+  createSseTransport,
+  type FilterableEntity,
+  type SseTransport,
+  type SseTransportOptions,
+} from "./sse-transport.js";

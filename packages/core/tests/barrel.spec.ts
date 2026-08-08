@@ -110,6 +110,7 @@ const PUBLIC_SURFACE: readonly string[] = [
   "IsUnknown",
   "cursorValuesOf",
   "encodeCursor",
+  "evaluateFilter",
   "isCursorPagination",
   "isSincePagination",
   "hasKeyset",

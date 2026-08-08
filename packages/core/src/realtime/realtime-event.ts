@@ -7,6 +7,16 @@ import type { EntityId } from "../types/entity-id.js";
  * delete strategy produced that). There is deliberately no id for a custom
  * operation — the vocabulary stays closed until a future issue decides what
  * a non-standard write publishes as.
+ *
+ * Issue #160 / ADR-0024 (filtered collection subscriptions) considered, and rejected,
+ * adding ids for a row entering/leaving a filtered subscriber's view on an
+ * ordinary `updated`/`patched` write — see `RealtimeTransport`'s doc for the
+ * chosen policy. The vocabulary stayed closed: a filtered subscriber's
+ * "this row left my view" case reuses `"deleted"` rather than earning a new
+ * id, and "entered my view" reuses whichever real event id the write
+ * already produced. The `deleted` overload does mean `"deleted"` no longer
+ * implies the row itself is gone — only that this subscriber should stop
+ * expecting to see it.
  */
 export type RealtimeEventId = "created" | "updated" | "patched" | "deleted" | "restored";
 
@@ -23,9 +33,17 @@ export interface RealtimeEventDto<ItemDto = unknown> {
   readonly entity: string;
   readonly id: EntityId;
   /**
-   * `<entity>.<id>` — the entity-level subscription channel a future
-   * transport routes this event to. Field-level and collection channels
-   * are not built yet (deferred, see the issue that added this seam).
+   * `<entity>.<id>` — the item-level subscription channel a transport
+   * routes this event to. The **collection**-level channel (every event for
+   * the entity, not just one id) is deliberately not a separate field:
+   * it is exactly `entity` above, so a transport that wants to fan one
+   * event out to both an item-channel subscriber and a collection-channel
+   * subscriber reads `channel` for the former and `entity` for the latter
+   * off this same payload (issue #160) — the engine still builds and
+   * publishes exactly one `RealtimeEventDto` per write. Field-level
+   * channels (a topic per field) are still not built; `RealtimeSettings.
+   * subscribableFields` instead bounds which fields a transport may
+   * *include* in the item it delivers on either channel above.
    */
   readonly channel: string;
   /** ISO-8601, set once by the engine so every transport agrees on it. */

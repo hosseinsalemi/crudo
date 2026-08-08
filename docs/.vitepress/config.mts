@@ -134,6 +134,7 @@ const config = defineConfig({
               { text: "Mongoose adapter", link: "/internals/architecture/15-mongoose-adapter" },
               { text: "MCP binding", link: "/internals/architecture/16-mcp-binding" },
               { text: "MikroORM adapter", link: "/internals/architecture/17-mikroorm-adapter" },
+              { text: "Realtime", link: "/internals/architecture/18-realtime" },
             ],
           },
           {
@@ -206,6 +207,14 @@ const config = defineConfig({
               {
                 text: "0022 — Since pagination composes a value|id keyset",
                 link: "/internals/adr/0022-since-pagination-composes-a-value-id-keyset",
+              },
+              {
+                text: "0023 — Realtime transports are resolved config, not settings",
+                link: "/internals/adr/0023-realtime-transports-are-not-settings",
+              },
+              {
+                text: "0024 — Collection channels reuse the filter grammar and vocabulary",
+                link: "/internals/adr/0024-collection-channels-reuse-the-filter-grammar-and-vocabulary",
               },
             ],
           },

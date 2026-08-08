@@ -14,9 +14,18 @@ or any other framework — same rule `packages/orms/*` follows.
 import { createSseTransport } from "@kavo/sse";
 import { createKavo } from "@kavo/core";
 
+// Filled in below, after `createCrud` — the callback only runs once a
+// subscribe request actually arrives, so the forward reference is fine.
+let bookService: ReturnType<typeof kavo.createCrud<Book>>;
+
 const sse = createSseTransport({
-  verifyToken: (token) => verifyJwt(token), // returns a principal, or null
   subscribableFields: (entityName) => (entityName === "Book" ? ["title", "status", "price"] : undefined),
+  // Enables subscribe-time filtering (issue #160) for an entity — omit an
+  // entry and a `filter[...]` query param on that entity is rejected with
+  // 400 rather than silently ignored. Typically `service.engine.metadata`/
+  // `service.engine.config` off the `createCrud` service already returned.
+  filterableEntities: (entityName) =>
+    entityName === "Book" ? { metadata: bookService.engine.metadata, config: bookService.engine.config } : undefined,
 });
 
 const kavo = createKavo({
@@ -26,7 +35,15 @@ const kavo = createKavo({
     realtime: { enabled: true, events: { created: true, updated: true, patched: true, deleted: true } },
   },
 });
+
+bookService = kavo.createCrud(Book);
 ```
+
+`@kavo/sse` has **no authentication of its own** — `handleRequest` accepts
+any subscribe request that otherwise validates. A deployment that needs to
+gate who may open a stream does so in front of it: a reverse proxy, or the
+host framework's own guard/middleware on the mounted route, since
+`handleRequest` is just an ordinary `(req, res)` handler.
 
 Mount `sse.handleRequest` on a plain Node HTTP route (or any host
 framework's request/response — Express, Nest, Fastify's raw
@@ -43,28 +60,44 @@ http.createServer((req, res) => {
 });
 ```
 
-A client subscribes to one entity/id with `EventSource`, or any HTTP
-client that reads a chunked `text/event-stream` body:
+A client subscribes to one entity/id, or to the whole entity, with
+`EventSource` (or any HTTP client that reads a chunked `text/event-stream`
+body):
 
 ```js
-const source = new EventSource("/realtime?channel=Book.42&token=...");
-source.addEventListener("updated", (message) => {
+// Item channel: every event for Book id 42.
+const one = new EventSource("/realtime?channel=Book.42");
+
+// Collection channel: every event for every Book (issue #160).
+const all = new EventSource("/realtime?channel=Book");
+
+// Collection channel, scoped with the same filter grammar REST uses.
+const published = new EventSource("/realtime?channel=Book&filter[status][eq]=published");
+
+all.addEventListener("updated", (message) => {
   const event = JSON.parse(message.data); // RealtimeEventDto
 });
 ```
 
-`channel` is required and always `<entity>.<id>` — entity-level
-subscriptions only; collection/view subscriptions are a future issue.
-`token` may be passed as a query param (what `EventSource` needs, since it
-cannot set custom headers) or as a normal `Authorization: Bearer <token>`
-header for any other client. An invalid or missing token gets a `401`
-_before_ any SSE frame is written. An optional `fields` query param
-(comma-separated) is checked against that entity's configured
-`realtime.subscribableFields`, if any — a field outside the allowlist gets
-a `400`, the same way `allowlists.selectable` rejects an unlisted field
-over REST; the field list does not filter what a subscription receives yet
-(entity-level events are always the whole item), it only bounds what a
-future field-scoped subscription could reach.
+`channel` is required: `<entity>.<id>` for an item-level subscription, or
+the bare `<entity>` for a collection-level one (every event for that
+entity). A collection-channel subscribe request may add a `filter` query
+string in the exact `filter[field][operator]=value` grammar REST list
+requests use (doc 18) — evaluated in memory per event, no DB round trip.
+Filtering is opt-in per entity via `filterableEntities`; an entity with no
+entry there rejects any `filter[...]` param with `400` rather than
+silently ignoring it. See doc 18 §4.3 for what a filtered subscriber
+receives when a write moves a row across the filter boundary, and for the
+unconditional `"deleted"`-event bypass.
+
+Once `subscribableFields` is configured for an entity, it bounds every
+outgoing `item` **unconditionally** — not only when a subscriber names
+`fields` — the same way `allowlists.selectable`
+bounds a REST response whether or not the caller asked for a subset. An
+optional `fields` query param (comma-separated) narrows further within
+that bound; a field outside it (or outside `subscribableFields`, when no
+`fields` param is given) gets a `400` the same way `allowlists.selectable`
+rejects an unlisted field over REST.
 
 A connection that cannot keep up with its publish rate (the writable
 buffer on its response exceeds `bufferLimitBytes`, default 64 KiB) is
@@ -82,7 +115,17 @@ closed rather than left to block delivery to every other subscriber.
 - **No multi-node fan-out.** The channel registry is one process's
   in-memory `Map` — a subscriber connected to one instance of a
   horizontally-scaled app never sees a write handled by another instance.
-- **No subscriber-level authorization.** Every subscription within
-  `subscribableFields` is trusted once the connection is authenticated;
-  row-level/tenant scoping of subscribers is a future issue (`authorize`,
-  out of scope here — see `RealtimeTransport`'s own doc).
+- **No "leave" event on an ordinary write.** A write that makes a row stop
+  matching a filtered subscriber's filter is not delivered at all — only a
+  genuine `"deleted"` reliably tells that subscriber a row is gone. See
+  doc 18 §4.3.
+- **No filtering by which fields changed** — a subscribe-time filter
+  matches row data (`RealtimeEventDto.item`), not the write's diff
+  (`RealtimeEventDto.changed`).
+- **No authentication or authorization.** `@kavo/sse` accepts any subscribe
+  request that otherwise validates — gating who may open a stream is the
+  host app's job (a reverse proxy, or a guard on the mounted route), and
+  row/tenant-level subscriber scoping is a future issue (`authorize`, out
+  of scope here — see `RealtimeTransport`'s own doc). A `filter` narrows
+  _which_ events a subscriber receives, not _whether_ they were authorized
+  to receive them.

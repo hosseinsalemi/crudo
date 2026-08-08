@@ -47,6 +47,7 @@ export type { FieldSelection, FieldSelectionInput } from "./query/field-selectio
 export type { NormalizedQueryContext, QueryContext } from "./query/query-context.js";
 export type { FilterParser } from "./query/filter-parser.js";
 export type { FilterBuilder } from "./query/filter-builder.js";
+export { evaluateFilter } from "./query/filter-evaluator.js";
 
 // ── DTO system ────────────────────────────────────────────────────────
 export type {
