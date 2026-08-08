@@ -4,7 +4,7 @@ layout: home
 hero:
   name: Kavo
   text: Turn models into APIs
-  tagline: Define an entity once and get a complete REST, GraphQL, and MCP CRUD API with filtering, sorting, pagination, and generated routes. Vibe code it in minutes, on a fraction of the tokens.
+  tagline: Define an entity once and get a complete REST, GraphQL, and MCP CRUD API with filtering, sorting, pagination, realtime events, and generated routes. Vibe code it in minutes, on a fraction of the tokens.
   actions:
     - theme: brand
       text: Get started
