@@ -346,67 +346,11 @@
 
 .realtime-subtitle {
   margin: 0 auto 28px;
-  max-width: 560px;
+  max-width: 640px;
   font-size: 14.5px;
   color: var(--vp-c-text-2);
 }
 
-.realtime-demo {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  max-width: 900px;
-  margin: 0 auto;
-  text-align: left;
-  min-width: 0;
-}
-
-@media (max-width: 719px) {
-  .realtime-demo {
-    grid-template-columns: 1fr;
-  }
-}
-
-.realtime-demo-col {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-}
-
-.realtime-demo-label {
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--vp-c-text-3);
-  padding-left: 2px;
-}
-
-.realtime-demo-col div[class*="language-"] {
-  margin: 0;
-  border-radius: 12px;
-  flex: 1;
-  min-width: 0;
-}
-
-.realtime-demo-col pre {
-  overflow-x: auto;
-  font-size: 14px;
-}
-
-.realtime-demo-col button.copy {
-  display: none;
-}
-
-.realtime-note {
-  max-width: 640px;
-  margin: 28px auto 0;
+.realtime-subtitle code {
   font-size: 13px;
-  line-height: 1.6;
-  color: var(--vp-c-text-3);
-}
-
-.realtime-note code {
-  font-size: 12px;
 }

@@ -29,16 +29,20 @@ const transports = [
 
 const useCases = [
   {
-    title: "Back to front",
-    desc: "Push a row's own update straight to the screen it's open on — no polling, no second query.",
+    title: "Client-facing UI",
+    desc: "Live dashboards, badge counts, presence, scoped inventory views, job progress — pushed straight to the browser or mobile client.",
   },
   {
-    title: "Backend to backend",
-    desc: "Fan writes out to a queue or a broker so other services react without calling your API back.",
+    title: "Service-to-service",
+    desc: "Cache invalidation, search index sync, audit trails, analytics pipelines — fanned out to other backends over a broker.",
   },
   {
-    title: "And more",
-    desc: "Audit trails, cache invalidation, search re-indexing — anything that reacts to a write, off the same events.",
+    title: "External-facing",
+    desc: "Partner webhooks and mobile push, scoped and authorized per recipient rather than held open as a connection.",
+  },
+  {
+    title: "Bridging",
+    desc: "Ingest on one transport, fan out on another — IoT telemetry over a broker, live on an ops dashboard over WebSocket.",
   },
 ];
 </script>
@@ -86,14 +90,20 @@ const useCases = [
 
 .realtime-usecases {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 20px;
-  max-width: 900px;
+  max-width: 1040px;
   margin: 32px auto 0;
   text-align: left;
 }
 
-@media (max-width: 719px) {
+@media (max-width: 900px) {
+  .realtime-usecases {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
   .realtime-usecases {
     grid-template-columns: 1fr;
   }
