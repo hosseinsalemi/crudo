@@ -20,7 +20,6 @@ import ToolLogoStrip from "./.vitepress/theme/components/ToolLogoStrip.vue";
 import QueryGrammarTabs from "./.vitepress/theme/components/QueryGrammarTabs.vue";
 import FeatureGrid from "./.vitepress/theme/components/FeatureGrid.vue";
 import McpSection from "./.vitepress/theme/components/McpSection.vue";
-import ConfigScopes from "./.vitepress/theme/components/ConfigScopes.vue";
 import LayerEquation from "./.vitepress/theme/components/LayerEquation.vue";
 
 const queryGrammarTabs = [
@@ -315,7 +314,5 @@ GET /books
     </div>
   </div>
 </div>
-
-<ConfigScopes />
 
 <LayerEquation />
