@@ -20,6 +20,7 @@ import ToolLogoStrip from "./.vitepress/theme/components/ToolLogoStrip.vue";
 import QueryGrammarTabs from "./.vitepress/theme/components/QueryGrammarTabs.vue";
 import FeatureGrid from "./.vitepress/theme/components/FeatureGrid.vue";
 import McpSection from "./.vitepress/theme/components/McpSection.vue";
+import RealtimeSection from "./.vitepress/theme/components/RealtimeSection.vue";
 import LayerEquation from "./.vitepress/theme/components/LayerEquation.vue";
 
 const queryGrammarTabs = [
@@ -313,6 +314,50 @@ GET /books
   </div>
     </div>
   </div>
+</div>
+
+<div class="realtime-section">
+  <p class="realtime-title">Realtime, without a second system</p>
+  <p class="realtime-subtitle">
+    Every create, update, patch, and delete already flows through one engine — publishing it as an event is a config flag, not a new pipeline.
+  </p>
+
+  <div class="realtime-demo">
+    <div class="realtime-demo-col">
+      <span class="realtime-demo-label">Setup</span>
+
+```ts
+const sse = createSseTransport({
+  verifyToken: (token) => verifyJwt(token),
+});
+
+const kavo = createKavo({
+  infrastructure,
+  realtimeTransports: [sse],
+  defaults: { realtime: { enabled: true } },
+});
+```
+
+  </div>
+    <div class="realtime-demo-col">
+      <span class="realtime-demo-label">Client</span>
+
+```js
+const source = new EventSource("/realtime?channel=Book.42");
+
+source.addEventListener("updated", (message) => {
+  const event = JSON.parse(message.data);
+});
+```
+
+  </div>
+  </div>
+
+  <RealtimeSection />
+
+  <p class="realtime-note">
+    One <code>RealtimeTransport</code> interface — <code>publish(event)</code> — behind every wire. Swap SSE for a broker without touching the entities or the engine that emit the events.
+  </p>
 </div>
 
 <LayerEquation />
