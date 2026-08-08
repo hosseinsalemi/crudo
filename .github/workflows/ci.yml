@@ -96,7 +96,7 @@ jobs:
   # cross-checks the `build`/`test` split against the gate, so a job outside
   # that split is exempt by design.
   bun-compat:
-    name: bun compat
+    name: test (bun)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
