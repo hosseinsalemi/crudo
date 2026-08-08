@@ -346,7 +346,6 @@
 
 .realtime-subtitle {
   margin: 0 auto 28px;
-  max-width: 640px;
   font-size: 14.5px;
   color: var(--vp-c-text-2);
   text-align: center;
