@@ -38,106 +38,27 @@ function bookFilterable(): FilterableEntity {
 
 describe("createSseTransport — name", () => {
   it("identifies itself as 'sse'", () => {
-    expect(createSseTransport({ verifyToken: () => ({}) }).name).toBe("sse");
+    expect(createSseTransport({}).name).toBe("sse");
   });
 });
 
-describe("createSseTransport — handleRequest auth", () => {
-  it("rejects with 401 before opening the stream when no token is supplied", async () => {
-    const transport = createSseTransport({ verifyToken: () => ({ sub: "u1" }) });
-    const { req } = fakeRequest("/realtime?channel=Book.1", { accept: "text/event-stream" });
-    const res = fakeResponse();
+describe("createSseTransport — no authentication of its own", () => {
+  it("accepts a subscribe request whether or not it carries a token or Authorization header", async () => {
+    const transport = createSseTransport({});
 
-    await transport.handleRequest(req, res);
+    for (const url of ["/realtime?channel=Book.1", "/realtime?channel=Book.1&token=whatever"]) {
+      const { req } = fakeRequest(url, { accept: "text/event-stream" });
+      const res = fakeResponse();
+      await transport.handleRequest(req, res);
+      expect(res.statusCode).toBe(200);
+    }
 
-    expect(res.statusCode).toBe(401);
-    expect(res.frames).toHaveLength(0);
-    expect(transport.connectionCount).toBe(0);
-  });
-
-  it("rejects with 401 when verifyToken returns null", async () => {
-    const transport = createSseTransport({ verifyToken: () => null });
-    const { req } = fakeRequest("/realtime?channel=Book.1&token=bad", { accept: "text/event-stream" });
-    const res = fakeResponse();
-
-    await transport.handleRequest(req, res);
-
-    expect(res.statusCode).toBe(401);
-    expect(res.jsonBody).toMatchObject({ error: expect.any(String) });
-  });
-
-  it("rejects with 401 when verifyToken rejects", async () => {
-    const transport = createSseTransport({
-      verifyToken: () => Promise.reject(new Error("token service down")),
-    });
-    const { req } = fakeRequest("/realtime?channel=Book.1&token=whatever", { accept: "text/event-stream" });
-    const res = fakeResponse();
-
-    await transport.handleRequest(req, res);
-
-    expect(res.statusCode).toBe(401);
-  });
-
-  it("rejects with 401 when verifyToken throws synchronously", async () => {
-    const transport = createSseTransport({
-      verifyToken: () => {
-        throw new Error("malformed token");
-      },
-    });
-    const { req } = fakeRequest("/realtime?channel=Book.1&token=whatever", { accept: "text/event-stream" });
-    const res = fakeResponse();
-
-    await transport.handleRequest(req, res);
-
-    expect(res.statusCode).toBe(401);
-  });
-
-  it("reads the token from a query param — what EventSource can actually set", async () => {
-    const verifyToken = vi.fn().mockReturnValue({ sub: "u1" });
-    const transport = createSseTransport({ verifyToken });
-    const { req } = fakeRequest("/realtime?channel=Book.1&token=abc123", { accept: "text/event-stream" });
-    const res = fakeResponse();
-
-    await transport.handleRequest(req, res);
-
-    expect(verifyToken).toHaveBeenCalledWith("abc123");
-    expect(res.statusCode).toBe(200);
-  });
-
-  it("prefers the Authorization header over a token query param when both are present", async () => {
-    const verifyToken = vi.fn().mockReturnValue({ sub: "u1" });
-    const transport = createSseTransport({ verifyToken });
-    const { req } = fakeRequest("/realtime?channel=Book.1&token=from-query", {
+    const { req } = fakeRequest("/realtime?channel=Book.1", {
       accept: "text/event-stream",
-      authorization: "Bearer from-header",
+      authorization: "Bearer whatever",
     });
     const res = fakeResponse();
-
     await transport.handleRequest(req, res);
-
-    expect(verifyToken).toHaveBeenCalledWith("from-header");
-  });
-});
-
-describe("createSseTransport — verifyToken omitted (authentication disabled)", () => {
-  it("accepts a subscribe request with no token at all", async () => {
-    const transport = createSseTransport({});
-    const { req } = fakeRequest("/realtime?channel=Book.1", { accept: "text/event-stream" });
-    const res = fakeResponse();
-
-    await transport.handleRequest(req, res);
-
-    expect(res.statusCode).toBe(200);
-    expect(transport.connectionCount).toBe(1);
-  });
-
-  it("accepts a subscribe request that carries a token, without ever calling any verifier", async () => {
-    const transport = createSseTransport({});
-    const { req } = fakeRequest("/realtime?channel=Book.1&token=whatever", { accept: "text/event-stream" });
-    const res = fakeResponse();
-
-    await transport.handleRequest(req, res);
-
     expect(res.statusCode).toBe(200);
   });
 
@@ -154,8 +75,8 @@ describe("createSseTransport — verifyToken omitted (authentication disabled)",
 
 describe("createSseTransport — handleRequest request shape", () => {
   it("rejects a non-GET method with 400 before opening the stream", async () => {
-    const transport = createSseTransport({ verifyToken: () => ({}) });
-    const { req } = fakeRequest("/realtime?channel=Book.1&token=t", { accept: "text/event-stream" });
+    const transport = createSseTransport({});
+    const { req } = fakeRequest("/realtime?channel=Book.1", { accept: "text/event-stream" });
     (req as { method: string }).method = "POST";
     const res = fakeResponse();
 
@@ -165,8 +86,8 @@ describe("createSseTransport — handleRequest request shape", () => {
   });
 
   it("rejects a request with no 'Accept: text/event-stream' header with 400", async () => {
-    const transport = createSseTransport({ verifyToken: () => ({}) });
-    const { req } = fakeRequest("/realtime?channel=Book.1&token=t", { accept: "application/json" });
+    const transport = createSseTransport({});
+    const { req } = fakeRequest("/realtime?channel=Book.1", { accept: "application/json" });
     const res = fakeResponse();
 
     await transport.handleRequest(req, res);
@@ -175,8 +96,8 @@ describe("createSseTransport — handleRequest request shape", () => {
   });
 
   it("rejects a request with no 'channel' query parameter with 400", async () => {
-    const transport = createSseTransport({ verifyToken: () => ({}) });
-    const { req } = fakeRequest("/realtime?token=t", { accept: "text/event-stream" });
+    const transport = createSseTransport({});
+    const { req } = fakeRequest("/realtime", { accept: "text/event-stream" });
     const res = fakeResponse();
 
     await transport.handleRequest(req, res);
@@ -185,8 +106,8 @@ describe("createSseTransport — handleRequest request shape", () => {
   });
 
   it.each(["", ".42", "Book."])("rejects a malformed channel %j with 400", async (channel) => {
-    const transport = createSseTransport({ verifyToken: () => ({}) });
-    const { req } = fakeRequest(`/realtime?channel=${encodeURIComponent(channel)}&token=t`, {
+    const transport = createSseTransport({});
+    const { req } = fakeRequest(`/realtime?channel=${encodeURIComponent(channel)}`, {
       accept: "text/event-stream",
     });
     const res = fakeResponse();
@@ -197,8 +118,8 @@ describe("createSseTransport — handleRequest request shape", () => {
   });
 
   it("accepts a bare entity name as a collection-channel subscription (issue #160)", async () => {
-    const transport = createSseTransport({ verifyToken: () => ({}) });
-    const { req } = fakeRequest("/realtime?channel=Book&token=t", { accept: "text/event-stream" });
+    const transport = createSseTransport({});
+    const { req } = fakeRequest("/realtime?channel=Book", { accept: "text/event-stream" });
     const res = fakeResponse();
 
     await transport.handleRequest(req, res);
@@ -211,10 +132,9 @@ describe("createSseTransport — handleRequest request shape", () => {
 describe("createSseTransport — subscribableFields enforcement", () => {
   it("accepts a 'fields' request naming only allowlisted fields (array form)", async () => {
     const transport = createSseTransport({
-      verifyToken: () => ({}),
       subscribableFields: (entity) => (entity === "Book" ? ["title", "status"] : undefined),
     });
-    const { req } = fakeRequest("/realtime?channel=Book.1&token=t&fields=title,status", {
+    const { req } = fakeRequest("/realtime?channel=Book.1&fields=title,status", {
       accept: "text/event-stream",
     });
     const res = fakeResponse();
@@ -226,10 +146,9 @@ describe("createSseTransport — subscribableFields enforcement", () => {
 
   it("rejects a 'fields' request naming a field outside the allowlist (array form) with 400", async () => {
     const transport = createSseTransport({
-      verifyToken: () => ({}),
       subscribableFields: (entity) => (entity === "Book" ? ["title", "status"] : undefined),
     });
-    const { req } = fakeRequest("/realtime?channel=Book.1&token=t&fields=title,price", {
+    const { req } = fakeRequest("/realtime?channel=Book.1&fields=title,price", {
       accept: "text/event-stream",
     });
     const res = fakeResponse();
@@ -243,10 +162,9 @@ describe("createSseTransport — subscribableFields enforcement", () => {
 
   it("rejects a field named in an 'exclude' selector with 400", async () => {
     const transport = createSseTransport({
-      verifyToken: () => ({}),
       subscribableFields: () => ({ exclude: ["price"] }),
     });
-    const { req } = fakeRequest("/realtime?channel=Book.1&token=t&fields=price", { accept: "text/event-stream" });
+    const { req } = fakeRequest("/realtime?channel=Book.1&fields=price", { accept: "text/event-stream" });
     const res = fakeResponse();
 
     await transport.handleRequest(req, res);
@@ -256,10 +174,9 @@ describe("createSseTransport — subscribableFields enforcement", () => {
 
   it("accepts a field not named by an 'exclude' selector", async () => {
     const transport = createSseTransport({
-      verifyToken: () => ({}),
       subscribableFields: () => ({ exclude: ["price"] }),
     });
-    const { req } = fakeRequest("/realtime?channel=Book.1&token=t&fields=title", { accept: "text/event-stream" });
+    const { req } = fakeRequest("/realtime?channel=Book.1&fields=title", { accept: "text/event-stream" });
     const res = fakeResponse();
 
     await transport.handleRequest(req, res);
@@ -268,8 +185,8 @@ describe("createSseTransport — subscribableFields enforcement", () => {
   });
 
   it("accepts any field when no subscribableFields callback is configured", async () => {
-    const transport = createSseTransport({ verifyToken: () => ({}) });
-    const { req } = fakeRequest("/realtime?channel=Book.1&token=t&fields=anything", {
+    const transport = createSseTransport({});
+    const { req } = fakeRequest("/realtime?channel=Book.1&fields=anything", {
       accept: "text/event-stream",
     });
     const res = fakeResponse();
@@ -281,10 +198,9 @@ describe("createSseTransport — subscribableFields enforcement", () => {
 
   it("accepts any field when the callback returns undefined for that entity", async () => {
     const transport = createSseTransport({
-      verifyToken: () => ({}),
       subscribableFields: () => undefined,
     });
-    const { req } = fakeRequest("/realtime?channel=Book.1&token=t&fields=anything", {
+    const { req } = fakeRequest("/realtime?channel=Book.1&fields=anything", {
       accept: "text/event-stream",
     });
     const res = fakeResponse();
@@ -296,8 +212,8 @@ describe("createSseTransport — subscribableFields enforcement", () => {
 
   it("skips 'fields'-list validation when no 'fields' param is given, but still resolves the allowlist for payload narrowing", async () => {
     const subscribableFields = vi.fn().mockReturnValue([]);
-    const transport = createSseTransport({ verifyToken: () => ({}), subscribableFields });
-    const { req } = fakeRequest("/realtime?channel=Book.1&token=t", { accept: "text/event-stream" });
+    const transport = createSseTransport({ subscribableFields });
+    const { req } = fakeRequest("/realtime?channel=Book.1", { accept: "text/event-stream" });
     const res = fakeResponse();
 
     await transport.handleRequest(req, res);
@@ -313,10 +229,9 @@ describe("createSseTransport — subscribableFields enforcement", () => {
 describe("createSseTransport — subscribableFields payload narrowing", () => {
   it("narrows the outgoing item to an array selector even when no 'fields' param was requested", async () => {
     const transport = createSseTransport({
-      verifyToken: () => ({}),
       subscribableFields: (entity) => (entity === "Book" ? ["title", "status"] : undefined),
     });
-    const { req } = fakeRequest("/realtime?channel=Book.1&token=t", { accept: "text/event-stream" });
+    const { req } = fakeRequest("/realtime?channel=Book.1", { accept: "text/event-stream" });
     const res = fakeResponse();
     await transport.handleRequest(req, res);
 
@@ -328,10 +243,9 @@ describe("createSseTransport — subscribableFields payload narrowing", () => {
 
   it("narrows further to a requested 'fields' subset within the configured allowlist", async () => {
     const transport = createSseTransport({
-      verifyToken: () => ({}),
       subscribableFields: (entity) => (entity === "Book" ? ["title", "status"] : undefined),
     });
-    const { req } = fakeRequest("/realtime?channel=Book.1&token=t&fields=title", { accept: "text/event-stream" });
+    const { req } = fakeRequest("/realtime?channel=Book.1&fields=title", { accept: "text/event-stream" });
     const res = fakeResponse();
     await transport.handleRequest(req, res);
 
@@ -343,10 +257,9 @@ describe("createSseTransport — subscribableFields payload narrowing", () => {
 
   it("narrows to 'not excluded' for an exclude selector, with no 'fields' param", async () => {
     const transport = createSseTransport({
-      verifyToken: () => ({}),
       subscribableFields: () => ({ exclude: ["price"] }),
     });
-    const { req } = fakeRequest("/realtime?channel=Book.1&token=t", { accept: "text/event-stream" });
+    const { req } = fakeRequest("/realtime?channel=Book.1", { accept: "text/event-stream" });
     const res = fakeResponse();
     await transport.handleRequest(req, res);
 
@@ -357,8 +270,8 @@ describe("createSseTransport — subscribableFields payload narrowing", () => {
   });
 
   it("delivers the item unnarrowed when no subscribableFields callback is configured", async () => {
-    const transport = createSseTransport({ verifyToken: () => ({}) });
-    const { req } = fakeRequest("/realtime?channel=Book.1&token=t", { accept: "text/event-stream" });
+    const transport = createSseTransport({});
+    const { req } = fakeRequest("/realtime?channel=Book.1", { accept: "text/event-stream" });
     const res = fakeResponse();
     await transport.handleRequest(req, res);
 
@@ -371,8 +284,8 @@ describe("createSseTransport — subscribableFields payload narrowing", () => {
 
 describe("createSseTransport — opening a stream", () => {
   it("writes text/event-stream response headers and registers the connection", async () => {
-    const transport = createSseTransport({ verifyToken: () => ({}) });
-    const { req } = fakeRequest("/realtime?channel=Book.1&token=t", { accept: "text/event-stream" });
+    const transport = createSseTransport({});
+    const { req } = fakeRequest("/realtime?channel=Book.1", { accept: "text/event-stream" });
     const res = fakeResponse();
 
     await transport.handleRequest(req, res);
@@ -388,8 +301,8 @@ describe("createSseTransport — opening a stream", () => {
   });
 
   it("unsubscribes the connection once the underlying request closes", async () => {
-    const transport = createSseTransport({ verifyToken: () => ({}) });
-    const { req, close } = fakeRequest("/realtime?channel=Book.1&token=t", { accept: "text/event-stream" });
+    const transport = createSseTransport({});
+    const { req, close } = fakeRequest("/realtime?channel=Book.1", { accept: "text/event-stream" });
     const res = fakeResponse();
 
     await transport.handleRequest(req, res);
@@ -404,8 +317,8 @@ describe("createSseTransport — opening a stream", () => {
     // a broken pipe surfaces as an 'error' on the response, not a 'close' on
     // the request, and both must free the connection or a channel accumulates
     // dead subscribers forever.
-    const transport = createSseTransport({ verifyToken: () => ({}) });
-    const { req } = fakeRequest("/realtime?channel=Book.1&token=t", { accept: "text/event-stream" });
+    const transport = createSseTransport({});
+    const { req } = fakeRequest("/realtime?channel=Book.1", { accept: "text/event-stream" });
     const res = fakeResponse();
 
     await transport.handleRequest(req, res);
@@ -418,8 +331,8 @@ describe("createSseTransport — opening a stream", () => {
 
 describe("createSseTransport — publish", () => {
   it("writes a spec-correct SSE frame (id/event/data) to a subscriber of the matching channel", async () => {
-    const transport = createSseTransport({ verifyToken: () => ({}) });
-    const { req } = fakeRequest("/realtime?channel=Book.1&token=t", { accept: "text/event-stream" });
+    const transport = createSseTransport({});
+    const { req } = fakeRequest("/realtime?channel=Book.1", { accept: "text/event-stream" });
     const res = fakeResponse();
     await transport.handleRequest(req, res);
 
@@ -435,8 +348,8 @@ describe("createSseTransport — publish", () => {
   });
 
   it("does not deliver to a connection subscribed to a different channel", async () => {
-    const transport = createSseTransport({ verifyToken: () => ({}) });
-    const { req } = fakeRequest("/realtime?channel=Book.2&token=t", { accept: "text/event-stream" });
+    const transport = createSseTransport({});
+    const { req } = fakeRequest("/realtime?channel=Book.2", { accept: "text/event-stream" });
     const res = fakeResponse();
     await transport.handleRequest(req, res);
 
@@ -446,22 +359,16 @@ describe("createSseTransport — publish", () => {
   });
 
   it("is a no-op when no connection is subscribed to the event's channel", async () => {
-    const transport = createSseTransport({ verifyToken: () => ({}) });
+    const transport = createSseTransport({});
     await expect(transport.publish(createdEvent())).resolves.toBeUndefined();
   });
 
   it("fans one event out to every connection subscribed to the same channel", async () => {
-    const transport = createSseTransport({ verifyToken: () => ({}) });
+    const transport = createSseTransport({});
     const first = fakeResponse();
     const second = fakeResponse();
-    await transport.handleRequest(
-      fakeRequest("/realtime?channel=Book.1&token=t", { accept: "text/event-stream" }).req,
-      first,
-    );
-    await transport.handleRequest(
-      fakeRequest("/realtime?channel=Book.1&token=t", { accept: "text/event-stream" }).req,
-      second,
-    );
+    await transport.handleRequest(fakeRequest("/realtime?channel=Book.1", { accept: "text/event-stream" }).req, first);
+    await transport.handleRequest(fakeRequest("/realtime?channel=Book.1", { accept: "text/event-stream" }).req, second);
 
     await transport.publish(createdEvent());
 
@@ -474,15 +381,15 @@ describe("createSseTransport — publish", () => {
   });
 
   it("assigns increasing 'id:' values across successive publishes, shared across channels", async () => {
-    const transport = createSseTransport({ verifyToken: () => ({}) });
+    const transport = createSseTransport({});
     const bookRes = fakeResponse();
     const authorRes = fakeResponse();
     await transport.handleRequest(
-      fakeRequest("/realtime?channel=Book.1&token=t", { accept: "text/event-stream" }).req,
+      fakeRequest("/realtime?channel=Book.1", { accept: "text/event-stream" }).req,
       bookRes,
     );
     await transport.handleRequest(
-      fakeRequest("/realtime?channel=Author.5&token=t", { accept: "text/event-stream" }).req,
+      fakeRequest("/realtime?channel=Author.5", { accept: "text/event-stream" }).req,
       authorRes,
     );
 
@@ -497,15 +404,12 @@ describe("createSseTransport — publish", () => {
   });
 
   it("drops a connection whose write buffer exceeds bufferLimitBytes instead of blocking other subscribers", async () => {
-    const transport = createSseTransport({ verifyToken: () => ({}), bufferLimitBytes: 10 });
+    const transport = createSseTransport({ bufferLimitBytes: 10 });
     const slow = fakeResponse();
     const healthy = fakeResponse();
+    await transport.handleRequest(fakeRequest("/realtime?channel=Book.1", { accept: "text/event-stream" }).req, slow);
     await transport.handleRequest(
-      fakeRequest("/realtime?channel=Book.1&token=t", { accept: "text/event-stream" }).req,
-      slow,
-    );
-    await transport.handleRequest(
-      fakeRequest("/realtime?channel=Book.1&token=t", { accept: "text/event-stream" }).req,
+      fakeRequest("/realtime?channel=Book.1", { accept: "text/event-stream" }).req,
       healthy,
     );
     setWritableLength(slow, 1_000_000);
@@ -522,15 +426,15 @@ describe("createSseTransport — publish", () => {
 
 describe("createSseTransport — collection channel + dual routing", () => {
   it("delivers one write to both an item-channel and a collection-channel subscriber", async () => {
-    const transport = createSseTransport({ verifyToken: () => ({}) });
+    const transport = createSseTransport({});
     const itemSub = fakeResponse();
     const collectionSub = fakeResponse();
     await transport.handleRequest(
-      fakeRequest("/realtime?channel=Book.1&token=t", { accept: "text/event-stream" }).req,
+      fakeRequest("/realtime?channel=Book.1", { accept: "text/event-stream" }).req,
       itemSub,
     );
     await transport.handleRequest(
-      fakeRequest("/realtime?channel=Book&token=t", { accept: "text/event-stream" }).req,
+      fakeRequest("/realtime?channel=Book", { accept: "text/event-stream" }).req,
       collectionSub,
     );
 
@@ -541,10 +445,10 @@ describe("createSseTransport — collection channel + dual routing", () => {
   });
 
   it("does not deliver to a collection subscriber of a different entity", async () => {
-    const transport = createSseTransport({ verifyToken: () => ({}) });
+    const transport = createSseTransport({});
     const authorSub = fakeResponse();
     await transport.handleRequest(
-      fakeRequest("/realtime?channel=Author&token=t", { accept: "text/event-stream" }).req,
+      fakeRequest("/realtime?channel=Author", { accept: "text/event-stream" }).req,
       authorSub,
     );
 
@@ -554,15 +458,15 @@ describe("createSseTransport — collection channel + dual routing", () => {
   });
 
   it("shares one 'id:' across every connection notified by one publish, even across item and collection channels", async () => {
-    const transport = createSseTransport({ verifyToken: () => ({}) });
+    const transport = createSseTransport({});
     const itemSub = fakeResponse();
     const collectionSub = fakeResponse();
     await transport.handleRequest(
-      fakeRequest("/realtime?channel=Book.1&token=t", { accept: "text/event-stream" }).req,
+      fakeRequest("/realtime?channel=Book.1", { accept: "text/event-stream" }).req,
       itemSub,
     );
     await transport.handleRequest(
-      fakeRequest("/realtime?channel=Book&token=t&fields=title", { accept: "text/event-stream" }).req,
+      fakeRequest("/realtime?channel=Book&fields=title", { accept: "text/event-stream" }).req,
       collectionSub,
     );
 
@@ -579,8 +483,8 @@ describe("createSseTransport — collection channel + dual routing", () => {
 
 describe("createSseTransport — subscribe-time filtering (issue #160)", () => {
   it("rejects filter query params with 400 when filterableEntities is not configured", async () => {
-    const transport = createSseTransport({ verifyToken: () => ({}) });
-    const { req } = fakeRequest("/realtime?channel=Book&token=t&filter[status][eq]=published", {
+    const transport = createSseTransport({});
+    const { req } = fakeRequest("/realtime?channel=Book&filter[status][eq]=published", {
       accept: "text/event-stream",
     });
     const res = fakeResponse();
@@ -593,10 +497,9 @@ describe("createSseTransport — subscribe-time filtering (issue #160)", () => {
 
   it("accepts a well-formed filter when filterableEntities is configured", async () => {
     const transport = createSseTransport({
-      verifyToken: () => ({}),
       filterableEntities: (entity) => (entity === "Book" ? bookFilterable() : undefined),
     });
-    const { req } = fakeRequest("/realtime?channel=Book&token=t&filter[status][eq]=published", {
+    const { req } = fakeRequest("/realtime?channel=Book&filter[status][eq]=published", {
       accept: "text/event-stream",
     });
     const res = fakeResponse();
@@ -608,10 +511,9 @@ describe("createSseTransport — subscribe-time filtering (issue #160)", () => {
 
   it("rejects a malformed filter (unknown operator) with 400 before opening the stream", async () => {
     const transport = createSseTransport({
-      verifyToken: () => ({}),
       filterableEntities: () => bookFilterable(),
     });
-    const { req } = fakeRequest("/realtime?channel=Book&token=t&filter[status][bogus]=published", {
+    const { req } = fakeRequest("/realtime?channel=Book&filter[status][bogus]=published", {
       accept: "text/event-stream",
     });
     const res = fakeResponse();
@@ -625,10 +527,9 @@ describe("createSseTransport — subscribe-time filtering (issue #160)", () => {
 
   it("rejects a filter naming a field the entity doesn't have, with 400", async () => {
     const transport = createSseTransport({
-      verifyToken: () => ({}),
       filterableEntities: () => bookFilterable(),
     });
-    const { req } = fakeRequest("/realtime?channel=Book&token=t&filter[nope][eq]=x", {
+    const { req } = fakeRequest("/realtime?channel=Book&filter[nope][eq]=x", {
       accept: "text/event-stream",
     });
     const res = fakeResponse();
@@ -640,11 +541,10 @@ describe("createSseTransport — subscribe-time filtering (issue #160)", () => {
 
   it("rejects a filter field outside subscribableFields with 400", async () => {
     const transport = createSseTransport({
-      verifyToken: () => ({}),
       subscribableFields: (entity) => (entity === "Book" ? ["title", "status"] : undefined),
       filterableEntities: () => bookFilterable(),
     });
-    const { req } = fakeRequest("/realtime?channel=Book&token=t&filter[price][eq]=12", {
+    const { req } = fakeRequest("/realtime?channel=Book&filter[price][eq]=12", {
       accept: "text/event-stream",
     });
     const res = fakeResponse();
@@ -657,10 +557,9 @@ describe("createSseTransport — subscribe-time filtering (issue #160)", () => {
 
   it("delivers to a filtered collection subscriber only when the published item matches", async () => {
     const transport = createSseTransport({
-      verifyToken: () => ({}),
       filterableEntities: () => bookFilterable(),
     });
-    const { req } = fakeRequest("/realtime?channel=Book&token=t&filter[status][eq]=published", {
+    const { req } = fakeRequest("/realtime?channel=Book&filter[status][eq]=published", {
       accept: "text/event-stream",
     });
     const res = fakeResponse();
@@ -675,10 +574,9 @@ describe("createSseTransport — subscribe-time filtering (issue #160)", () => {
 
   it("delivers an 'entering' write as its ordinary event id, not a synthesized one", async () => {
     const transport = createSseTransport({
-      verifyToken: () => ({}),
       filterableEntities: () => bookFilterable(),
     });
-    const { req } = fakeRequest("/realtime?channel=Book&token=t&filter[status][eq]=published", {
+    const { req } = fakeRequest("/realtime?channel=Book&filter[status][eq]=published", {
       accept: "text/event-stream",
     });
     const res = fakeResponse();
@@ -694,10 +592,9 @@ describe("createSseTransport — subscribe-time filtering (issue #160)", () => {
 
   it("does not deliver a write that makes a row stop matching (leave is silent — documented limitation)", async () => {
     const transport = createSseTransport({
-      verifyToken: () => ({}),
       filterableEntities: () => bookFilterable(),
     });
-    const { req } = fakeRequest("/realtime?channel=Book&token=t&filter[status][eq]=published", {
+    const { req } = fakeRequest("/realtime?channel=Book&filter[status][eq]=published", {
       accept: "text/event-stream",
     });
     const res = fakeResponse();
@@ -713,10 +610,9 @@ describe("createSseTransport — subscribe-time filtering (issue #160)", () => {
 
   it("delivers a 'deleted' event to a filtered subscriber unconditionally, item null (bypass policy)", async () => {
     const transport = createSseTransport({
-      verifyToken: () => ({}),
       filterableEntities: () => bookFilterable(),
     });
-    const { req } = fakeRequest("/realtime?channel=Book&token=t&filter[status][eq]=published", {
+    const { req } = fakeRequest("/realtime?channel=Book&filter[status][eq]=published", {
       accept: "text/event-stream",
     });
     const res = fakeResponse();
@@ -732,10 +628,9 @@ describe("createSseTransport — subscribe-time filtering (issue #160)", () => {
 
   it("never delivers to a filtered subscriber across several writes that never match", async () => {
     const transport = createSseTransport({
-      verifyToken: () => ({}),
       filterableEntities: () => bookFilterable(),
     });
-    const { req } = fakeRequest("/realtime?channel=Book&token=t&filter[status][eq]=published", {
+    const { req } = fakeRequest("/realtime?channel=Book&filter[status][eq]=published", {
       accept: "text/event-stream",
     });
     const res = fakeResponse();
@@ -751,10 +646,9 @@ describe("createSseTransport — subscribe-time filtering (issue #160)", () => {
 
   it("delivers from creation when the created item already matches", async () => {
     const transport = createSseTransport({
-      verifyToken: () => ({}),
       filterableEntities: () => bookFilterable(),
     });
-    const { req } = fakeRequest("/realtime?channel=Book&token=t&filter[status][eq]=published", {
+    const { req } = fakeRequest("/realtime?channel=Book&filter[status][eq]=published", {
       accept: "text/event-stream",
     });
     const res = fakeResponse();
@@ -768,12 +662,9 @@ describe("createSseTransport — subscribe-time filtering (issue #160)", () => {
 
 describe("createSseTransport — close", () => {
   it("ends every open connection and clears the registry", async () => {
-    const transport = createSseTransport({ verifyToken: () => ({}) });
+    const transport = createSseTransport({});
     const res = fakeResponse();
-    await transport.handleRequest(
-      fakeRequest("/realtime?channel=Book.1&token=t", { accept: "text/event-stream" }).req,
-      res,
-    );
+    await transport.handleRequest(fakeRequest("/realtime?channel=Book.1", { accept: "text/event-stream" }).req, res);
     expect(transport.connectionCount).toBe(1);
 
     transport.close();

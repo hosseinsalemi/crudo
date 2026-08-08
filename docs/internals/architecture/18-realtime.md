@@ -75,7 +75,7 @@ to a subset of rows — `GET /realtime?channel=Book&filter[status][eq]=published
 This reuses REST's grammar and AST verbatim (ADR-0024): no second filter
 language, no new `RealtimeSettings` key. The filter travels on the
 subscribe request's query string, the same transport-level parameter
-`channel`/`fields`/`token` already are.
+`channel`/`fields` already are.
 
 ### 4.1 Parsing and validation
 
@@ -87,7 +87,6 @@ supplies via `SseTransportOptions.filterableEntities`, the same pattern
 
 ```ts
 const sse = createSseTransport({
-  verifyToken,
   subscribableFields: (entity) => (entity === "Book" ? ["title", "status", "price"] : undefined),
   filterableEntities: (entity) =>
     entity === "Book" ? { metadata: bookService.engine.metadata, config: bookService.engine.config } : undefined,
@@ -160,14 +159,15 @@ checking, per subscriber, whether that principal could have read the row
 over REST leaks it to every subscriber of that channel, filtered or not.
 Row/tenant-level subscriber scoping (`authorize`) is future work.
 
-Authentication itself (`SseTransportOptions.verifyToken`) is optional, not
-mandatory — omitting it disables the `401` check entirely and every
-subscribe request is accepted, regardless of `token`/`Authorization`. That
-is a deliberate opt-out for an internal-only or already
-perimeter-authenticated deployment, not a default worth reaching for on a
-publicly reachable stream: with no `verifyToken`, `subscribableFields`
-narrowing and subscribe-time filtering are the only things bounding what a
-connection can see, and neither is an access-control mechanism (§4.3, §5).
+`@kavo/sse` also has **no authentication of its own** — `handleRequest`
+accepts any subscribe request that otherwise validates. A deployment that
+needs to gate who may open a stream does so in front of `handleRequest` (a
+reverse proxy, or the host framework's own guard/middleware on the mounted
+route); `handleRequest` is an ordinary `(req, res)` handler for that
+purpose, nothing more. `subscribableFields` narrowing and subscribe-time
+filtering are the only things bounding what a connection can _see_, and
+neither is an access-control mechanism — worth restating given how easy
+`filter[ownerId][eq]=me` reads as if it were one (§4.3, §5).
 
 ## 7. Known limitations
 

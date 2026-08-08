@@ -43,26 +43,16 @@ export interface FilterableEntity {
   readonly config: ResolvedEntityConfig;
 }
 
-/** What `handleRequest` needs to authenticate and scope one subscription. */
+/**
+ * What `handleRequest` needs to scope one subscription. `@kavo/sse` has no
+ * authentication of its own — every subscribe request that otherwise
+ * validates is accepted. A deployment that needs to gate who may open a
+ * stream does so in front of `handleRequest` (a reverse proxy, a host
+ * framework's own guard/middleware on the mounted route, …) — see
+ * `RealtimeTransport`'s doc comment on why subscriber-level access control
+ * is out of this seam entirely.
+ */
 export interface SseTransportOptions {
-  /**
-   * Authenticates a subscribe request the same way REST does: a bearer
-   * token, read from the `Authorization` header or a `token` query param
-   * (`EventSource` cannot set custom headers, so the query param is the
-   * only option a browser client actually has). Returning `null` (or
-   * `undefined`) fails the request with `401` *before* any SSE frame is
-   * written — `handleRequest` never opens the stream on an invalid or
-   * missing token. The resolved value is only used to gate the connection;
-   * `@kavo/sse` carries no `authorize` seam (out of scope for this issue,
-   * see `RealtimeTransport`'s own doc on subscriber-level access control).
-   *
-   * **Optional.** Omitting it disables authentication entirely — every
-   * subscribe request is accepted regardless of `token`/`Authorization`,
-   * and no `401` is ever produced. That is a deliberate choice for a
-   * public/internal-only stream, not a fallback to guess at; nothing else
-   * in `@kavo/sse` gates a connection once this callback is absent.
-   */
-  verifyToken?(token: string): unknown | Promise<unknown>;
   /**
    * Per-entity `RealtimeSettings.subscribableFields`, the same allowlist an
    * app already configured via `createCrud` — this package has no config
@@ -177,13 +167,6 @@ function narrowItem(
   return narrowed;
 }
 
-function bearerToken(req: IncomingMessage): string | undefined {
-  const header = req.headers.authorization;
-  if (typeof header !== "string") return undefined;
-  const match = /^Bearer (.+)$/.exec(header);
-  return match?.[1];
-}
-
 function sendJson(res: ServerResponse, status: number, body: Record<string, unknown>): void {
   const payload = JSON.stringify(body);
   res.writeHead(status, { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) });
@@ -208,8 +191,8 @@ function frame(id: number, event: RealtimeEventDto): string {
  * `DefaultFilterParser` expects: one entry per literal key, repeated keys
  * (the `filter[status][in][]=a&filter[status][in][]=b` form) collapsed
  * into one array value under that key. Every other query param
- * (`channel`, `token`, `fields`, …) rides along harmlessly — the parser
- * only ever reads keys starting with `filter[` or the bare `filter` key.
+ * (`channel`, `fields`, …) rides along harmlessly — the parser only ever
+ * reads keys starting with `filter[` or the bare `filter` key.
  */
 function collectRawParams(searchParams: URLSearchParams): Record<string, unknown> {
   const raw: Record<string, unknown> = {};
@@ -374,22 +357,6 @@ export function createSseTransport(options: SseTransportOptions): SseTransport {
         return;
       }
       const entityName = dot === -1 ? channel : channel.slice(0, dot);
-
-      if (options.verifyToken !== undefined) {
-        const token = bearerToken(req) ?? url.searchParams.get("token") ?? undefined;
-        let principal: unknown = null;
-        if (token !== undefined) {
-          try {
-            principal = (await options.verifyToken(token)) ?? null;
-          } catch {
-            principal = null;
-          }
-        }
-        if (principal === null) {
-          sendJson(res, 401, { error: "unauthorized" });
-          return;
-        }
-      }
 
       const selector = options.subscribableFields?.(entityName);
       const fieldsParam = url.searchParams.get("fields");

@@ -61,7 +61,6 @@ describe("@kavo/sse — end-to-end over a real HTTP server", () => {
   beforeEach(async () => {
     adapter = new InMemoryBookAdapter();
     transport = createSseTransport({
-      verifyToken: (token) => (token === "good-token" ? { sub: "u1" } : null),
       subscribableFields: (entity) => (entity === "Book" ? ["title", "status"] : undefined),
     });
 
@@ -78,18 +77,19 @@ describe("@kavo/sse — end-to-end over a real HTTP server", () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 
-  it("rejects with 401 and never opens the stream when the token is missing or invalid", async () => {
+  it("opens the stream over a real socket with no authentication involved", async () => {
     const response = await fetch(`${baseUrl}/realtime?channel=Book.1`, {
       headers: { Accept: "text/event-stream" },
     });
 
-    expect(response.status).toBe(401);
-    expect(response.headers.get("content-type")).toContain("application/json");
-    expect(transport.connectionCount).toBe(0);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/event-stream");
+    expect(transport.connectionCount).toBe(1);
+    await response.body?.cancel();
   });
 
   it("rejects a 'fields' request naming a field outside subscribableFields with 400", async () => {
-    const response = await fetch(`${baseUrl}/realtime?channel=Book.1&token=good-token&fields=title,price`, {
+    const response = await fetch(`${baseUrl}/realtime?channel=Book.1&fields=title,price`, {
       headers: { Accept: "text/event-stream" },
     });
 
@@ -107,7 +107,7 @@ describe("@kavo/sse — end-to-end over a real HTTP server", () => {
       metadata: bookMetadata,
     });
 
-    const response = await fetch(`${baseUrl}/realtime?channel=Book.1&token=good-token`, {
+    const response = await fetch(`${baseUrl}/realtime?channel=Book.1`, {
       headers: { Accept: "text/event-stream" },
     });
     expect(response.status).toBe(200);
@@ -141,37 +141,5 @@ describe("@kavo/sse — end-to-end over a real HTTP server", () => {
     // Proves the real disconnect path over a genuine socket, not just the
     // fake-driven mechanism sse-transport.spec.ts exercises.
     await waitForConnectionCount(transport, 0);
-  });
-});
-
-describe("@kavo/sse — end-to-end, verifyToken omitted", () => {
-  let server: Server;
-  let baseUrl: string;
-  let transport: SseTransport;
-
-  beforeEach(async () => {
-    transport = createSseTransport({});
-    server = createServer((req, res) => {
-      void transport.handleRequest(req, res);
-    });
-    await new Promise<void>((resolve) => server.listen(0, resolve));
-    const address = server.address() as AddressInfo;
-    baseUrl = `http://127.0.0.1:${address.port}`;
-  });
-
-  afterEach(async () => {
-    transport.close();
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  });
-
-  it("opens the stream over a real socket with no token at all", async () => {
-    const response = await fetch(`${baseUrl}/realtime?channel=Book.1`, {
-      headers: { Accept: "text/event-stream" },
-    });
-
-    expect(response.status).toBe(200);
-    expect(response.headers.get("content-type")).toContain("text/event-stream");
-    expect(transport.connectionCount).toBe(1);
-    await response.body?.cancel();
   });
 });

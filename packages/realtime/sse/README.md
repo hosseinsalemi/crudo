@@ -19,7 +19,6 @@ import { createKavo } from "@kavo/core";
 let bookService: ReturnType<typeof kavo.createCrud<Book>>;
 
 const sse = createSseTransport({
-  verifyToken: (token) => verifyJwt(token), // returns a principal, or null
   subscribableFields: (entityName) => (entityName === "Book" ? ["title", "status", "price"] : undefined),
   // Enables subscribe-time filtering (issue #160) for an entity — omit an
   // entry and a `filter[...]` query param on that entity is rejected with
@@ -40,13 +39,11 @@ const kavo = createKavo({
 bookService = kavo.createCrud(Book);
 ```
 
-`verifyToken` is optional — omit it and `handleRequest` never authenticates
-a subscribe request at all (no `401`, no `token`/`Authorization` check),
-useful for an internal-only or already-perimeter-authenticated stream:
-
-```ts
-const sse = createSseTransport({}); // no verifyToken: every subscribe request is accepted
-```
+`@kavo/sse` has **no authentication of its own** — `handleRequest` accepts
+any subscribe request that otherwise validates. A deployment that needs to
+gate who may open a stream does so in front of it: a reverse proxy, or the
+host framework's own guard/middleware on the mounted route, since
+`handleRequest` is just an ordinary `(req, res)` handler.
 
 Mount `sse.handleRequest` on a plain Node HTTP route (or any host
 framework's request/response — Express, Nest, Fastify's raw
@@ -69,13 +66,13 @@ body):
 
 ```js
 // Item channel: every event for Book id 42.
-const one = new EventSource("/realtime?channel=Book.42&token=...");
+const one = new EventSource("/realtime?channel=Book.42");
 
 // Collection channel: every event for every Book (issue #160).
-const all = new EventSource("/realtime?channel=Book&token=...");
+const all = new EventSource("/realtime?channel=Book");
 
 // Collection channel, scoped with the same filter grammar REST uses.
-const published = new EventSource("/realtime?channel=Book&filter[status][eq]=published&token=...");
+const published = new EventSource("/realtime?channel=Book&filter[status][eq]=published");
 
 all.addEventListener("updated", (message) => {
   const event = JSON.parse(message.data); // RealtimeEventDto
@@ -93,14 +90,9 @@ silently ignoring it. See doc 18 §4.3 for what a filtered subscriber
 receives when a write moves a row across the filter boundary, and for the
 unconditional `"deleted"`-event bypass.
 
-`token` may be passed as a query param (what `EventSource` needs, since it
-cannot set custom headers) or as a normal `Authorization: Bearer <token>`
-header for any other client. An invalid or missing token gets a `401`
-_before_ any SSE frame is written — unless `verifyToken` was omitted from
-`createSseTransport`, in which case `token` is ignored entirely and every
-subscribe request is accepted. Once `subscribableFields` is configured
-for an entity, it bounds every outgoing `item` **unconditionally** — not
-only when a subscriber names `fields` — the same way `allowlists.selectable`
+Once `subscribableFields` is configured for an entity, it bounds every
+outgoing `item` **unconditionally** — not only when a subscriber names
+`fields` — the same way `allowlists.selectable`
 bounds a REST response whether or not the caller asked for a subset. An
 optional `fields` query param (comma-separated) narrows further within
 that bound; a field outside it (or outside `subscribableFields`, when no
@@ -130,9 +122,10 @@ closed rather than left to block delivery to every other subscriber.
 - **No filtering by which fields changed** — a subscribe-time filter
   matches row data (`RealtimeEventDto.item`), not the write's diff
   (`RealtimeEventDto.changed`).
-- **No subscriber-level authorization.** Every subscription within
-  `subscribableFields` is trusted once the connection is authenticated (or
-  unconditionally, if `verifyToken` was omitted); row-level/tenant scoping
-  of subscribers is a future issue (`authorize`, out of scope here — see
-  `RealtimeTransport`'s own doc). A `filter` narrows _which_ events a
-  subscriber receives, not _whether_ they were authorized to receive them.
+- **No authentication or authorization.** `@kavo/sse` accepts any subscribe
+  request that otherwise validates — gating who may open a stream is the
+  host app's job (a reverse proxy, or a guard on the mounted route), and
+  row/tenant-level subscriber scoping is a future issue (`authorize`, out
+  of scope here — see `RealtimeTransport`'s own doc). A `filter` narrows
+  _which_ events a subscriber receives, not _whether_ they were authorized
+  to receive them.
