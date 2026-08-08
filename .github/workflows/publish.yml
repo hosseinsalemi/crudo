@@ -29,6 +29,7 @@ jobs:
         packages/orms/prisma
         packages/orms/mongoose
         packages/orms/mikroorm
+        packages/realtime/sse
         packages/protocols/graphql
         packages/protocols/mcp
         packages/frameworks/nest

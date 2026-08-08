@@ -6,6 +6,7 @@
     { "path": "packages/orms/prisma" },
     { "path": "packages/orms/mongoose" },
     { "path": "packages/orms/mikroorm" },
+    { "path": "packages/realtime/sse" },
     { "path": "packages/frameworks/nest" },
     { "path": "packages/protocols/graphql" },
     { "path": "packages/protocols/mcp" },
