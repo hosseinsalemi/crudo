@@ -330,3 +330,27 @@
 .query-demo-col button.copy {
   display: none;
 }
+
+.realtime-section {
+  margin: 64px 0;
+  text-align: center;
+}
+
+.realtime-title {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--vp-c-text-1);
+}
+
+.realtime-subtitle {
+  margin: 0 auto 28px;
+  font-size: 14.5px;
+  color: var(--vp-c-text-2);
+  text-align: center;
+}
+
+.realtime-subtitle code {
+  font-size: 13px;
+}
