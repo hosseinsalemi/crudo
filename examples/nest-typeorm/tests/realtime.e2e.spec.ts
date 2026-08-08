@@ -130,4 +130,67 @@ describe("GET /realtime — Owner writes stream over SSE", () => {
 
     await frames.cancel();
   });
+
+  it("delivers patched, deleted, and restored events for the same owner in order", async () => {
+    const created = await fetch(`${baseUrl}/owners`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Lifecycle", email: "lifecycle@example.com" }),
+    }).then((r) => r.json() as Promise<{ id: number }>);
+
+    const response = await fetch(`${baseUrl}/realtime?channel=Owner.${created.id}`, {
+      headers: { Accept: "text/event-stream" },
+    });
+    expect(response.status).toBe(200);
+    const frames = readSseFrames(response.body!);
+
+    const patchResponse = await fetch(`${baseUrl}/owners/${created.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Lifecycle Renamed" }),
+    });
+    expect(patchResponse.status).toBe(200);
+    const deleteResponse = await fetch(`${baseUrl}/owners/${created.id}`, { method: "DELETE" });
+    expect(deleteResponse.status).toBe(204);
+    const restoreResponse = await fetch(`${baseUrl}/owners/${created.id}/restore`, { method: "PATCH" });
+    expect(restoreResponse.status).toBe(200);
+
+    const events: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      const frame = await frames.next();
+      events.push(/^event: (.+)$/m.exec(frame)![1]!);
+    }
+    expect(events).toEqual(["patched", "deleted", "restored"]);
+
+    await frames.cancel();
+  });
+
+  it("rejects a filter query param with 400 for an entity not wired for filtering (Cat)", async () => {
+    const response = await fetch(`${baseUrl}/realtime?channel=Cat&filter[name][eq]=Whiskers`, {
+      headers: { Accept: "text/event-stream" },
+    });
+
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: string };
+    expect(body.error).toContain("Cat");
+  });
+
+  it("registers and frees the connection, visible on the transport's own connectionCount", async () => {
+    expect(sse.connectionCount).toBe(0);
+
+    const response = await fetch(`${baseUrl}/realtime?channel=Owner`, {
+      headers: { Accept: "text/event-stream" },
+    });
+    expect(response.status).toBe(200);
+    expect(sse.connectionCount).toBe(1);
+
+    await response.body?.cancel();
+    // The server only learns about a client disconnect once the socket
+    // teardown propagates — poll rather than assert immediately.
+    const deadline = Date.now() + 2000;
+    while (sse.connectionCount !== 0) {
+      if (Date.now() > deadline) throw new Error(`connectionCount stuck at ${sse.connectionCount}`);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  });
 });

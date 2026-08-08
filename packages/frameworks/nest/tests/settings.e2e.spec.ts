@@ -374,6 +374,47 @@ describe("KavoModule.forRoot({ realtimeTransports }) — a registered transport 
     // anything) — this only proves the write itself still succeeds with
     // realtime turned on and zero transports registered.
   });
+
+  it("publishes to every transport registered via realtimeTransports, not just the first", async () => {
+    const first = new FakeTransport();
+    const second = new FakeTransport();
+    await bootstrap(RealtimeController, { realtimeTransports: [first, second] });
+
+    await request(server()).post("/todos").send({ title: "x" }).expect(201);
+
+    expect(first.events).toHaveLength(1);
+    expect(second.events).toHaveLength(1);
+    expect(first.events[0]?.id).toBe(second.events[0]?.id);
+  });
+
+  it("does not publish for an entity whose own realtime.enabled is false, even with a transport registered", async () => {
+    // `RealtimeController` above turns realtime on; this one, over the same
+    // Todo entity, deliberately doesn't — proving the transport registration
+    // alone never turns realtime on for an entity that didn't ask for it.
+    @Kavo(Todo)
+    @Controller("todos")
+    class NoRealtimeController {}
+
+    const transport = new FakeTransport();
+    await bootstrap(NoRealtimeController, { realtimeTransports: [transport] });
+
+    await request(server()).post("/todos").send({ title: "x" }).expect(201);
+
+    expect(transport.events).toHaveLength(0);
+  });
+
+  it("publishes updated/patched/deleted events too, not only created", async () => {
+    const transport = new FakeTransport();
+    await bootstrap(RealtimeController, { realtimeTransports: [transport] });
+
+    const created = await request(server()).post("/todos").send({ title: "x" }).expect(201);
+    const id = created.body.id as number;
+    await request(server()).put(`/todos/${id}`).send({ title: "y", done: true, priority: 1 }).expect(200);
+    await request(server()).delete(`/todos/${id}`).expect(204);
+
+    const eventIds = transport.events.map((event) => event.event);
+    expect(eventIds).toEqual(["created", "updated", "deleted"]);
+  });
 });
 
 describe("ListResultDto.meta over the wire — what a findMany handler contributes (issue #122)", () => {
