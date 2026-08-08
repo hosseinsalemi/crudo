@@ -160,6 +160,43 @@ jobs:
       - name: Coverage
         run: pnpm run generate && pnpm run test:coverage
 
+  # A smoke check, not a behavior test: the `test` job above already covers
+  # behavior under Node/Vitest. This only confirms every published package's
+  # compiled `dist/` entry point is importable under Bun with no crash — the
+  # thing a Bun consumer actually experiences. It deliberately imports
+  # compiled output rather than running the test suite under `bun test`:
+  # Bun's own transpiler cannot emit `emitDecoratorMetadata` the way `tsc`
+  # (and the SWC vitest plugin) do, so TypeORM/Nest-decorated sources fail
+  # under Bun for reasons unrelated to actual Bun compatibility. Building
+  # first with `tsc` sidesteps that, since decorator metadata is already
+  # baked into plain JS by the time Bun ever sees it.
+  bun-compat:
+    name: bun compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run generate && pnpm run build
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Sanity import under Bun
+        run: bun run .github/scripts/bun-compat-check.mjs
+
   format:
     name: format
     runs-on: ubuntu-latest
