@@ -23,6 +23,9 @@ kavo/
 │  │  │  └─ src/index.ts
 │  │  └─ mikroorm/            # @kavo/mikroorm
 │  │     └─ src/index.ts
+│  ├─ realtime/
+│  │  └─ sse/                 # @kavo/sse
+│  │     └─ src/index.ts
 │  ├─ frameworks/
 │  │  └─ nest/                # @kavo/nest
 │  │     └─ src/index.ts
@@ -41,19 +44,30 @@ kavo/
 └─ docs/                      # this documentation
 ```
 
-The `orms/`, `frameworks/`, and `protocols/` parent folders keep the door
-open for future adapters, host framework bindings (Express, Fastify,
-Next.js, …), and wire protocols (gRPC, …) without implying any get built
-ahead of real work landing (ADR-0002, ADR-0016). `@kavo/prisma` and
-`@kavo/mongoose` are the second and third `orms/*` adapters, alongside
-`@kavo/typeorm` — see ADR-0017 for the one place Prisma's design departs
-from the TypeORM adapter's shape (marker classes standing in for Prisma's
-lack of runtime entity classes), and ADR-0018 for Mongoose's two (a model
-is already the entity identity, and `ObjectId` converts at the adapter
-boundary rather than widening core's `EntityId`). `@kavo/mikroorm` is the
-fourth, and needed no ADR of its own: a decorated MikroORM entity class is
-already the identity, exactly as under TypeORM, so the only decisions it
-makes are adapter-local and live in doc 17.
+The `orms/`, `realtime/`, `frameworks/`, and `protocols/` parent folders
+keep the door open for future adapters, transports, host framework
+bindings (Express, Fastify, Next.js, …), and wire protocols (gRPC, …)
+without implying any get built ahead of real work landing (ADR-0002,
+ADR-0016). `@kavo/prisma` and `@kavo/mongoose` are the second and third
+`orms/*` adapters, alongside `@kavo/typeorm` — see ADR-0017 for the one
+place Prisma's design departs from the TypeORM adapter's shape (marker
+classes standing in for Prisma's lack of runtime entity classes), and
+ADR-0018 for Mongoose's two (a model is already the entity identity, and
+`ObjectId` converts at the adapter boundary rather than widening core's
+`EntityId`). `@kavo/mikroorm` is the fourth, and needed no ADR of its own:
+a decorated MikroORM entity class is already the identity, exactly as
+under TypeORM, so the only decisions it makes are adapter-local and live
+in doc 17.
+
+`realtime/` is a new parent folder alongside `orms/` (issue #155,
+building on the `RealtimeTransport` seam ADR-0023 added): `@kavo/sse` is
+its first package, and — like an ORM adapter — an interchangeable
+implementation of one seam rather than a different API surface the way
+`protocols/*` is. It follows the exact `orms/*` boundary shape (own
+directory, `@kavo/core` plus its own peer only) rather than the
+`protocols/*`/ADR-0016 one: `@kavo/nest` may only reach it through a lazy
+`import()`, the same way it lazy-loads the MCP SDK, never a static import
+edge.
 
 ## 2. Responsibility statements
 
@@ -79,6 +93,12 @@ makes are adapter-local and live in doc 17.
   under the same no-framework rule. See doc 17 for the two places it splits
   the difference between its siblings — TypeORM's decorated-class metadata
   seam, Prisma's declarative query surface.
+- **`@kavo/sse`** (`packages/realtime/sse`, issue #155) exists to
+  implement core's `RealtimeTransport` seam over Server-Sent Events —
+  plain HTTP `text/event-stream`, no peer dependency at all, since SSE
+  needs no client/server library the way WebSocket needs `ws`. Same
+  no-framework rule as an ORM adapter: `@kavo/core` only, never
+  `@kavo/nest`. See `packages/realtime/sse/README.md`.
 - **`@kavo/nest`** exists to bind Kavo to NestJS (module, decorator,
   route generation, exception filter, Swagger). It can't depend on TypeORM
   or `@kavo/typeorm` — it sees persistence only as an injected
@@ -164,7 +184,7 @@ Two independent enforcement layers:
 ## 4. Workspace tooling: pnpm + plain scripts (ADR-0003)
 
 pnpm workspaces with **plain root scripts**, no
-task runner. The entire build graph is eight packages and three example apps,
+task runner. The entire build graph is nine packages and three example apps,
 whose ordering is already fully expressed by TS project references — `tsc -b`
 performs incremental, dependency-ordered, cached builds natively. A task runner
 (turborepo/nx) would add a second place where the graph is declared, a
@@ -210,7 +230,7 @@ dual ESM+CJS output is a future deliverable.
 ## 6. Build strategy
 
 `tsc -b` against the solution file: incremental (`.tsbuildinfo`),
-project-reference-ordered (core → typeorm/prisma/mongoose/mikroorm/graphql/mcp → nest),
+project-reference-ordered (core → typeorm/prisma/mongoose/mikroorm/sse/graphql/mcp → nest),
 each package emitting
 `dist/` with declarations + declaration maps. Consumers inside the
 workspace resolve `@kavo/*` via pnpm workspace links to the built
@@ -249,6 +269,7 @@ uninstallable — and npm does not allow republishing a version to correct it.
 | `@kavo/prisma`   | `@kavo/core`                               | `@prisma/client`                                                                                                                   |
 | `@kavo/mongoose` | `@kavo/core`                               | `mongoose`                                                                                                                         |
 | `@kavo/mikroorm` | `@kavo/core`                               | `@mikro-orm/core`                                                                                                                  |
+| `@kavo/sse`      | `@kavo/core`                               | — (none)                                                                                                                           |
 | `@kavo/graphql`  | `@kavo/core`                               | `graphql`                                                                                                                          |
 | `@kavo/mcp`      | `@kavo/core`                               | `@modelcontextprotocol/sdk`                                                                                                        |
 | `@kavo/nest`     | `@kavo/core`, `@kavo/graphql`, `@kavo/mcp` | `@nestjs/common`, `@nestjs/core`, `graphql`, `@modelcontextprotocol/sdk` (+ `@nestjs/swagger`, all three protocol peers, optional) |

@@ -38,17 +38,18 @@ Because the build compiles `src` only, each package also has a `tsconfig.tests.j
 
 ## Architecture
 
-Eight published packages in a hub-and-spoke topology (`pnpm-workspace.yaml`, which globs in the three `examples/*` apps as well), plus one sanctioned sideways edge:
+Nine published packages in a hub-and-spoke topology (`pnpm-workspace.yaml`, which globs in the three `examples/*` apps as well), plus one sanctioned sideways edge:
 
 ```
 @kavo/nest ──▶ @kavo/core ◀── @kavo/typeorm
-   │            ▲ ▲ ▲ ▲ ▲
-   │            │ │ │ │ └─── @kavo/prisma
-   │            │ │ │ └───── @kavo/mongoose
-   │            │ │ └─────── @kavo/mikroorm
-   │            │ └───────── @kavo/mcp     ◀─┐
-   │            └─────────── @kavo/graphql ◀─┤
-   └───── the one sanctioned sideways edge ──┘
+   │            ▲ ▲ ▲ ▲ ▲ ▲
+   │            │ │ │ │ │ └─── @kavo/prisma
+   │            │ │ │ │ └───── @kavo/mongoose
+   │            │ │ │ └─────── @kavo/mikroorm
+   │            │ │ └───────── @kavo/sse
+   │            │ └─────────── @kavo/mcp     ◀─┐
+   │            └───────────── @kavo/graphql ◀─┤
+   └────── the one sanctioned sideways edge ───┘
           (frameworks/* → protocols/*, ADR-0016; never the reverse)
 ```
 
@@ -57,6 +58,7 @@ Eight published packages in a hub-and-spoke topology (`pnpm-workspace.yaml`, whi
 - **`@kavo/prisma`** (`packages/orms/prisma`) — the same seams over a Prisma Client delegate, fed from Prisma's DMMF. Needs caller-declared marker classes as entity identities (ADR-0017). `@prisma/client` is a peer dependency.
 - **`@kavo/mongoose`** (`packages/orms/mongoose`) — the same seams over a Mongoose model, fed from `schema.paths`. A Mongoose model _is_ the entity identity, so nothing is declared twice, and `ObjectId` converts to a hex string at the adapter boundary (ADR-0018). `mongoose` is a peer dependency.
 - **`@kavo/mikroorm`** (`packages/orms/mikroorm`) — the same seams over a MikroORM `EntityManager`, fed from MikroORM's `MetadataStorage`. A decorated entity class _is_ the identity, as with TypeORM, so it needs no marker classes; the query surface is declarative like Prisma's, so the filter translator nests relation paths rather than building joins. Every operation forks its own `EntityManager`, and soft delete must name its column explicitly (MikroORM declares none). `@mikro-orm/core` is a peer dependency.
+- **`@kavo/sse`** (`packages/realtime/sse`) — the first `RealtimeTransport` implementation (ADR-0023, issue #155): plain HTTP `text/event-stream`, no peer dependency at all. A sibling of `packages/orms/*` — an interchangeable implementation of one seam, not a `protocols/*` API surface — so it gets no ADR-0016 exception; `@kavo/nest` may only reach it through a lazy `import()`.
 - **`@kavo/nest`** (`packages/frameworks/nest`) — the `@Kavo` decorator and NestJS route generation.
 - **`@kavo/graphql`** (`packages/protocols/graphql`) — host-framework-agnostic GraphQL schema binding: builds a schema over a `createCrud` service, delegating every resolver to the same engine REST uses. Depends only on `@kavo/core` and the `graphql` peer, never on `@kavo/nest` — the `frameworks/* → protocols/*` edge is one-directional (ADR-0016). `@kavo/nest` is the side that imports it, to provide `BaseKavoGraphQLController`; it does so through a lazy `import("@kavo/graphql")` so the peer stays genuinely optional.
 - **`@kavo/mcp`** (`packages/protocols/mcp`) — host-framework-agnostic MCP binding: exposes a `createCrud` service's standard operations as MCP tools, every tool handler a direct call into the same engine REST uses. Same `protocols/*` constraint as `@kavo/graphql` — `@kavo/core` plus the `@modelcontextprotocol/sdk` peer, which it consumes for **types only**, never at runtime. That is why `@kavo/nest` imports it directly rather than lazily, to provide `BaseKavoMcpController`; the one place `@kavo/nest` actually runs the SDK is its zero-config default MCP controller, which lazy-loads it (`load-mcp-sdk.ts`).
