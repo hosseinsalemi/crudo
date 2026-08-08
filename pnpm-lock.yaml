@@ -353,6 +353,12 @@ importers:
         specifier: ^1.0.0
         version: 1.30.0(zod@4.4.3)
 
+  packages/realtime/sse:
+    dependencies:
+      '@kavo/core':
+        specifier: workspace:^
+        version: link:../../core
+
 packages:
 
   '@algolia/abtesting@1.22.0':

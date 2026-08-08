@@ -9,10 +9,17 @@
  *      │                ├── @kavo/prisma
  *      │                ├── @kavo/mongoose
  *      │                ├── @kavo/mikroorm
+ *      │                ├── @kavo/sse
  *      │                ├── @kavo/graphql ◀─┐
  *      │                └── @kavo/mcp     ◀─┤
  *      └── the one sanctioned sideways edge ┘
  *          (frameworks/* → protocols/*, ADR-0016; never the reverse)
+ *
+ * `@kavo/sse` (`packages/realtime/sse`) is a sibling of the ORM adapters,
+ * not a `protocols/*` binding — it implements one seam (`RealtimeTransport`)
+ * the same way an ORM adapter implements `RepositoryAdapter`, so it gets no
+ * ADR-0016 exception and @kavo/nest may only reach it through a lazy
+ * `import()`, never a static edge (issue #155).
  *
  * `@kavo/core` imports nothing. Every other package imports the `@kavo/core`
  * barrel and its own peer dependency, and nothing else from the workspace —
@@ -69,6 +76,26 @@ module.exports = {
       },
     },
     {
+      name: "realtime-transports-only-import-core",
+      severity: "error",
+      comment:
+        "A realtime transport's `src` may import the `@kavo/core` barrel and " +
+        "its own peer, if any (`@kavo/sse` has none) — nothing else in the " +
+        "workspace, the same rule `orm-adapters-only-import-core` gives an " +
+        "ORM adapter (issue #155: `packages/realtime/*` is a sibling of " +
+        "`packages/orms/*`, an interchangeable implementation of one seam, " +
+        "not a different API surface like `protocols/*`). Not a framework " +
+        "binding, not a protocol binding, and not another realtime " +
+        "transport. `$1` is the transport's own directory captured from " +
+        "`from`, so its internal relative imports stay legal while every " +
+        "sibling package is forbidden in both spellings.",
+      from: { path: "^packages/realtime/([^/]+)/src" },
+      to: {
+        path: "^(@kavo/|packages/)",
+        pathNot: "^(@kavo/core$|packages/realtime/$1/)",
+      },
+    },
+    {
       name: "protocol-bindings-only-import-core",
       severity: "error",
       comment:
@@ -121,15 +148,15 @@ module.exports = {
         "above: this one also covers each package's `tests/` and the " +
         "`examples/*` apps, which are the reference apps, so an illegal " +
         "import there teaches one.",
-      from: { path: "^(packages/(orms|frameworks|protocols)|examples)" },
+      from: { path: "^(packages/(orms|realtime|frameworks|protocols)|examples)" },
       to: { path: "^(packages/core/src/.+|@kavo/core/.+)" },
     },
     {
       name: "no-cross-package-deep-imports-adapters",
       severity: "error",
-      comment: "Same rule for adapter/framework/protocol package internals.",
+      comment: "Same rule for adapter/realtime-transport/framework/protocol package internals.",
       from: { path: "^packages/core" },
-      to: { path: "^packages/(orms|frameworks|protocols)/[^/]+/src/.+" },
+      to: { path: "^packages/(orms|realtime|frameworks|protocols)/[^/]+/src/.+" },
     },
     {
       name: "no-deep-imports-through-a-barrel",
@@ -151,10 +178,10 @@ module.exports = {
         "`packages/**/src`-scoped and never look at `examples/`. `$1` is the " +
         "importing package root, so same-package relative imports stay legal.",
       from: {
-        path: "^(packages/(?:core|orms/[^/]+|frameworks/[^/]+|protocols/[^/]+)|examples/[^/]+)/",
+        path: "^(packages/(?:core|orms/[^/]+|realtime/[^/]+|frameworks/[^/]+|protocols/[^/]+)|examples/[^/]+)/",
       },
       to: {
-        path: "^(@kavo/[^/]+/.+|packages/(?:core|orms/[^/]+|frameworks/[^/]+|protocols/[^/]+)/src/.+)",
+        path: "^(@kavo/[^/]+/.+|packages/(?:core|orms/[^/]+|realtime/[^/]+|frameworks/[^/]+|protocols/[^/]+)/src/.+)",
         pathNot: "^$1/",
       },
     },
@@ -162,11 +189,12 @@ module.exports = {
       name: "only-framework-bindings-import-a-host-framework",
       severity: "error",
       comment:
-        "An ORM adapter and a protocol binding are both leaves that adapt " +
-        "exactly one external technology, and a host framework is never it. " +
-        "ADR-0002 puts it as 'an adapter must be usable from any future " +
-        "framework binding'; doc 16 says @kavo/mcp 'has no idea Nest, " +
-        "Express, or any other host exists'. The rules above cannot say this " +
+        "An ORM adapter, a realtime transport, and a protocol binding are " +
+        "all leaves that adapt exactly one external technology, and a host " +
+        "framework is never it. ADR-0002 puts it as 'an adapter must be " +
+        "usable from any future framework binding'; doc 16 says @kavo/mcp " +
+        "'has no idea Nest, Express, or any other host exists' — the same " +
+        "is true of @kavo/sse (issue #155). The rules above cannot say this " +
         "— they gate on `to.path: ^(@kavo/|packages/)`, so a bare " +
         "`@nestjs/common` is outside what they look at, and a hard import of " +
         "it would break every consumer wiring the package into a non-Nest " +
@@ -180,7 +208,7 @@ module.exports = {
         "index.js`. Anchoring on `^` alone matches only the undeclared case, " +
         "which `tsc -b` already rejects as TS2307, so the rule would fire " +
         "exclusively where it is redundant and never where it is needed.",
-      from: { path: "^packages/(orms|protocols)/[^/]+/src" },
+      from: { path: "^packages/(orms|realtime|protocols)/[^/]+/src" },
       to: { path: "(^|/)@nestjs/" },
     },
     {
@@ -196,10 +224,10 @@ module.exports = {
         "back-reference is the package root captured from `from`, so " +
         "same-package imports stay legal.",
       from: {
-        path: "^(packages/core|packages/orms/[^/]+|packages/frameworks/[^/]+|packages/protocols/[^/]+|examples/[^/]+)/tests/",
+        path: "^(packages/core|packages/orms/[^/]+|packages/realtime/[^/]+|packages/frameworks/[^/]+|packages/protocols/[^/]+|examples/[^/]+)/tests/",
       },
       to: {
-        path: "^(packages/core|packages/orms/[^/]+|packages/frameworks/[^/]+|packages/protocols/[^/]+|examples/[^/]+)/(src|tests)/",
+        path: "^(packages/core|packages/orms/[^/]+|packages/realtime/[^/]+|packages/frameworks/[^/]+|packages/protocols/[^/]+|examples/[^/]+)/(src|tests)/",
         pathNot: "^$1/",
       },
     },
@@ -208,15 +236,16 @@ module.exports = {
       severity: "error",
       comment:
         "Core's tests are held to core's own ignorance: the engine must be " +
-        "testable with an in-memory fake and no ORM or framework anywhere " +
-        "(ADR-0005, ADR-0001). `core-imports-nothing` is scoped to `src` so " +
-        "core's tests may use the barrel and vitest; this keeps the part that " +
-        "still matters — no adapter, no framework — enforced for them too. " +
-        "Spelled as `not @kavo/core` rather than as a package list, so a new " +
-        "adapter or protocol package is covered the day it is created.",
+        "testable with an in-memory fake and no ORM, transport, or framework " +
+        "anywhere (ADR-0005, ADR-0001). `core-imports-nothing` is scoped to " +
+        "`src` so core's tests may use the barrel and vitest; this keeps the " +
+        "part that still matters — no adapter, no transport, no framework — " +
+        "enforced for them too. Spelled as `not @kavo/core` rather than as a " +
+        "package list, so a new adapter, realtime transport, or protocol " +
+        "package is covered the day it is created.",
       from: { path: "^packages/core/tests" },
       to: {
-        path: "^(@kavo/|packages/(orms|frameworks|protocols))",
+        path: "^(@kavo/|packages/(orms|realtime|frameworks|protocols))",
         pathNot: "^@kavo/core$",
       },
     },

@@ -1,6 +1,7 @@
 packages:
   - packages/core
   - packages/orms/*
+  - packages/realtime/*
   - packages/frameworks/*
   - packages/protocols/*
   - examples/*
