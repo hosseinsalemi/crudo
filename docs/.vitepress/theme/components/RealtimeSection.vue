@@ -11,10 +11,12 @@
     </div>
   </div>
 
-  <div class="realtime-usecases">
-    <div v-for="useCase in useCases" :key="useCase.title" class="realtime-usecase">
-      <span class="realtime-usecase-title">{{ useCase.title }}</span>
-      <span class="realtime-usecase-desc">{{ useCase.desc }}</span>
+  <div class="realtime-categories">
+    <div v-for="category in categories" :key="category.title" class="realtime-category">
+      <span class="realtime-category-title">{{ category.title }}</span>
+      <div class="realtime-features">
+        <span v-for="feature in category.features" :key="feature" class="realtime-feature">{{ feature }}</span>
+      </div>
     </div>
   </div>
 </template>
@@ -27,22 +29,22 @@ const transports = [
   { name: "Kafka", shipped: false },
 ];
 
-const useCases = [
+const categories = [
   {
     title: "Client-facing UI",
-    desc: "Live dashboards, badge counts, presence, scoped inventory views, job progress — pushed straight to the browser or mobile client.",
+    features: ["Live dashboards", "Badge counts", "Presence", "Scoped inventory views", "Job progress"],
   },
   {
     title: "Service-to-service",
-    desc: "Cache invalidation, search index sync, audit trails, analytics pipelines — fanned out to other backends over a broker.",
+    features: ["Cache invalidation", "Search index sync", "Audit trails", "Analytics pipelines"],
   },
   {
     title: "External-facing",
-    desc: "Partner webhooks and mobile push, scoped and authorized per recipient rather than held open as a connection.",
+    features: ["Partner webhooks", "Mobile push"],
   },
   {
     title: "Bridging",
-    desc: "Ingest on one transport, fan out on another — IoT telemetry over a broker, live on an ops dashboard over WebSocket.",
+    features: ["IoT telemetry → ops dashboard"],
   },
 ];
 </script>
@@ -88,42 +90,57 @@ const useCases = [
   color: var(--vp-c-brand-1);
 }
 
-.realtime-usecases {
+.realtime-categories {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
+  gap: 16px;
   max-width: 1040px;
   margin: 32px auto 0;
   text-align: left;
 }
 
 @media (max-width: 900px) {
-  .realtime-usecases {
+  .realtime-categories {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
 @media (max-width: 480px) {
-  .realtime-usecases {
+  .realtime-categories {
     grid-template-columns: 1fr;
   }
 }
 
-.realtime-usecase {
+.realtime-category {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  background: var(--vp-c-bg-soft);
 }
 
-.realtime-usecase-title {
-  font-size: 14.5px;
+.realtime-category-title {
+  font-size: 13px;
   font-weight: 600;
+  letter-spacing: 0.01em;
   color: var(--vp-c-text-1);
 }
 
-.realtime-usecase-desc {
-  font-size: 12.5px;
-  line-height: 1.55;
+.realtime-features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.realtime-feature {
+  padding: 4px 9px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 999px;
+  background: var(--vp-c-bg);
+  font-size: 11.5px;
+  line-height: 1.4;
   color: var(--vp-c-text-2);
 }
 </style>
