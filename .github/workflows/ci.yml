@@ -98,6 +98,11 @@ jobs:
   bun-compat:
     name: test (bun)
     runs-on: ubuntu-latest
+    # The job's own rationale above is a documented hang failure mode
+    # (mongodb-memory-server contention under nesting). A bound turns any
+    # recurrence into a fast red instead of sitting on a runner for GitHub's
+    # 6-hour default, the same reasoning `docs` uses below.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
@@ -119,9 +124,12 @@ jobs:
       # No `build` step, same as `test`: vitest aliases every `@kavo/*`
       # specifier straight to package `src/`, so the suite never reads
       # `dist/`. `generate` is still required for the same reason it is in
-      # `test` — the Prisma client and the SQLite fixture schema.
+      # `test` — the Prisma client and the SQLite fixture schema. Runs
+      # `pnpm run test:bun` (not a bare `bun run vitest run` here) so
+      # `tests/ci-workflow.spec.ts` can see the invocation the same way it
+      # sees every other job's `pnpm run <script>` step.
       - name: Test under Bun
-        run: pnpm run generate && bun run vitest run
+        run: pnpm run generate && pnpm run test:bun
 
   # Deliberately its own job rather than a step in `pnpm check`. It re-runs
   # the whole suite under v8 instrumentation, so folding it into the gate

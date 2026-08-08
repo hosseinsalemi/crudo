@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,11 +15,14 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
  *
  * This builds `@kavo/core` for real (`tsc -b`, the same command its own
  * `package.json` build script runs) and then has the actual Bun binary
- * `import` the resulting `dist/index.js` — the same artifact `bun add
- * @kavo/core` would resolve to via its `exports` map — and checks that a
- * representative export survives the round trip. Both cases skip outright
- * when Bun isn't on PATH, so this never turns into a red gate on a machine
- * that simply lacks the binary.
+ * `import { createKavo } from "@kavo/core"` — the bare specifier, resolved
+ * through a scratch `node_modules/@kavo/core` symlink to the package root, so
+ * Bun's resolver genuinely walks `package.json`'s `exports` map the way `bun
+ * add @kavo/core` would, rather than reading `dist/index.js` off an absolute
+ * path (which would silently pass even if `exports` pointed nowhere) — and
+ * checks that a representative export survives the round trip. Both cases
+ * skip outright when Bun isn't on PATH, so this never turns into a red gate
+ * on a machine that simply lacks the binary.
  *
  * This file deliberately does NOT also spawn the whole workspace suite under
  * Bun — that runs as its own top-level step in the `bun-compat` CI job
@@ -35,7 +38,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
  */
 
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
-const CORE_DIST_INDEX = resolve(REPO_ROOT, "packages/core/dist/index.js");
+const CORE_PACKAGE_DIR = resolve(REPO_ROOT, "packages/core");
 
 const bunAvailable = spawnSync("bun", ["--version"], { stdio: "ignore" }).status === 0;
 
@@ -43,7 +46,7 @@ describe.skipIf(!bunAvailable)("Bun compatibility", () => {
   let scratchDir: string;
 
   beforeAll(() => {
-    const build = spawnSync("npx", ["tsc", "-b", "packages/core"], {
+    const build = spawnSync("pnpm", ["exec", "tsc", "-b", "packages/core"], {
       cwd: REPO_ROOT,
       encoding: "utf8",
     });
@@ -52,18 +55,26 @@ describe.skipIf(!bunAvailable)("Bun compatibility", () => {
     }
 
     scratchDir = mkdtempSync(join(tmpdir(), "kavo-bun-compat-"));
+
+    // A real `node_modules/@kavo/core` symlink, so importing the bare
+    // specifier below actually walks package.json's `exports` map through
+    // Bun's own resolver, instead of reading dist/index.js off a path that
+    // bypasses `exports` entirely.
+    const scopeDir = join(scratchDir, "node_modules", "@kavo");
+    mkdirSync(scopeDir, { recursive: true });
+    symlinkSync(CORE_PACKAGE_DIR, join(scopeDir, "core"), "dir");
   });
 
   afterAll(() => {
     rmSync(scratchDir, { recursive: true, force: true });
   });
 
-  it("lets the Bun runtime import the built @kavo/core barrel", () => {
+  it("lets the Bun runtime resolve @kavo/core through its exports map and import the built barrel", () => {
     const probeScript = resolve(scratchDir, "probe.mjs");
     writeFileSync(
       probeScript,
       `
-      import { createKavo } from ${JSON.stringify(CORE_DIST_INDEX)};
+      import { createKavo } from "@kavo/core";
       if (typeof createKavo !== "function") {
         throw new Error("createKavo did not survive the Bun import as a function");
       }

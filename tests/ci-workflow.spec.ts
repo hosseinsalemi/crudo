@@ -148,6 +148,45 @@ describe("the coverage job", () => {
   });
 });
 
+/**
+ * Same exemption, same reasoning, as the coverage job above: `bun-compat`
+ * re-runs the whole suite with Bun as the runtime instead of Node, so it
+ * sits outside `pnpm check` and outside the two build/test assertions. Its
+ * step deliberately calls `pnpm run test:bun` rather than a bare `bun run
+ * vitest run`, so that if root `scripts.test` ever changes, this job's own
+ * `pnpm run <script>` invocation is visible to `jobSteps()` the same way
+ * every other job's is — a bare shell command here would be invisible to
+ * that extraction and could drift from what `test` actually runs without
+ * anything going red.
+ */
+describe("the bun-compat job", () => {
+  const bunCompat = jobSteps("bun-compat");
+
+  it("runs `pnpm run test:bun`", () => {
+    expect(bunCompat).toContain("test:bun");
+  });
+
+  it("generates the Prisma client first, like the test job", () => {
+    expect(bunCompat).toContain("generate");
+  });
+
+  it("stays out of `pnpm check`, so the local gate is not doubled", () => {
+    expect(gateSteps()).not.toContain("test:bun");
+  });
+
+  it("is backed by a real script that actually runs vitest under Bun", () => {
+    const script = manifest.scripts?.["test:bun"] ?? "";
+    expect(script).toContain("bun run");
+    expect(script).toContain("vitest run");
+  });
+
+  it("sets up the Bun toolchain before running it", () => {
+    const body = new RegExp(`\\n  bun-compat:\\n([\\s\\S]*?)(?=\\n  \\w[\\w-]*:\\n|$)`).exec(workflow)?.[1];
+    expect(body, "ci.yml declares a `bun-compat` job").toBeDefined();
+    expect(body).toContain("setup-bun");
+  });
+});
+
 describe("the README status badges point at real check runs", () => {
   it("filters on a check-run name ci.yml actually produces", () => {
     const badged = badgedCheckRunNames();
